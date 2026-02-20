@@ -8,8 +8,8 @@ A modular, self-hosted Life OS. Track your workouts, recipes, habits, and more �
 | ------ | ----------- |
 | **Culinara** | Recipe management, cook mode, trial logging, shopping list |
 | **Jym** | Gym tracking — splits, sessions, sets, PRs, body weight |
-| **Chronos** | Reminders and recurring tasks (in progress) |
-| **Echo** | Journaling and reflections (planned) |
+| **Echo** | Reminders and recurring tasks (in progress) |
+| **Planner** | Journaling and reflections (planned) |
 
 ## Stack
 
@@ -25,7 +25,7 @@ A modular, self-hosted Life OS. Track your workouts, recipes, habits, and more �
 ## Repos
 
 ```text
-Fejiro-App/
+Jiro-App/
 ├── jiro-api/   # Go REST API
 └── jiro-ui/    # Angular frontend
 ```

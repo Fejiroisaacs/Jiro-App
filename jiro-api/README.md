@@ -54,7 +54,7 @@ go run ./cmd/server/main.go
 On Windows (PowerShell):
 
 ```powershell
-powershell.exe -Command "Set-Location 'C:\Users\fejir\OneDrive\Documents\Project\Fejiro-App\jiro-api'; & 'C:\Program Files\Go\bin\go.exe' run ./cmd/server/main.go"
+powershell.exe -Command "Set-Location 'C:\Users\fejir\OneDrive\Documents\Project\Jiro-App\jiro-api'; & 'C:\Program Files\Go\bin\go.exe' run ./cmd/server/main.go"
 ```
 
 ### Run database migrations
