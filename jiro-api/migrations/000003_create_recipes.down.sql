@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS recipe_trials;
+DROP TABLE IF EXISTS recipes;

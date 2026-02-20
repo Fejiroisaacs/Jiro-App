@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS session_sets;
+DROP TABLE IF EXISTS sessions;

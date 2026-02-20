@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS splits;
+DROP TABLE IF EXISTS exercises;

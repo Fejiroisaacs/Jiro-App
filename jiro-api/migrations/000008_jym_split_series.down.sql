@@ -1,0 +1,2 @@
+ALTER TABLE sessions DROP COLUMN IF EXISTS series_id;
+DROP TABLE IF EXISTS split_series;
