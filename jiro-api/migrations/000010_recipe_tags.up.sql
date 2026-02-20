@@ -1,0 +1,1 @@
+ALTER TABLE recipes ADD COLUMN tags TEXT[] NOT NULL DEFAULT '{}';
