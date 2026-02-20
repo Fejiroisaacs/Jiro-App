@@ -1,0 +1,62 @@
+Project Structure
+
+jiro-api/
+├── cmd/server/main.go              # Entry point
+├── internal/
+│   ├── config/config.go            # Env var loading
+│   ├── database/postgres.go        # pgxpool connection + health check
+│   ├── middleware/
+│   │   ├── auth.go                 # JWT Bearer validation
+│   │   ├── cors.go                 # Origin allowlist CORS
+│   │   └── ratelimit.go            # Token bucket rate limiter
+│   ├── models/user.go              # User, RefreshToken, request/response types
+│   ├── handlers/
+│   │   ├── auth.go                 # Register, Login, Refresh, Logout
+│   │   ├── user.go                 # GET/PATCH /user/me
+│   │   └── health.go              # Health check
+│   ├── services/
+│   │   ├── auth.go                 # Argon2id hashing, JWT, refresh token CRUD
+│   │   └── user.go                 # User CRUD, settings merge
+│   └── router/router.go            # Gin route wiring
+├── migrations/
+│   ├── 000001_create_users.up.sql
+│   ├── 000001_create_users.down.sql
+│   ├── 000002_create_refresh_tokens.up.sql
+│   └── 000002_create_refresh_tokens.down.sql
+├── Dockerfile                       # Multi-stage build
+├── .env.example                     # Documented env vars
+├── .gitignore
+├── go.mod / go.sum
+
+jiro-ui/
+├── src/
+│   ├── index.html
+│   ├── styles.scss                  # "Earth & Clay" design system (CSS variables)
+│   ├── app/
+│   │   ├── app.ts                   # Root component (router-outlet only)
+│   │   ├── app.config.ts            # Providers (router, httpClient, interceptors)
+│   │   ├── app.routes.ts            # Lazy-loaded routes with guards
+│   │   ├── core/
+│   │   │   ├── services/
+│   │   │   │   └── auth.service.ts  # Auth state (signals), API calls, token management
+│   │   │   ├── guards/
+│   │   │   │   └── auth.guard.ts    # authGuard + guestGuard
+│   │   │   └── interceptors/
+│   │   │       └── auth.interceptor.ts  # JWT injection + 401 refresh retry
+│   │   ├── shared/components/
+│   │   │   ├── jiro-card/          # Card with shadow + hover
+│   │   │   ├── jiro-button/        # Primary, Secondary, Danger variants
+│   │   │   └── jiro-input/         # Label, validation, ControlValueAccessor
+│   │   ├── layouts/
+│   │   │   └── main-layout/         # Sidebar + Topbar + router-outlet
+│   │   └── features/
+│   │       ├── auth/
+│   │       │   ├── login.ts
+│   │       │   └── register.ts
+│   │       ├── dashboard/
+│   │       │   └── dashboard.ts     # Module cards (Echo, Culinara, Jym)
+│   │       └── settings/
+│   │           └── settings.ts      # Theme, weight unit, timezone
+├── angular.json
+├── package.json
+└── tsconfig.json

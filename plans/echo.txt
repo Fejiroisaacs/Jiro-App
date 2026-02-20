@@ -1,0 +1,147 @@
+Goal: A high-reliability notification engine that supports complex recurring schedules.
+
+Requirements
+    Core Function: A notification system where the user inputs reminder details.
+
+    Delivery Channels: Must support three distinct channels:
+
+        Email (SMTP/SendGrid)
+
+        Text Message (SMS via Twilio)
+
+        App Notification (Web Push via VAPID)
+
+    Interface: The UI should function "sort of like a calendar," implying a date-based view of upcoming alerts.
+
+    Snooze: Users can snooze reminders for a configurable duration. Snoozed reminders re-fire after the snooze window.
+
+    Quiet Hours: Non-urgent reminders deferred during configured quiet window. HIGH priority bypasses quiet hours.
+
+    Retry Logic: Failed deliveries retry up to 3 times with exponential backoff.
+
+    Multi-tenancy: All reminders scoped by user_id.
+
+A. Database Schema
+    reminders:
+
+        id (UUID, PK)
+
+        user_id (FK -> users.id, NOT NULL)
+
+        title (VARCHAR, NOT NULL)
+
+        description (TEXT)
+
+        due_at (TIMESTAMPTZ, NOT NULL)
+
+        recurrence_rule (VARCHAR) - RFC 5545 RRULE string (e.g., "FREQ=WEEKLY;BYDAY=MO,WE,FR"). NULL for one-time reminders.
+
+        timezone (VARCHAR, NOT NULL) - IANA timezone from user profile (e.g., "America/New_York").
+
+        status (VARCHAR) - PENDING, SENT, SNOOZED, PAUSED.
+
+        snoozed_until (TIMESTAMPTZ) - NULL unless status is SNOOZED. Scheduler re-fires when NOW() >= snoozed_until.
+
+        channels (JSONB, NOT NULL) - ["email", "push", "sms"].
+
+        priority (VARCHAR) - LOW, NORMAL, HIGH. HIGH bypasses quiet hours.
+
+        created_at (TIMESTAMPTZ, DEFAULT NOW())
+
+        updated_at (TIMESTAMPTZ, DEFAULT NOW())
+
+    notification_logs:
+
+        id (UUID, PK)
+
+        reminder_id (FK -> reminders.id, ON DELETE CASCADE)
+
+        channel (VARCHAR) - "email", "push", "sms".
+
+        sent_at (TIMESTAMPTZ, DEFAULT NOW())
+
+        status (VARCHAR) - SENT, FAILED, RETRYING.
+
+        retry_count (INT, DEFAULT 0, max 3)
+
+        error_message (TEXT) - NULL on success.
+
+    Indexes:
+
+        idx_reminders_due ON reminders(due_at) WHERE status = 'PENDING'
+
+        idx_reminders_snoozed ON reminders(snoozed_until) WHERE status = 'SNOOZED'
+
+        idx_reminders_user ON reminders(user_id)
+
+B. Backend Logic (Go / Gin — The Scheduler)
+    All routes under /api/v1/echo/.
+
+    Tick Endpoint: POST /api/v1/echo/tick
+
+        Triggered by GCP Cloud Scheduler every minute.
+
+        SECURED: Authenticated via GCP service account OIDC token. Middleware validates token email claim. Non-matching requests get 403.
+
+    Tick Logic:
+
+        1. Select reminders WHERE (status = 'PENDING' AND due_at <= NOW()) OR (status = 'SNOOZED' AND snoozed_until <= NOW()).
+
+        2. For each reminder:
+
+            a. Check quiet hours: If current time is within user's quiet window AND priority != 'HIGH', skip (will retry next tick).
+
+            b. For each channel in reminder.channels:
+
+                - Send Email (SMTP/SendGrid).
+
+                - Send SMS (Twilio API).
+
+                - Send Push (Web Push VAPID).
+
+            c. On success: Insert notification_log with status = 'SENT'.
+
+            d. On failure: Insert notification_log with status = 'RETRYING', increment retry_count. If retry_count >= 3, set status = 'FAILED'.
+
+        3. If recurrence_rule is not NULL:
+
+            - Calculate next occurrence using rrule-go library with user's timezone.
+
+            - Update due_at to next occurrence, reset status to 'PENDING'.
+
+        4. If one-time (recurrence_rule IS NULL):
+
+            - Set status to 'SENT'.
+
+    Snooze Endpoint: POST /api/v1/echo/reminders/:id/snooze
+
+        Body: { "duration_minutes": 30 }
+
+        Sets status = 'SNOOZED', snoozed_until = NOW() + duration.
+
+    Recurrence Standard: RFC 5545 RRULE (NOT cron).
+
+        Supports "Every 2nd Tuesday", "Last Friday of month", "Every weekday", etc.
+
+        Go library: teambition/rrule-go.
+
+C. UI Components
+    Calendar View: FullCalendar.js integration showing dots for upcoming reminders.
+
+    Wizard Modal:
+
+        Step 1: "What is it?" (Title/Description).
+
+        Step 2: "When?" (Recurrence picker: One-time, Daily, Weekly, Monthly, Custom RRULE builder).
+
+        Step 3: "How?" (Toggle switches for Email/SMS/Push, Priority selector).
+
+    Dashboard (The "Inbox"):
+
+        Critical/Overdue section (top priority).
+
+        Today's Timeline.
+
+        Upcoming (next 7 days).
+
+    Snooze Action: Quick-snooze buttons (15min, 30min, 1hr, custom) on each reminder card.

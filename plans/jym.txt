@@ -1,0 +1,96 @@
+Goal: Structured progressive overload tracking. Separation of "Planning" vs. "Doing."
+
+Requirements (Source of Truth)
+    Hierarchy:
+
+        Splits: Users define high-level strategies (e.g., "Bro Split", "Push/Pull/Legs").
+
+        Workouts: Specific days under a split (e.g., "Legs").
+
+        Exercises: A list of movements (e.g., "Squats", "Calves") associated with a workout.
+
+    Exercise Management:
+
+        Users can add/remove exercises from lists.
+
+        Must support adding pictures or videos and notes to specific exercise definitions.
+
+        Media stored in Cloudflare R2 via presigned URLs.
+
+    Tracking & Logging:
+
+        Session Mode: Users can "start a session" based on a selected list of workouts.
+
+        Data Points: Must track weights and reps for each exercise performed.
+
+        Goals: Users must be able to create goals for specific workouts.
+
+    Planning: Users can create "Workout Plans" by selecting a list of workouts they intend to do.
+
+    Multi-tenancy: All tables include user_id. Users can only see their own data.
+
+A. Database Schema (Normalized PostgreSQL — source of truth)
+    Uses the fully normalized schema from GYM-DESIGN-DOC.md (6 tables with proper FKs).
+    NOT the JSONB approach — referential integrity and queryability take priority.
+
+    exercises: id, user_id, name, muscle_group, media_url, notes, created_at, updated_at.
+        UNIQUE(user_id, name)
+
+    splits: id, user_id, name, description, created_at, updated_at.
+
+    routines: id, user_id, split_id (FK), name, day_order, created_at, updated_at.
+
+    routine_items: id, routine_id (FK, CASCADE), exercise_id (FK), target_sets, target_reps, order_index.
+
+    sessions: id, user_id, routine_id (FK, optional for freestyle), started_at, ended_at, notes.
+
+    session_sets: id, session_id (FK, CASCADE), exercise_id (FK), set_number, weight (DECIMAL), reps_performed, rpe (1-10), is_pr.
+
+    Indexes:
+        idx_session_sets_exercise ON session_sets(exercise_id, session_id)
+        idx_sessions_user_date ON sessions(user_id, started_at)
+        idx_sessions_started ON sessions(started_at)
+
+    Weight stored as raw decimal. Unit (lbs/kg) from users.settings, applied at display time.
+
+B. Backend Logic (Go / Gin)
+    All routes under /api/v1/jym/.
+
+    "Start Session" Action:
+
+        Frontend sends routine_id.
+
+        Backend creates a session row.
+
+        Backend queries routine_items for the routine and returns targets in the response so the UI knows what to display.
+
+    "PR Detection":
+
+        On every set save, check: IF new_weight > MAX(previous weight for same exercise by this user) THEN mark is_pr = true and return { is_pr: true }.
+
+    "Estimated 1RM":
+
+        Calculated using Epley formula: weight * (1 + reps / 30).
+
+        Computed on read, not stored.
+
+C. UI Components
+    The Player (Active Session):
+
+        Timer: Floating "00:45" stopwatch.
+
+        Set List: Rows of inputs (weight, reps) that auto-fill with last session's numbers (ghost text) for comparison.
+
+    Exercise Library:
+
+        Searchable list with muscle group filter.
+
+        Clicking an item shows a graph of "Estimated 1 Rep Max" over time.
+
+    Routine Builder:
+
+        Drag-and-drop exercises into buckets ("Day 1", "Day 2").
+
+    Split Overview:
+
+        Card-based view showing each split with its routines and exercise counts.

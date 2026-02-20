@@ -1,0 +1,101 @@
+Goal: A scientific notebook for cooking that tracks iterations and improvements.
+
+Requirements
+    Data Hierarchy:
+
+        Parent (Recipe): Must allow saving ingredients, steps, and a "Target Image" of what the food should look like.
+
+        Child (Trials): Users must be able to add multiple "Trials" under a recipe to track when they cooked it.
+
+    Trial Features:
+
+        Upload images of the specific result ("what I made").
+
+        Add comments/notes about that specific attempt.
+
+        Record structured modifications (JSONB) for semi-automated promotion.
+
+        Ability to delete individual trial records.
+
+    UI/UX Flow:
+
+        List View: Recipes must be filterable and organized.
+
+        Detail View: Clicking a recipe shows the standard ingredients/steps.
+
+        Trial View: Trials should appear as "cards" under the main recipe. Clicking a card opens a "popup modal" with details.
+
+    Optional Data: Nutrition facts are requested but explicitly marked as optional.
+
+    Multi-tenancy: recipes table has user_id. Trials inherit ownership via recipe_id FK.
+
+A. Database Schema
+    recipes (The Standard):
+
+        id (UUID, PK, DEFAULT gen_random_uuid())
+
+        user_id (UUID, FK -> users.id, NOT NULL)
+
+        title (VARCHAR, NOT NULL), description (TEXT)
+
+        target_image_url (VARCHAR - R2 presigned URL)
+
+        base_ingredients (JSONB) - [{"item": "Flour", "qty": "500g"}]
+
+        instructions (TEXT)
+
+        created_at (TIMESTAMPTZ, DEFAULT NOW())
+
+        updated_at (TIMESTAMPTZ, DEFAULT NOW())
+
+    recipe_trials (The History):
+
+        id (UUID, PK, DEFAULT gen_random_uuid())
+
+        recipe_id (UUID, FK -> recipes.id, ON DELETE CASCADE)
+
+        date_cooked (TIMESTAMPTZ, DEFAULT NOW())
+
+        result_image_url (VARCHAR - R2 presigned URL)
+
+        rating (INT, CHECK 1-5)
+
+        notes (TEXT) - "Too salty, cook 5 mins less."
+
+        modifications (JSONB) - [{"item": "Soy Sauce", "change": "Reduced from 2tbsp to 1tbsp"}]
+
+        created_at (TIMESTAMPTZ, DEFAULT NOW())
+
+B. API Endpoints (Go / Gin)
+    All routes under /api/v1/culinara/.
+
+    POST /api/v1/culinara/recipes - Create new standard.
+
+    GET /api/v1/culinara/recipes - List user's recipes (filterable by title search).
+
+    GET /api/v1/culinara/recipes/:id - Get recipe with trial summary.
+
+    PUT /api/v1/culinara/recipes/:id - Update recipe standard.
+
+    DELETE /api/v1/culinara/recipes/:id - Delete recipe and all trials (CASCADE).
+
+    POST /api/v1/culinara/recipes/:id/trials - Log an attempt.
+
+    DELETE /api/v1/culinara/trials/:id - Delete a specific trial.
+
+    POST /api/v1/upload/presign - Returns a temporary R2 URL so the frontend can upload images directly (bypassing the server for speed).
+
+    POST /api/v1/culinara/promote/:trial_id - Takes the modifications from a trial and updates the parent recipe's base_ingredients to match.
+
+C. UI Components
+    Recipe Card: Shows "Target Image" and "Last Rating."
+
+    Detail Split-View:
+
+        Left Pane: The "Official" Recipe (Ingredients checklist).
+
+        Right Pane: Scrollable history of Trials.
+
+    "Log Attempt" Button: Opens a modal to snap a pic, record modifications, and rate the meal.
+
+    Promote Dialog: Confirmation modal showing diff between current standard and trial modifications before applying.

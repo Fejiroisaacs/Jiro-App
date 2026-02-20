@@ -1,0 +1,115 @@
+Goal: Create the container that holds the sub-apps, manages users, and enforces the "Earth & Clay" design system.
+
+Requirements
+    Visual Theme: The UI must adhere to a "nude palette" containing variations of brown, maroon, and green.
+
+    Access Control: The system is primarily personal ("for me") but must support multi-tenancy so other users can log in and use features independently. Every domain table includes user_id for data isolation.
+
+    Navigation Structure:
+
+        Global: Simple navigation bar.
+
+        Home: A dashboard displaying "boxes" (cards) for each sub-app with a description.
+
+        Settings: Global settings page (theme, profile, weight unit preference, timezone).
+
+    Tech Stack:
+
+        Frontend: Angular v17+ with TypeScript.
+
+        Backend: Go 1.22+ (Gin framework).
+
+        Database: PostgreSQL 16+.
+
+        Object Store: Cloudflare R2 (S3-compatible).
+
+        Migrations: golang-migrate (numbered SQL files).
+
+    Constraint: Hosting on GCP free tier (Cloud Run + e2-micro for Postgres). Total cost: $0/month.
+
+A. Database Schema (PostgreSQL)
+    users:
+
+        id (UUID, PK, DEFAULT gen_random_uuid())
+
+        email (VARCHAR, Unique, NOT NULL)
+
+        password_hash (TEXT, Argon2id)
+
+        created_at (TIMESTAMPTZ, DEFAULT NOW())
+
+        updated_at (TIMESTAMPTZ, DEFAULT NOW())
+
+        settings (JSONB - stores theme preference, avatar URL, weight_unit: "lbs"|"kg", timezone: IANA string)
+
+    refresh_tokens:
+
+        id (UUID, PK)
+
+        user_id (UUID, FK -> users.id)
+
+        token_hash (TEXT, NOT NULL) -- SHA-256 hash of the refresh token
+
+        expires_at (TIMESTAMPTZ, NOT NULL)
+
+        created_at (TIMESTAMPTZ, DEFAULT NOW())
+
+B. Core API Endpoints (Go / Gin)
+    All routes prefixed with /api/v1/.
+
+    POST /api/v1/auth/register - Creates user, hashes password with Argon2id.
+
+    POST /api/v1/auth/login - Returns access token (JSON body, 15min TTL) + refresh token (httpOnly secure cookie, 7 day TTL).
+
+    POST /api/v1/auth/refresh - Validates refresh token cookie, rotates both tokens, revokes old refresh token.
+
+    POST /api/v1/auth/logout - Revokes refresh token, clears cookie.
+
+    GET /api/v1/user/me - Validates access token, returns user profile.
+
+    PATCH /api/v1/user/me - Update user settings (theme, avatar, timezone, weight unit).
+
+    GET /api/v1/health - Checks connection to DB, R2, and Python AI service.
+
+    Standard error response: { "error": { "code": "...", "message": "..." } }
+
+    Rate limiting: 10 req/min per IP on auth endpoints, 100 req/min per user on all others.
+
+    CORS: Explicit frontend origin allowlist, no wildcards in production.
+
+C. Frontend Components (Angular)
+    App Shell (app.component):
+
+        Sidebar Navigation (collapsible).
+
+        Top Bar (User avatar, Global Notifications bell).
+
+    Dashboard (home.component):
+
+        Grid of "App Cards" (Echo, Culinara, Jym).
+
+        Recent Activity Feed (fetched from all 3 apps).
+
+    Settings (settings.component):
+
+        Theme picker ("Earth", "Clay", "Sand", "Forest").
+
+        Profile editor (avatar, email).
+
+        Preferences (weight unit toggle, timezone selector).
+
+    Auth pages (login.component, register.component):
+
+        Email/password form.
+
+        Google OAuth button (future).
+
+    Shared Library (libs/ui):
+
+        jiro-card: The standard container with shadow and rounded corners.
+
+        jiro-button: Primary (Maroon), Secondary (Sand), Danger (Burnt Orange).
+
+        jiro-modal: Reusable modal overlay.
+
+        jiro-input: Styled form input with validation states.
