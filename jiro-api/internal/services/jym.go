@@ -1,0 +1,1086 @@
+package services
+
+import (
+	"context"
+	"errors"
+	"math"
+	"strconv"
+	"time"
+
+	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/models"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+var (
+	ErrExerciseNotFound   = errors.New("exercise not found")
+	ErrSplitNotFound      = errors.New("split not found")
+	ErrRoutineNotFound    = errors.New("routine not found")
+	ErrSessionNotFound    = errors.New("session not found")
+	ErrSetNotFound        = errors.New("set not found")
+	ErrBodyWeightNotFound = errors.New("body weight not found")
+	ErrSeriesNotFound     = errors.New("series not found")
+)
+
+type JymService struct {
+	db *pgxpool.Pool
+}
+
+func NewJymService(db *pgxpool.Pool) *JymService {
+	return &JymService{db: db}
+}
+
+func epley1RM(weight float64, reps int) float64 {
+	if reps == 1 {
+		return weight
+	}
+	return math.Round((weight*(1+float64(reps)/30.0))*10) / 10
+}
+
+// ─── Exercises ───────────────────────────────────────────────────────────────
+
+func (s *JymService) CreateExercise(ctx context.Context, userID uuid.UUID, req *models.CreateExerciseRequest) (*models.Exercise, error) {
+	ex := &models.Exercise{}
+	err := s.db.QueryRow(ctx,
+		`INSERT INTO exercises (user_id, name, muscle_group, notes)
+		 VALUES ($1, $2, $3, $4)
+		 RETURNING id, user_id, name, muscle_group, notes, created_at, updated_at`,
+		userID, req.Name, req.MuscleGroup, req.Notes,
+	).Scan(&ex.ID, &ex.UserID, &ex.Name, &ex.MuscleGroup, &ex.Notes, &ex.CreatedAt, &ex.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return ex, nil
+}
+
+func (s *JymService) ListExercises(ctx context.Context, userID uuid.UUID, search, muscleGroup string) ([]models.Exercise, error) {
+	query := `SELECT id, user_id, name, muscle_group, notes, created_at, updated_at
+	          FROM exercises WHERE user_id = $1`
+	args := []interface{}{userID}
+
+	if search != "" {
+		args = append(args, "%"+search+"%")
+		query += ` AND name ILIKE $` + intStr(len(args))
+	}
+	if muscleGroup != "" {
+		args = append(args, muscleGroup)
+		query += ` AND muscle_group = $` + intStr(len(args))
+	}
+	query += ` ORDER BY name ASC`
+
+	rows, err := s.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var exercises []models.Exercise
+	for rows.Next() {
+		var ex models.Exercise
+		if err := rows.Scan(&ex.ID, &ex.UserID, &ex.Name, &ex.MuscleGroup, &ex.Notes, &ex.CreatedAt, &ex.UpdatedAt); err != nil {
+			return nil, err
+		}
+		exercises = append(exercises, ex)
+	}
+	if exercises == nil {
+		exercises = []models.Exercise{}
+	}
+	return exercises, nil
+}
+
+func (s *JymService) GetExerciseWithHistory(ctx context.Context, userID, exerciseID uuid.UUID) (*models.ExerciseWithHistory, error) {
+	ex := &models.ExerciseWithHistory{}
+	err := s.db.QueryRow(ctx,
+		`SELECT id, user_id, name, muscle_group, notes, created_at, updated_at
+		 FROM exercises WHERE id = $1 AND user_id = $2`,
+		exerciseID, userID,
+	).Scan(&ex.ID, &ex.UserID, &ex.Name, &ex.MuscleGroup, &ex.Notes, &ex.CreatedAt, &ex.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrExerciseNotFound
+		}
+		return nil, err
+	}
+
+	// Fetch last 100 sets for this exercise with session_type
+	rows, err := s.db.Query(ctx,
+		`SELECT ss.session_id, s.started_at, ss.weight, ss.reps_performed, ss.is_pr, s.session_type
+		 FROM session_sets ss
+		 JOIN sessions s ON ss.session_id = s.id
+		 WHERE ss.exercise_id = $1 AND s.user_id = $2
+		 ORDER BY s.started_at DESC
+		 LIMIT 100`,
+		exerciseID, userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	ex.History = []models.SetHistory{}
+	var bestWeight float64
+	for rows.Next() {
+		var h models.SetHistory
+		if err := rows.Scan(&h.SessionID, &h.Date, &h.Weight, &h.Reps, &h.IsPR, &h.SessionType); err != nil {
+			return nil, err
+		}
+		h.Est1RM = epley1RM(h.Weight, h.Reps)
+		ex.History = append(ex.History, h)
+		if h.Weight > bestWeight {
+			bestWeight = h.Weight
+		}
+	}
+	ex.BestWeight = bestWeight
+	var maxEst1RM float64
+	for _, h := range ex.History {
+		if h.Est1RM > maxEst1RM {
+			maxEst1RM = h.Est1RM
+		}
+	}
+	ex.Est1RM = maxEst1RM
+	return ex, nil
+}
+
+func (s *JymService) UpdateExercise(ctx context.Context, userID, exerciseID uuid.UUID, req *models.UpdateExerciseRequest) (*models.Exercise, error) {
+	ex := &models.Exercise{}
+	err := s.db.QueryRow(ctx,
+		`UPDATE exercises SET
+		   name         = COALESCE($3, name),
+		   muscle_group = COALESCE($4, muscle_group),
+		   notes        = COALESCE($5, notes),
+		   updated_at   = NOW()
+		 WHERE id = $1 AND user_id = $2
+		 RETURNING id, user_id, name, muscle_group, notes, created_at, updated_at`,
+		exerciseID, userID, req.Name, req.MuscleGroup, req.Notes,
+	).Scan(&ex.ID, &ex.UserID, &ex.Name, &ex.MuscleGroup, &ex.Notes, &ex.CreatedAt, &ex.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrExerciseNotFound
+		}
+		return nil, err
+	}
+	return ex, nil
+}
+
+func (s *JymService) DeleteExercise(ctx context.Context, userID, exerciseID uuid.UUID) error {
+	res, err := s.db.Exec(ctx, `DELETE FROM exercises WHERE id = $1 AND user_id = $2`, exerciseID, userID)
+	if err != nil {
+		return err
+	}
+	if res.RowsAffected() == 0 {
+		return ErrExerciseNotFound
+	}
+	return nil
+}
+
+// ─── Splits ──────────────────────────────────────────────────────────────────
+
+func (s *JymService) CreateSplit(ctx context.Context, userID uuid.UUID, req *models.CreateSplitRequest) (*models.Split, error) {
+	sp := &models.Split{}
+	err := s.db.QueryRow(ctx,
+		`INSERT INTO splits (user_id, name, description)
+		 VALUES ($1, $2, $3)
+		 RETURNING id, user_id, name, description, created_at, updated_at`,
+		userID, req.Name, req.Description,
+	).Scan(&sp.ID, &sp.UserID, &sp.Name, &sp.Description, &sp.CreatedAt, &sp.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return sp, nil
+}
+
+func (s *JymService) ListSplits(ctx context.Context, userID uuid.UUID) ([]models.Split, error) {
+	rows, err := s.db.Query(ctx,
+		`SELECT s.id, s.user_id, s.name, s.description, s.created_at, s.updated_at,
+		        COUNT(r.id) as routine_count
+		 FROM splits s
+		 LEFT JOIN routines r ON r.split_id = s.id
+		 WHERE s.user_id = $1
+		 GROUP BY s.id
+		 ORDER BY s.updated_at DESC`,
+		userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var splits []models.Split
+	for rows.Next() {
+		var sp models.Split
+		if err := rows.Scan(&sp.ID, &sp.UserID, &sp.Name, &sp.Description, &sp.CreatedAt, &sp.UpdatedAt, &sp.RoutineCount); err != nil {
+			return nil, err
+		}
+		splits = append(splits, sp)
+	}
+	if splits == nil {
+		splits = []models.Split{}
+	}
+	return splits, nil
+}
+
+func (s *JymService) GetSplitWithRoutines(ctx context.Context, userID, splitID uuid.UUID) (*models.SplitWithRoutines, error) {
+	sp := &models.SplitWithRoutines{}
+	err := s.db.QueryRow(ctx,
+		`SELECT id, user_id, name, description, created_at, updated_at
+		 FROM splits WHERE id = $1 AND user_id = $2`,
+		splitID, userID,
+	).Scan(&sp.ID, &sp.UserID, &sp.Name, &sp.Description, &sp.CreatedAt, &sp.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSplitNotFound
+		}
+		return nil, err
+	}
+
+	rows, err := s.db.Query(ctx,
+		`SELECT r.id, r.split_id, r.name, r.day_order, r.created_at
+		 FROM routines r WHERE r.split_id = $1 ORDER BY r.day_order ASC`,
+		splitID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	sp.Routines = []models.RoutineWithItems{}
+	for rows.Next() {
+		var rt models.RoutineWithItems
+		if err := rows.Scan(&rt.ID, &rt.SplitID, &rt.Name, &rt.DayOrder, &rt.CreatedAt); err != nil {
+			return nil, err
+		}
+		rt.Items = []models.RoutineItemWithExercise{}
+		sp.Routines = append(sp.Routines, rt)
+	}
+	rows.Close()
+
+	// Fetch all items for all routines in one query
+	if len(sp.Routines) > 0 {
+		itemRows, err := s.db.Query(ctx,
+			`SELECT ri.id, ri.routine_id, ri.exercise_id, ri.target_sets, ri.target_reps, ri.order_index,
+			        e.name, e.muscle_group
+			 FROM routine_items ri
+			 JOIN exercises e ON ri.exercise_id = e.id
+			 WHERE ri.routine_id IN (
+			   SELECT id FROM routines WHERE split_id = $1
+			 )
+			 ORDER BY ri.routine_id, ri.order_index ASC`,
+			splitID,
+		)
+		if err != nil {
+			return nil, err
+		}
+		defer itemRows.Close()
+
+		// Index routines by ID for fast lookup
+		routineIdx := make(map[uuid.UUID]int)
+		for i, rt := range sp.Routines {
+			routineIdx[rt.ID] = i
+		}
+
+		for itemRows.Next() {
+			var item models.RoutineItemWithExercise
+			if err := itemRows.Scan(
+				&item.ID, &item.RoutineID, &item.ExerciseID,
+				&item.TargetSets, &item.TargetReps, &item.OrderIndex,
+				&item.ExerciseName, &item.MuscleGroup,
+			); err != nil {
+				return nil, err
+			}
+			if idx, ok := routineIdx[item.RoutineID]; ok {
+				sp.Routines[idx].Items = append(sp.Routines[idx].Items, item)
+			}
+		}
+	}
+
+	return sp, nil
+}
+
+func (s *JymService) UpdateSplit(ctx context.Context, userID, splitID uuid.UUID, req *models.UpdateSplitRequest) (*models.Split, error) {
+	sp := &models.Split{}
+	err := s.db.QueryRow(ctx,
+		`UPDATE splits SET
+		   name        = COALESCE($3, name),
+		   description = COALESCE($4, description),
+		   updated_at  = NOW()
+		 WHERE id = $1 AND user_id = $2
+		 RETURNING id, user_id, name, description, created_at, updated_at`,
+		splitID, userID, req.Name, req.Description,
+	).Scan(&sp.ID, &sp.UserID, &sp.Name, &sp.Description, &sp.CreatedAt, &sp.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSplitNotFound
+		}
+		return nil, err
+	}
+	return sp, nil
+}
+
+func (s *JymService) DeleteSplit(ctx context.Context, userID, splitID uuid.UUID) error {
+	res, err := s.db.Exec(ctx, `DELETE FROM splits WHERE id = $1 AND user_id = $2`, splitID, userID)
+	if err != nil {
+		return err
+	}
+	if res.RowsAffected() == 0 {
+		return ErrSplitNotFound
+	}
+	return nil
+}
+
+// ─── Routines ─────────────────────────────────────────────────────────────────
+
+func (s *JymService) CreateRoutine(ctx context.Context, userID, splitID uuid.UUID, req *models.CreateRoutineRequest) (*models.Routine, error) {
+	// Verify split ownership
+	var ownerID uuid.UUID
+	if err := s.db.QueryRow(ctx, `SELECT user_id FROM splits WHERE id = $1`, splitID).Scan(&ownerID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSplitNotFound
+		}
+		return nil, err
+	}
+	if ownerID != userID {
+		return nil, ErrNotOwner
+	}
+
+	dayOrder := req.DayOrder
+	if dayOrder == 0 {
+		dayOrder = 1
+	}
+
+	rt := &models.Routine{}
+	err := s.db.QueryRow(ctx,
+		`INSERT INTO routines (split_id, name, day_order)
+		 VALUES ($1, $2, $3)
+		 RETURNING id, split_id, name, day_order, created_at`,
+		splitID, req.Name, dayOrder,
+	).Scan(&rt.ID, &rt.SplitID, &rt.Name, &rt.DayOrder, &rt.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return rt, nil
+}
+
+func (s *JymService) UpdateRoutine(ctx context.Context, userID, routineID uuid.UUID, req *models.UpdateRoutineRequest) (*models.Routine, error) {
+	rt := &models.Routine{}
+	err := s.db.QueryRow(ctx,
+		`UPDATE routines SET
+		   name      = COALESCE($3, name),
+		   day_order = COALESCE($4, day_order)
+		 WHERE id = $1
+		   AND split_id IN (SELECT id FROM splits WHERE user_id = $2)
+		 RETURNING id, split_id, name, day_order, created_at`,
+		routineID, userID, req.Name, req.DayOrder,
+	).Scan(&rt.ID, &rt.SplitID, &rt.Name, &rt.DayOrder, &rt.CreatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrRoutineNotFound
+		}
+		return nil, err
+	}
+	return rt, nil
+}
+
+func (s *JymService) DeleteRoutine(ctx context.Context, userID, routineID uuid.UUID) error {
+	res, err := s.db.Exec(ctx,
+		`DELETE FROM routines WHERE id = $1
+		 AND split_id IN (SELECT id FROM splits WHERE user_id = $2)`,
+		routineID, userID,
+	)
+	if err != nil {
+		return err
+	}
+	if res.RowsAffected() == 0 {
+		return ErrRoutineNotFound
+	}
+	return nil
+}
+
+// ReplaceRoutineItems does a full replace of all items in a routine (for drag-drop saves).
+func (s *JymService) ReplaceRoutineItems(ctx context.Context, userID, routineID uuid.UUID, items []models.ReplaceItemEntry) ([]models.RoutineItemWithExercise, error) {
+	// Verify ownership via split
+	var exists bool
+	err := s.db.QueryRow(ctx,
+		`SELECT EXISTS(
+		   SELECT 1 FROM routines r
+		   JOIN splits s ON r.split_id = s.id
+		   WHERE r.id = $1 AND s.user_id = $2
+		 )`, routineID, userID,
+	).Scan(&exists)
+	if err != nil || !exists {
+		return nil, ErrRoutineNotFound
+	}
+
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err = tx.Exec(ctx, `DELETE FROM routine_items WHERE routine_id = $1`, routineID); err != nil {
+		return nil, err
+	}
+
+	for i, item := range items {
+		sets := item.TargetSets
+		if sets == 0 {
+			sets = 3
+		}
+		reps := item.TargetReps
+		if reps == 0 {
+			reps = 8
+		}
+		if _, err = tx.Exec(ctx,
+			`INSERT INTO routine_items (routine_id, exercise_id, target_sets, target_reps, order_index)
+			 VALUES ($1, $2, $3, $4, $5)`,
+			routineID, item.ExerciseID, sets, reps, i,
+		); err != nil {
+			return nil, err
+		}
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	// Return updated items with exercise names
+	rows, err := s.db.Query(ctx,
+		`SELECT ri.id, ri.routine_id, ri.exercise_id, ri.target_sets, ri.target_reps, ri.order_index,
+		        e.name, e.muscle_group
+		 FROM routine_items ri
+		 JOIN exercises e ON ri.exercise_id = e.id
+		 WHERE ri.routine_id = $1
+		 ORDER BY ri.order_index ASC`,
+		routineID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []models.RoutineItemWithExercise
+	for rows.Next() {
+		var item models.RoutineItemWithExercise
+		if err := rows.Scan(
+			&item.ID, &item.RoutineID, &item.ExerciseID,
+			&item.TargetSets, &item.TargetReps, &item.OrderIndex,
+			&item.ExerciseName, &item.MuscleGroup,
+		); err != nil {
+			return nil, err
+		}
+		result = append(result, item)
+	}
+	if result == nil {
+		result = []models.RoutineItemWithExercise{}
+	}
+	return result, nil
+}
+
+// ─── Sessions ─────────────────────────────────────────────────────────────────
+
+func (s *JymService) StartSession(ctx context.Context, userID uuid.UUID, req *models.CreateSessionRequest) (*models.StartSessionResponse, error) {
+	sess := &models.StartSessionResponse{}
+	err := s.db.QueryRow(ctx,
+		`INSERT INTO sessions (user_id, routine_id, series_id)
+		 VALUES ($1, $2, $3)
+		 RETURNING id, user_id, routine_id, series_id, session_type, started_at, ended_at, notes`,
+		userID, req.RoutineID, req.SeriesID,
+	).Scan(&sess.ID, &sess.UserID, &sess.RoutineID, &sess.SeriesID, &sess.SessionType, &sess.StartedAt, &sess.EndedAt, &sess.Notes)
+	if err != nil {
+		return nil, err
+	}
+
+	sess.Targets = []models.RoutineItemWithExercise{}
+	if req.RoutineID != nil {
+		rows, err := s.db.Query(ctx,
+			`SELECT ri.id, ri.routine_id, ri.exercise_id, ri.target_sets, ri.target_reps, ri.order_index,
+			        e.name, e.muscle_group
+			 FROM routine_items ri
+			 JOIN exercises e ON ri.exercise_id = e.id
+			 WHERE ri.routine_id = $1
+			 ORDER BY ri.order_index ASC`,
+			req.RoutineID,
+		)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var item models.RoutineItemWithExercise
+			if err := rows.Scan(
+				&item.ID, &item.RoutineID, &item.ExerciseID,
+				&item.TargetSets, &item.TargetReps, &item.OrderIndex,
+				&item.ExerciseName, &item.MuscleGroup,
+			); err != nil {
+				return nil, err
+			}
+			sess.Targets = append(sess.Targets, item)
+		}
+	}
+
+	return sess, nil
+}
+
+func (s *JymService) ListSessions(ctx context.Context, userID uuid.UUID) ([]models.SessionSummary, error) {
+	rows, err := s.db.Query(ctx,
+		`SELECT s.id, s.user_id, s.routine_id, s.series_id, s.session_type, s.started_at, s.ended_at, s.notes,
+		        r.name as routine_name,
+		        COUNT(ss.id) as set_count,
+		        COALESCE(SUM(ss.weight * ss.reps_performed), 0) as total_volume,
+		        COALESCE(array_agg(DISTINCT e.muscle_group) FILTER (WHERE e.muscle_group IS NOT NULL), '{}'::text[]) as muscle_groups
+		 FROM sessions s
+		 LEFT JOIN routines r ON s.routine_id = r.id
+		 LEFT JOIN session_sets ss ON ss.session_id = s.id
+		 LEFT JOIN exercises e ON ss.exercise_id = e.id
+		 WHERE s.user_id = $1
+		 GROUP BY s.id, r.name
+		 ORDER BY s.started_at DESC
+		 LIMIT 50`,
+		userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var sessions []models.SessionSummary
+	for rows.Next() {
+		var sess models.SessionSummary
+		if err := rows.Scan(
+			&sess.ID, &sess.UserID, &sess.RoutineID, &sess.SeriesID, &sess.SessionType,
+			&sess.StartedAt, &sess.EndedAt, &sess.Notes,
+			&sess.RoutineName, &sess.SetCount, &sess.TotalVolume, &sess.MuscleGroups,
+		); err != nil {
+			return nil, err
+		}
+		if sess.MuscleGroups == nil {
+			sess.MuscleGroups = []string{}
+		}
+		sessions = append(sessions, sess)
+	}
+	if sessions == nil {
+		sessions = []models.SessionSummary{}
+	}
+	return sessions, nil
+}
+
+func (s *JymService) GetSession(ctx context.Context, userID, sessionID uuid.UUID) (*models.SessionWithSets, error) {
+	sess := &models.SessionWithSets{}
+	err := s.db.QueryRow(ctx,
+		`SELECT s.id, s.user_id, s.routine_id, s.series_id, s.session_type, s.started_at, s.ended_at, s.notes, r.name
+		 FROM sessions s
+		 LEFT JOIN routines r ON s.routine_id = r.id
+		 WHERE s.id = $1 AND s.user_id = $2`,
+		sessionID, userID,
+	).Scan(&sess.ID, &sess.UserID, &sess.RoutineID, &sess.SeriesID, &sess.SessionType, &sess.StartedAt, &sess.EndedAt, &sess.Notes, &sess.RoutineName)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSessionNotFound
+		}
+		return nil, err
+	}
+
+	rows, err := s.db.Query(ctx,
+		`SELECT ss.id, ss.session_id, ss.exercise_id, ss.set_number, ss.weight,
+		        ss.reps_performed, ss.rpe, ss.is_pr, ss.is_warmup, ss.exercise_note, ss.created_at,
+		        e.name, e.muscle_group
+		 FROM session_sets ss
+		 JOIN exercises e ON ss.exercise_id = e.id
+		 WHERE ss.session_id = $1
+		 ORDER BY ss.exercise_id, ss.set_number ASC`,
+		sessionID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	sess.Sets = []models.SessionSetWithExercise{}
+	for rows.Next() {
+		var set models.SessionSetWithExercise
+		if err := rows.Scan(
+			&set.ID, &set.SessionID, &set.ExerciseID, &set.SetNumber, &set.Weight,
+			&set.RepsPerformed, &set.RPE, &set.IsPR, &set.IsWarmup, &set.ExerciseNote, &set.CreatedAt,
+			&set.ExerciseName, &set.MuscleGroup,
+		); err != nil {
+			return nil, err
+		}
+		sess.Sets = append(sess.Sets, set)
+	}
+	return sess, nil
+}
+
+func (s *JymService) UpdateSession(ctx context.Context, userID, sessionID uuid.UUID, req *models.UpdateSessionRequest) (*models.Session, error) {
+	sess := &models.Session{}
+	err := s.db.QueryRow(ctx,
+		`UPDATE sessions SET
+		   ended_at     = COALESCE($3, ended_at),
+		   notes        = COALESCE($4, notes),
+		   session_type = COALESCE($5, session_type)
+		 WHERE id = $1 AND user_id = $2
+		 RETURNING id, user_id, routine_id, series_id, session_type, started_at, ended_at, notes`,
+		sessionID, userID, req.EndedAt, req.Notes, req.SessionType,
+	).Scan(&sess.ID, &sess.UserID, &sess.RoutineID, &sess.SeriesID, &sess.SessionType, &sess.StartedAt, &sess.EndedAt, &sess.Notes)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSessionNotFound
+		}
+		return nil, err
+	}
+	return sess, nil
+}
+
+func (s *JymService) DeleteSession(ctx context.Context, userID, sessionID uuid.UUID) error {
+	res, err := s.db.Exec(ctx, `DELETE FROM sessions WHERE id = $1 AND user_id = $2`, sessionID, userID)
+	if err != nil {
+		return err
+	}
+	if res.RowsAffected() == 0 {
+		return ErrSessionNotFound
+	}
+	return nil
+}
+
+// ─── Sets ─────────────────────────────────────────────────────────────────────
+
+func (s *JymService) LogSet(ctx context.Context, userID, sessionID uuid.UUID, req *models.CreateSetRequest) (*models.SessionSet, error) {
+	// Verify session ownership and get session type
+	var ownerID uuid.UUID
+	var sessionType string
+	if err := s.db.QueryRow(ctx, `SELECT user_id, session_type FROM sessions WHERE id = $1`, sessionID).Scan(&ownerID, &sessionType); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSessionNotFound
+		}
+		return nil, err
+	}
+	if ownerID != userID {
+		return nil, ErrNotOwner
+	}
+
+	isWarmup := req.IsWarmup != nil && *req.IsWarmup
+
+	// PR check: skipped for deload sessions and warmup sets
+	var isPR bool
+	if sessionType != "deload" && !isWarmup {
+		var maxWeight float64
+		s.db.QueryRow(ctx,
+			`SELECT COALESCE(MAX(ss.weight), 0) FROM session_sets ss
+			 JOIN sessions s ON ss.session_id = s.id
+			 WHERE ss.exercise_id = $1 AND s.user_id = $2 AND ss.is_warmup = false`,
+			req.ExerciseID, userID,
+		).Scan(&maxWeight)
+		isPR = req.Weight > maxWeight
+	}
+
+	set := &models.SessionSet{}
+	err := s.db.QueryRow(ctx,
+		`INSERT INTO session_sets (session_id, exercise_id, set_number, weight, reps_performed, rpe, is_pr, is_warmup, exercise_note)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		 RETURNING id, session_id, exercise_id, set_number, weight, reps_performed, rpe, is_pr, is_warmup, exercise_note, created_at`,
+		sessionID, req.ExerciseID, req.SetNumber, req.Weight, req.RepsPerformed, req.RPE, isPR, isWarmup, req.ExerciseNote,
+	).Scan(&set.ID, &set.SessionID, &set.ExerciseID, &set.SetNumber, &set.Weight,
+		&set.RepsPerformed, &set.RPE, &set.IsPR, &set.IsWarmup, &set.ExerciseNote, &set.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return set, nil
+}
+
+func (s *JymService) UpdateSet(ctx context.Context, userID, setID uuid.UUID, req *models.UpdateSetRequest) (*models.SessionSet, error) {
+	set := &models.SessionSet{}
+	err := s.db.QueryRow(ctx,
+		`UPDATE session_sets SET
+		   weight         = COALESCE($3, weight),
+		   reps_performed = COALESCE($4, reps_performed),
+		   rpe            = COALESCE($5, rpe),
+		   is_warmup      = COALESCE($6, is_warmup),
+		   exercise_note  = COALESCE($7, exercise_note)
+		 WHERE id = $1
+		   AND session_id IN (SELECT id FROM sessions WHERE user_id = $2)
+		 RETURNING id, session_id, exercise_id, set_number, weight, reps_performed, rpe, is_pr, is_warmup, exercise_note, created_at`,
+		setID, userID, req.Weight, req.RepsPerformed, req.RPE, req.IsWarmup, req.ExerciseNote,
+	).Scan(&set.ID, &set.SessionID, &set.ExerciseID, &set.SetNumber, &set.Weight,
+		&set.RepsPerformed, &set.RPE, &set.IsPR, &set.IsWarmup, &set.ExerciseNote, &set.CreatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSetNotFound
+		}
+		return nil, err
+	}
+	return set, nil
+}
+
+func (s *JymService) DeleteSet(ctx context.Context, userID, setID uuid.UUID) error {
+	res, err := s.db.Exec(ctx,
+		`DELETE FROM session_sets WHERE id = $1
+		 AND session_id IN (SELECT id FROM sessions WHERE user_id = $2)`,
+		setID, userID,
+	)
+	if err != nil {
+		return err
+	}
+	if res.RowsAffected() == 0 {
+		return ErrSetNotFound
+	}
+	return nil
+}
+
+// GetLastSessionSets returns the last logged sets for each exercise (for ghost text).
+func (s *JymService) GetLastSessionSets(ctx context.Context, userID uuid.UUID, exerciseIDs []uuid.UUID) (map[uuid.UUID][]models.SessionSet, error) {
+	if len(exerciseIDs) == 0 {
+		return map[uuid.UUID][]models.SessionSet{}, nil
+	}
+
+	// Build $2,$3,... placeholders
+	args := []interface{}{userID}
+	placeholders := ""
+	for i, id := range exerciseIDs {
+		args = append(args, id)
+		if i > 0 {
+			placeholders += ","
+		}
+		placeholders += "$" + intStr(i+2)
+	}
+
+	rows, err := s.db.Query(ctx,
+		`SELECT DISTINCT ON (ss.exercise_id) ss.id, ss.session_id, ss.exercise_id,
+		        ss.set_number, ss.weight, ss.reps_performed, ss.rpe, ss.is_pr, ss.is_warmup, ss.exercise_note, ss.created_at
+		 FROM session_sets ss
+		 JOIN sessions s ON ss.session_id = s.id
+		 WHERE s.user_id = $1 AND ss.exercise_id IN (`+placeholders+`)
+		 ORDER BY ss.exercise_id, s.started_at DESC`,
+		args...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[uuid.UUID][]models.SessionSet)
+	for rows.Next() {
+		var set models.SessionSet
+		if err := rows.Scan(&set.ID, &set.SessionID, &set.ExerciseID, &set.SetNumber,
+			&set.Weight, &set.RepsPerformed, &set.RPE, &set.IsPR, &set.IsWarmup, &set.ExerciseNote, &set.CreatedAt); err != nil {
+			return nil, err
+		}
+		result[set.ExerciseID] = append(result[set.ExerciseID], set)
+	}
+	return result, nil
+}
+
+// GetPRs returns the best personal record set (by weight) for each exercise the user has logged.
+func (s *JymService) GetPRs(ctx context.Context, userID uuid.UUID) ([]models.ExercisePR, error) {
+	rows, err := s.db.Query(ctx,
+		`SELECT DISTINCT ON (ss.exercise_id)
+		        e.id, e.name, e.muscle_group,
+		        ss.weight, ss.reps_performed, s.started_at
+		 FROM session_sets ss
+		 JOIN sessions s  ON ss.session_id  = s.id
+		 JOIN exercises e ON ss.exercise_id = e.id
+		 WHERE s.user_id = $1
+		   AND ss.is_pr  = true
+		   AND (s.session_type IS NULL OR s.session_type != 'deload')
+		 ORDER BY ss.exercise_id, ss.weight DESC`,
+		userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	prs := []models.ExercisePR{}
+	for rows.Next() {
+		var pr models.ExercisePR
+		if err := rows.Scan(&pr.ExerciseID, &pr.Name, &pr.MuscleGroup, &pr.Weight, &pr.Reps, &pr.Date); err != nil {
+			return nil, err
+		}
+		pr.Est1RM = epley1RM(pr.Weight, pr.Reps)
+		prs = append(prs, pr)
+	}
+	return prs, nil
+}
+
+// ─── Body Weights ─────────────────────────────────────────────────────────────
+
+func (s *JymService) LogBodyWeight(ctx context.Context, userID uuid.UUID, req *models.LogBodyWeightRequest) (*models.BodyWeight, error) {
+	bw := &models.BodyWeight{}
+	err := s.db.QueryRow(ctx,
+		`INSERT INTO body_weights (user_id, recorded_at, weight_kg)
+		 VALUES ($1, $2::date, $3)
+		 ON CONFLICT (user_id, recorded_at) DO UPDATE SET weight_kg = EXCLUDED.weight_kg
+		 RETURNING id, user_id, recorded_at, weight_kg, created_at`,
+		userID, req.RecordedAt, req.WeightKg,
+	).Scan(&bw.ID, &bw.UserID, &bw.RecordedAt, &bw.WeightKg, &bw.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return bw, nil
+}
+
+func (s *JymService) ListBodyWeights(ctx context.Context, userID uuid.UUID) ([]models.BodyWeight, error) {
+	rows, err := s.db.Query(ctx,
+		`SELECT id, user_id, recorded_at, weight_kg, created_at
+		 FROM body_weights WHERE user_id = $1
+		 ORDER BY recorded_at DESC
+		 LIMIT 365`,
+		userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []models.BodyWeight
+	for rows.Next() {
+		var bw models.BodyWeight
+		if err := rows.Scan(&bw.ID, &bw.UserID, &bw.RecordedAt, &bw.WeightKg, &bw.CreatedAt); err != nil {
+			return nil, err
+		}
+		result = append(result, bw)
+	}
+	if result == nil {
+		result = []models.BodyWeight{}
+	}
+	return result, nil
+}
+
+func (s *JymService) DeleteBodyWeight(ctx context.Context, userID, id uuid.UUID) error {
+	res, err := s.db.Exec(ctx, `DELETE FROM body_weights WHERE id = $1 AND user_id = $2`, id, userID)
+	if err != nil {
+		return err
+	}
+	if res.RowsAffected() == 0 {
+		return ErrBodyWeightNotFound
+	}
+	return nil
+}
+
+// ─── Split Series ─────────────────────────────────────────────────────────────
+
+func (s *JymService) CreateSeries(ctx context.Context, userID uuid.UUID, req *models.CreateSeriesRequest) (*models.SplitSeriesSummary, error) {
+	// Verify split ownership
+	var ownerID uuid.UUID
+	if err := s.db.QueryRow(ctx, `SELECT user_id FROM splits WHERE id = $1`, req.SplitID).Scan(&ownerID); err != nil {
+		return nil, ErrSplitNotFound
+	}
+	if ownerID != userID {
+		return nil, ErrNotOwner
+	}
+
+	sr := &models.SplitSeriesSummary{}
+	err := s.db.QueryRow(ctx,
+		`INSERT INTO split_series (user_id, split_id, name, duration_type, target_weeks, target_sessions)
+		 VALUES ($1, $2, $3, $4, $5, $6)
+		 RETURNING id, user_id, split_id, name, duration_type, target_weeks, target_sessions, started_at, ended_at, created_at`,
+		userID, req.SplitID, req.Name, req.DurationType, req.TargetWeeks, req.TargetSessions,
+	).Scan(&sr.ID, &sr.UserID, &sr.SplitID, &sr.Name, &sr.DurationType,
+		&sr.TargetWeeks, &sr.TargetSessions, &sr.StartedAt, &sr.EndedAt, &sr.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetch split name
+	s.db.QueryRow(ctx, `SELECT name FROM splits WHERE id = $1`, req.SplitID).Scan(&sr.SplitName)
+	return sr, nil
+}
+
+func (s *JymService) ListSeries(ctx context.Context, userID uuid.UUID) ([]models.SplitSeriesSummary, error) {
+	rows, err := s.db.Query(ctx,
+		`SELECT sr.id, sr.user_id, sr.split_id, sr.name, sr.duration_type,
+		        sr.target_weeks, sr.target_sessions, sr.started_at, sr.ended_at, sr.created_at,
+		        sp.name as split_name,
+		        COUNT(sess.id) as session_count
+		 FROM split_series sr
+		 JOIN splits sp ON sr.split_id = sp.id
+		 LEFT JOIN sessions sess ON sess.series_id = sr.id
+		 WHERE sr.user_id = $1
+		 GROUP BY sr.id, sp.name
+		 ORDER BY sr.started_at DESC`,
+		userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []models.SplitSeriesSummary
+	for rows.Next() {
+		var sr models.SplitSeriesSummary
+		if err := rows.Scan(
+			&sr.ID, &sr.UserID, &sr.SplitID, &sr.Name, &sr.DurationType,
+			&sr.TargetWeeks, &sr.TargetSessions, &sr.StartedAt, &sr.EndedAt, &sr.CreatedAt,
+			&sr.SplitName, &sr.SessionCount,
+		); err != nil {
+			return nil, err
+		}
+		result = append(result, sr)
+	}
+	if result == nil {
+		result = []models.SplitSeriesSummary{}
+	}
+	return result, nil
+}
+
+func (s *JymService) GetSeriesDetail(ctx context.Context, userID, seriesID uuid.UUID) (*models.SplitSeriesDetail, error) {
+	detail := &models.SplitSeriesDetail{}
+	err := s.db.QueryRow(ctx,
+		`SELECT sr.id, sr.user_id, sr.split_id, sr.name, sr.duration_type,
+		        sr.target_weeks, sr.target_sessions, sr.started_at, sr.ended_at, sr.created_at,
+		        sp.name,
+		        COUNT(sess.id)
+		 FROM split_series sr
+		 JOIN splits sp ON sr.split_id = sp.id
+		 LEFT JOIN sessions sess ON sess.series_id = sr.id
+		 WHERE sr.id = $1 AND sr.user_id = $2
+		 GROUP BY sr.id, sp.name`,
+		seriesID, userID,
+	).Scan(
+		&detail.ID, &detail.UserID, &detail.SplitID, &detail.Name, &detail.DurationType,
+		&detail.TargetWeeks, &detail.TargetSessions, &detail.StartedAt, &detail.EndedAt, &detail.CreatedAt,
+		&detail.SplitName, &detail.SessionCount,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSeriesNotFound
+		}
+		return nil, err
+	}
+
+	// Session points (for volume chart)
+	sessRows, err := s.db.Query(ctx,
+		`SELECT s.id, s.started_at, s.session_type,
+		        COALESCE(SUM(ss.weight * ss.reps_performed), 0) as total_volume,
+		        COUNT(ss.id) as set_count
+		 FROM sessions s
+		 LEFT JOIN session_sets ss ON ss.session_id = s.id
+		 WHERE s.series_id = $1
+		 GROUP BY s.id
+		 ORDER BY s.started_at ASC`,
+		seriesID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer sessRows.Close()
+
+	detail.Sessions = []models.SeriesSessionPoint{}
+	var sessionIDs []uuid.UUID
+	for sessRows.Next() {
+		var pt models.SeriesSessionPoint
+		if err := sessRows.Scan(&pt.SessionID, &pt.Date, &pt.SessionType, &pt.TotalVolume, &pt.SetCount); err != nil {
+			return nil, err
+		}
+		detail.Sessions = append(detail.Sessions, pt)
+		sessionIDs = append(sessionIDs, pt.SessionID)
+	}
+	sessRows.Close()
+
+	// Build session date lookup
+	sessDateMap := make(map[uuid.UUID]time.Time)
+	for _, sp := range detail.Sessions {
+		sessDateMap[sp.SessionID] = sp.Date
+	}
+
+	// Exercise progressions (best est 1RM per exercise per session)
+	if len(sessionIDs) > 0 {
+		placeholders := ""
+		args := []interface{}{}
+		for i, id := range sessionIDs {
+			args = append(args, id)
+			if i > 0 {
+				placeholders += ","
+			}
+			placeholders += "$" + intStr(i+1)
+		}
+
+		exRows, err := s.db.Query(ctx,
+			`SELECT ss.session_id, ss.exercise_id, e.name, e.muscle_group,
+			        MAX(ss.weight * (1 + ss.reps_performed::float / 30.0)) as best_est_1rm
+			 FROM session_sets ss
+			 JOIN exercises e ON ss.exercise_id = e.id
+			 WHERE ss.session_id IN (`+placeholders+`)
+			 GROUP BY ss.session_id, ss.exercise_id, e.name, e.muscle_group
+			 ORDER BY ss.exercise_id, ss.session_id ASC`,
+			args...,
+		)
+		if err != nil {
+			return nil, err
+		}
+		defer exRows.Close()
+
+		exMap := make(map[uuid.UUID]*models.ExerciseProgression)
+		exOrder := []uuid.UUID{}
+		for exRows.Next() {
+			var sessID, exID uuid.UUID
+			var exName string
+			var mg *string
+			var best1RM float64
+			if err := exRows.Scan(&sessID, &exID, &exName, &mg, &best1RM); err != nil {
+				return nil, err
+			}
+			if _, ok := exMap[exID]; !ok {
+				exMap[exID] = &models.ExerciseProgression{
+					ExerciseID:   exID,
+					ExerciseName: exName,
+					MuscleGroup:  mg,
+					Points:       []models.ProgressionPoint{},
+				}
+				exOrder = append(exOrder, exID)
+			}
+			exMap[exID].Points = append(exMap[exID].Points, models.ProgressionPoint{
+				SessionID:  sessID,
+				Date:       sessDateMap[sessID],
+				BestEst1RM: math.Round(best1RM*10) / 10,
+			})
+		}
+
+		for _, exID := range exOrder {
+			detail.ExerciseProgressions = append(detail.ExerciseProgressions, *exMap[exID])
+		}
+		if detail.ExerciseProgressions == nil {
+			detail.ExerciseProgressions = []models.ExerciseProgression{}
+		}
+	} else {
+		detail.ExerciseProgressions = []models.ExerciseProgression{}
+	}
+
+	return detail, nil
+}
+
+func (s *JymService) UpdateSeries(ctx context.Context, userID, seriesID uuid.UUID, req *models.UpdateSeriesRequest) (*models.SplitSeriesSummary, error) {
+	sr := &models.SplitSeriesSummary{}
+	err := s.db.QueryRow(ctx,
+		`UPDATE split_series SET
+		   name     = COALESCE($3, name),
+		   ended_at = COALESCE($4, ended_at)
+		 WHERE id = $1 AND user_id = $2
+		 RETURNING id, user_id, split_id, name, duration_type, target_weeks, target_sessions, started_at, ended_at, created_at`,
+		seriesID, userID, req.Name, req.EndedAt,
+	).Scan(&sr.ID, &sr.UserID, &sr.SplitID, &sr.Name, &sr.DurationType,
+		&sr.TargetWeeks, &sr.TargetSessions, &sr.StartedAt, &sr.EndedAt, &sr.CreatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSeriesNotFound
+		}
+		return nil, err
+	}
+	s.db.QueryRow(ctx, `SELECT name FROM splits WHERE id = $1`, sr.SplitID).Scan(&sr.SplitName)
+	s.db.QueryRow(ctx, `SELECT COUNT(*) FROM sessions WHERE series_id = $1`, seriesID).Scan(&sr.SessionCount)
+	return sr, nil
+}
+
+func (s *JymService) DeleteSeries(ctx context.Context, userID, seriesID uuid.UUID) error {
+	res, err := s.db.Exec(ctx, `DELETE FROM split_series WHERE id = $1 AND user_id = $2`, seriesID, userID)
+	if err != nil {
+		return err
+	}
+	if res.RowsAffected() == 0 {
+		return ErrSeriesNotFound
+	}
+	return nil
+}
+
+func intStr(n int) string {
+	return strconv.Itoa(n)
+}
