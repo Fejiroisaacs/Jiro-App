@@ -1,15 +1,17 @@
 # Jiro
 
+Just life FeJiro, get it? :)
 A modular, self-hosted Life OS. Track your workouts, recipes, habits, and more — all in one place, on your own infrastructure.
 
 ## Modules
 
-| Module | Description |
-| ------ | ----------- |
-| **Culinara** | Recipe management, cook mode, trial logging, shopping list |
-| **Jym** | Gym tracking — splits, sessions, sets, PRs, body weight |
-| **Echo** | Reminders and recurring tasks (in progress) |
-| **Planner** | Journaling and reflections (planned) |
+| Module | Status | Description |
+| ------ | ------ | ----------- |
+| **Culinara** | Done | Recipe management, cook mode, trial logging, shopping list |
+| **Jym** | Done | Gym tracking — splits, sessions, sets, PRs, body weight |
+| **Echo** | Planned | Reminders and recurring tasks |
+| **Ledger** | Planned | Finance tracking — income, expenses, budgets, net worth |
+| **Planner** | Planned | Journaling and reflections |
 
 ## Stack
 
