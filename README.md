@@ -1,7 +1,6 @@
 # Jiro
 
 Just life FeJiro, get it? :)
-A modular, self-hosted Life OS. Track your workouts, recipes, habits, and more — all in one place, on your own infrastructure.
 
 ## Modules
 
