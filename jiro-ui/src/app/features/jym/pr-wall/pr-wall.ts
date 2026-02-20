@@ -72,7 +72,7 @@ import { SettingsService } from '../../../core/services/settings.service';
             <div *ngFor="let pr of group.prs" class="pr-row"
               (click)="router.navigate(['/jym/exercises', pr.exercise_id])">
               <span class="col-exercise ex-name">
-                <span class="trophy">🏆</span>
+                <img src="/icons/badge-icon.svg" class="trophy" alt="PR" />
                 {{ pr.name }}
               </span>
               <span class="col-lift lift-val">
@@ -169,7 +169,7 @@ import { SettingsService } from '../../../core/services/settings.service';
       color: var(--color-primary); display: flex; align-items: center; gap: var(--space-xs);
     }
 
-    .trophy { font-size: 14px; flex-shrink: 0; }
+    .trophy { width: 22px; height: 22px; flex-shrink: 0; }
 
     .lift-val { font-size: var(--font-size-sm); font-weight: 600; }
 

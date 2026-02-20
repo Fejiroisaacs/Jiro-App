@@ -222,7 +222,7 @@ interface ExerciseBlock {
                   (click)="toggleWarmup(bi, si)">W</button>
 
                 <div class="action-cell">
-                  <span *ngIf="row.saved && row.isPR" class="pr-badge" title="Personal Record">🏆</span>
+                  <img *ngIf="row.saved && row.isPR" src="/icons/badge-icon.svg" class="pr-badge" title="Personal Record" alt="PR" />
                   <button
                     *ngIf="!row.saved"
                     class="log-btn"
@@ -659,7 +659,7 @@ interface ExerciseBlock {
 
     .del-btn:hover { color: var(--color-danger); border-color: var(--color-danger); }
 
-    .pr-badge { font-size: 18px; }
+    .pr-badge { width: 28px; height: 28px; display: block; }
 
     .spinner-sm {
       width: 14px; height: 14px;

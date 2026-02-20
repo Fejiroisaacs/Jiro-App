@@ -87,7 +87,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
                     <span class="ds-weight">{{ settingsService.toDisplay(set.weight) | number:'1.1-1' }} {{ settingsService.unitLabel() }}</span>
                     <span class="ds-x">×</span>
                     <span class="ds-reps">{{ set.reps_performed }} reps</span>
-                    <span *ngIf="set.is_pr" class="pr-badge">🏆</span>
+                    <img *ngIf="set.is_pr" src="/icons/badge-icon.svg" class="pr-badge" alt="PR" />
                   </div>
                 </div>
               </div>
@@ -254,7 +254,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
     .ds-reps { color: var(--text-primary); }
 
-    .pr-badge { font-size: 14px; }
+    .pr-badge { width: 22px; height: 22px; flex-shrink: 0; }
 
     .detail-notes {
       margin-top: var(--space-md);

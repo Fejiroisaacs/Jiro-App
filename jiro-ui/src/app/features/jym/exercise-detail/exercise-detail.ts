@@ -124,7 +124,7 @@ type ChartType = '1rm' | 'volume' | 'maxweight' | 'repsatweight';
                 <td>{{ entry.reps }} reps</td>
                 <td class="orm-cell">{{ settingsService.toDisplay(entry.est_1rm) | number:'1.1-1' }} {{ settingsService.unitLabel() }}</td>
                 <td class="pr-cell">
-                  <span *ngIf="entry.is_pr" class="pr-badge" title="Personal Record">🏆</span>
+                  <img *ngIf="entry.is_pr" src="/icons/badge-icon.svg" class="pr-badge" title="Personal Record" alt="PR" />
                 </td>
               </tr>
             </tbody>
@@ -296,7 +296,7 @@ type ChartType = '1rm' | 'volume' | 'maxweight' | 'repsatweight';
 
     .pr-cell { text-align: center; }
 
-    .pr-badge { font-size: 16px; }
+    .pr-badge { width: 24px; height: 24px; display: block; margin: auto; }
 
     @keyframes spin { to { transform: rotate(360deg); } }
   `]
