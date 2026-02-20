@@ -39,20 +39,31 @@ import { SettingsService } from '../../core/services/settings.service';
             <span class="nav-section-title">Modules</span>
           </div>
 
-          <a class="nav-item disabled">
-            <img src="/icons/echo-icon.svg" width="28" height="28" alt="Echo" />
-            <span *ngIf="!collapsed()" class="nav-label">Echo</span>
+          <a routerLink="/jym" routerLinkActive="active" class="nav-item">
+            <img src="/icons/jym-icon.svg" width="28" height="28" alt="Jym" />
+            <span *ngIf="!collapsed()" class="nav-label">Jym</span>
           </a>
-
+          
           <a routerLink="/culinara" routerLinkActive="active" class="nav-item">
             <img src="/icons/culinara-icon.svg" width="28" height="28" alt="Culinara" />
             <span *ngIf="!collapsed()" class="nav-label">Culinara</span>
           </a>
 
-          <a routerLink="/jym" routerLinkActive="active" class="nav-item">
-            <img src="/icons/jym-icon.svg" width="28" height="28" alt="Jym" />
-            <span *ngIf="!collapsed()" class="nav-label">Jym</span>
+          <a class="nav-item disabled">
+            <img src="/icons/ledger-icon.svg" width="28" height="28" alt="Ledger" />
+            <span *ngIf="!collapsed()" class="nav-label">Ledger</span>
           </a>
+          
+          <a class="nav-item disabled">
+            <img src="/icons/folio-icon.svg" width="28" height="28" alt="Folio" />
+            <span *ngIf="!collapsed()" class="nav-label">Folio</span>
+          </a>
+
+          <a class="nav-item disabled">
+            <img src="/icons/echo-icon.svg" width="28" height="28" alt="Echo" />
+            <span *ngIf="!collapsed()" class="nav-label">Echo</span>
+          </a>
+
         </nav>
 
         <div class="sidebar-footer">

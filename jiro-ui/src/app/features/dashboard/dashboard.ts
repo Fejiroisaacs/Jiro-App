@@ -101,14 +101,14 @@ interface ModuleCard {
 })
 export class DashboardComponent {
   modules: ModuleCard[] = [
-    // {
-    //   name: 'Echo',
-    //   description: 'Active reminder engine with multi-channel notifications. Never miss a critical task.',
-    //   icon: '\u23F0',
-    //   route: '/echo',
-    //   color: 'rgba(74, 103, 65, 0.15)',
-    //   available: false,
-    // },
+    {
+      name: 'Jym',
+      description: 'Structured progressive overload tracking. Plan workouts, log sessions, chase PRs.',
+      icon: '/icons/jym-icon.svg',
+      route: '/jym',
+      color: 'rgba(122, 59, 46, 0.15)',
+      available: true,
+    },
     {
       name: 'Culinara',
       description: 'Recipe notebook. Track and plan meals, compare results, improve your dishes.',
@@ -118,12 +118,28 @@ export class DashboardComponent {
       available: true,
     },
     {
-      name: 'Jym',
-      description: 'Structured progressive overload tracking. Plan workouts, log sessions, chase PRs.',
-      icon: '/icons/jym-icon.svg',
-      route: '/jym',
-      color: 'rgba(122, 59, 46, 0.15)',
-      available: true,
+      name: 'Ledger',
+      description: 'Financial tracking and budgeting.',
+      icon: '/icons/ledger-icon.svg',
+      route: '/ledger',
+      color: 'rgba(122, 103, 65, 0.15)',
+      available: false,
+    },
+    {
+      name: 'Folio',
+      description: 'Personal knowledge base. Organize and share your thoughts.',
+      icon: '/icons/folio-icon.svg',
+      route: '/folio',
+      color: 'rgba(122, 103, 65, 0.15)',
+      available: false,
+    },
+    {
+      name: 'Echo',
+      description: 'Active reminder engine with multi-channel notifications. Never miss a critical task.',
+      icon: '/icons/echo-icon.svg',
+      route: '/echo',
+      color: 'rgba(74, 103, 65, 0.15)',
+      available: false,
     },
   ];
 
