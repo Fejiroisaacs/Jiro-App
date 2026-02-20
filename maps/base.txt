@@ -1,0 +1,15 @@
+ROOT (Landing / Auth)
+ ├──  Login / Register (Google Auth or Email/Pass)
+ │
+ └──  Dashboard (The "Command Center")
+      ├──  Module Switcher (The "Dock")
+      │    ├── Launch: Echo (Reminders)
+      │    ├── Launch: Culinara (Recipes)
+      │    └── Launch: Jym (Gym)
+      │
+      ├──  Global Settings
+      │    ├──  Theme Picker ("Earth", "Clay", "Sand", "Forest")
+      │    └──  User Profile (Avatar, Email)
+      │
+      └──  Global Notification Center
+           └── List of recent alerts from ALL apps

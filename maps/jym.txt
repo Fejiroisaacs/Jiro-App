@@ -1,0 +1,41 @@
+ROOT (Home)
+ ├──   Library (Your "Database" of movements)
+ │    ├──  Muscle Groups (Tags)
+ │    │    ├── "Legs"
+ │    │    ├── "Push"
+ │    │    └── "Pull"
+ │    │
+ │    └──  Exercise Definitions (The "Wikidata" of your gym)
+ │         ├── Name: "Barbell Squat"
+ │         ├── Media: [Video Link / Image of Form]
+ │         ├── Notes: "Keep back straight, depth < 90 deg"
+ │         └── Personal Records (PRs): "315 lbs (Jan 2026)"
+ │
+ ├──  Splits (The "Strategy")
+ │    ├── "Bro Split"
+ │    │    ├── Day 1: Chest
+ │    │    ├── Day 2: Back
+ │    │    └── Day 3: Legs
+ │    │
+ │    └── "PPL (Push/Pull/Legs)"
+ │         ├── Day A: Push (Heavy)
+ │         └── Day B: Pull (Hypertrophy)
+ │
+ ├──  Plans / Templates (The "Menu")
+ │    ├── "Leg Destroyer 3000"
+ │    │    ├── Exercise 1: Squat (Target: 3 sets x 5 reps)
+ │    │    ├── Exercise 2: Lunges (Target: 3 sets x 12 reps)
+ │    │    └── Goal: "Finish in under 60 mins"
+ │    │
+ │    └── "Quick Arm Pump"
+ │         └── [List of Exercises]
+ │
+ └──  Active Session (The "Logger")
+      ├──  Start New Session
+      │    ├── Select from Plan: "Leg Destroyer 3000"
+      │    └── OR Empty Session (Freestyle)
+      │
+      └──  Current Workout
+           ├── Log Set 1: 225lbs x 5
+           ├── Log Set 2: 225lbs x 5
+           └── Notes: "Felt heavy today"

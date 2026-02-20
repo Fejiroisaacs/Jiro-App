@@ -1,0 +1,22 @@
+ROOT (Echo Home)
+ ├──  Dashboard (The "Inox")
+ │    ├──  Critical / Overdue (Top Priority)
+ │    ├──  Today's Schedule (Timeline View)
+ │    └──  Upcoming (Next 7 Days)
+ │
+ ├──  Create Reminder (The "Wizard")
+ │    ├──  Basic Info (Title, Description)
+ │    ├──  Timing (One-time vs. Recurring)
+ │    │    └── "Every 2nd Tuesday" / "Daily" / "Cron Expression"
+ │    └──  Delivery Channels (Toggle switches)
+ │         ├── [x] Push Notification
+ │         ├── [ ] SMS (Twilio)
+ │         └── [x] Email
+ │
+ ├──  Manage / Search
+ │    ├── Filter by Tag ("Bills", "Health", "Work")
+ │    └── Snooze / Pause Recurring Rules
+ │
+ └──  Configuration
+      ├──  Quiet Hours ("Don't text me between 11PM - 7AM")
+      └──  Channel Setup (Add Phone Number, Verify Email)

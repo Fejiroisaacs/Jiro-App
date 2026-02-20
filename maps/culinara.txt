@@ -1,0 +1,30 @@
+ROOT (Kitchen Library)
+ ├──  Cookbook (The Grid View)
+ │    ├──  Search / Filter ("Dinner", "High Protein", "Dessert")
+ │    ├──  Favorites
+ │    └──  Create New Recipe (Defines the "Standard")
+ │         ├── Title & Description
+ │         ├──  Target Image (What it *should* look like)
+ │         ├──  Base Ingredients (The control variables)
+ │         └──  Base Instructions
+ │
+ └──  Recipe Detail View (The "Lab Notebook")
+      ├──  Tab 1: The Standard (Read-Only View)
+      │    ├── Ingredients List
+      │    ├── Step-by-Step Mode
+      │    └── Nutrition Facts (Optional)
+      │
+      ├──  Tab 2: The Trials (History of Attempts)
+      │    ├──  Button: "Log New Attempt"
+      │    │    ├── Date & Time
+      │    │    ├──  Upload Result Photo (What you *actually* made)
+      │    │    ├──  Modifications ("Used less salt", "Cooked longer")
+      │    │    └──  Rating (1-5)
+      │    │
+      │    └──  History Stream
+      │         ├── Card: "Trial #3 - Perfect" (5/5)
+      │         ├── Card: "Trial #2 - Too Salty" (3/5)
+      │         └── Card: "Trial #1 - Burnt" (1/5)
+      │
+      └──  Edit Standard
+           └── "Promote" a trial to be the new Standard (Update base recipe)
