@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/models"
@@ -204,6 +205,66 @@ func (h *JymHandler) DeleteSplit(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Split deleted"})
+}
+
+// ─── Public Split Discovery ────────────────────────────────────────────────────
+
+func (h *JymHandler) ListPublicSplits(c *gin.Context) {
+	search := c.Query("search")
+	tag := c.Query("tag")
+	muscleGroup := c.Query("muscle_group")
+
+	limit := 20
+	offset := 0
+	if p := c.Query("page"); p != "" {
+		if n, err := strconv.Atoi(p); err == nil && n > 1 {
+			offset = (n - 1) * limit
+		}
+	}
+
+	splits, err := h.jymService.ListPublicSplits(c.Request.Context(), search, tag, muscleGroup, limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to list public splits"}})
+		return
+	}
+	c.JSON(http.StatusOK, splits)
+}
+
+func (h *JymHandler) GetPublicSplit(c *gin.Context) {
+	splitID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid split ID"}})
+		return
+	}
+	detail, err := h.jymService.GetPublicSplit(c.Request.Context(), splitID)
+	if err != nil {
+		if err == services.ErrSplitNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Split not found or not public"}})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to get split"}})
+		return
+	}
+	c.JSON(http.StatusOK, detail)
+}
+
+func (h *JymHandler) ImportPublicSplit(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	splitID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid split ID"}})
+		return
+	}
+	newSplitID, err := h.jymService.ImportPublicSplit(c.Request.Context(), userID, splitID)
+	if err != nil {
+		if err == services.ErrSplitNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Split not found or not public"}})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to import split"}})
+		return
+	}
+	c.JSON(http.StatusOK, models.ImportShareResponse{SplitID: newSplitID.String()})
 }
 
 // ─── Routines ─────────────────────────────────────────────────────────────────

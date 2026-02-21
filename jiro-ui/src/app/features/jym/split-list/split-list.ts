@@ -21,6 +21,12 @@ import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
           <p class="text-secondary">Structured progressive overload tracking</p>
         </div>
         <div class="header-actions">
+          <button class="discover-btn" (click)="router.navigate(['/jym/discover'])">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            Discover
+          </button>
           <jiro-button variant="secondary" type="button" (click)="startFreeSession()">
             Freestyle Session
           </jiro-button>
@@ -185,6 +191,9 @@ import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
             <div class="split-info">
               <h3 class="split-name">{{ split.name }}</h3>
               <p class="split-desc text-secondary" *ngIf="split.description">{{ split.description }}</p>
+              <div *ngIf="split.tags.length" class="split-tags">
+                <span *ngFor="let tag of split.tags" class="tag-chip">{{ tag }}</span>
+              </div>
             </div>
             <span class="routine-badge">{{ split.routine_count || 0 }} {{ (split.routine_count || 0) === 1 ? 'day' : 'days' }}</span>
           </div>
@@ -243,6 +252,15 @@ import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
               name="desc"
               rows="2"
               placeholder="Brief description of this split..."></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Tags (optional, comma-separated)</label>
+            <input
+              class="form-input"
+              type="text"
+              [(ngModel)]="newTagsRaw"
+              name="tags"
+              placeholder="e.g. PPL, Hypertrophy, Beginner" />
           </div>
           <div class="form-actions">
             <jiro-button variant="secondary" type="button" (click)="showCreate.set(false)">Cancel</jiro-button>
@@ -336,9 +354,29 @@ import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
 
     .page-header h1 { font-size: var(--font-size-2xl); font-weight: 700; }
 
-    .header-actions { display: flex; gap: var(--space-sm); flex-shrink: 0; }
+    .header-actions { display: flex; gap: var(--space-sm); flex-shrink: 0; align-items: center; }
 
     .header-actions ::ng-deep .jiro-btn { width: auto; }
+
+    .discover-btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 14px;
+      background: none; border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      color: var(--text-secondary); font-size: var(--font-size-sm);
+      cursor: pointer; transition: all 0.15s; white-space: nowrap;
+    }
+
+    .discover-btn:hover { border-color: var(--color-primary); color: var(--color-primary); background: rgba(122,59,46,0.05); }
+
+    .split-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: var(--space-xs); }
+
+    .tag-chip {
+      font-size: 11px; font-weight: 500;
+      padding: 2px 8px; border-radius: 10px;
+      background: rgba(122,59,46,0.08); color: var(--color-primary);
+      border: 1px solid rgba(122,59,46,0.18);
+    }
 
     @media (max-width: 600px) {
       .page-header { flex-direction: column; }
@@ -735,6 +773,7 @@ export class SplitListComponent implements OnInit {
 
   newName = '';
   newDesc = '';
+  newTagsRaw = '';
   private selectedSplitId = '';
   private selectedSeriesId = '';
 
@@ -772,12 +811,18 @@ export class SplitListComponent implements OnInit {
   createSplit() {
     if (!this.newName.trim()) return;
     this.saving.set(true);
-    this.jymService.createSplit({ name: this.newName.trim(), description: this.newDesc.trim() || undefined }).subscribe({
+    const tags = this.newTagsRaw.split(',').map(t => t.trim()).filter(t => t.length > 0);
+    this.jymService.createSplit({
+      name: this.newName.trim(),
+      description: this.newDesc.trim() || undefined,
+      tags: tags.length > 0 ? tags : undefined,
+    }).subscribe({
       next: s => {
         this.splits.update(list => [s, ...list]);
         this.showCreate.set(false);
         this.newName = '';
         this.newDesc = '';
+        this.newTagsRaw = '';
         this.saving.set(false);
       },
       error: () => this.saving.set(false),

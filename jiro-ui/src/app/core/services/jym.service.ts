@@ -50,9 +50,27 @@ export interface Split {
   user_id: string;
   name: string;
   description: string | null;
+  visibility: string;
+  tags: string[];
   routine_count: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface PublicSplitSummary {
+  id: string;
+  name: string;
+  description: string | null;
+  tags: string[];
+  routine_count: number;
+  created_at: string;
+}
+
+export interface PublicSplitDetail {
+  split_id: string;
+  split_name: string;
+  tags: string[];
+  routines: ShareRoutinePreview[];
 }
 
 export interface RoutineItem {
@@ -184,8 +202,8 @@ export interface StartSessionResponse extends Session {
 
 export interface CreateExerciseRequest { name: string; muscle_group?: string; notes?: string; }
 export interface UpdateExerciseRequest { name?: string; muscle_group?: string; notes?: string; }
-export interface CreateSplitRequest { name: string; description?: string; }
-export interface UpdateSplitRequest { name?: string; description?: string; }
+export interface CreateSplitRequest { name: string; description?: string; tags?: string[]; }
+export interface UpdateSplitRequest { name?: string; description?: string; visibility?: string; tags?: string[]; }
 export interface CreateRoutineRequest { name: string; day_order?: number; }
 export interface UpdateRoutineRequest { name?: string; day_order?: number; }
 export interface ReplaceItemEntry { exercise_id: string; target_sets: number; target_reps: number; }
@@ -380,5 +398,22 @@ export class JymService {
 
   importShare(shareId: string): Observable<{ split_id: string }> {
     return this.http.post<{ split_id: string }>(`${API_URL}/shares/${shareId}/import`, {});
+  }
+
+  // Public split discovery
+  listPublicSplits(search = '', tag = '', muscleGroup = '', page = 1): Observable<PublicSplitSummary[]> {
+    let params = new HttpParams().set('page', page.toString());
+    if (search) params = params.set('search', search);
+    if (tag) params = params.set('tag', tag);
+    if (muscleGroup) params = params.set('muscle_group', muscleGroup);
+    return this.http.get<PublicSplitSummary[]>(`${environment.apiUrl}/jym/public-splits`, { params });
+  }
+
+  getPublicSplit(splitId: string): Observable<PublicSplitDetail> {
+    return this.http.get<PublicSplitDetail>(`${environment.apiUrl}/jym/public-splits/${splitId}`);
+  }
+
+  importPublicSplit(splitId: string): Observable<{ split_id: string }> {
+    return this.http.post<{ split_id: string }>(`${API_URL}/public-splits/${splitId}/import`, {});
   }
 }

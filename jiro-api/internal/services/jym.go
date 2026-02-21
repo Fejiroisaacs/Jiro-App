@@ -183,13 +183,17 @@ func (s *JymService) DeleteExercise(ctx context.Context, userID, exerciseID uuid
 // ─── Splits ──────────────────────────────────────────────────────────────────
 
 func (s *JymService) CreateSplit(ctx context.Context, userID uuid.UUID, req *models.CreateSplitRequest) (*models.Split, error) {
+	tags := req.Tags
+	if tags == nil {
+		tags = []string{}
+	}
 	sp := &models.Split{}
 	err := s.db.QueryRow(ctx,
-		`INSERT INTO splits (user_id, name, description)
-		 VALUES ($1, $2, $3)
-		 RETURNING id, user_id, name, description, created_at, updated_at`,
-		userID, req.Name, req.Description,
-	).Scan(&sp.ID, &sp.UserID, &sp.Name, &sp.Description, &sp.CreatedAt, &sp.UpdatedAt)
+		`INSERT INTO splits (user_id, name, description, tags)
+		 VALUES ($1, $2, $3, $4)
+		 RETURNING id, user_id, name, description, visibility, tags, created_at, updated_at`,
+		userID, req.Name, req.Description, tags,
+	).Scan(&sp.ID, &sp.UserID, &sp.Name, &sp.Description, &sp.Visibility, &sp.Tags, &sp.CreatedAt, &sp.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -198,8 +202,8 @@ func (s *JymService) CreateSplit(ctx context.Context, userID uuid.UUID, req *mod
 
 func (s *JymService) ListSplits(ctx context.Context, userID uuid.UUID) ([]models.Split, error) {
 	rows, err := s.db.Query(ctx,
-		`SELECT s.id, s.user_id, s.name, s.description, s.created_at, s.updated_at,
-		        COUNT(r.id) as routine_count
+		`SELECT s.id, s.user_id, s.name, s.description, s.visibility, s.tags,
+		        s.created_at, s.updated_at, COUNT(r.id) as routine_count
 		 FROM splits s
 		 LEFT JOIN routines r ON r.split_id = s.id
 		 WHERE s.user_id = $1
@@ -215,7 +219,7 @@ func (s *JymService) ListSplits(ctx context.Context, userID uuid.UUID) ([]models
 	var splits []models.Split
 	for rows.Next() {
 		var sp models.Split
-		if err := rows.Scan(&sp.ID, &sp.UserID, &sp.Name, &sp.Description, &sp.CreatedAt, &sp.UpdatedAt, &sp.RoutineCount); err != nil {
+		if err := rows.Scan(&sp.ID, &sp.UserID, &sp.Name, &sp.Description, &sp.Visibility, &sp.Tags, &sp.CreatedAt, &sp.UpdatedAt, &sp.RoutineCount); err != nil {
 			return nil, err
 		}
 		splits = append(splits, sp)
@@ -229,10 +233,10 @@ func (s *JymService) ListSplits(ctx context.Context, userID uuid.UUID) ([]models
 func (s *JymService) GetSplitWithRoutines(ctx context.Context, userID, splitID uuid.UUID) (*models.SplitWithRoutines, error) {
 	sp := &models.SplitWithRoutines{}
 	err := s.db.QueryRow(ctx,
-		`SELECT id, user_id, name, description, created_at, updated_at
+		`SELECT id, user_id, name, description, visibility, tags, created_at, updated_at
 		 FROM splits WHERE id = $1 AND user_id = $2`,
 		splitID, userID,
-	).Scan(&sp.ID, &sp.UserID, &sp.Name, &sp.Description, &sp.CreatedAt, &sp.UpdatedAt)
+	).Scan(&sp.ID, &sp.UserID, &sp.Name, &sp.Description, &sp.Visibility, &sp.Tags, &sp.CreatedAt, &sp.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrSplitNotFound
@@ -304,16 +308,22 @@ func (s *JymService) GetSplitWithRoutines(ctx context.Context, userID, splitID u
 }
 
 func (s *JymService) UpdateSplit(ctx context.Context, userID, splitID uuid.UUID, req *models.UpdateSplitRequest) (*models.Split, error) {
+	var tagsArg interface{}
+	if req.Tags != nil {
+		tagsArg = *req.Tags
+	}
 	sp := &models.Split{}
 	err := s.db.QueryRow(ctx,
 		`UPDATE splits SET
 		   name        = COALESCE($3, name),
 		   description = COALESCE($4, description),
+		   visibility  = COALESCE($5, visibility),
+		   tags        = CASE WHEN $6::TEXT[] IS NULL THEN tags ELSE $6::TEXT[] END,
 		   updated_at  = NOW()
 		 WHERE id = $1 AND user_id = $2
-		 RETURNING id, user_id, name, description, created_at, updated_at`,
-		splitID, userID, req.Name, req.Description,
-	).Scan(&sp.ID, &sp.UserID, &sp.Name, &sp.Description, &sp.CreatedAt, &sp.UpdatedAt)
+		 RETURNING id, user_id, name, description, visibility, tags, created_at, updated_at`,
+		splitID, userID, req.Name, req.Description, req.Visibility, tagsArg,
+	).Scan(&sp.ID, &sp.UserID, &sp.Name, &sp.Description, &sp.Visibility, &sp.Tags, &sp.CreatedAt, &sp.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrSplitNotFound
@@ -332,6 +342,139 @@ func (s *JymService) DeleteSplit(ctx context.Context, userID, splitID uuid.UUID)
 		return ErrSplitNotFound
 	}
 	return nil
+}
+
+// ─── Public Split Discovery ───────────────────────────────────────────────────
+
+func (s *JymService) ListPublicSplits(ctx context.Context, search, tag, muscleGroup string, limit, offset int) ([]models.PublicSplitSummary, error) {
+	rows, err := s.db.Query(ctx, `
+		SELECT s.id, s.name, s.description, s.tags, s.created_at, COUNT(r.id) as routine_count
+		FROM splits s
+		LEFT JOIN routines r ON r.split_id = s.id
+		WHERE s.visibility = 'public'
+		  AND ($1 = '' OR s.name ILIKE '%' || $1 || '%')
+		  AND ($2 = '' OR s.tags && ARRAY[$2]::TEXT[])
+		  AND ($3 = '' OR EXISTS (
+		        SELECT 1 FROM routines r2
+		        JOIN routine_items ri ON ri.routine_id = r2.id
+		        JOIN exercises e ON e.id = ri.exercise_id
+		        WHERE r2.split_id = s.id AND LOWER(e.muscle_group) = LOWER($3)
+		      ))
+		GROUP BY s.id
+		ORDER BY s.created_at DESC
+		LIMIT $4 OFFSET $5
+	`, search, tag, muscleGroup, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []models.PublicSplitSummary
+	for rows.Next() {
+		var p models.PublicSplitSummary
+		if err := rows.Scan(&p.ID, &p.Name, &p.Description, &p.Tags, &p.CreatedAt, &p.RoutineCount); err != nil {
+			return nil, err
+		}
+		results = append(results, p)
+	}
+	if results == nil {
+		results = []models.PublicSplitSummary{}
+	}
+	return results, nil
+}
+
+func (s *JymService) GetPublicSplit(ctx context.Context, splitID uuid.UUID) (*models.PublicSplitDetail, error) {
+	var name string
+	var tags []string
+	var visibility string
+	err := s.db.QueryRow(ctx,
+		`SELECT name, tags, visibility FROM splits WHERE id = $1`,
+		splitID,
+	).Scan(&name, &tags, &visibility)
+	if err == pgx.ErrNoRows {
+		return nil, ErrSplitNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if visibility != "public" {
+		return nil, ErrSplitNotFound
+	}
+
+	rows, err := s.db.Query(ctx, `
+		SELECT r.id, r.name, r.day_order,
+		       e.name, e.muscle_group,
+		       COALESCE(ri.target_sets, 0), COALESCE(ri.target_reps, 0)
+		FROM routines r
+		LEFT JOIN routine_items ri ON ri.routine_id = r.id
+		LEFT JOIN exercises e ON e.id = ri.exercise_id
+		WHERE r.split_id = $1
+		ORDER BY r.day_order, ri.order_index
+	`, splitID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	routineMap := map[uuid.UUID]*models.ShareRoutinePreview{}
+	var routineOrder []uuid.UUID
+
+	for rows.Next() {
+		var rID uuid.UUID
+		var rName string
+		var dayOrder int
+		var exName *string
+		var mg *string
+		var tSets, tReps int
+
+		if err := rows.Scan(&rID, &rName, &dayOrder, &exName, &mg, &tSets, &tReps); err != nil {
+			return nil, err
+		}
+		if _, ok := routineMap[rID]; !ok {
+			routineMap[rID] = &models.ShareRoutinePreview{
+				Name:      rName,
+				DayOrder:  dayOrder,
+				Exercises: []models.ShareExercisePreview{},
+			}
+			routineOrder = append(routineOrder, rID)
+		}
+		if exName != nil {
+			routineMap[rID].Exercises = append(routineMap[rID].Exercises, models.ShareExercisePreview{
+				Name:        *exName,
+				MuscleGroup: mg,
+				TargetSets:  tSets,
+				TargetReps:  tReps,
+			})
+		}
+	}
+
+	routines := make([]models.ShareRoutinePreview, 0, len(routineOrder))
+	for _, id := range routineOrder {
+		routines = append(routines, *routineMap[id])
+	}
+
+	return &models.PublicSplitDetail{
+		SplitID:   splitID.String(),
+		SplitName: name,
+		Tags:      tags,
+		Routines:  routines,
+	}, nil
+}
+
+func (s *JymService) ImportPublicSplit(ctx context.Context, importerID, splitID uuid.UUID) (uuid.UUID, error) {
+	// Verify the split is public
+	var visibility string
+	err := s.db.QueryRow(ctx, `SELECT visibility FROM splits WHERE id = $1`, splitID).Scan(&visibility)
+	if err == pgx.ErrNoRows {
+		return uuid.Nil, ErrSplitNotFound
+	}
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if visibility != "public" {
+		return uuid.Nil, ErrSplitNotFound
+	}
+	return s.copySplit(ctx, importerID, splitID)
 }
 
 // ─── Routines ─────────────────────────────────────────────────────────────────
@@ -1313,9 +1456,7 @@ func (s *JymService) GetSharePreview(ctx context.Context, shareID uuid.UUID) (*m
 }
 
 // ImportShare deep-copies a shared split into the importing user's account.
-// Original owner's user_id and exercise IDs are never exposed.
 func (s *JymService) ImportShare(ctx context.Context, importerID, shareID uuid.UUID) (uuid.UUID, error) {
-	// Resolve share → split
 	var splitID uuid.UUID
 	var expiresAt *time.Time
 	err := s.db.QueryRow(ctx,
@@ -1331,18 +1472,22 @@ func (s *JymService) ImportShare(ctx context.Context, importerID, shareID uuid.U
 	if expiresAt != nil && time.Now().After(*expiresAt) {
 		return uuid.Nil, ErrShareExpired
 	}
+	return s.copySplit(ctx, importerID, splitID)
+}
 
+// copySplit deep-copies split splitID into importerID's account and returns the new split ID.
+func (s *JymService) copySplit(ctx context.Context, importerID, splitID uuid.UUID) (uuid.UUID, error) {
 	// Load original split
 	var origName string
 	var origDesc *string
-	err = s.db.QueryRow(ctx,
+	err := s.db.QueryRow(ctx,
 		`SELECT name, description FROM splits WHERE id = $1`, splitID,
 	).Scan(&origName, &origDesc)
 	if err != nil {
 		return uuid.Nil, err
 	}
 
-	// Load routines + items (all in one query)
+	// Load routines + items
 	rows, err := s.db.Query(ctx, `
 		SELECT r.id, r.name, r.day_order,
 		       e.name, e.muscle_group,
@@ -1357,7 +1502,6 @@ func (s *JymService) ImportShare(ctx context.Context, importerID, shareID uuid.U
 	if err != nil {
 		return uuid.Nil, err
 	}
-	defer rows.Close()
 
 	type itemRow struct {
 		exName     string
@@ -1384,6 +1528,7 @@ func (s *JymService) ImportShare(ctx context.Context, importerID, shareID uuid.U
 		var tSets, tReps, orderIdx int
 
 		if err := rows.Scan(&rID, &rName, &dayOrder, &exName, &mg, &tSets, &tReps, &orderIdx); err != nil {
+			rows.Close()
 			return uuid.Nil, err
 		}
 		if _, ok := rMap[rID]; !ok {
@@ -1398,14 +1543,12 @@ func (s *JymService) ImportShare(ctx context.Context, importerID, shareID uuid.U
 	}
 	rows.Close()
 
-	// Resolve / create exercises for importer using a transaction
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return uuid.Nil, err
 	}
 	defer tx.Rollback(ctx) //nolint:errcheck
 
-	// Exercise name → importer's exercise ID cache
 	exCache := map[string]uuid.UUID{}
 
 	resolveExercise := func(name string, mg *string) (uuid.UUID, error) {
@@ -1424,7 +1567,6 @@ func (s *JymService) ImportShare(ctx context.Context, importerID, shareID uuid.U
 		if err != pgx.ErrNoRows {
 			return uuid.Nil, err
 		}
-		// Create new exercise
 		err = tx.QueryRow(ctx,
 			`INSERT INTO exercises (user_id, name, muscle_group) VALUES ($1, $2, $3) RETURNING id`,
 			importerID, name, mg,
@@ -1436,7 +1578,6 @@ func (s *JymService) ImportShare(ctx context.Context, importerID, shareID uuid.U
 		return id, nil
 	}
 
-	// Create new split
 	var newSplitID uuid.UUID
 	err = tx.QueryRow(ctx,
 		`INSERT INTO splits (user_id, name, description) VALUES ($1, $2, $3) RETURNING id`,
@@ -1446,7 +1587,6 @@ func (s *JymService) ImportShare(ctx context.Context, importerID, shareID uuid.U
 		return uuid.Nil, err
 	}
 
-	// Copy routines + items
 	for _, rID := range rOrder {
 		rd := rMap[rID]
 		var newRoutineID uuid.UUID
@@ -1457,7 +1597,6 @@ func (s *JymService) ImportShare(ctx context.Context, importerID, shareID uuid.U
 		if err != nil {
 			return uuid.Nil, err
 		}
-
 		for _, item := range rd.items {
 			exID, err := resolveExercise(item.exName, item.mg)
 			if err != nil {

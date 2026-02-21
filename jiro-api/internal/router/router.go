@@ -47,6 +47,10 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 		// Public split share preview (no auth required)
 		v1.GET("/jym/shares/:share_id", jymHandler.GetSharePreview)
 
+		// Public split discovery (no auth required)
+		v1.GET("/jym/public-splits", jymHandler.ListPublicSplits)
+		v1.GET("/jym/public-splits/:id", jymHandler.GetPublicSplit)
+
 		// Auth routes (rate limited by IP: 10/min)
 		auth := v1.Group("/auth")
 		auth.Use(middleware.RateLimitByIP(rl, 10))
@@ -135,6 +139,9 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 				jym.POST("/splits/:split_id/share", jymHandler.CreateShare)
 				jym.DELETE("/shares/:share_id", jymHandler.RevokeShare)
 				jym.POST("/shares/:share_id/import", jymHandler.ImportShare)
+
+				// Public split import (auth required)
+				jym.POST("/public-splits/:id/import", jymHandler.ImportPublicSplit)
 			}
 		}
 	}
