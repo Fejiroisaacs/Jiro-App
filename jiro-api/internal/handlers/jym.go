@@ -8,6 +8,7 @@ import (
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 )
 
 type JymHandler struct {
@@ -592,4 +593,41 @@ func (h *JymHandler) DeleteSet(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Set deleted"})
+}
+
+// ─── CSV Export ───────────────────────────────────────────────────────────────
+
+func (h *JymHandler) ExportSessions(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+
+	var from, to *time.Time
+	if f := c.Query("from"); f != "" {
+		t, err := time.Parse("2006-01-02", f)
+		if err == nil {
+			from = &t
+		}
+	}
+	if t := c.Query("to"); t != "" {
+		parsed, err := time.Parse("2006-01-02", t)
+		if err == nil {
+			to = &parsed
+		}
+	}
+
+	var exerciseID *uuid.UUID
+	if eid := c.Query("exercise_id"); eid != "" {
+		id, err := uuid.Parse(eid)
+		if err == nil {
+			exerciseID = &id
+		}
+	}
+
+	filename := "jym-export-" + time.Now().Format("2006-01-02") + ".csv"
+	c.Header("Content-Type", "text/csv; charset=utf-8")
+	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
+	c.Status(http.StatusOK)
+
+	if err := h.jymService.StreamSessionsCSV(c.Request.Context(), userID, from, to, exerciseID, c.Writer); err != nil {
+		log.Error().Err(err).Msg("failed to stream sessions CSV")
+	}
 }

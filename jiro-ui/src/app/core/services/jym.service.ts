@@ -335,4 +335,12 @@ export class JymService {
   deleteSeries(id: string): Observable<void> {
     return this.http.delete<void>(`${API_URL}/series/${id}`);
   }
+
+  // CSV Export
+  exportSessionsCSV(from?: string, to?: string): Observable<Blob> {
+    let params = new HttpParams();
+    if (from) params = params.set('from', from);
+    if (to) params = params.set('to', to);
+    return this.http.get(`${API_URL}/export/sessions.csv`, { responseType: 'blob', params });
+  }
 }

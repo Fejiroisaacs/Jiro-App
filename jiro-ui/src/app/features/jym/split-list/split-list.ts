@@ -141,7 +141,7 @@ import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
               <div class="asc-split-label">{{ sr.split_name }}</div>
               <div class="asc-name">{{ sr.name }}</div>
               <div class="asc-pills">
-                <span class="asc-pill">{{ sr.session_count }} sessions</span>
+                <span class="asc-pill" *ngIf="!(sr.duration_type === 'sessions' && sr.target_sessions)">{{ sr.session_count }} sessions</span>
                 <span *ngIf="sr.duration_type === 'weeks' && sr.target_weeks" class="asc-pill">
                   {{ progressWeeks(sr) }} / {{ sr.target_weeks }} wks
                 </span>
@@ -631,6 +631,29 @@ import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
     .day-stale { color: var(--color-danger); }
 
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 600px) {
+      .asc { flex-wrap: wrap; gap: var(--space-sm); padding: var(--space-md); }
+
+      .asc-actions { width: 100%; justify-content: flex-end; }
+
+      .asc-view-btn { padding: 0.3rem 0.6rem; font-size: 0.7rem; }
+
+      .asc-actions ::ng-deep .jiro-btn { font-size: 0.7rem; padding: 0.3rem 0.6rem; }
+
+      /* Split card: shrink the whole actions row to fit in one line */
+      .split-actions { gap: 0.3rem; }
+
+      .split-actions ::ng-deep .jiro-btn {
+        padding: 0.4rem 0.55rem;
+        font-size: 0.7rem;
+        gap: 0.2rem;
+      }
+
+      .split-actions svg { width: 10px; height: 10px; }
+
+      .delete-split-btn { width: 2rem; height: 2rem; }
+    }
   `]
 })
 export class SplitListComponent implements OnInit {

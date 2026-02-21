@@ -2,7 +2,10 @@ package services
 
 import (
 	"context"
+	"encoding/csv"
 	"errors"
+	"fmt"
+	"io"
 	"math"
 	"strconv"
 	"time"
@@ -1079,6 +1082,100 @@ func (s *JymService) DeleteSeries(ctx context.Context, userID, seriesID uuid.UUI
 		return ErrSeriesNotFound
 	}
 	return nil
+}
+
+// ─── CSV Export ───────────────────────────────────────────────────────────────
+
+// StreamSessionsCSV writes a CSV of all session sets for the user directly to w.
+// Optional from/to filter by session start date (inclusive). Optional exerciseID narrows to one exercise.
+func (s *JymService) StreamSessionsCSV(ctx context.Context, userID uuid.UUID, from, to *time.Time, exerciseID *uuid.UUID, w io.Writer) error {
+	args := []interface{}{userID}
+	where := "WHERE s.user_id = $1"
+	p := 2
+
+	if from != nil {
+		where += fmt.Sprintf(" AND s.started_at >= $%d", p)
+		args = append(args, *from)
+		p++
+	}
+	if to != nil {
+		// include the full end day
+		end := to.AddDate(0, 0, 1)
+		where += fmt.Sprintf(" AND s.started_at < $%d", p)
+		args = append(args, end)
+		p++
+	}
+	if exerciseID != nil {
+		where += fmt.Sprintf(" AND ss.exercise_id = $%d", p)
+		args = append(args, *exerciseID)
+	}
+
+	query := `
+		SELECT
+			s.started_at::date,
+			s.id,
+			COALESCE(r.name, ''),
+			e.name,
+			COALESCE(e.muscle_group, ''),
+			ss.set_number,
+			ss.weight,
+			ss.reps_performed,
+			COALESCE(ss.rpe::text, ''),
+			ss.is_warmup,
+			ss.is_pr,
+			ROUND((ss.weight * (1 + ss.reps_performed::float / 30.0))::numeric, 1)
+		FROM sessions s
+		LEFT JOIN routines r ON s.routine_id = r.id
+		JOIN session_sets ss ON ss.session_id = s.id
+		JOIN exercises e ON ss.exercise_id = e.id
+		` + where + `
+		ORDER BY s.started_at DESC, e.name, ss.set_number`
+
+	rows, err := s.db.Query(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	cw := csv.NewWriter(w)
+	_ = cw.Write([]string{
+		"date", "session_id", "routine", "exercise", "muscle_group",
+		"set", "weight_kg", "reps", "rpe", "is_warmup", "is_pr", "estimated_1rm",
+	})
+
+	for rows.Next() {
+		var date time.Time
+		var sessionID uuid.UUID
+		var routine, exercise, muscleGroup, rpe string
+		var setNum, reps int
+		var weight, est1rm float64
+		var isWarmup, isPR bool
+
+		if err := rows.Scan(
+			&date, &sessionID, &routine, &exercise, &muscleGroup,
+			&setNum, &weight, &reps, &rpe, &isWarmup, &isPR, &est1rm,
+		); err != nil {
+			return err
+		}
+
+		_ = cw.Write([]string{
+			date.Format("2006-01-02"),
+			sessionID.String(),
+			routine,
+			exercise,
+			muscleGroup,
+			strconv.Itoa(setNum),
+			fmt.Sprintf("%.2f", weight),
+			strconv.Itoa(reps),
+			rpe,
+			strconv.FormatBool(isWarmup),
+			strconv.FormatBool(isPR),
+			fmt.Sprintf("%.1f", est1rm),
+		})
+	}
+
+	cw.Flush()
+	return cw.Error()
 }
 
 func intStr(n int) string {
