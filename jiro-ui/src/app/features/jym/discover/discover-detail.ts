@@ -62,7 +62,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
             <polyline points="20,6 9,17 4,12"/>
           </svg>
           Split added to your account.
-          <button class="goto-btn" (click)="router.navigate(['/jym'])">Go to My Splits</button>
+          <button class="goto-btn" (click)="router.navigate(['/jym/splits'])">Go to My Splits</button>
         </div>
 
         <!-- Routines -->
@@ -220,7 +220,7 @@ export class DiscoverDetailComponent implements OnInit {
     private jymService: JymService,
     private route: ActivatedRoute,
     public router: Router,
-  ) {}
+  ) { }
 
   ngOnInit() {
     this.splitId = this.route.snapshot.paramMap.get('id') || '';

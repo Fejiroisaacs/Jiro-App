@@ -39,6 +39,10 @@ export const routes: Routes = [
       },
       {
         path: 'jym',
+        loadComponent: () => import('./features/jym/jym-dashboard/jym-dashboard').then(m => m.JymDashboardComponent),
+      },
+      {
+        path: 'jym/splits',
         loadComponent: () => import('./features/jym/split-list/split-list').then(m => m.SplitListComponent),
       },
       {
