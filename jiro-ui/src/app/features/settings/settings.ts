@@ -54,7 +54,7 @@ import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-inpu
             <p class="text-secondary setting-desc">Lowercase letters, numbers and underscores — used in share links</p>
             <jiro-input
               [(ngModel)]="username"
-              placeholder="e.g. fejiro"
+              [placeholder]="usernamePlaceholder"
               [style.margin-top]="'8px'">
             </jiro-input>
           </div>
@@ -309,6 +309,7 @@ export class SettingsComponent implements OnInit {
   displayName = '';
   username = '';
   bio = '';
+  usernamePlaceholder = 'e.g. myusername';
   profileSaving = signal(false);
   profileError = signal<string | null>(null);
 
@@ -355,6 +356,7 @@ export class SettingsComponent implements OnInit {
       this.displayName = user.display_name ?? '';
       this.username = user.username ?? '';
       this.bio = user.bio ?? '';
+      this.usernamePlaceholder = user.email.split('@')[0];
     }
   }
 
