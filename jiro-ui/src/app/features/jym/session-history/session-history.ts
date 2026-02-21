@@ -1,5 +1,6 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
 import { JymService, SessionSummary, SessionWithSets } from '../../../core/services/jym.service';
@@ -10,7 +11,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 @Component({
   selector: 'app-session-history',
   standalone: true,
-  imports: [CommonModule, JiroButtonComponent, JiroModalComponent, JymQuickNavComponent],
+  imports: [CommonModule, FormsModule, JiroButtonComponent, JiroModalComponent, JymQuickNavComponent],
   template: `
     <div class="session-history">
       <!-- Header -->
@@ -26,6 +27,21 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
       <!-- Quick nav -->
       <jym-quick-nav></jym-quick-nav>
+
+      <!-- Export row -->
+      <div class="export-row">
+        <div class="date-field">
+          <label class="date-label">From</label>
+          <input type="date" class="date-input" [(ngModel)]="exportFrom" />
+        </div>
+        <div class="date-field">
+          <label class="date-label">To</label>
+          <input type="date" class="date-input" [(ngModel)]="exportTo" />
+        </div>
+        <jiro-button variant="secondary" type="button" [disabled]="exporting()" (click)="downloadCSV()">
+          {{ exporting() ? 'Exporting...' : 'Export CSV' }}
+        </jiro-button>
+      </div>
 
       <!-- Loading -->
       <div *ngIf="loading()" class="state-message">
@@ -121,7 +137,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
   styles: [`
     :host { display: block; }
 
-    .session-history { max-width: 800px; width: 100%; overflow-x: hidden; }
+    .session-history { max-width: 800px; width: 100%; }
 
     .delete-confirm { display: flex; flex-direction: column; gap: var(--space-xs); }
 
@@ -141,6 +157,41 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     }
 
     .header-actions ::ng-deep .jiro-btn { width: auto; }
+
+    .export-row {
+      display: flex; align-items: flex-end; gap: var(--space-sm);
+      margin-bottom: var(--space-lg);
+    }
+
+    .export-row ::ng-deep .jiro-btn { width: auto; }
+
+    .date-field {
+      display: flex; flex-direction: column; gap: 4px;
+    }
+
+    .date-label {
+      font-size: var(--font-size-xs);
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .date-input {
+      padding: 6px 10px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      font-size: var(--font-size-sm);
+      font-family: inherit;
+      cursor: pointer;
+    }
+
+    .date-input:focus {
+      outline: none;
+      border-color: var(--color-primary);
+    }
 
     .state-message {
       display: flex; flex-direction: column; align-items: center;
@@ -280,6 +331,35 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       from { opacity: 0; transform: translateY(-4px); }
       to { opacity: 1; transform: translateY(0); }
     }
+
+    @media (max-width: 768px) {
+      .export-row { flex-wrap: wrap; align-items: flex-start; }
+      .date-field { flex: 1; min-width: 120px; }
+      .date-input { width: 100%; box-sizing: border-box; }
+
+      .session-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: var(--space-md);
+        gap: var(--space-xs);
+        position: relative;
+      }
+
+      .session-meta { flex-wrap: wrap; gap: var(--space-xs); }
+
+      .session-right {
+        width: 100%;
+        justify-content: flex-start;
+      }
+
+      .session-stats { flex-wrap: wrap; }
+
+      .delete-session-btn {
+        position: absolute;
+        top: var(--space-sm);
+        right: var(--space-sm);
+      }
+    }
   `]
 })
 export class SessionHistoryComponent implements OnInit {
@@ -290,6 +370,9 @@ export class SessionHistoryComponent implements OnInit {
   detailLoading = signal(false);
   deletingSession = signal<SessionSummary | null>(null);
   deletingInProgress = signal(false);
+  exporting = signal(false);
+  exportFrom = '';
+  exportTo = '';
 
   constructor(
     private jymService: JymService,
@@ -376,6 +459,23 @@ export class SessionHistoryComponent implements OnInit {
   startNew() {
     this.jymService.startSession({}).subscribe({
       next: s => this.router.navigate(['/jym/session', s.id]),
+    });
+  }
+
+  downloadCSV() {
+    this.exporting.set(true);
+    this.jymService.exportSessionsCSV(this.exportFrom || undefined, this.exportTo || undefined).subscribe({
+      next: (blob) => {
+        const date = new Date().toISOString().slice(0, 10);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `jym-export-${date}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.exporting.set(false);
+      },
+      error: () => this.exporting.set(false),
     });
   }
 }

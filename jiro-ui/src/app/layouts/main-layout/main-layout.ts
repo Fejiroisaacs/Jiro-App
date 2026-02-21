@@ -435,7 +435,7 @@ import { SettingsService } from '../../core/services/settings.service';
       .sidebar { display: none; }
 
       .main,
-      .sidebar-collapsed .main { margin-left: 0; transition: none; }
+      .sidebar-collapsed .main { margin-left: 0; transition: none; overflow-x: clip; }
 
       .topbar { padding: 0 var(--space-md); }
 

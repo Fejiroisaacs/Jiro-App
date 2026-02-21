@@ -66,6 +66,8 @@ type Split struct {
 	UserID       uuid.UUID `json:"user_id"`
 	Name         string    `json:"name"`
 	Description  *string   `json:"description"`
+	Visibility   string    `json:"visibility"`
+	Tags         []string  `json:"tags"`
 	RoutineCount int       `json:"routine_count,omitempty"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
@@ -77,13 +79,34 @@ type SplitWithRoutines struct {
 }
 
 type CreateSplitRequest struct {
-	Name        string  `json:"name" binding:"required"`
-	Description *string `json:"description"`
+	Name        string   `json:"name" binding:"required"`
+	Description *string  `json:"description"`
+	Tags        []string `json:"tags"`
 }
 
 type UpdateSplitRequest struct {
-	Name        *string `json:"name"`
-	Description *string `json:"description"`
+	Name        *string   `json:"name"`
+	Description *string   `json:"description"`
+	Visibility  *string   `json:"visibility"`
+	Tags        *[]string `json:"tags"`
+}
+
+// ─── Public Split Discovery ───────────────────────────────────────────────────
+
+type PublicSplitSummary struct {
+	ID           uuid.UUID `json:"id"`
+	Name         string    `json:"name"`
+	Description  *string   `json:"description"`
+	Tags         []string  `json:"tags"`
+	RoutineCount int       `json:"routine_count"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+type PublicSplitDetail struct {
+	SplitID   string                `json:"split_id"`
+	SplitName string                `json:"split_name"`
+	Tags      []string              `json:"tags"`
+	Routines  []ShareRoutinePreview `json:"routines"`
 }
 
 // ─── Routine ─────────────────────────────────────────────────────────────────
@@ -207,6 +230,44 @@ type CreateSeriesRequest struct {
 type UpdateSeriesRequest struct {
 	Name    *string    `json:"name"`
 	EndedAt *time.Time `json:"ended_at"`
+}
+
+// ─── Split Share ─────────────────────────────────────────────────────────────
+
+type SplitShare struct {
+	ID        uuid.UUID  `json:"id"`
+	SplitID   uuid.UUID  `json:"split_id"`
+	CreatedBy uuid.UUID  `json:"created_by"`
+	CreatedAt time.Time  `json:"created_at"`
+	ExpiresAt *time.Time `json:"expires_at"`
+}
+
+type CreateShareResponse struct {
+	ShareID string `json:"share_id"`
+	URL     string `json:"url"`
+}
+
+type ShareExercisePreview struct {
+	Name        string  `json:"name"`
+	MuscleGroup *string `json:"muscle_group"`
+	TargetSets  int     `json:"target_sets"`
+	TargetReps  int     `json:"target_reps"`
+}
+
+type ShareRoutinePreview struct {
+	Name      string                 `json:"name"`
+	DayOrder  int                    `json:"day_order"`
+	Exercises []ShareExercisePreview `json:"exercises"`
+}
+
+type SharePreview struct {
+	ShareID   string                `json:"share_id"`
+	SplitName string                `json:"split_name"`
+	Routines  []ShareRoutinePreview `json:"routines"`
+}
+
+type ImportShareResponse struct {
+	SplitID string `json:"split_id"`
 }
 
 // ─── Session ─────────────────────────────────────────────────────────────────

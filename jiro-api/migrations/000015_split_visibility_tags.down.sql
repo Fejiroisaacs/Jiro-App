@@ -1,0 +1,4 @@
+DROP INDEX IF EXISTS idx_splits_tags;
+DROP INDEX IF EXISTS idx_splits_public;
+ALTER TABLE splits DROP COLUMN IF EXISTS tags;
+ALTER TABLE splits DROP COLUMN IF EXISTS visibility;

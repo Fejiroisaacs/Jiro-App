@@ -78,11 +78,23 @@ export const routes: Routes = [
         loadComponent: () => import('./features/jym/pr-wall/pr-wall').then(m => m.PrWallComponent),
       },
       {
+        path: 'jym/discover',
+        loadComponent: () => import('./features/jym/discover/discover').then(m => m.DiscoverComponent),
+      },
+      {
+        path: 'jym/discover/:id',
+        loadComponent: () => import('./features/jym/discover/discover-detail').then(m => m.DiscoverDetailComponent),
+      },
+      {
         path: '',
         redirectTo: 'dashboard',
         pathMatch: 'full',
       },
     ],
+  },
+  {
+    path: 'jym/share/:share_id',
+    loadComponent: () => import('./features/jym/share-preview/share-preview').then(m => m.SharePreviewComponent),
   },
   {
     path: 'forgot-password',

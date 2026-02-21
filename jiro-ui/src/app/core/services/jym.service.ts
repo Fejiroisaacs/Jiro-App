@@ -50,9 +50,27 @@ export interface Split {
   user_id: string;
   name: string;
   description: string | null;
+  visibility: string;
+  tags: string[];
   routine_count: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface PublicSplitSummary {
+  id: string;
+  name: string;
+  description: string | null;
+  tags: string[];
+  routine_count: number;
+  created_at: string;
+}
+
+export interface PublicSplitDetail {
+  split_id: string;
+  split_name: string;
+  tags: string[];
+  routines: ShareRoutinePreview[];
 }
 
 export interface RoutineItem {
@@ -184,8 +202,8 @@ export interface StartSessionResponse extends Session {
 
 export interface CreateExerciseRequest { name: string; muscle_group?: string; notes?: string; }
 export interface UpdateExerciseRequest { name?: string; muscle_group?: string; notes?: string; }
-export interface CreateSplitRequest { name: string; description?: string; }
-export interface UpdateSplitRequest { name?: string; description?: string; }
+export interface CreateSplitRequest { name: string; description?: string; tags?: string[]; }
+export interface UpdateSplitRequest { name?: string; description?: string; visibility?: string; tags?: string[]; }
 export interface CreateRoutineRequest { name: string; day_order?: number; }
 export interface UpdateRoutineRequest { name?: string; day_order?: number; }
 export interface ReplaceItemEntry { exercise_id: string; target_sets: number; target_reps: number; }
@@ -195,6 +213,27 @@ export interface CreateSetRequest { exercise_id: string; set_number: number; wei
 export interface UpdateSetRequest { weight?: number; reps_performed?: number; rpe?: number; is_warmup?: boolean; exercise_note?: string; }
 export interface CreateSeriesRequest { split_id: string; name: string; duration_type: 'weeks' | 'sessions' | 'open'; target_weeks?: number; target_sessions?: number; }
 export interface UpdateSeriesRequest { name?: string; ended_at?: string; }
+
+// ─── Shares ───────────────────────────────────────────────────────────────────
+
+export interface ShareExercisePreview {
+  name: string;
+  muscle_group: string | null;
+  target_sets: number;
+  target_reps: number;
+}
+
+export interface ShareRoutinePreview {
+  name: string;
+  day_order: number;
+  exercises: ShareExercisePreview[];
+}
+
+export interface SharePreview {
+  share_id: string;
+  split_name: string;
+  routines: ShareRoutinePreview[];
+}
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
@@ -334,5 +373,47 @@ export class JymService {
 
   deleteSeries(id: string): Observable<void> {
     return this.http.delete<void>(`${API_URL}/series/${id}`);
+  }
+
+  // CSV Export
+  exportSessionsCSV(from?: string, to?: string): Observable<Blob> {
+    let params = new HttpParams();
+    if (from) params = params.set('from', from);
+    if (to) params = params.set('to', to);
+    return this.http.get(`${API_URL}/export/sessions.csv`, { responseType: 'blob', params });
+  }
+
+  // Split shares
+  createShare(splitId: string): Observable<{ share_id: string; url: string }> {
+    return this.http.post<{ share_id: string; url: string }>(`${API_URL}/splits/${splitId}/share`, {});
+  }
+
+  revokeShare(shareId: string): Observable<void> {
+    return this.http.delete<void>(`${API_URL}/shares/${shareId}`);
+  }
+
+  getSharePreview(shareId: string): Observable<SharePreview> {
+    return this.http.get<SharePreview>(`${API_URL}/shares/${shareId}`);
+  }
+
+  importShare(shareId: string): Observable<{ split_id: string }> {
+    return this.http.post<{ split_id: string }>(`${API_URL}/shares/${shareId}/import`, {});
+  }
+
+  // Public split discovery
+  listPublicSplits(search = '', tag = '', muscleGroup = '', page = 1): Observable<PublicSplitSummary[]> {
+    let params = new HttpParams().set('page', page.toString());
+    if (search) params = params.set('search', search);
+    if (tag) params = params.set('tag', tag);
+    if (muscleGroup) params = params.set('muscle_group', muscleGroup);
+    return this.http.get<PublicSplitSummary[]>(`${environment.apiUrl}/jym/public-splits`, { params });
+  }
+
+  getPublicSplit(splitId: string): Observable<PublicSplitDetail> {
+    return this.http.get<PublicSplitDetail>(`${environment.apiUrl}/jym/public-splits/${splitId}`);
+  }
+
+  importPublicSplit(splitId: string): Observable<{ split_id: string }> {
+    return this.http.post<{ split_id: string }>(`${API_URL}/public-splits/${splitId}/import`, {});
   }
 }

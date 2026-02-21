@@ -57,7 +57,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
           </div>
 
           <div class="card-footer">
-            <span class="sessions-pill">{{ sr.session_count }} sessions</span>
+            <span class="sessions-pill" *ngIf="!(sr.duration_type === 'sessions' && sr.target_sessions)">{{ sr.session_count }} sessions</span>
             <span class="duration-pill" *ngIf="sr.duration_type === 'weeks' && sr.target_weeks">
               {{ progressWeeks(sr) }} / {{ sr.target_weeks }} wks
             </span>
@@ -114,6 +114,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
       border-radius: var(--border-radius); padding: var(--space-lg);
       cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s;
       display: flex; flex-direction: column; gap: var(--space-md);
+      position: relative;
     }
 
     .series-card:hover { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(122,59,46,0.08); }
@@ -155,6 +156,22 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
     .del-btn:hover { color: var(--color-danger); background: rgba(196,74,74,0.1); }
 
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 768px) {
+      .del-btn {
+        position: absolute;
+        top: var(--space-md);
+        right: var(--space-md);
+        margin-left: 0;
+      }
+
+      .card-top { padding-right: 32px; }
+
+      .sessions-pill, .duration-pill {
+        font-size: 10px;
+        padding: 2px 8px;
+      }
+    }
   `]
 })
 export class SeriesListComponent implements OnInit {

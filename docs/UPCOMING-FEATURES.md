@@ -6,91 +6,28 @@ Planned features across all Jiro modules, in rough priority order.
 
 ## Jym
 
-### Split Sharing (copy-on-import)
+### Jym Dashboard / Split Manager Separation
 
-Allow users to share workout splits via a link. The recipient gets a full independent copy — no ongoing sync, no data exposure.
+The current `/jym` page acts as both a dashboard and a split manager, which is becoming too convoluted as features grow.
 
-**Schema changes**
+**Proposed split:**
 
-New migration: `000011_split_shares.up.sql`
+`/jym` → **Dashboard** (read-only, action-oriented)
 
-```sql
-CREATE TABLE split_shares (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  split_id   UUID NOT NULL REFERENCES splits(id) ON DELETE CASCADE,
-  created_by UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  expires_at TIMESTAMPTZ  -- NULL = never expires
-);
-CREATE INDEX idx_split_shares_split ON split_shares(split_id);
-```
+- Activity heatmap + muscle group tracker
+- In-progress sessions (Resume / Discard)
+- Active series (Start / View)
+- "Your Splits" summary row with a "Manage Splits →" link (no creation UI here)
+- "Freestyle Session" quick-start button
 
-**API endpoints**
+`/jym/splits` → **Split Manager** (pure management)
 
-| Method | Path | Description |
-| ------ | ---- | ----------- |
-| POST | `/jym/splits/:id/share` | Generate a share link, returns `{ share_id, url }` |
-| DELETE | `/jym/shares/:share_id` | Revoke a share link |
-| GET | `/jym/shares/:share_id` | Preview shared split (name, routines, exercise names) — no auth required |
-| POST | `/jym/shares/:share_id/import` | Import the split as a copy into the current user's account — auth required |
+- Splits grid with Build / Series / Start / Delete actions
+- New Split button + create modal (with tags)
+- New Series modal
+- Discover button linking to `/jym/discover`
 
-**Deep copy logic (import)**
-
-When a user imports:
-1. Look up `split_shares.share_id` → get `split_id`
-2. Copy the `splits` row → new split owned by the importing user
-3. Copy all `routines` → linked to the new split
-4. For each `routine_items` row, resolve the exercise name:
-   - If the importing user already has an exercise with the same name → reuse it
-   - Otherwise → create a new exercise in their library
-5. Copy `routine_items` rows referencing the resolved exercise IDs
-6. Return the new split ID
-
-The original owner's `user_id` and exercise IDs are never exposed.
-
-**Frontend**
-
-- Share button on split detail page → copies link to clipboard, shows revoke option
-- Public preview page at `/jym/share/:share_id` — accessible without login, shows split name and routine overview
-- "Import to my account" button on preview page → redirects to login if needed, then imports
-
----
-
-### CSV Export (Session History) Jym App
-
-Allow users to download their full session history as a CSV file for use in spreadsheets, external analysis tools, or personal backups.
-
-#### API endpoint
-
-| Method | Path | Description |
-| ------ | ---- | ----------- |
-| GET | `/jym/export/sessions.csv` | Stream a CSV of all sessions and sets for the authenticated user |
-
-Optional query params:
-
-- `from` / `to` — date range filter (ISO 8601)
-- `exercise_id` — filter to a single exercise
-
-#### CSV format
-
-```text
-date,session_id,routine,exercise,muscle_group,set,weight_kg,reps,rpe,is_warmup,is_pr,estimated_1rm
-2025-01-15,abc-123,Push Day,Bench Press,Chest,1,80,5,,false,false,93.3
-2025-01-15,abc-123,Push Day,Bench Press,Chest,2,80,5,,false,true,93.3
-```
-
-#### Implementation notes
-
-- Response header: `Content-Disposition: attachment; filename="jym-export-{date}.csv"`
-- Stream rows directly from a single joined query (sessions → sets → exercises) — no in-memory accumulation
-- Weights always exported in kg regardless of user unit preference; a header comment notes this
-- Warm-up sets included but flagged in the `is_warmup` column so users can filter them out
-
-#### Frontend
-
-- "Export CSV" button on the Session History page (`/jym/sessions`)
-- Optional date range picker before downloading
-- Triggers a file download directly from the API response
+**Router change:** `app.routes.ts` gets a new `jym/splits` route; `jym` becomes the new `JymDashboardComponent`. The existing `SplitListComponent` is renamed/moved to `jym/splits`. The Quick Nav links update accordingly.
 
 ---
 
