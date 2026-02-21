@@ -85,6 +85,10 @@ export const routes: Routes = [
     ],
   },
   {
+    path: 'jym/share/:share_id',
+    loadComponent: () => import('./features/jym/share-preview/share-preview').then(m => m.SharePreviewComponent),
+  },
+  {
     path: 'forgot-password',
     loadComponent: () => import('./features/auth/forgot-password').then(m => m.ForgotPasswordComponent),
   },

@@ -24,6 +24,9 @@ var (
 	ErrSetNotFound        = errors.New("set not found")
 	ErrBodyWeightNotFound = errors.New("body weight not found")
 	ErrSeriesNotFound     = errors.New("series not found")
+	ErrShareNotFound      = errors.New("share not found")
+	ErrShareExpired       = errors.New("share link has expired")
+	ErrShareForbidden     = errors.New("not your share link")
 )
 
 type JymService struct {
@@ -1176,6 +1179,305 @@ func (s *JymService) StreamSessionsCSV(ctx context.Context, userID uuid.UUID, fr
 
 	cw.Flush()
 	return cw.Error()
+}
+
+// ─── Split Shares ─────────────────────────────────────────────────────────────
+
+// CreateShare generates a share record for a split the user owns and returns a
+// shareable URL.
+func (s *JymService) CreateShare(ctx context.Context, userID, splitID uuid.UUID, appBaseURL string) (*models.CreateShareResponse, error) {
+	// Verify ownership
+	var ownerID uuid.UUID
+	err := s.db.QueryRow(ctx, `SELECT user_id FROM splits WHERE id = $1`, splitID).Scan(&ownerID)
+	if err == pgx.ErrNoRows {
+		return nil, ErrSplitNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if ownerID != userID {
+		return nil, ErrSplitNotFound
+	}
+
+	var shareID uuid.UUID
+	err = s.db.QueryRow(ctx,
+		`INSERT INTO split_shares (split_id, created_by) VALUES ($1, $2) RETURNING id`,
+		splitID, userID,
+	).Scan(&shareID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &models.CreateShareResponse{
+		ShareID: shareID.String(),
+		URL:     appBaseURL + "/jym/share/" + shareID.String(),
+	}, nil
+}
+
+// RevokeShare deletes a share the user owns.
+func (s *JymService) RevokeShare(ctx context.Context, userID, shareID uuid.UUID) error {
+	tag, err := s.db.Exec(ctx,
+		`DELETE FROM split_shares WHERE id = $1 AND created_by = $2`,
+		shareID, userID,
+	)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrShareNotFound
+	}
+	return nil
+}
+
+// GetSharePreview returns a public, sanitised preview of the shared split.
+func (s *JymService) GetSharePreview(ctx context.Context, shareID uuid.UUID) (*models.SharePreview, error) {
+	var splitID uuid.UUID
+	var expiresAt *time.Time
+	err := s.db.QueryRow(ctx,
+		`SELECT split_id, expires_at FROM split_shares WHERE id = $1`,
+		shareID,
+	).Scan(&splitID, &expiresAt)
+	if err == pgx.ErrNoRows {
+		return nil, ErrShareNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if expiresAt != nil && time.Now().After(*expiresAt) {
+		return nil, ErrShareExpired
+	}
+
+	var splitName string
+	err = s.db.QueryRow(ctx, `SELECT name FROM splits WHERE id = $1`, splitID).Scan(&splitName)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := s.db.Query(ctx, `
+		SELECT r.id, r.name, r.day_order,
+		       e.name, e.muscle_group,
+		       COALESCE(ri.target_sets, 0), COALESCE(ri.target_reps, 0)
+		FROM routines r
+		LEFT JOIN routine_items ri ON ri.routine_id = r.id
+		LEFT JOIN exercises e ON e.id = ri.exercise_id
+		WHERE r.split_id = $1
+		ORDER BY r.day_order, ri.order_index
+	`, splitID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	routineMap := map[uuid.UUID]*models.ShareRoutinePreview{}
+	var routineOrder []uuid.UUID
+
+	for rows.Next() {
+		var rID uuid.UUID
+		var rName string
+		var dayOrder int
+		var exName *string
+		var mg *string
+		var tSets, tReps int
+
+		if err := rows.Scan(&rID, &rName, &dayOrder, &exName, &mg, &tSets, &tReps); err != nil {
+			return nil, err
+		}
+		if _, ok := routineMap[rID]; !ok {
+			routineMap[rID] = &models.ShareRoutinePreview{
+				Name:      rName,
+				DayOrder:  dayOrder,
+				Exercises: []models.ShareExercisePreview{},
+			}
+			routineOrder = append(routineOrder, rID)
+		}
+		if exName != nil {
+			routineMap[rID].Exercises = append(routineMap[rID].Exercises, models.ShareExercisePreview{
+				Name:        *exName,
+				MuscleGroup: mg,
+				TargetSets:  tSets,
+				TargetReps:  tReps,
+			})
+		}
+	}
+
+	routines := make([]models.ShareRoutinePreview, 0, len(routineOrder))
+	for _, id := range routineOrder {
+		routines = append(routines, *routineMap[id])
+	}
+
+	return &models.SharePreview{
+		ShareID:   shareID.String(),
+		SplitName: splitName,
+		Routines:  routines,
+	}, nil
+}
+
+// ImportShare deep-copies a shared split into the importing user's account.
+// Original owner's user_id and exercise IDs are never exposed.
+func (s *JymService) ImportShare(ctx context.Context, importerID, shareID uuid.UUID) (uuid.UUID, error) {
+	// Resolve share → split
+	var splitID uuid.UUID
+	var expiresAt *time.Time
+	err := s.db.QueryRow(ctx,
+		`SELECT split_id, expires_at FROM split_shares WHERE id = $1`,
+		shareID,
+	).Scan(&splitID, &expiresAt)
+	if err == pgx.ErrNoRows {
+		return uuid.Nil, ErrShareNotFound
+	}
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if expiresAt != nil && time.Now().After(*expiresAt) {
+		return uuid.Nil, ErrShareExpired
+	}
+
+	// Load original split
+	var origName string
+	var origDesc *string
+	err = s.db.QueryRow(ctx,
+		`SELECT name, description FROM splits WHERE id = $1`, splitID,
+	).Scan(&origName, &origDesc)
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	// Load routines + items (all in one query)
+	rows, err := s.db.Query(ctx, `
+		SELECT r.id, r.name, r.day_order,
+		       e.name, e.muscle_group,
+		       COALESCE(ri.target_sets, 0), COALESCE(ri.target_reps, 0),
+		       COALESCE(ri.order_index, 0)
+		FROM routines r
+		LEFT JOIN routine_items ri ON ri.routine_id = r.id
+		LEFT JOIN exercises e ON e.id = ri.exercise_id
+		WHERE r.split_id = $1
+		ORDER BY r.day_order, ri.order_index
+	`, splitID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	defer rows.Close()
+
+	type itemRow struct {
+		exName     string
+		mg         *string
+		targetSets int
+		targetReps int
+		orderIdx   int
+	}
+	type routineData struct {
+		name     string
+		dayOrder int
+		items    []itemRow
+	}
+
+	rMap := map[uuid.UUID]*routineData{}
+	var rOrder []uuid.UUID
+
+	for rows.Next() {
+		var rID uuid.UUID
+		var rName string
+		var dayOrder int
+		var exName *string
+		var mg *string
+		var tSets, tReps, orderIdx int
+
+		if err := rows.Scan(&rID, &rName, &dayOrder, &exName, &mg, &tSets, &tReps, &orderIdx); err != nil {
+			return uuid.Nil, err
+		}
+		if _, ok := rMap[rID]; !ok {
+			rMap[rID] = &routineData{name: rName, dayOrder: dayOrder}
+			rOrder = append(rOrder, rID)
+		}
+		if exName != nil {
+			rMap[rID].items = append(rMap[rID].items, itemRow{
+				exName: *exName, mg: mg, targetSets: tSets, targetReps: tReps, orderIdx: orderIdx,
+			})
+		}
+	}
+	rows.Close()
+
+	// Resolve / create exercises for importer using a transaction
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	// Exercise name → importer's exercise ID cache
+	exCache := map[string]uuid.UUID{}
+
+	resolveExercise := func(name string, mg *string) (uuid.UUID, error) {
+		if id, ok := exCache[name]; ok {
+			return id, nil
+		}
+		var id uuid.UUID
+		err := tx.QueryRow(ctx,
+			`SELECT id FROM exercises WHERE user_id = $1 AND LOWER(name) = LOWER($2) LIMIT 1`,
+			importerID, name,
+		).Scan(&id)
+		if err == nil {
+			exCache[name] = id
+			return id, nil
+		}
+		if err != pgx.ErrNoRows {
+			return uuid.Nil, err
+		}
+		// Create new exercise
+		err = tx.QueryRow(ctx,
+			`INSERT INTO exercises (user_id, name, muscle_group) VALUES ($1, $2, $3) RETURNING id`,
+			importerID, name, mg,
+		).Scan(&id)
+		if err != nil {
+			return uuid.Nil, err
+		}
+		exCache[name] = id
+		return id, nil
+	}
+
+	// Create new split
+	var newSplitID uuid.UUID
+	err = tx.QueryRow(ctx,
+		`INSERT INTO splits (user_id, name, description) VALUES ($1, $2, $3) RETURNING id`,
+		importerID, origName, origDesc,
+	).Scan(&newSplitID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	// Copy routines + items
+	for _, rID := range rOrder {
+		rd := rMap[rID]
+		var newRoutineID uuid.UUID
+		err = tx.QueryRow(ctx,
+			`INSERT INTO routines (split_id, name, day_order) VALUES ($1, $2, $3) RETURNING id`,
+			newSplitID, rd.name, rd.dayOrder,
+		).Scan(&newRoutineID)
+		if err != nil {
+			return uuid.Nil, err
+		}
+
+		for _, item := range rd.items {
+			exID, err := resolveExercise(item.exName, item.mg)
+			if err != nil {
+				return uuid.Nil, err
+			}
+			_, err = tx.Exec(ctx,
+				`INSERT INTO routine_items (routine_id, exercise_id, target_sets, target_reps, order_index)
+				 VALUES ($1, $2, $3, $4, $5)`,
+				newRoutineID, exID, item.targetSets, item.targetReps, item.orderIdx,
+			)
+			if err != nil {
+				return uuid.Nil, err
+			}
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return uuid.Nil, err
+	}
+	return newSplitID, nil
 }
 
 func intStr(n int) string {

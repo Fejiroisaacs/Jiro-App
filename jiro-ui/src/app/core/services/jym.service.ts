@@ -196,6 +196,27 @@ export interface UpdateSetRequest { weight?: number; reps_performed?: number; rp
 export interface CreateSeriesRequest { split_id: string; name: string; duration_type: 'weeks' | 'sessions' | 'open'; target_weeks?: number; target_sessions?: number; }
 export interface UpdateSeriesRequest { name?: string; ended_at?: string; }
 
+// ─── Shares ───────────────────────────────────────────────────────────────────
+
+export interface ShareExercisePreview {
+  name: string;
+  muscle_group: string | null;
+  target_sets: number;
+  target_reps: number;
+}
+
+export interface ShareRoutinePreview {
+  name: string;
+  day_order: number;
+  exercises: ShareExercisePreview[];
+}
+
+export interface SharePreview {
+  share_id: string;
+  split_name: string;
+  routines: ShareRoutinePreview[];
+}
+
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 @Injectable({ providedIn: 'root' })
@@ -342,5 +363,22 @@ export class JymService {
     if (from) params = params.set('from', from);
     if (to) params = params.set('to', to);
     return this.http.get(`${API_URL}/export/sessions.csv`, { responseType: 'blob', params });
+  }
+
+  // Split shares
+  createShare(splitId: string): Observable<{ share_id: string; url: string }> {
+    return this.http.post<{ share_id: string; url: string }>(`${API_URL}/splits/${splitId}/share`, {});
+  }
+
+  revokeShare(shareId: string): Observable<void> {
+    return this.http.delete<void>(`${API_URL}/shares/${shareId}`);
+  }
+
+  getSharePreview(shareId: string): Observable<SharePreview> {
+    return this.http.get<SharePreview>(`${API_URL}/shares/${shareId}`);
+  }
+
+  importShare(shareId: string): Observable<{ split_id: string }> {
+    return this.http.post<{ split_id: string }>(`${API_URL}/shares/${shareId}/import`, {});
   }
 }

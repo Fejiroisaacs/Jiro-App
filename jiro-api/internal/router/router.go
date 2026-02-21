@@ -30,7 +30,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	userHandler := handlers.NewUserHandler(userService)
 	healthHandler := handlers.NewHealthHandler(db)
 	recipeHandler := handlers.NewRecipeHandler(recipeService)
-	jymHandler := handlers.NewJymHandler(jymService)
+	jymHandler := handlers.NewJymHandler(jymService, cfg.AppBaseURL)
 
 	// Rate limiter
 	rl := middleware.NewRateLimiter()
@@ -43,6 +43,9 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 
 		// Public profile lookup (no auth required)
 		v1.GET("/profiles/:username", userHandler.GetPublicProfile)
+
+		// Public split share preview (no auth required)
+		v1.GET("/jym/shares/:share_id", jymHandler.GetSharePreview)
 
 		// Auth routes (rate limited by IP: 10/min)
 		auth := v1.Group("/auth")
@@ -127,6 +130,11 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 				jym.GET("/series/:id", jymHandler.GetSeries)
 				jym.PATCH("/series/:id", jymHandler.UpdateSeries)
 				jym.DELETE("/series/:id", jymHandler.DeleteSeries)
+
+				// Split shares (auth required for create/revoke/import)
+				jym.POST("/splits/:split_id/share", jymHandler.CreateShare)
+				jym.DELETE("/shares/:share_id", jymHandler.RevokeShare)
+				jym.POST("/shares/:share_id/import", jymHandler.ImportShare)
 			}
 		}
 	}

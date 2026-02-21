@@ -13,10 +13,11 @@ import (
 
 type JymHandler struct {
 	jymService *services.JymService
+	appBaseURL string
 }
 
-func NewJymHandler(jymService *services.JymService) *JymHandler {
-	return &JymHandler{jymService: jymService}
+func NewJymHandler(jymService *services.JymService, appBaseURL string) *JymHandler {
+	return &JymHandler{jymService: jymService, appBaseURL: appBaseURL}
 }
 
 // ─── Exercises ────────────────────────────────────────────────────────────────
@@ -630,4 +631,89 @@ func (h *JymHandler) ExportSessions(c *gin.Context) {
 	if err := h.jymService.StreamSessionsCSV(c.Request.Context(), userID, from, to, exerciseID, c.Writer); err != nil {
 		log.Error().Err(err).Msg("failed to stream sessions CSV")
 	}
+}
+
+// ─── Split Shares ─────────────────────────────────────────────────────────────
+
+func (h *JymHandler) CreateShare(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	splitID, err := uuid.Parse(c.Param("split_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid split ID"}})
+		return
+	}
+	resp, err := h.jymService.CreateShare(c.Request.Context(), userID, splitID, h.appBaseURL)
+	if err != nil {
+		if err == services.ErrSplitNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Split not found"}})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to create share"}})
+		return
+	}
+	c.JSON(http.StatusCreated, resp)
+}
+
+func (h *JymHandler) RevokeShare(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	shareID, err := uuid.Parse(c.Param("share_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid share ID"}})
+		return
+	}
+	if err := h.jymService.RevokeShare(c.Request.Context(), userID, shareID); err != nil {
+		if err == services.ErrShareNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Share not found"}})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to revoke share"}})
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+// GetSharePreview is a public endpoint — no auth required.
+func (h *JymHandler) GetSharePreview(c *gin.Context) {
+	shareID, err := uuid.Parse(c.Param("share_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid share ID"}})
+		return
+	}
+	preview, err := h.jymService.GetSharePreview(c.Request.Context(), shareID)
+	if err != nil {
+		if err == services.ErrShareNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Share link not found"}})
+			return
+		}
+		if err == services.ErrShareExpired {
+			c.JSON(http.StatusGone, models.ErrorResponse{Error: models.ErrorDetail{Code: "SHARE_EXPIRED", Message: "This share link has expired"}})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to load share"}})
+		return
+	}
+	c.JSON(http.StatusOK, preview)
+}
+
+func (h *JymHandler) ImportShare(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	shareID, err := uuid.Parse(c.Param("share_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid share ID"}})
+		return
+	}
+	newSplitID, err := h.jymService.ImportShare(c.Request.Context(), userID, shareID)
+	if err != nil {
+		if err == services.ErrShareNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Share link not found"}})
+			return
+		}
+		if err == services.ErrShareExpired {
+			c.JSON(http.StatusGone, models.ErrorResponse{Error: models.ErrorDetail{Code: "SHARE_EXPIRED", Message: "This share link has expired"}})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to import split"}})
+		return
+	}
+	c.JSON(http.StatusCreated, models.ImportShareResponse{SplitID: newSplitID.String()})
 }
