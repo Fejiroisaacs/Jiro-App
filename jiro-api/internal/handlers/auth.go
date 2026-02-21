@@ -100,7 +100,13 @@ func (h *AuthHandler) Register(c *gin.Context) {
 			return
 		}
 		link := fmt.Sprintf("%s/verify-email?token=%s", h.appBaseURL, rawToken)
-		body := fmt.Sprintf(`<p>Welcome to Jiro! Please verify your email:</p><p><a href="%s">Verify Email</a></p>`, link)
+		body := buildEmailHTML(
+			"Welcome to Jiro! Made with ❤️ by Fejiro :)",
+			"Thanks for signing up. Please verify your email address to get started.",
+			link,
+			"Verify Email",
+			"If you didn't create a Jiro account, you can safely ignore this email.",
+		)
 		if err := h.emailService.Send(user.Email, "Verify your Jiro account", body); err != nil {
 			log.Error().Err(err).Msg("Failed to send verification email")
 		}
@@ -286,7 +292,13 @@ func (h *AuthHandler) ResendVerification(c *gin.Context) {
 	}
 
 	link := fmt.Sprintf("%s/verify-email?token=%s", h.appBaseURL, rawToken)
-	body := fmt.Sprintf(`<p>Here is your new verification link for Jiro:</p><p><a href="%s">Verify Email</a></p>`, link)
+	body := buildEmailHTML(
+		"Verify Your Email",
+		"Here's a new verification link for your Jiro account.",
+		link,
+		"Verify Email",
+		"If you didn't request this, you can safely ignore this email.",
+	)
 	go h.emailService.Send(user.Email, "Verify your Jiro account", body)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Verification email sent"})
@@ -314,7 +326,13 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 	}
 
 	link := fmt.Sprintf("%s/reset-password?token=%s", h.appBaseURL, rawToken)
-	body := fmt.Sprintf(`<p>You requested a password reset for your Jiro account. Click the link below to set a new password:</p><p><a href="%s">Reset Password</a></p><p>This link expires in 1 hour. If you did not request this, ignore this email.</p>`, link)
+	body := buildEmailHTML(
+		"Reset Your Password",
+		"You requested a password reset for your Jiro account. Click the button below to set a new password.",
+		link,
+		"Reset Password",
+		"This link expires in 1 hour. If you didn't request a password reset, you can safely ignore this email.",
+	)
 	go h.emailService.Send(user.Email, "Reset your Jiro password", body)
 
 	c.JSON(http.StatusOK, gin.H{"message": "If that email is registered, you'll receive a reset link"})
@@ -351,4 +369,37 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Password updated successfully"})
+}
+
+func buildEmailHTML(heading, message, actionURL, buttonText, footer string) string {
+	return fmt.Sprintf(`<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background-color:#1a1a1a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="background-color:#1a1a1a;padding:40px 20px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="max-width:480px;background-color:#252525;border-radius:12px;overflow:hidden;">
+        <!-- Header -->
+        <tr><td style="padding:32px 32px 0;text-align:center;">
+          <h1 style="margin:0;font-size:28px;font-weight:700;color:#e8ddd3;letter-spacing:-0.5px;">Jiro</h1>
+        </td></tr>
+        <!-- Body -->
+        <tr><td style="padding:24px 32px 32px;">
+          <h2 style="margin:0 0 12px;font-size:20px;font-weight:600;color:#e0d4c8;">%s</h2>
+          <p style="margin:0 0 28px;font-size:15px;line-height:1.6;color:#a39888;">%s</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
+            <tr><td style="border-radius:8px;background-color:#7a3b2e;">
+              <a href="%s" target="_blank" style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">%s</a>
+            </td></tr>
+          </table>
+        </td></tr>
+        <!-- Footer -->
+        <tr><td style="padding:0 32px 28px;">
+          <p style="margin:0;font-size:13px;line-height:1.5;color:#6b5e52;text-align:center;">%s</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`, heading, message, actionURL, buttonText, footer)
 }
