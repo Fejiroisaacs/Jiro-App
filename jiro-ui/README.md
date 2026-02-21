@@ -41,7 +41,7 @@ Opens at `http://localhost:4200`. Hot-reloads on file changes.
 ng build
 ```
 
-Output goes to `dist/jiro-ui/`. Production build is optimised and minified.
+Output goes to `dist/jiro-ui/browser/`. Production build is optimised and minified. Uses `environment.production.ts` which points to the Cloud Run API.
 
 ### Build and watch (dev)
 
@@ -79,6 +79,9 @@ jiro-ui/
 │       ├── culinara-icon.svg
 │       └── jym-icon.svg
 ├── src/
+│   ├── environments/
+│   │   ├── environment.ts              # Dev — points to localhost:8080
+│   │   └── environment.production.ts   # Prod — points to Cloud Run
 │   ├── app/
 │   │   ├── app.ts          # Root component
 │   │   ├── app.routes.ts   # Top-level lazy routes
@@ -153,6 +156,28 @@ html.theme-slate     html.theme-rust
 ```
 
 Theme preference is persisted to the user's account via the API.
+
+---
+
+## Environments
+
+| File | Used when | API target |
+| ---- | --------- | ---------- |
+| `environment.ts` | `ng serve` (dev) | `http://localhost:8080` |
+| `environment.production.ts` | `ng build` (prod) | Cloud Run URL |
+
+Angular automatically swaps the file at build time via `fileReplacements` in `angular.json`. Never hardcode API URLs in services — always use `environment.apiUrl`.
+
+---
+
+## Deploy to Firebase Hosting
+
+From the project root:
+
+```bash
+cd jiro-ui && ng build && cd ..
+firebase deploy --only hosting
+```
 
 ---
 
