@@ -102,11 +102,9 @@ import { SettingsService } from '../../core/services/settings.service';
         </header>
 
         <!-- Email verification banner -->
-        <div class="verify-banner" *ngIf="authService.user() as user">
-          <ng-container *ngIf="!user.email_verified">
-            <span>Please verify your email to unlock sharing features.</span>
-            <button class="verify-banner-btn" (click)="resendVerification()">Resend email</button>
-          </ng-container>
+        <div class="verify-banner" *ngIf="authService.user() && !authService.user()!.email_verified">
+          <span>Please verify your email to unlock sharing features.</span>
+          <button class="verify-banner-btn" (click)="resendVerification()">Resend email</button>
         </div>
 
         <!-- Page content -->
