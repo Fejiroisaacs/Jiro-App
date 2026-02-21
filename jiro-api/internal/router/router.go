@@ -23,9 +23,10 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	userService := services.NewUserService(db)
 	recipeService := services.NewRecipeService(db)
 	jymService := services.NewJymService(db)
+	emailService := services.NewEmailService(cfg.ResendAPIKey, cfg.EmailFrom)
 
 	// Handlers
-	authHandler := handlers.NewAuthHandler(authService, userService, cfg)
+	authHandler := handlers.NewAuthHandler(authService, userService, emailService, cfg)
 	userHandler := handlers.NewUserHandler(userService)
 	healthHandler := handlers.NewHealthHandler(db)
 	recipeHandler := handlers.NewRecipeHandler(recipeService)
@@ -51,6 +52,9 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			auth.POST("/login", authHandler.Login)
 			auth.POST("/refresh", authHandler.Refresh)
 			auth.POST("/logout", authHandler.Logout)
+			auth.POST("/verify-email", authHandler.VerifyEmail)
+			auth.POST("/forgot-password", authHandler.ForgotPassword)
+			auth.POST("/reset-password", authHandler.ResetPassword)
 		}
 
 		// Protected routes (require JWT)
@@ -59,6 +63,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 		{
 			protected.GET("/user/me", userHandler.GetMe)
 			protected.PATCH("/user/me", userHandler.UpdateMe)
+			protected.POST("/auth/resend-verification", authHandler.ResendVerification)
 
 			// Culinara (Recipe Module)
 			culinara := protected.Group("/culinara")

@@ -178,6 +178,14 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID uuid.UUID, req *
 	return user, nil
 }
 
+func (s *UserService) SetEmailVerified(ctx context.Context, userID uuid.UUID) error {
+	_, err := s.db.Exec(ctx,
+		"UPDATE users SET email_verified = true, updated_at = NOW() WHERE id = $1",
+		userID,
+	)
+	return err
+}
+
 func (s *UserService) GetByUsername(ctx context.Context, username string) (*models.PublicUser, error) {
 	pub := &models.PublicUser{}
 	err := s.db.QueryRow(ctx,

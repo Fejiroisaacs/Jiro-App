@@ -38,6 +38,8 @@ import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-inpu
               name="password">
             </jiro-input>
 
+            <a routerLink="/forgot-password" class="forgot-link">Forgot password?</a>
+
             <jiro-button type="submit" [loading]="loading()" [disabled]="!email || !password">
               Sign In
             </jiro-button>
@@ -86,6 +88,18 @@ import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-inpu
       display: flex;
       flex-direction: column;
       gap: var(--space-md);
+    }
+
+    .forgot-link {
+      align-self: flex-end;
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+      text-decoration: none;
+      margin-top: -4px;
+    }
+
+    .forgot-link:hover {
+      color: var(--text-primary);
     }
 
     .auth-footer {

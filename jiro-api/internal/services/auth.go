@@ -187,3 +187,117 @@ func (s *AuthService) RevokeAllUserTokens(ctx context.Context, userID uuid.UUID)
 	_, err := s.db.Exec(ctx, "DELETE FROM refresh_tokens WHERE user_id = $1", userID)
 	return err
 }
+
+// Email verification tokens
+
+var ErrTokenExpired = errors.New("token has expired")
+
+func generateHexToken() (rawToken, tokenHash string, err error) {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return "", "", err
+	}
+	rawToken = hex.EncodeToString(raw)
+	h := sha256.Sum256([]byte(rawToken))
+	tokenHash = hex.EncodeToString(h[:])
+	return rawToken, tokenHash, nil
+}
+
+func (s *AuthService) CreateEmailVerification(ctx context.Context, userID uuid.UUID) (string, error) {
+	rawToken, tokenHash, err := generateHexToken()
+	if err != nil {
+		return "", err
+	}
+
+	// Delete any existing verification tokens for this user
+	s.db.Exec(ctx, "DELETE FROM email_verifications WHERE user_id = $1", userID)
+
+	expiresAt := time.Now().Add(24 * time.Hour)
+	_, err = s.db.Exec(ctx,
+		"INSERT INTO email_verifications (user_id, token_hash, expires_at) VALUES ($1, $2, $3)",
+		userID, tokenHash, expiresAt,
+	)
+	if err != nil {
+		return "", err
+	}
+	return rawToken, nil
+}
+
+func (s *AuthService) VerifyEmailToken(ctx context.Context, rawToken string) (uuid.UUID, error) {
+	h := sha256.Sum256([]byte(rawToken))
+	tokenHash := hex.EncodeToString(h[:])
+
+	var userID uuid.UUID
+	var expiresAt time.Time
+	err := s.db.QueryRow(ctx,
+		"SELECT user_id, expires_at FROM email_verifications WHERE token_hash = $1",
+		tokenHash,
+	).Scan(&userID, &expiresAt)
+	if err != nil {
+		return uuid.Nil, ErrInvalidToken
+	}
+
+	if time.Now().After(expiresAt) {
+		s.db.Exec(ctx, "DELETE FROM email_verifications WHERE token_hash = $1", tokenHash)
+		return uuid.Nil, ErrTokenExpired
+	}
+
+	s.db.Exec(ctx, "DELETE FROM email_verifications WHERE token_hash = $1", tokenHash)
+	return userID, nil
+}
+
+// Password reset tokens
+
+func (s *AuthService) CreatePasswordReset(ctx context.Context, userID uuid.UUID) (string, error) {
+	rawToken, tokenHash, err := generateHexToken()
+	if err != nil {
+		return "", err
+	}
+
+	// Delete any existing reset tokens for this user
+	s.db.Exec(ctx, "DELETE FROM password_resets WHERE user_id = $1", userID)
+
+	expiresAt := time.Now().Add(1 * time.Hour)
+	_, err = s.db.Exec(ctx,
+		"INSERT INTO password_resets (user_id, token_hash, expires_at) VALUES ($1, $2, $3)",
+		userID, tokenHash, expiresAt,
+	)
+	if err != nil {
+		return "", err
+	}
+	return rawToken, nil
+}
+
+func (s *AuthService) ConsumePasswordReset(ctx context.Context, rawToken, newPasswordHash string) error {
+	h := sha256.Sum256([]byte(rawToken))
+	tokenHash := hex.EncodeToString(h[:])
+
+	var userID uuid.UUID
+	var expiresAt time.Time
+	var usedAt *time.Time
+	err := s.db.QueryRow(ctx,
+		"SELECT user_id, expires_at, used_at FROM password_resets WHERE token_hash = $1",
+		tokenHash,
+	).Scan(&userID, &expiresAt, &usedAt)
+	if err != nil {
+		return ErrInvalidToken
+	}
+
+	if usedAt != nil {
+		return ErrInvalidToken
+	}
+
+	if time.Now().After(expiresAt) {
+		return ErrTokenExpired
+	}
+
+	// Mark token as used
+	s.db.Exec(ctx, "UPDATE password_resets SET used_at = NOW() WHERE token_hash = $1", tokenHash)
+
+	// Update password
+	_, err = s.db.Exec(ctx,
+		"UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2",
+		newPasswordHash, userID,
+	)
+	return err
+}

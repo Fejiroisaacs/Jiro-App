@@ -18,6 +18,9 @@ type Config struct {
 	RefreshTokenTTL time.Duration
 	CORSOrigins     []string
 	Environment     string // "development" or "production"
+	ResendAPIKey    string
+	EmailFrom       string
+	AppBaseURL      string
 }
 
 func Load() *Config {
@@ -33,6 +36,9 @@ func Load() *Config {
 		RefreshTokenTTL: getDuration("JWT_REFRESH_TTL_DAYS", 7*24*60), // 7 days in minutes
 		CORSOrigins:     strings.Split(getEnv("CORS_ORIGINS", "http://localhost:4200"), ","),
 		Environment:     getEnv("ENVIRONMENT", "development"),
+		ResendAPIKey:    getEnv("RESEND_API_KEY", ""),
+		EmailFrom:       getEnv("EMAIL_FROM", "noreply@jiro.app"),
+		AppBaseURL:      getEnv("APP_BASE_URL", "http://localhost:4200"),
 	}
 }
 

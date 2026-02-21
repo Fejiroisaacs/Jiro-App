@@ -101,6 +101,14 @@ import { SettingsService } from '../../core/services/settings.service';
           </div>
         </header>
 
+        <!-- Email verification banner -->
+        <div class="verify-banner" *ngIf="authService.user() as user">
+          <ng-container *ngIf="!user.email_verified">
+            <span>Please verify your email to unlock sharing features.</span>
+            <button class="verify-banner-btn" (click)="resendVerification()">Resend email</button>
+          </ng-container>
+        </div>
+
         <!-- Page content -->
         <main class="content">
           <router-outlet></router-outlet>
@@ -352,6 +360,34 @@ import { SettingsService } from '../../core/services/settings.service';
       color: var(--color-danger);
     }
 
+    .verify-banner {
+      background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+      border-bottom: 1px solid color-mix(in srgb, var(--color-primary) 25%, transparent);
+      padding: 10px var(--space-lg);
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      font-size: var(--font-size-sm);
+      color: var(--text-primary);
+    }
+
+    .verify-banner-btn {
+      background: none;
+      border: 1px solid var(--color-primary);
+      color: var(--color-primary);
+      font-size: var(--font-size-xs);
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: var(--border-radius);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .verify-banner-btn:hover {
+      background: var(--color-primary);
+      color: var(--text-on-primary);
+    }
+
     .content {
       flex: 1;
       padding: var(--space-xl);
@@ -429,5 +465,9 @@ export class MainLayoutComponent {
     const user = this.authService.user();
     if (!user) return '?';
     return (user.display_name || user.email)[0].toUpperCase();
+  }
+
+  resendVerification() {
+    this.authService.resendVerification().subscribe();
   }
 }

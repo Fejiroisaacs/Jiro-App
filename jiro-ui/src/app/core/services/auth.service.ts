@@ -96,6 +96,30 @@ export class AuthService {
       }));
   }
 
+  verifyEmail(token: string) {
+    return this.http.post<{ message: string }>(`${API_URL}/auth/verify-email`, { token })
+      .pipe(tap(() => {
+        const user = this.currentUser();
+        if (user) {
+          const updated = { ...user, email_verified: true };
+          this.currentUser.set(updated);
+          localStorage.setItem('jiro_user', JSON.stringify(updated));
+        }
+      }));
+  }
+
+  resendVerification() {
+    return this.http.post<{ message: string }>(`${API_URL}/auth/resend-verification`, {});
+  }
+
+  forgotPassword(email: string) {
+    return this.http.post<void>(`${API_URL}/auth/forgot-password`, { email });
+  }
+
+  resetPassword(token: string, password: string) {
+    return this.http.post<void>(`${API_URL}/auth/reset-password`, { token, password });
+  }
+
   private handleAuth(res: AuthResponse) {
     this.accessToken.set(res.access_token);
     this.currentUser.set(res.user);

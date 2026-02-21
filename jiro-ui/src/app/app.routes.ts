@@ -85,6 +85,18 @@ export const routes: Routes = [
     ],
   },
   {
+    path: 'forgot-password',
+    loadComponent: () => import('./features/auth/forgot-password').then(m => m.ForgotPasswordComponent),
+  },
+  {
+    path: 'reset-password',
+    loadComponent: () => import('./features/auth/reset-password').then(m => m.ResetPasswordComponent),
+  },
+  {
+    path: 'verify-email',
+    loadComponent: () => import('./features/auth/verify-email').then(m => m.VerifyEmailComponent),
+  },
+  {
     path: '**',
     redirectTo: 'login',
   },
