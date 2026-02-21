@@ -1,2 +1,10 @@
 .claude/*
+.agents/
+skills-lock.json
 desktop.ini
+
+# Firebase
+.firebase/
+
+# Environment
+jiro-api/.env
