@@ -6,45 +6,28 @@ Planned features across all Jiro modules, in rough priority order.
 
 ## Jym
 
-### Public Split Discovery
+### Jym Dashboard / Split Manager Separation
 
-Allow users to opt-in to making their splits publicly browseable. Anyone can view and copy a public split — no link required.
+The current `/jym` page acts as both a dashboard and a split manager, which is becoming too convoluted as features grow.
 
-**Schema changes**
+**Proposed split:**
 
-New migration: `000015_split_visibility_tags.up.sql`
+`/jym` → **Dashboard** (read-only, action-oriented)
 
-```sql
-ALTER TABLE splits ADD COLUMN visibility TEXT NOT NULL DEFAULT 'private'
-  CHECK (visibility IN ('private', 'public'));
+- Activity heatmap + muscle group tracker
+- In-progress sessions (Resume / Discard)
+- Active series (Start / View)
+- "Your Splits" summary row with a "Manage Splits →" link (no creation UI here)
+- "Freestyle Session" quick-start button
 
-ALTER TABLE splits ADD COLUMN tags TEXT[] NOT NULL DEFAULT '{}';
+`/jym/splits` → **Split Manager** (pure management)
 
-CREATE INDEX idx_splits_public ON splits(visibility, created_at DESC)
-  WHERE visibility = 'public';
+- Splits grid with Build / Series / Start / Delete actions
+- New Split button + create modal (with tags)
+- New Series modal
+- Discover button linking to `/jym/discover`
 
-CREATE INDEX idx_splits_tags ON splits USING GIN(tags);
-```
-
-**API endpoints**
-
-| Method | Path | Description |
-| ------ | ---- | ----------- |
-| GET | `/jym/public-splits` | Browse public splits — paginated, optional `?search=`, `?tag=`, and `?muscle_group=` filters — no auth required |
-| GET | `/jym/public-splits/:id` | Public split detail (name, tags, routines, exercise names) — no auth required |
-| POST | `/jym/public-splits/:id/import` | Deep-copy the split into the caller's account — auth required |
-
-The `PATCH /jym/splits/:id` endpoint gains `visibility` and `tags` fields. The `POST /jym/splits` and `PUT /jym/splits/:id` endpoints also accept `tags`. Tag filtering uses the PostgreSQL `&&` array overlap operator (`WHERE tags && ARRAY[$1]`). Import logic reuses the existing `copySplit` helper from share imports.
-
-Tags also apply to private splits — users can tag and filter their own splits in the personal split list (`GET /jym/splits?tag=ppl`), independent of the public discovery feature.
-
-**Frontend**
-
-- Tags input on the split create/edit form — comma-separated or chip-style entry
-- Tag chips displayed on each split card (personal list and discover page)
-- Visibility toggle on the split detail page (Private / Public)
-- New `/jym/discover` browse page — card grid with search, tag filter, and muscle group filter, accessible without login
-- Public split detail at `/jym/discover/:id` — same layout as the share preview page, with "Import to My Account" button
+**Router change:** `app.routes.ts` gets a new `jym/splits` route; `jym` becomes the new `JymDashboardComponent`. The existing `SplitListComponent` is renamed/moved to `jym/splits`. The Quick Nav links update accordingly.
 
 ---
 
