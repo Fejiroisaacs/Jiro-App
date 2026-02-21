@@ -78,7 +78,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
             {{ sharing() ? 'Generating...' : 'Share' }}
           </jiro-button>
           <jiro-button variant="primary" type="button" (click)="showAddRoutine.set(true)">
-            + Add Day
+            Add Day
           </jiro-button>
         </div>
       </div>
@@ -526,6 +526,16 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     }
     .share-revoke-btn:hover { color: var(--color-danger); }
 
+    @media (max-width: 600px) {
+      .header-btns {
+        flex-direction: column;
+      }
+
+      .header-btns ::ng-deep .jiro-btn {
+        width: 100%;
+      }
+    }
+
     @keyframes spin { to { transform: rotate(360deg); } }
   `]
 })
@@ -564,7 +574,7 @@ export class SplitDetailComponent implements OnInit {
     private jymService: JymService,
     private route: ActivatedRoute,
     private router: Router,
-  ) {}
+  ) { }
 
   ngOnInit() {
     this.splitId = this.route.snapshot.paramMap.get('id') || '';
