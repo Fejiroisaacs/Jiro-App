@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, AfterViewInit, ViewChild, ElementRef } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 
 @Component({
@@ -6,7 +6,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
   standalone: true,
   imports: [RouterLink, RouterLinkActive],
   template: `
-    <div class="quick-nav">
+    <div class="quick-nav" #navStrip>
       <a routerLink="/jym" routerLinkActive="current" [routerLinkActiveOptions]="{ exact: true }" class="quick-link">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/>
@@ -46,10 +46,14 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
     </div>
   `,
   styles: [`
+    :host {
+      display: block;
+      margin-bottom: var(--space-xl);
+    }
+
     .quick-nav {
       display: flex;
       gap: var(--space-sm);
-      margin-bottom: var(--space-xl);
       flex-wrap: wrap;
     }
 
@@ -80,6 +84,47 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
       background: rgba(122, 59, 46, 0.06);
       font-weight: 500;
     }
+
+    @media (max-width: 600px) {
+      :host {
+        position: sticky;
+        top: var(--topbar-height, 56px);
+        z-index: 40;
+        background: var(--bg-canvas);
+        margin-bottom: var(--space-lg);
+        padding: var(--space-sm) 0;
+      }
+
+      .quick-nav {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding-right: var(--space-xl);
+        mask-image: linear-gradient(to right, black 85%, transparent 100%);
+        -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
+      }
+
+      .quick-nav::-webkit-scrollbar { display: none; }
+
+      .quick-link {
+        white-space: nowrap;
+        flex-shrink: 0;
+        font-size: var(--font-size-sm);
+      }
+    }
   `]
 })
-export class JymQuickNavComponent {}
+export class JymQuickNavComponent implements AfterViewInit {
+  @ViewChild('navStrip') navStrip!: ElementRef<HTMLElement>;
+
+  ngAfterViewInit() {
+    if (window.innerWidth <= 600) {
+      const el = this.navStrip.nativeElement;
+      setTimeout(() => {
+        el.scrollTo({ left: 60, behavior: 'smooth' });
+        setTimeout(() => el.scrollTo({ left: 0, behavior: 'smooth' }), 600);
+      }, 400);
+    }
+  }
+}
