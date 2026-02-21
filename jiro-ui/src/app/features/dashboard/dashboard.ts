@@ -31,7 +31,7 @@ interface ModuleCard {
           [routerLink]="mod.available ? mod.route : null"
           class="module-card">
           <div class="module-icon" [style.background]="mod.color">
-            <img [src]="mod.icon" [alt]="mod.name + ' icon'" class="w-full h-full object-contain">
+            <img [src]="mod.icon" [alt]="mod.name + ' icon'" class="module-icon-img">
           </div>
           <h3 class="module-name">{{ mod.name }}</h3>
           <p class="module-desc text-secondary">{{ mod.description }}</p>
@@ -74,6 +74,21 @@ interface ModuleCard {
       justify-content: center;
       font-size: 24px;
       margin-bottom: var(--space-md);
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .module-icon-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    @media (max-width: 480px) {
+      .module-icon {
+        width: 40px;
+        height: 40px;
+      }
     }
 
     .module-name {
@@ -143,7 +158,7 @@ export class DashboardComponent {
     },
   ];
 
-  constructor(private authService: AuthService) {}
+  constructor(private authService: AuthService) { }
 
   userName(): string {
     const user = this.authService.user();

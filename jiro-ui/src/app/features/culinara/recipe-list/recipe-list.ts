@@ -168,6 +168,7 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
       justify-content: space-between;
       margin-bottom: var(--space-xl);
       gap: var(--space-md);
+      flex-wrap: wrap;
     }
 
     .page-header h1 {
@@ -179,7 +180,6 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
       display: flex;
       align-items: center;
       gap: var(--space-sm);
-      flex-shrink: 0;
     }
 
     .header-actions ::ng-deep .jiro-btn {
@@ -483,7 +483,7 @@ export class RecipeListComponent implements OnInit {
     return list;
   });
 
-  constructor(private recipeService: RecipeService) {}
+  constructor(private recipeService: RecipeService) { }
 
   ngOnInit() {
     this.loadRecipes();
