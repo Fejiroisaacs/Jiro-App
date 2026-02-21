@@ -9,6 +9,7 @@ import {
   SetHistory,
 } from '../../../core/services/jym.service';
 import { SettingsService } from '../../../core/services/settings.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 
@@ -53,6 +54,10 @@ interface ExerciseBlock {
             <button class="type-btn" [class.active]="sessionType() === 'normal'" (click)="setSessionType('normal')">Normal</button>
             <button class="type-btn" [class.active]="sessionType() === 'deload'" (click)="setSessionType('deload')">Deload</button>
             <button class="type-btn" [class.active]="sessionType() === 'test'" (click)="setSessionType('test')">Test</button>
+          </div>
+          <div class="type-toggle unit-toggle">
+            <button class="type-btn" [class.active]="settingsService.weightUnit() === 'lbs'" (click)="toggleUnit('lbs')">lbs</button>
+            <button class="type-btn" [class.active]="settingsService.weightUnit() === 'kg'" (click)="toggleUnit('kg')">kg</button>
           </div>
           <jiro-button variant="secondary" type="button" (click)="showExitConfirm.set(true)">Exit</jiro-button>
           <jiro-button variant="primary" type="button" (click)="finishSession()" [disabled]="finishing()">
@@ -848,7 +853,8 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private router: Router,
     public settingsService: SettingsService,
-  ) {}
+    private authService: AuthService,
+  ) { }
 
   ngOnInit() {
     this.sessionId = this.route.snapshot.paramMap.get('id') || '';
@@ -1040,6 +1046,10 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   setSessionType(type: string) {
     this.sessionType.set(type);
     this.jymService.updateSession(this.sessionId, { session_type: type }).subscribe();
+  }
+
+  toggleUnit(unit: string) {
+    this.authService.updateSettings({ weight_unit: unit }).subscribe();
   }
 
   rpeInvalid(rpe: string): boolean {
