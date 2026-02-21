@@ -89,7 +89,9 @@ import { SettingsService } from '../../core/services/settings.service';
               <div class="user-avatar">
                 {{ userInitial() }}
               </div>
-              <span class="user-email" *ngIf="authService.user() as user">{{ user.email }}</span>
+              <span class="user-email" *ngIf="authService.user() as user">
+                {{ user.display_name || user.email }}
+              </span>
 
               <div class="dropdown" *ngIf="showMenu()">
                 <a routerLink="/settings" class="dropdown-item">Settings</a>
@@ -115,16 +117,11 @@ import { SettingsService } from '../../core/services/settings.service';
           <span>Home</span>
         </a>
         <a routerLink="/culinara" routerLinkActive="active" class="mobile-nav-item">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2a5 5 0 0 1 5 5c0 2.5-2 4.5-4.5 5.4V20h-1v-7.6C9 11.5 7 9.5 7 7a5 5 0 0 1 5-5z"/>
-            <path d="M9 7h6"/>
-          </svg>
+          <img src="/icons/culinara-icon.svg" width="28" height="28" alt="Culinara" />
           <span>Culinara</span>
         </a>
         <a routerLink="/jym" routerLinkActive="active" class="mobile-nav-item">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M6.5 6.5l11 11M6.5 17.5l11-11M12 2v20"/>
-          </svg>
+          <img src="/icons/jym-icon.svg" width="28" height="28" alt="Jym" />
           <span>Jym</span>
         </a>
         <a routerLink="/settings" routerLinkActive="active" class="mobile-nav-item">
@@ -430,6 +427,7 @@ export class MainLayoutComponent {
 
   userInitial(): string {
     const user = this.authService.user();
-    return user ? user.email[0].toUpperCase() : '?';
+    if (!user) return '?';
+    return (user.display_name || user.email)[0].toUpperCase();
   }
 }

@@ -3,10 +3,12 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService, UserSettings } from '../../core/services/auth.service';
 import { JiroCardComponent } from '../../shared/components/jiro-card/jiro-card';
+import { JiroButtonComponent } from '../../shared/components/jiro-button/jiro-button';
+import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-input';
 @Component({
   selector: 'app-settings',
   standalone: true,
-  imports: [CommonModule, FormsModule, JiroCardComponent],
+  imports: [CommonModule, FormsModule, JiroCardComponent, JiroButtonComponent, JiroInputComponent],
   template: `
     <div class="settings">
       <h1>Settings</h1>
@@ -18,6 +20,60 @@ import { JiroCardComponent } from '../../shared/components/jiro-card/jiro-card';
           <div>
             <label class="setting-label">Email</label>
             <p class="text-secondary">{{ user.email }}</p>
+          </div>
+          <div class="verified-badge" *ngIf="user.email_verified">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+              <polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+            Verified
+          </div>
+          <div class="unverified-badge" *ngIf="!user.email_verified">
+            Not verified
+          </div>
+        </div>
+      </jiro-card>
+
+      <!-- Profile -->
+      <jiro-card class="settings-section">
+        <h2>Profile</h2>
+
+        <div class="profile-form">
+          <div class="form-field">
+            <label class="setting-label">Display Name</label>
+            <p class="text-secondary setting-desc">How your name appears across the app</p>
+            <jiro-input
+              [(ngModel)]="displayName"
+              placeholder="Your name"
+              [style.margin-top]="'8px'">
+            </jiro-input>
+          </div>
+
+          <div class="form-field">
+            <label class="setting-label">Username</label>
+            <p class="text-secondary setting-desc">Lowercase letters, numbers and underscores — used in share links</p>
+            <jiro-input
+              [(ngModel)]="username"
+              placeholder="e.g. fejiro"
+              [style.margin-top]="'8px'">
+            </jiro-input>
+          </div>
+
+          <div class="form-field">
+            <label class="setting-label">Bio</label>
+            <p class="text-secondary setting-desc">A short description about yourself</p>
+            <textarea
+              [(ngModel)]="bio"
+              class="bio-textarea"
+              rows="3"
+              placeholder="Tell us a bit about yourself..."></textarea>
+          </div>
+
+          <div class="profile-actions">
+            <jiro-button variant="primary" (click)="saveProfile()" [disabled]="profileSaving()">
+              {{ profileSaving() ? 'Saving...' : 'Save Profile' }}
+            </jiro-button>
+            <span class="profile-error" *ngIf="profileError()">{{ profileError() }}</span>
           </div>
         </div>
       </jiro-card>
@@ -149,6 +205,66 @@ import { JiroCardComponent } from '../../shared/components/jiro-card/jiro-card';
       margin-top: 2px;
     }
 
+    .verified-badge {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: var(--font-size-xs);
+      font-weight: 600;
+      color: var(--color-accent);
+      background: rgba(var(--color-accent-rgb, 74, 103, 65), 0.1);
+      padding: 4px 10px;
+      border-radius: 20px;
+    }
+
+    .unverified-badge {
+      font-size: var(--font-size-xs);
+      color: var(--text-secondary);
+      background: var(--bg-surface-hover);
+      padding: 4px 10px;
+      border-radius: 20px;
+    }
+
+    .profile-form {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-lg);
+    }
+
+    .form-field {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .bio-textarea {
+      margin-top: 8px;
+      padding: 10px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      font-size: var(--font-size-sm);
+      font-family: inherit;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .bio-textarea:focus {
+      border-color: var(--color-primary);
+    }
+
+    .profile-actions {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+    }
+
+    .profile-error {
+      font-size: var(--font-size-sm);
+      color: var(--color-danger);
+    }
+
     .jiro-select {
       padding: 8px 12px;
       border: 1px solid var(--border-color);
@@ -189,6 +305,13 @@ export class SettingsComponent implements OnInit {
   weightUnit = 'lbs';
   timezone = 'America/New_York';
 
+  // Profile fields
+  displayName = '';
+  username = '';
+  bio = '';
+  profileSaving = signal(false);
+  profileError = signal<string | null>(null);
+
   themes = [
     { value: 'earth', label: 'Earth', color: '#5C4033' },
     { value: 'clay', label: 'Clay', color: '#C4956A' },
@@ -228,6 +351,11 @@ export class SettingsComponent implements OnInit {
       this.weightUnit = s.weight_unit || 'lbs';
       this.timezone = s.timezone || 'America/New_York';
     }
+    if (user) {
+      this.displayName = user.display_name ?? '';
+      this.username = user.username ?? '';
+      this.bio = user.bio ?? '';
+    }
   }
 
   selectTheme(theme: string) {
@@ -246,6 +374,29 @@ export class SettingsComponent implements OnInit {
       next: () => {
         this.saved.set(true);
         setTimeout(() => this.saved.set(false), 2000);
+      },
+    });
+  }
+
+  saveProfile() {
+    this.profileSaving.set(true);
+    this.profileError.set(null);
+
+    const payload: { username?: string; display_name?: string; bio?: string } = {};
+    if (this.username.trim()) payload.username = this.username.trim().toLowerCase();
+    if (this.displayName.trim()) payload.display_name = this.displayName.trim();
+    payload.bio = this.bio.trim();
+
+    this.authService.updateProfile(payload).subscribe({
+      next: () => {
+        this.profileSaving.set(false);
+        this.saved.set(true);
+        setTimeout(() => this.saved.set(false), 2000);
+      },
+      error: (err) => {
+        this.profileSaving.set(false);
+        const msg = err?.error?.error?.message ?? 'Failed to save profile';
+        this.profileError.set(msg);
       },
     });
   }

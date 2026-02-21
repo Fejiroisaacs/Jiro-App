@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/config"
@@ -51,8 +52,20 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	user, err := h.userService.CreateUser(c.Request.Context(), req.Email, hash)
+	user, err := h.userService.CreateUser(c.Request.Context(), req.Email, hash, req.DisplayName, req.Username)
 	if err != nil {
+		if errors.Is(err, services.ErrUsernameTaken) {
+			c.JSON(http.StatusConflict, models.ErrorResponse{
+				Error: models.ErrorDetail{Code: "USERNAME_TAKEN", Message: "Username is already taken"},
+			})
+			return
+		}
+		if errors.Is(err, services.ErrUsernameInvalid) {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{
+				Error: models.ErrorDetail{Code: "USERNAME_INVALID", Message: err.Error()},
+			})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to create user"},
 		})

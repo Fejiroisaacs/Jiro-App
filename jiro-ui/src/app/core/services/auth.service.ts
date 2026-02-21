@@ -7,6 +7,10 @@ import { environment } from '../../../environments/environment';
 export interface User {
   id: string;
   email: string;
+  username?: string;
+  display_name?: string;
+  email_verified: boolean;
+  bio?: string;
   settings: UserSettings;
   created_at: string;
   updated_at: string;
@@ -14,7 +18,6 @@ export interface User {
 
 export interface UserSettings {
   theme?: string;
-  avatar_url?: string;
   weight_unit?: string;
   timezone?: string;
 }
@@ -48,8 +51,10 @@ export class AuthService {
     return this.accessToken();
   }
 
-  register(email: string, password: string) {
-    return this.http.post<AuthResponse>(`${API_URL}/auth/register`, { email, password }, { withCredentials: true })
+  register(email: string, password: string, displayName: string, username?: string) {
+    const body: Record<string, string> = { email, password, display_name: displayName };
+    if (username) body['username'] = username;
+    return this.http.post<AuthResponse>(`${API_URL}/auth/register`, body, { withCredentials: true })
       .pipe(tap(res => this.handleAuth(res)));
   }
 
@@ -77,6 +82,14 @@ export class AuthService {
 
   updateSettings(settings: Partial<UserSettings>) {
     return this.http.patch<User>(`${API_URL}/user/me`, settings)
+      .pipe(tap(user => {
+        this.currentUser.set(user);
+        localStorage.setItem('jiro_user', JSON.stringify(user));
+      }));
+  }
+
+  updateProfile(profile: { username?: string; display_name?: string; bio?: string }) {
+    return this.http.patch<User>(`${API_URL}/user/me`, profile)
       .pipe(tap(user => {
         this.currentUser.set(user);
         localStorage.setItem('jiro_user', JSON.stringify(user));

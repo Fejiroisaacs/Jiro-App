@@ -40,6 +40,9 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 		// Health (no auth)
 		v1.GET("/health", healthHandler.Check)
 
+		// Public profile lookup (no auth required)
+		v1.GET("/profiles/:username", userHandler.GetPublicProfile)
+
 		// Auth routes (rate limited by IP: 10/min)
 		auth := v1.Group("/auth")
 		auth.Use(middleware.RateLimitByIP(rl, 10))

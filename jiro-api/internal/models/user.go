@@ -8,17 +8,20 @@ import (
 )
 
 type User struct {
-	ID           uuid.UUID       `json:"id"`
-	Email        string          `json:"email"`
-	PasswordHash string          `json:"-"` // never expose in JSON
-	Settings     json.RawMessage `json:"settings"`
-	CreatedAt    time.Time       `json:"created_at"`
-	UpdatedAt    time.Time       `json:"updated_at"`
+	ID            uuid.UUID       `json:"id"`
+	Email         string          `json:"email"`
+	PasswordHash  string          `json:"-"` // never expose in JSON
+	Username      *string         `json:"username"`
+	DisplayName   *string         `json:"display_name"`
+	EmailVerified bool            `json:"email_verified"`
+	Bio           *string         `json:"bio"`
+	Settings      json.RawMessage `json:"settings"`
+	CreatedAt     time.Time       `json:"created_at"`
+	UpdatedAt     time.Time       `json:"updated_at"`
 }
 
 type UserSettings struct {
 	Theme      string `json:"theme,omitempty"`       // "earth", "clay", "sand", "forest"
-	AvatarURL  string `json:"avatar_url,omitempty"`
 	WeightUnit string `json:"weight_unit,omitempty"` // "lbs" or "kg"
 	Timezone   string `json:"timezone,omitempty"`    // IANA timezone
 }
@@ -34,8 +37,10 @@ type RefreshToken struct {
 // Request/response types
 
 type RegisterRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=8"`
+	Email       string  `json:"email" binding:"required,email"`
+	Password    string  `json:"password" binding:"required,min=8"`
+	DisplayName string  `json:"display_name" binding:"required"`
+	Username    *string `json:"username,omitempty"`
 }
 
 type LoginRequest struct {
@@ -45,9 +50,20 @@ type LoginRequest struct {
 
 type UpdateSettingsRequest struct {
 	Theme      *string `json:"theme,omitempty"`
-	AvatarURL  *string `json:"avatar_url,omitempty"`
 	WeightUnit *string `json:"weight_unit,omitempty"`
 	Timezone   *string `json:"timezone,omitempty"`
+}
+
+type UpdateProfileRequest struct {
+	Username    *string `json:"username,omitempty"`
+	DisplayName *string `json:"display_name,omitempty"`
+	Bio         *string `json:"bio,omitempty"`
+}
+
+type PublicUser struct {
+	Username    string  `json:"username"`
+	DisplayName *string `json:"display_name"`
+	Bio         *string `json:"bio"`
 }
 
 type AuthResponse struct {
