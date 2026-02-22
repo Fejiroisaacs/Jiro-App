@@ -80,3 +80,27 @@ type UpdateTrialRequest struct {
 	Modifications json.RawMessage `json:"modifications"`
 	Rating        *int            `json:"rating" binding:"omitempty,min=1,max=5"`
 }
+
+type CookStreakResponse struct {
+	CurrentStreak int `json:"current_streak"`
+	LongestStreak int `json:"longest_streak"`
+	TotalCookDays int `json:"total_cook_days"`
+}
+
+type Collection struct {
+	ID        uuid.UUID `json:"id"`
+	UserID    uuid.UUID `json:"user_id"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	// Computed
+	RecipeCount *int `json:"recipe_count,omitempty"`
+}
+
+type CreateCollectionRequest struct {
+	Name string `json:"name" binding:"required"`
+}
+
+type UpdateCollectionRequest struct {
+	Name *string `json:"name"`
+}

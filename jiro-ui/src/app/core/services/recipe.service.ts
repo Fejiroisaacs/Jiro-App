@@ -100,6 +100,21 @@ export interface UpdateTrialRequest {
 
 const API_URL = `${environment.apiUrl}/culinara`;
 
+export interface CookStreak {
+  current_streak: number;
+  longest_streak: number;
+  total_cook_days: number;
+}
+
+export interface Collection {
+  id: string;
+  user_id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+  recipe_count?: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class RecipeService {
   constructor(private http: HttpClient) { }
@@ -142,5 +157,38 @@ export class RecipeService {
 
   promoteTrial(trialId: string): Observable<Recipe> {
     return this.http.post<Recipe>(`${API_URL}/promote/${trialId}`, {});
+  }
+
+  getCookStreak(): Observable<CookStreak> {
+    return this.http.get<CookStreak>(`${API_URL}/cook-streak`);
+  }
+
+  // ─── Collections ──────────────────────────────────
+  listCollections(): Observable<Collection[]> {
+    return this.http.get<Collection[]>(`${API_URL}/collections`);
+  }
+
+  createCollection(name: string): Observable<Collection> {
+    return this.http.post<Collection>(`${API_URL}/collections`, { name });
+  }
+
+  updateCollection(id: string, name: string): Observable<Collection> {
+    return this.http.put<Collection>(`${API_URL}/collections/${id}`, { name });
+  }
+
+  deleteCollection(id: string): Observable<void> {
+    return this.http.delete<void>(`${API_URL}/collections/${id}`);
+  }
+
+  addToCollection(collectionId: string, recipeId: string): Observable<any> {
+    return this.http.post(`${API_URL}/collections/${collectionId}/recipes`, { recipe_id: recipeId });
+  }
+
+  removeFromCollection(collectionId: string, recipeId: string): Observable<void> {
+    return this.http.delete<void>(`${API_URL}/collections/${collectionId}/recipes/${recipeId}`);
+  }
+
+  getCollectionRecipeIds(collectionId: string): Observable<string[]> {
+    return this.http.get<string[]>(`${API_URL}/collections/${collectionId}/recipe-ids`);
   }
 }

@@ -1,8 +1,8 @@
-import { Component, OnInit, computed, signal } from '@angular/core';
+import { Component, OnInit, computed, signal, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { RecipeService, Recipe } from '../../../core/services/recipe.service';
+import { RecipeService, Recipe, CookStreak, Collection } from '../../../core/services/recipe.service';
 import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-card';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
@@ -30,7 +30,20 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
           <h1>Culinara</h1>
           <p class="text-secondary">Your recipe lab notebook</p>
         </div>
-        <div class="header-actions">
+        <div class="header-right">
+          <div class="streak-badge" *ngIf="cookStreak()?.current_streak">
+            <span class="streak-flame">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+            </span>
+            <div class="streak-info">
+              <span class="streak-num">{{ cookStreak()!.current_streak }}</span>
+              <span class="streak-label">day streak</span>
+            </div>
+            <div class="streak-stat" *ngIf="cookStreak()!.total_cook_days">
+              <span class="streak-total">{{ cookStreak()!.total_cook_days }}</span> days cooked
+            </div>
+          </div>
+          <div class="header-actions">
           <a routerLink="/culinara/shopping" class="shopping-link">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
@@ -42,6 +55,7 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
           <jiro-button variant="primary" type="button" (click)="showCreate.set(true)">
             + New Recipe
           </jiro-button>
+          </div>
         </div>
       </div>
 
@@ -79,6 +93,36 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
           (click)="activeTag.set(activeTag() === tag ? null : tag)">
           {{ tag }}
         </button>
+      </div>
+
+      <!-- Collection filter -->
+      <div class="collection-filter" *ngIf="collections().length > 0">
+        <button
+          class="collection-chip"
+          [class.collection-chip--active]="activeCollection() === null"
+          (click)="activeCollection.set(null)">
+          All
+        </button>
+        <button
+          *ngFor="let col of collections()"
+          class="collection-chip"
+          [class.collection-chip--active]="activeCollection() === col.id"
+          (click)="activeCollection.set(activeCollection() === col.id ? null : col.id)">
+          <svg class="folder-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> {{ col.name }}
+          <span class="col-count" *ngIf="col.recipe_count">{{ col.recipe_count }}</span>
+        </button>
+        <button class="collection-chip collection-chip--add" (click)="showNewCollectionInput = true" *ngIf="!showNewCollectionInput">
+          +
+        </button>
+        <div class="new-collection-inline" *ngIf="showNewCollectionInput">
+          <input
+            class="new-collection-input"
+            [(ngModel)]="newCollectionName"
+            placeholder="Collection name"
+            (keydown.enter)="createCollection()"
+            (keydown.escape)="showNewCollectionInput = false; newCollectionName = ''" />
+          <button class="new-collection-save" (click)="createCollection()">✓</button>
+        </div>
       </div>
 
       <!-- Loading -->
@@ -431,16 +475,176 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
+
+    .header-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: var(--space-sm);
+    }
+
+    .streak-badge {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: 6px 14px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+    }
+
+    .streak-flame {
+      display: flex;
+      align-items: center;
+      color: var(--color-primary);
+    }
+
+    .streak-info {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+    }
+
+    .streak-num {
+      font-size: var(--font-size-xl);
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .streak-label {
+      font-size: var(--font-size-xs);
+      color: var(--text-muted);
+    }
+
+    .streak-stat {
+      font-size: var(--font-size-xs);
+      color: var(--text-muted);
+      border-left: 1px solid var(--border-color);
+      padding-left: var(--space-sm);
+    }
+
+    .streak-total {
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .collection-filter {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-xs);
+      margin-bottom: var(--space-md);
+    }
+
+    .collection-chip {
+      padding: 4px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      background: var(--bg-surface);
+      color: var(--text-secondary);
+      font-size: var(--font-size-xs);
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .collection-chip:hover {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+    }
+
+    .collection-chip--active {
+      background: rgba(122, 59, 46, 0.12);
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+    }
+
+    .collection-chip--add {
+      font-size: var(--font-size-md);
+      padding: 2px 10px;
+    }
+
+    .col-count {
+      background: var(--color-secondary);
+      border-radius: 50%;
+      width: 16px;
+      height: 16px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .new-collection-inline {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .new-collection-input {
+      padding: 4px 10px;
+      border: 1px solid var(--color-primary);
+      border-radius: 20px;
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      font-size: var(--font-size-xs);
+      outline: none;
+      width: 140px;
+      font-family: inherit;
+    }
+
+    .new-collection-save {
+      background: var(--color-primary);
+      color: #fff;
+      border: none;
+      border-radius: 50%;
+      width: 22px;
+      height: 22px;
+      font-size: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    @media (max-width: 600px) {
+      .page-header {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .header-right {
+        align-items: stretch;
+      }
+
+      .streak-badge {
+        justify-content: center;
+      }
+
+      .header-actions {
+        justify-content: flex-end;
+      }
+    }
   `]
 })
 export class RecipeListComponent implements OnInit {
   allRecipes = signal<Recipe[]>([]);
+  cookStreak = signal<CookStreak | null>(null);
+  collections = signal<Collection[]>([]);
+  activeCollection = signal<string | null>(null);
   loading = signal(true);
   showCreate = signal(false);
   sortKey = signal<SortKey>('newest');
   activeTag = signal<string | null>(null);
   searchQuery = '';
+  showNewCollectionInput = false;
+  newCollectionName = '';
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
+  private collectionRecipeIds = signal<Set<string>>(new Set());
 
   sortOptions: { key: SortKey; label: string }[] = [
     { key: 'newest', label: 'Newest' },
@@ -466,6 +670,12 @@ export class RecipeListComponent implements OnInit {
       list = list.filter(r => r.tags?.includes(tag));
     }
 
+    // Collection filter
+    const colIds = this.collectionRecipeIds();
+    if (this.activeCollection() && colIds.size > 0) {
+      list = list.filter(r => colIds.has(r.id));
+    }
+
     // Sort
     switch (this.sortKey()) {
       case 'trials':
@@ -483,10 +693,47 @@ export class RecipeListComponent implements OnInit {
     return list;
   });
 
-  constructor(private recipeService: RecipeService) { }
+  constructor(private recipeService: RecipeService) {
+    effect(() => {
+      this.onCollectionChange();
+    });
+  }
 
   ngOnInit() {
     this.loadRecipes();
+    this.recipeService.getCookStreak().subscribe({
+      next: (s) => this.cookStreak.set(s),
+    });
+    this.loadCollections();
+  }
+
+  loadCollections() {
+    this.recipeService.listCollections().subscribe({
+      next: (cols) => this.collections.set(cols),
+    });
+  }
+
+  createCollection() {
+    const name = this.newCollectionName.trim();
+    if (!name) return;
+    this.recipeService.createCollection(name).subscribe({
+      next: () => {
+        this.newCollectionName = '';
+        this.showNewCollectionInput = false;
+        this.loadCollections();
+      },
+    });
+  }
+
+  onCollectionChange() {
+    const colId = this.activeCollection();
+    if (!colId) {
+      this.collectionRecipeIds.set(new Set());
+      return;
+    }
+    this.recipeService.getCollectionRecipeIds(colId).subscribe({
+      next: (ids) => this.collectionRecipeIds.set(new Set(ids)),
+    });
   }
 
   loadRecipes(search?: string) {

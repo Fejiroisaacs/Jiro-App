@@ -9,12 +9,12 @@ import {
   DietaryFlags,
   CreateRecipeRequest,
   UpdateRecipeRequest,
+  Collection,
 } from '../../../core/services/recipe.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 
 const PRESET_TAGS = [
-  'African', 'Mexican', 'Asian', 'Indian', 'American',
-  'Mediterranean', 'French', 'Japanese', 'Thai',
+  'Mexican', 'Chinese', 'Indian', 'Mediterranean', 'Thai',
   'Breakfast', 'Lunch', 'Dinner', 'Snack', 'Dessert', 'Drinks',
 ];
 
@@ -167,6 +167,28 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
             <label class="macro-label">Fat (g)</label>
             <input class="field-input macro-input" type="number" min="0" [(ngModel)]="nutrition.fat" name="fat" placeholder="—" />
           </div>
+        </div>
+      </div>
+
+      <!-- Collection (create only) -->
+      <div class="field" *ngIf="!recipe">
+        <label class="field-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          Add to Collection
+        </label>
+        <select class="field-input" [(ngModel)]="selectedCollectionId" name="collection" (change)="onCollectionSelectChange()">
+          <option value="">None</option>
+          <option *ngFor="let col of collections()" [value]="col.id">{{ col.name }}</option>
+          <option value="__new__">+ New Collection</option>
+        </select>
+        <div class="new-col-row" *ngIf="showNewCollectionInForm">
+          <input
+            class="field-input"
+            [(ngModel)]="newCollectionNameInForm"
+            name="newColName"
+            placeholder="Collection name"
+            (keydown.enter)="createCollectionInForm(); $event.preventDefault()" />
+          <button type="button" class="new-col-btn" (click)="createCollectionInForm()">Create</button>
         </div>
       </div>
 
@@ -443,6 +465,25 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
       -webkit-appearance: none; margin: 0;
     }
 
+    .new-col-row {
+      display: flex;
+      gap: var(--space-xs);
+      margin-top: var(--space-xs);
+    }
+
+    .new-col-btn {
+      padding: 8px 14px;
+      background: var(--color-primary);
+      color: #fff;
+      border: none;
+      border-radius: var(--border-radius);
+      font-size: var(--font-size-sm);
+      font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+      white-space: nowrap;
+    }
+
     .field-hint {
       font-weight: 400;
       color: var(--text-muted);
@@ -479,6 +520,11 @@ export class RecipeFormComponent implements OnInit {
   constructor(private recipeService: RecipeService) { }
 
   ngOnInit() {
+    // Load collections for the dropdown
+    this.recipeService.listCollections().subscribe({
+      next: (cols) => this.collections.set(cols),
+    });
+
     if (this.recipe) {
       this.title = this.recipe.title;
       this.description = this.recipe.description ?? '';
@@ -493,6 +539,33 @@ export class RecipeFormComponent implements OnInit {
         this.nutrition = { calories: n.calories ?? null, protein: n.protein ?? null, carbs: n.carbs ?? null, fat: n.fat ?? null };
       }
     }
+  }
+
+  collections = signal<Collection[]>([]);
+  selectedCollectionId = '';
+  showNewCollectionInForm = false;
+  newCollectionNameInForm = '';
+
+  onCollectionSelectChange() {
+    if (this.selectedCollectionId === '__new__') {
+      this.showNewCollectionInForm = true;
+      this.selectedCollectionId = '';
+    } else {
+      this.showNewCollectionInForm = false;
+    }
+  }
+
+  createCollectionInForm() {
+    const name = this.newCollectionNameInForm.trim();
+    if (!name) return;
+    this.recipeService.createCollection(name).subscribe({
+      next: (col) => {
+        this.collections.update(list => [...list, col]);
+        this.selectedCollectionId = col.id;
+        this.showNewCollectionInForm = false;
+        this.newCollectionNameInForm = '';
+      },
+    });
   }
 
   toggleTag(tag: string) {
@@ -566,7 +639,13 @@ export class RecipeFormComponent implements OnInit {
     } else {
       const req: CreateRecipeRequest = body as CreateRecipeRequest;
       this.recipeService.createRecipe(req).subscribe({
-        next: (created) => { this.saving.set(false); this.saved.emit(created); },
+        next: (created) => {
+          this.saving.set(false);
+          if (this.selectedCollectionId) {
+            this.recipeService.addToCollection(this.selectedCollectionId, created.id).subscribe();
+          }
+          this.saved.emit(created);
+        },
         error: (err) => { this.saving.set(false); this.error.set(err.error?.message ?? 'Failed to create'); },
       });
     }
