@@ -75,6 +75,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			// Culinara (Recipe Module)
 			culinara := protected.Group("/culinara")
 			{
+				culinara.GET("/cook-streak", recipeHandler.CookStreak)
 				culinara.POST("/recipes", recipeHandler.Create)
 				culinara.GET("/recipes", recipeHandler.List)
 				culinara.GET("/recipes/:id", recipeHandler.Get)
@@ -84,6 +85,15 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 				culinara.PUT("/trials/:id", recipeHandler.UpdateTrial)
 				culinara.DELETE("/trials/:id", recipeHandler.DeleteTrial)
 				culinara.POST("/promote/:trial_id", recipeHandler.Promote)
+
+				// Collections
+				culinara.GET("/collections", recipeHandler.ListCollections)
+				culinara.POST("/collections", recipeHandler.CreateCollection)
+				culinara.PUT("/collections/:id", recipeHandler.UpdateCollection)
+				culinara.DELETE("/collections/:id", recipeHandler.DeleteCollection)
+				culinara.POST("/collections/:id/recipes", recipeHandler.AddToCollection)
+				culinara.DELETE("/collections/:id/recipes/:recipe_id", recipeHandler.RemoveFromCollection)
+				culinara.GET("/collections/:id/recipe-ids", recipeHandler.GetCollectionRecipeIDs)
 			}
 
 			// Jym (Gym Module)

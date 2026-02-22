@@ -16,7 +16,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
           <h1>Discover</h1>
           <p class="text-secondary">Browse public training splits from the community</p>
         </div>
-        <button class="back-btn" (click)="router.navigate(['/jym'])">
+        <button class="back-btn" (click)="router.navigate(['/jym/splits'])">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="15,18 9,12 15,6"/>
           </svg>
@@ -234,7 +234,7 @@ export class DiscoverComponent implements OnInit {
   searchQuery = '';
   tagFilter = '';
 
-  constructor(private jymService: JymService, public router: Router) {}
+  constructor(private jymService: JymService, public router: Router) { }
 
   ngOnInit() {
     // Load first page on entry

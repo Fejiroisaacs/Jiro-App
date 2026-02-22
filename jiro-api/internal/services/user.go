@@ -42,7 +42,7 @@ func (s *UserService) CreateUser(ctx context.Context, email, passwordHash, displ
 	user := &models.User{}
 	err := s.db.QueryRow(ctx,
 		`INSERT INTO users (email, password_hash, display_name, username, settings)
-		 VALUES ($1, $2, $3, $4, '{}')
+		 VALUES ($1, $2, $3, $4, '{"weight_unit":"lbs"}')
 		 RETURNING id, email, username, display_name, email_verified, bio, settings, created_at, updated_at`,
 		email, passwordHash, displayName, username,
 	).Scan(&user.ID, &user.Email, &user.Username, &user.DisplayName, &user.EmailVerified, &user.Bio, &user.Settings, &user.CreatedAt, &user.UpdatedAt)

@@ -12,7 +12,7 @@ export class SettingsService {
     return ((typeof s === 'string' ? JSON.parse(s) : s) ?? {}) as Record<string, string>;
   });
 
-  weightUnit = computed<string>(() => this.parsedSettings()['weight_unit'] ?? 'kg');
+  weightUnit = computed<string>(() => this.parsedSettings()['weight_unit'] ?? 'lbs');
   theme = computed<string>(() => this.parsedSettings()['theme'] ?? 'earth');
 
   /** Convert a stored kg value to the user's preferred display unit. */

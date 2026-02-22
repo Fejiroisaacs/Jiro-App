@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, signal } from '@angular/core';
+import { Component, OnInit, computed, signal, HostListener, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ShoppingListComponent } from '../shopping-list/shopping-list';
@@ -7,6 +7,7 @@ import {
   Recipe,
   RecipeWithTrials,
   RecipeTrial,
+  Collection,
 } from '../../../core/services/recipe.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
@@ -109,6 +110,56 @@ interface CookIngredient {
             <!-- Tags -->
             <div class="tag-row" *ngIf="r.tags && r.tags.length">
               <span *ngFor="let tag of r.tags" class="recipe-tag">{{ tag }}</span>
+            </div>
+
+            <!-- Dietary flags -->
+            <div class="dietary-row" *ngIf="r.dietary_flags">
+              <span class="dietary-pill" *ngIf="r.dietary_flags.vegan">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.9C15.5 4.9 17 3.5 19 1c1 2 2 4.5 2 8 0 5.5-4.5 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>
+                Vegan
+              </span>
+              <span class="dietary-pill" *ngIf="r.dietary_flags.vegetarian">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 20h10"/><path d="M10 20c5.5-2.5 8-6.5 8-12"/><path d="M6 20c-2-5-2.5-10 0-15 3 2 6 3 10 3"/></svg>
+                Vegetarian
+              </span>
+              <span class="dietary-pill" *ngIf="r.dietary_flags.gluten_free">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 22 16 8"/><path d="M3.47 12.53 5 11l1.53 1.53a3.5 3.5 0 0 1 0 4.94L5 19l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z"/><path d="M7.47 8.53 9 7l1.53 1.53a3.5 3.5 0 0 1 0 4.94L9 15l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z"/><path d="M11.47 4.53 13 3l1.53 1.53a3.5 3.5 0 0 1 0 4.94L13 11l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z"/><line x1="20" y1="2" x2="22" y2="4"/><path d="M17.47 8.53 19 7l1.53 1.53a3.5 3.5 0 0 1 0 4.94L19 15l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z"/></svg>
+                Gluten-Free
+              </span>
+              <span class="dietary-pill" *ngIf="r.dietary_flags.dairy_free">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 2 1.88 1.88"/><path d="M14.12 3.88 16 2"/><path d="M9 7.13v-1a3.003 3.003 0 1 1 6 0v1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 .67-2.22 2.75 2.75 0 0 1 4.78 0A4 4 0 0 1 12 11"/><path d="M12 20c3.3 0 6-2.7 6-6v-3a4 4 0 0 0-.67-2.22 2.75 2.75 0 0 0-4.78 0A4 4 0 0 0 12 11"/><path d="M2 2 22 22"/></svg>
+                Dairy-Free
+              </span>
+              <span class="dietary-pill" *ngIf="r.dietary_flags.nut_free">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                Nut-Free
+              </span>
+            </div>
+
+            <!-- Nutrition -->
+            <div class="macro-bar" *ngIf="r.nutrition && (r.nutrition.calories || r.nutrition.protein || r.nutrition.carbs || r.nutrition.fat)">
+              <div class="macro-chip" *ngIf="r.nutrition.calories"><span class="macro-val">{{ r.nutrition.calories }}</span> cal</div>
+              <div class="macro-chip" *ngIf="r.nutrition.protein"><span class="macro-val">{{ r.nutrition.protein }}g</span> protein</div>
+              <div class="macro-chip" *ngIf="r.nutrition.carbs"><span class="macro-val">{{ r.nutrition.carbs }}g</span> carbs</div>
+              <div class="macro-chip" *ngIf="r.nutrition.fat"><span class="macro-val">{{ r.nutrition.fat }}g</span> fat</div>
+            </div>
+
+            <!-- Add to Collection -->
+            <div class="collection-picker" *ngIf="collections().length > 0">
+              <button class="collection-toggle" (click)="showCollectionPicker.set(!showCollectionPicker()); $event.stopPropagation()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                {{ recipeCollectionIds().size > 0 ? recipeCollectionIds().size + ' collection' + (recipeCollectionIds().size > 1 ? 's' : '') : 'Add to collection' }}
+              </button>
+              <div class="collection-dropdown" *ngIf="showCollectionPicker()" (click)="$event.stopPropagation()">
+                <button
+                  *ngFor="let col of collections()"
+                  class="collection-option"
+                  [class.collection-option--active]="recipeCollectionIds().has(col.id)"
+                  (click)="toggleCollection(col)">
+                  <span class="col-check">{{ recipeCollectionIds().has(col.id) ? '✓' : '' }}</span>
+                  {{ col.name }}
+                </button>
+              </div>
             </div>
 
             <!-- Stats row -->
@@ -554,6 +605,101 @@ interface CookIngredient {
 
     .section {
       margin-top: var(--space-md);
+    }
+
+    .dietary-row {
+      display: flex; flex-wrap: wrap; gap: 6px;
+    }
+
+    .dietary-pill {
+      font-size: var(--font-size-xs); padding: 3px 10px;
+      background: rgba(122, 59, 46, 0.08); color: var(--color-primary);
+      border: 1px solid rgba(122, 59, 46, 0.2);
+      border-radius: 12px; font-weight: 500;
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+
+    .macro-bar {
+      display: flex; gap: var(--space-sm); flex-wrap: wrap;
+    }
+
+    .macro-chip {
+      font-size: var(--font-size-xs); color: var(--text-secondary);
+      background: var(--bg-surface); border: 1px solid var(--border-color);
+      border-radius: var(--border-radius); padding: 4px 10px;
+    }
+
+    .macro-val { font-weight: 600; color: var(--text-primary); }
+
+    .collection-picker {
+      position: relative;
+    }
+
+    .collection-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      background: var(--bg-surface);
+      color: var(--text-secondary);
+      font-size: var(--font-size-xs);
+      font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+
+    .collection-toggle:hover {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+    }
+
+    .collection-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      margin-top: 4px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      z-index: 10;
+      min-width: 160px;
+      overflow: hidden;
+    }
+
+    .collection-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 8px 12px;
+      border: none;
+      background: none;
+      color: var(--text-secondary);
+      font-size: var(--font-size-sm);
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.1s;
+      text-align: left;
+    }
+
+    .collection-option:hover {
+      background: var(--bg-canvas);
+    }
+
+    .collection-option--active {
+      color: var(--color-primary);
+      font-weight: 500;
+    }
+
+    .col-check {
+      width: 14px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--color-primary);
     }
 
     .section-title {
@@ -1176,15 +1322,80 @@ export class RecipeDetailComponent implements OnInit {
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private recipeService: RecipeService
-  ) {}
+    private recipeService: RecipeService,
+    private elRef: ElementRef
+  ) { }
+
+  @HostListener('document:click', ['$event'])
+  onDocClick(event: Event) {
+    if (this.showCollectionPicker() && !this.elRef.nativeElement.querySelector('.collection-picker')?.contains(event.target)) {
+      this.showCollectionPicker.set(false);
+    }
+  }
+
+  collections = signal<Collection[]>([]);
+  recipeCollectionIds = signal<Set<string>>(new Set());
+  showCollectionPicker = signal(false);
 
   ngOnInit() {
     const id = this.route.snapshot.paramMap.get('id')!;
     this.recipeService.getRecipe(id).subscribe({
-      next: (r) => { this.recipe.set(r); this.loading.set(false); },
+      next: (r) => { this.recipe.set(r); this.loading.set(false); this.loadRecipeCollections(r.id); },
       error: () => this.loading.set(false),
     });
+    this.recipeService.listCollections().subscribe({
+      next: (cols) => this.collections.set(cols),
+    });
+  }
+
+  loadRecipeCollections(recipeId: string) {
+    // Check which collections contain this recipe
+    const cols = this.collections();
+    // We'll check each collection — or better, iterate after collections load
+    this.recipeService.listCollections().subscribe({
+      next: (allCols) => {
+        this.collections.set(allCols);
+        const ids = new Set<string>();
+        let pending = allCols.length;
+        if (pending === 0) return;
+        for (const col of allCols) {
+          this.recipeService.getCollectionRecipeIds(col.id).subscribe({
+            next: (recipeIds) => {
+              if (recipeIds.includes(recipeId)) {
+                ids.add(col.id);
+              }
+              pending--;
+              if (pending === 0) {
+                this.recipeCollectionIds.set(ids);
+              }
+            },
+          });
+        }
+      },
+    });
+  }
+
+  toggleCollection(col: Collection) {
+    const r = this.recipe();
+    if (!r) return;
+    const ids = this.recipeCollectionIds();
+    if (ids.has(col.id)) {
+      this.recipeService.removeFromCollection(col.id, r.id).subscribe({
+        next: () => {
+          const updated = new Set(ids);
+          updated.delete(col.id);
+          this.recipeCollectionIds.set(updated);
+        },
+      });
+    } else {
+      this.recipeService.addToCollection(col.id, r.id).subscribe({
+        next: () => {
+          const updated = new Set(ids);
+          updated.add(col.id);
+          this.recipeCollectionIds.set(updated);
+        },
+      });
+    }
   }
 
   formatDate(dateStr: string): string {

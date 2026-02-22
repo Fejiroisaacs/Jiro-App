@@ -277,3 +277,198 @@ func (h *RecipeHandler) Promote(c *gin.Context) {
 
 	c.JSON(http.StatusOK, recipe)
 }
+
+func (h *RecipeHandler) CookStreak(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+
+	streak, err := h.recipeService.GetCookStreak(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to compute cook streak"},
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, streak)
+}
+
+// ─── Collections ────────────────────────────────────────────────────
+
+func (h *RecipeHandler) ListCollections(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+
+	collections, err := h.recipeService.ListCollections(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to list collections"},
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, collections)
+}
+
+func (h *RecipeHandler) CreateCollection(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+
+	var req models.CreateCollectionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()},
+		})
+		return
+	}
+
+	collection, err := h.recipeService.CreateCollection(c.Request.Context(), userID, &req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to create collection"},
+		})
+		return
+	}
+
+	c.JSON(http.StatusCreated, collection)
+}
+
+func (h *RecipeHandler) UpdateCollection(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	collectionID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid collection ID"},
+		})
+		return
+	}
+
+	var req models.UpdateCollectionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()},
+		})
+		return
+	}
+
+	collection, err := h.recipeService.UpdateCollection(c.Request.Context(), userID, collectionID, &req)
+	if err != nil {
+		c.JSON(http.StatusNotFound, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Collection not found"},
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, collection)
+}
+
+func (h *RecipeHandler) DeleteCollection(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	collectionID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid collection ID"},
+		})
+		return
+	}
+
+	if err := h.recipeService.DeleteCollection(c.Request.Context(), userID, collectionID); err != nil {
+		c.JSON(http.StatusNotFound, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Collection not found"},
+		})
+		return
+	}
+
+	c.JSON(http.StatusNoContent, nil)
+}
+
+func (h *RecipeHandler) AddToCollection(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	collectionID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid collection ID"},
+		})
+		return
+	}
+
+	var body struct {
+		RecipeID string `json:"recipe_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()},
+		})
+		return
+	}
+
+	recipeID, err := uuid.Parse(body.RecipeID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid recipe ID"},
+		})
+		return
+	}
+
+	if err := h.recipeService.AddToCollection(c.Request.Context(), userID, collectionID, recipeID); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to add recipe to collection"},
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+func (h *RecipeHandler) RemoveFromCollection(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	collectionID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid collection ID"},
+		})
+		return
+	}
+
+	recipeID, err := uuid.Parse(c.Param("recipe_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid recipe ID"},
+		})
+		return
+	}
+
+	if err := h.recipeService.RemoveFromCollection(c.Request.Context(), userID, collectionID, recipeID); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to remove recipe from collection"},
+		})
+		return
+	}
+
+	c.JSON(http.StatusNoContent, nil)
+}
+
+func (h *RecipeHandler) GetCollectionRecipeIDs(c *gin.Context) {
+	collectionID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid collection ID"},
+		})
+		return
+	}
+
+	ids, err := h.recipeService.GetCollectionRecipeIDs(c.Request.Context(), collectionID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to get recipe IDs"},
+		})
+		return
+	}
+
+	strIDs := make([]string, len(ids))
+	for i, id := range ids {
+		strIDs[i] = id.String()
+	}
+	if strIDs == nil {
+		strIDs = []string{}
+	}
+
+	c.JSON(http.StatusOK, strIDs)
+}

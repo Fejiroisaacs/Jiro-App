@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/models"
 	"github.com/google/uuid"
@@ -37,12 +38,12 @@ func (s *RecipeService) CreateRecipe(ctx context.Context, userID uuid.UUID, req 
 
 	recipe := &models.Recipe{}
 	err := s.db.QueryRow(ctx,
-		`INSERT INTO recipes (user_id, title, description, target_image_url, base_ingredients, instructions, tags)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)
-		 RETURNING id, user_id, title, description, target_image_url, base_ingredients, instructions, tags, created_at, updated_at`,
-		userID, req.Title, req.Description, req.TargetImageURL, ingredients, req.Instructions, tags,
+		`INSERT INTO recipes (user_id, title, description, target_image_url, base_ingredients, instructions, tags, nutrition, dietary_flags)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		 RETURNING id, user_id, title, description, target_image_url, base_ingredients, instructions, tags, nutrition, dietary_flags, created_at, updated_at`,
+		userID, req.Title, req.Description, req.TargetImageURL, ingredients, req.Instructions, tags, req.Nutrition, req.DietaryFlags,
 	).Scan(&recipe.ID, &recipe.UserID, &recipe.Title, &recipe.Description, &recipe.TargetImageURL,
-		&recipe.BaseIngredients, &recipe.Instructions, &recipe.Tags, &recipe.CreatedAt, &recipe.UpdatedAt)
+		&recipe.BaseIngredients, &recipe.Instructions, &recipe.Tags, &recipe.Nutrition, &recipe.DietaryFlags, &recipe.CreatedAt, &recipe.UpdatedAt)
 
 	if err != nil {
 		return nil, err
@@ -53,6 +54,7 @@ func (s *RecipeService) CreateRecipe(ctx context.Context, userID uuid.UUID, req 
 func (s *RecipeService) ListRecipes(ctx context.Context, userID uuid.UUID, search string) ([]models.Recipe, error) {
 	query := `
 		SELECT r.id, r.user_id, r.title, r.description, r.target_image_url, r.base_ingredients, r.instructions, r.tags,
+		       r.nutrition, r.dietary_flags,
 		       r.created_at, r.updated_at,
 		       (SELECT rt.rating FROM recipe_trials rt WHERE rt.recipe_id = r.id ORDER BY rt.date_cooked DESC LIMIT 1) as latest_rating,
 		       (SELECT COUNT(*) FROM recipe_trials rt WHERE rt.recipe_id = r.id) as trial_count,
@@ -79,7 +81,8 @@ func (s *RecipeService) ListRecipes(ctx context.Context, userID uuid.UUID, searc
 	for rows.Next() {
 		var r models.Recipe
 		err := rows.Scan(&r.ID, &r.UserID, &r.Title, &r.Description, &r.TargetImageURL,
-			&r.BaseIngredients, &r.Instructions, &r.Tags, &r.CreatedAt, &r.UpdatedAt,
+			&r.BaseIngredients, &r.Instructions, &r.Tags, &r.Nutrition, &r.DietaryFlags,
+			&r.CreatedAt, &r.UpdatedAt,
 			&r.LatestRating, &r.TrialCount, &r.LastCooked)
 		if err != nil {
 			return nil, err
@@ -99,11 +102,11 @@ func (s *RecipeService) ListRecipes(ctx context.Context, userID uuid.UUID, searc
 func (s *RecipeService) GetRecipe(ctx context.Context, userID, recipeID uuid.UUID) (*models.RecipeWithTrials, error) {
 	recipe := &models.RecipeWithTrials{}
 	err := s.db.QueryRow(ctx,
-		`SELECT id, user_id, title, description, target_image_url, base_ingredients, instructions, tags, created_at, updated_at
+		`SELECT id, user_id, title, description, target_image_url, base_ingredients, instructions, tags, nutrition, dietary_flags, created_at, updated_at
 		 FROM recipes WHERE id = $1 AND user_id = $2`,
 		recipeID, userID,
 	).Scan(&recipe.ID, &recipe.UserID, &recipe.Title, &recipe.Description, &recipe.TargetImageURL,
-		&recipe.BaseIngredients, &recipe.Instructions, &recipe.Tags, &recipe.CreatedAt, &recipe.UpdatedAt)
+		&recipe.BaseIngredients, &recipe.Instructions, &recipe.Tags, &recipe.Nutrition, &recipe.DietaryFlags, &recipe.CreatedAt, &recipe.UpdatedAt)
 	if recipe.Tags == nil {
 		recipe.Tags = []string{}
 	}
@@ -156,12 +159,14 @@ func (s *RecipeService) UpdateRecipe(ctx context.Context, userID, recipeID uuid.
 			base_ingredients = COALESCE($6, base_ingredients),
 			instructions = COALESCE($7, instructions),
 			tags = COALESCE($8, tags),
+			nutrition = COALESCE($9, nutrition),
+			dietary_flags = COALESCE($10, dietary_flags),
 			updated_at = NOW()
 		 WHERE id = $1 AND user_id = $2
-		 RETURNING id, user_id, title, description, target_image_url, base_ingredients, instructions, tags, created_at, updated_at`,
-		recipeID, userID, req.Title, req.Description, req.TargetImageURL, req.BaseIngredients, req.Instructions, tagsArg,
+		 RETURNING id, user_id, title, description, target_image_url, base_ingredients, instructions, tags, nutrition, dietary_flags, created_at, updated_at`,
+		recipeID, userID, req.Title, req.Description, req.TargetImageURL, req.BaseIngredients, req.Instructions, tagsArg, req.Nutrition, req.DietaryFlags,
 	).Scan(&recipe.ID, &recipe.UserID, &recipe.Title, &recipe.Description, &recipe.TargetImageURL,
-		&recipe.BaseIngredients, &recipe.Instructions, &recipe.Tags, &recipe.CreatedAt, &recipe.UpdatedAt)
+		&recipe.BaseIngredients, &recipe.Instructions, &recipe.Tags, &recipe.Nutrition, &recipe.DietaryFlags, &recipe.CreatedAt, &recipe.UpdatedAt)
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -364,4 +369,211 @@ func applyModifications(base, mods json.RawMessage) json.RawMessage {
 
 	result, _ := json.Marshal(ingredients)
 	return result
+}
+
+func (s *RecipeService) GetCookStreak(ctx context.Context, userID uuid.UUID) (*models.CookStreakResponse, error) {
+	rows, err := s.db.Query(ctx,
+		`SELECT DISTINCT (date_cooked AT TIME ZONE 'UTC')::date AS cook_date
+		 FROM recipe_trials rt
+		 JOIN recipes r ON rt.recipe_id = r.id
+		 WHERE r.user_id = $1
+		 ORDER BY cook_date DESC`,
+		userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var dates []string
+	for rows.Next() {
+		var d string
+		if err := rows.Scan(&d); err != nil {
+			return nil, err
+		}
+		dates = append(dates, d)
+	}
+
+	if len(dates) == 0 {
+		return &models.CookStreakResponse{CurrentStreak: 0, LongestStreak: 0, TotalCookDays: 0}, nil
+	}
+
+	// dates are DESC — newest first
+	// Parse today
+	now := time.Now().UTC().Truncate(24 * time.Hour)
+	parseDate := func(s string) time.Time {
+		// date comes back as "2026-02-21" or "2026-02-21T00:00:00Z"
+		t, _ := time.Parse("2006-01-02", s[:10])
+		return t
+	}
+
+	// Current streak: count consecutive days starting from today or yesterday
+	current := 0
+	for i, ds := range dates {
+		d := parseDate(ds)
+		expected := now.AddDate(0, 0, -i)
+		if d.Equal(expected) {
+			current++
+		} else if i == 0 && d.Equal(now.AddDate(0, 0, -1)) {
+			// If latest cook was yesterday, start from yesterday
+			current = 1
+			now = now.AddDate(0, 0, -1)
+		} else {
+			break
+		}
+	}
+
+	// Longest streak
+	longest := 1
+	streak := 1
+	for i := 1; i < len(dates); i++ {
+		prev := parseDate(dates[i-1])
+		curr := parseDate(dates[i])
+		if prev.Sub(curr) == 24*time.Hour {
+			streak++
+			if streak > longest {
+				longest = streak
+			}
+		} else {
+			streak = 1
+		}
+	}
+
+	if current > longest {
+		longest = current
+	}
+
+	return &models.CookStreakResponse{
+		CurrentStreak: current,
+		LongestStreak: longest,
+		TotalCookDays: len(dates),
+	}, nil
+}
+
+// ─── Collections ────────────────────────────────────────────────────
+
+func (s *RecipeService) CreateCollection(ctx context.Context, userID uuid.UUID, req *models.CreateCollectionRequest) (*models.Collection, error) {
+	c := &models.Collection{}
+	err := s.db.QueryRow(ctx,
+		`INSERT INTO recipe_collections (user_id, name)
+		 VALUES ($1, $2)
+		 RETURNING id, user_id, name, created_at, updated_at`,
+		userID, req.Name,
+	).Scan(&c.ID, &c.UserID, &c.Name, &c.CreatedAt, &c.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
+}
+
+func (s *RecipeService) ListCollections(ctx context.Context, userID uuid.UUID) ([]models.Collection, error) {
+	rows, err := s.db.Query(ctx,
+		`SELECT c.id, c.user_id, c.name, c.created_at, c.updated_at,
+		        (SELECT COUNT(*) FROM recipe_collection_items ci WHERE ci.collection_id = c.id) as recipe_count
+		 FROM recipe_collections c
+		 WHERE c.user_id = $1
+		 ORDER BY c.name`,
+		userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var collections []models.Collection
+	for rows.Next() {
+		var c models.Collection
+		if err := rows.Scan(&c.ID, &c.UserID, &c.Name, &c.CreatedAt, &c.UpdatedAt, &c.RecipeCount); err != nil {
+			return nil, err
+		}
+		collections = append(collections, c)
+	}
+	if collections == nil {
+		collections = []models.Collection{}
+	}
+	return collections, nil
+}
+
+func (s *RecipeService) UpdateCollection(ctx context.Context, userID, collectionID uuid.UUID, req *models.UpdateCollectionRequest) (*models.Collection, error) {
+	c := &models.Collection{}
+	err := s.db.QueryRow(ctx,
+		`UPDATE recipe_collections SET name = COALESCE($3, name), updated_at = NOW()
+		 WHERE id = $1 AND user_id = $2
+		 RETURNING id, user_id, name, created_at, updated_at`,
+		collectionID, userID, req.Name,
+	).Scan(&c.ID, &c.UserID, &c.Name, &c.CreatedAt, &c.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrRecipeNotFound
+		}
+		return nil, err
+	}
+	return c, nil
+}
+
+func (s *RecipeService) DeleteCollection(ctx context.Context, userID, collectionID uuid.UUID) error {
+	result, err := s.db.Exec(ctx,
+		"DELETE FROM recipe_collections WHERE id = $1 AND user_id = $2",
+		collectionID, userID,
+	)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		return ErrRecipeNotFound
+	}
+	return nil
+}
+
+func (s *RecipeService) AddToCollection(ctx context.Context, userID, collectionID, recipeID uuid.UUID) error {
+	// Verify ownership of both
+	var cOwner, rOwner uuid.UUID
+	if err := s.db.QueryRow(ctx, "SELECT user_id FROM recipe_collections WHERE id = $1", collectionID).Scan(&cOwner); err != nil {
+		return ErrRecipeNotFound
+	}
+	if err := s.db.QueryRow(ctx, "SELECT user_id FROM recipes WHERE id = $1", recipeID).Scan(&rOwner); err != nil {
+		return ErrRecipeNotFound
+	}
+	if cOwner != userID || rOwner != userID {
+		return ErrNotOwner
+	}
+
+	_, err := s.db.Exec(ctx,
+		`INSERT INTO recipe_collection_items (collection_id, recipe_id)
+		 VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+		collectionID, recipeID,
+	)
+	return err
+}
+
+func (s *RecipeService) RemoveFromCollection(ctx context.Context, userID, collectionID, recipeID uuid.UUID) error {
+	_, err := s.db.Exec(ctx,
+		`DELETE FROM recipe_collection_items ci
+		 USING recipe_collections c
+		 WHERE ci.collection_id = $1 AND ci.recipe_id = $2
+		   AND ci.collection_id = c.id AND c.user_id = $3`,
+		collectionID, recipeID, userID,
+	)
+	return err
+}
+
+func (s *RecipeService) GetCollectionRecipeIDs(ctx context.Context, collectionID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := s.db.Query(ctx,
+		"SELECT recipe_id FROM recipe_collection_items WHERE collection_id = $1",
+		collectionID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ids []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
 }

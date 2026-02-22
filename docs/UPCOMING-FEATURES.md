@@ -6,31 +6,6 @@ Planned features across all Jiro modules, in rough priority order.
 
 ## Jym
 
-### Jym Dashboard / Split Manager Separation
-
-The current `/jym` page acts as both a dashboard and a split manager, which is becoming too convoluted as features grow.
-
-**Proposed split:**
-
-`/jym` → **Dashboard** (read-only, action-oriented)
-
-- Activity heatmap + muscle group tracker
-- In-progress sessions (Resume / Discard)
-- Active series (Start / View)
-- "Your Splits" summary row with a "Manage Splits →" link (no creation UI here)
-- "Freestyle Session" quick-start button
-
-`/jym/splits` → **Split Manager** (pure management)
-
-- Splits grid with Build / Series / Start / Delete actions
-- New Split button + create modal (with tags)
-- New Series modal
-- Discover button linking to `/jym/discover`
-
-**Router change:** `app.routes.ts` gets a new `jym/splits` route; `jym` becomes the new `JymDashboardComponent`. The existing `SplitListComponent` is renamed/moved to `jym/splits`. The Quick Nav links update accordingly.
-
----
-
 ### Other Jym Features
 
 - **Routine templates** — save a session layout as a reusable routine without it being tied to a split
@@ -41,14 +16,9 @@ The current `/jym` page acts as both a dashboard and a split manager, which is b
 
 ## Culinara
 
-- **Recipe scaling** — enter a target serving count, all ingredient quantities scale automatically
-- **Nutritional info** — optional per-recipe macros (calories, protein, carbs, fat)
 - **Recipe sharing** — same copy-on-import model as splits: share a recipe link, recipient gets an independent copy
 - **Meal planner** — drag recipes onto a weekly calendar; auto-generates a shopping list from the plan
-- **Cook streak** — track how many days in a row a trial was logged (encourages consistent cooking)
 - **Import from URL** — paste a recipe URL, parse it into the recipe form (structured data / open graph)
-- **Collections** — group recipes into named folders beyond tags (e.g. "Date night", "Batch cooking Sunday", "Under 30 mins"); a recipe can belong to multiple collections
-- **Dietary flags** — boolean flags per recipe: vegan, vegetarian, gluten-free, dairy-free, nut-free; filterable in the recipe list alongside existing tag filters; stored as a `dietary_flags JSONB` column on the `recipes` table
 
 ---
 
