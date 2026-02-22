@@ -37,12 +37,12 @@ func (s *RecipeService) CreateRecipe(ctx context.Context, userID uuid.UUID, req 
 
 	recipe := &models.Recipe{}
 	err := s.db.QueryRow(ctx,
-		`INSERT INTO recipes (user_id, title, description, target_image_url, base_ingredients, instructions, tags)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)
-		 RETURNING id, user_id, title, description, target_image_url, base_ingredients, instructions, tags, created_at, updated_at`,
-		userID, req.Title, req.Description, req.TargetImageURL, ingredients, req.Instructions, tags,
+		`INSERT INTO recipes (user_id, title, description, target_image_url, base_ingredients, instructions, tags, nutrition, dietary_flags)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		 RETURNING id, user_id, title, description, target_image_url, base_ingredients, instructions, tags, nutrition, dietary_flags, created_at, updated_at`,
+		userID, req.Title, req.Description, req.TargetImageURL, ingredients, req.Instructions, tags, req.Nutrition, req.DietaryFlags,
 	).Scan(&recipe.ID, &recipe.UserID, &recipe.Title, &recipe.Description, &recipe.TargetImageURL,
-		&recipe.BaseIngredients, &recipe.Instructions, &recipe.Tags, &recipe.CreatedAt, &recipe.UpdatedAt)
+		&recipe.BaseIngredients, &recipe.Instructions, &recipe.Tags, &recipe.Nutrition, &recipe.DietaryFlags, &recipe.CreatedAt, &recipe.UpdatedAt)
 
 	if err != nil {
 		return nil, err
@@ -53,6 +53,7 @@ func (s *RecipeService) CreateRecipe(ctx context.Context, userID uuid.UUID, req 
 func (s *RecipeService) ListRecipes(ctx context.Context, userID uuid.UUID, search string) ([]models.Recipe, error) {
 	query := `
 		SELECT r.id, r.user_id, r.title, r.description, r.target_image_url, r.base_ingredients, r.instructions, r.tags,
+		       r.nutrition, r.dietary_flags,
 		       r.created_at, r.updated_at,
 		       (SELECT rt.rating FROM recipe_trials rt WHERE rt.recipe_id = r.id ORDER BY rt.date_cooked DESC LIMIT 1) as latest_rating,
 		       (SELECT COUNT(*) FROM recipe_trials rt WHERE rt.recipe_id = r.id) as trial_count,
@@ -79,7 +80,8 @@ func (s *RecipeService) ListRecipes(ctx context.Context, userID uuid.UUID, searc
 	for rows.Next() {
 		var r models.Recipe
 		err := rows.Scan(&r.ID, &r.UserID, &r.Title, &r.Description, &r.TargetImageURL,
-			&r.BaseIngredients, &r.Instructions, &r.Tags, &r.CreatedAt, &r.UpdatedAt,
+			&r.BaseIngredients, &r.Instructions, &r.Tags, &r.Nutrition, &r.DietaryFlags,
+			&r.CreatedAt, &r.UpdatedAt,
 			&r.LatestRating, &r.TrialCount, &r.LastCooked)
 		if err != nil {
 			return nil, err
@@ -99,11 +101,11 @@ func (s *RecipeService) ListRecipes(ctx context.Context, userID uuid.UUID, searc
 func (s *RecipeService) GetRecipe(ctx context.Context, userID, recipeID uuid.UUID) (*models.RecipeWithTrials, error) {
 	recipe := &models.RecipeWithTrials{}
 	err := s.db.QueryRow(ctx,
-		`SELECT id, user_id, title, description, target_image_url, base_ingredients, instructions, tags, created_at, updated_at
+		`SELECT id, user_id, title, description, target_image_url, base_ingredients, instructions, tags, nutrition, dietary_flags, created_at, updated_at
 		 FROM recipes WHERE id = $1 AND user_id = $2`,
 		recipeID, userID,
 	).Scan(&recipe.ID, &recipe.UserID, &recipe.Title, &recipe.Description, &recipe.TargetImageURL,
-		&recipe.BaseIngredients, &recipe.Instructions, &recipe.Tags, &recipe.CreatedAt, &recipe.UpdatedAt)
+		&recipe.BaseIngredients, &recipe.Instructions, &recipe.Tags, &recipe.Nutrition, &recipe.DietaryFlags, &recipe.CreatedAt, &recipe.UpdatedAt)
 	if recipe.Tags == nil {
 		recipe.Tags = []string{}
 	}
@@ -156,12 +158,14 @@ func (s *RecipeService) UpdateRecipe(ctx context.Context, userID, recipeID uuid.
 			base_ingredients = COALESCE($6, base_ingredients),
 			instructions = COALESCE($7, instructions),
 			tags = COALESCE($8, tags),
+			nutrition = COALESCE($9, nutrition),
+			dietary_flags = COALESCE($10, dietary_flags),
 			updated_at = NOW()
 		 WHERE id = $1 AND user_id = $2
-		 RETURNING id, user_id, title, description, target_image_url, base_ingredients, instructions, tags, created_at, updated_at`,
-		recipeID, userID, req.Title, req.Description, req.TargetImageURL, req.BaseIngredients, req.Instructions, tagsArg,
+		 RETURNING id, user_id, title, description, target_image_url, base_ingredients, instructions, tags, nutrition, dietary_flags, created_at, updated_at`,
+		recipeID, userID, req.Title, req.Description, req.TargetImageURL, req.BaseIngredients, req.Instructions, tagsArg, req.Nutrition, req.DietaryFlags,
 	).Scan(&recipe.ID, &recipe.UserID, &recipe.Title, &recipe.Description, &recipe.TargetImageURL,
-		&recipe.BaseIngredients, &recipe.Instructions, &recipe.Tags, &recipe.CreatedAt, &recipe.UpdatedAt)
+		&recipe.BaseIngredients, &recipe.Instructions, &recipe.Tags, &recipe.Nutrition, &recipe.DietaryFlags, &recipe.CreatedAt, &recipe.UpdatedAt)
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

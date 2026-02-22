@@ -16,6 +16,8 @@ type Recipe struct {
 	BaseIngredients json.RawMessage `json:"base_ingredients"`
 	Instructions    *string         `json:"instructions"`
 	Tags            []string        `json:"tags"`
+	Nutrition       json.RawMessage `json:"nutrition"`
+	DietaryFlags    json.RawMessage `json:"dietary_flags"`
 	CreatedAt       time.Time       `json:"created_at"`
 	UpdatedAt       time.Time       `json:"updated_at"`
 	// Computed fields (from list query)
@@ -49,6 +51,8 @@ type CreateRecipeRequest struct {
 	BaseIngredients json.RawMessage `json:"base_ingredients"`
 	Instructions    *string         `json:"instructions"`
 	Tags            []string        `json:"tags"`
+	Nutrition       json.RawMessage `json:"nutrition"`
+	DietaryFlags    json.RawMessage `json:"dietary_flags"`
 }
 
 type UpdateRecipeRequest struct {
@@ -58,6 +62,8 @@ type UpdateRecipeRequest struct {
 	BaseIngredients json.RawMessage `json:"base_ingredients"`
 	Instructions    *string         `json:"instructions"`
 	Tags            []string        `json:"tags"`
+	Nutrition       json.RawMessage `json:"nutrition"`
+	DietaryFlags    json.RawMessage `json:"dietary_flags"`
 }
 
 type CreateTrialRequest struct {

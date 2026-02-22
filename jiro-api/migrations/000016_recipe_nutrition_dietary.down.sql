@@ -1,0 +1,2 @@
+ALTER TABLE recipes DROP COLUMN IF EXISTS dietary_flags;
+ALTER TABLE recipes DROP COLUMN IF EXISTS nutrition;

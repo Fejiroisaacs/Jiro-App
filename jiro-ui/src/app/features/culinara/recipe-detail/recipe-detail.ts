@@ -111,6 +111,23 @@ interface CookIngredient {
               <span *ngFor="let tag of r.tags" class="recipe-tag">{{ tag }}</span>
             </div>
 
+            <!-- Dietary flags -->
+            <div class="dietary-row" *ngIf="r.dietary_flags">
+              <span class="dietary-pill" *ngIf="r.dietary_flags.vegan">🌱 Vegan</span>
+              <span class="dietary-pill" *ngIf="r.dietary_flags.vegetarian">🥬 Vegetarian</span>
+              <span class="dietary-pill" *ngIf="r.dietary_flags.gluten_free">🌾 Gluten-Free</span>
+              <span class="dietary-pill" *ngIf="r.dietary_flags.dairy_free">🥛 Dairy-Free</span>
+              <span class="dietary-pill" *ngIf="r.dietary_flags.nut_free">🥜 Nut-Free</span>
+            </div>
+
+            <!-- Nutrition -->
+            <div class="macro-bar" *ngIf="r.nutrition && (r.nutrition.calories || r.nutrition.protein || r.nutrition.carbs || r.nutrition.fat)">
+              <div class="macro-chip" *ngIf="r.nutrition.calories"><span class="macro-val">{{ r.nutrition.calories }}</span> cal</div>
+              <div class="macro-chip" *ngIf="r.nutrition.protein"><span class="macro-val">{{ r.nutrition.protein }}g</span> protein</div>
+              <div class="macro-chip" *ngIf="r.nutrition.carbs"><span class="macro-val">{{ r.nutrition.carbs }}g</span> carbs</div>
+              <div class="macro-chip" *ngIf="r.nutrition.fat"><span class="macro-val">{{ r.nutrition.fat }}g</span> fat</div>
+            </div>
+
             <!-- Stats row -->
             <div class="stats-row">
               <div class="stat" *ngIf="r.trials && r.trials.length > 0">
@@ -555,6 +572,29 @@ interface CookIngredient {
     .section {
       margin-top: var(--space-md);
     }
+
+    .dietary-row {
+      display: flex; flex-wrap: wrap; gap: 6px;
+    }
+
+    .dietary-pill {
+      font-size: var(--font-size-xs); padding: 3px 10px;
+      background: rgba(76,175,80,0.08); color: #2e7d32;
+      border: 1px solid rgba(76,175,80,0.25);
+      border-radius: 12px; font-weight: 500;
+    }
+
+    .macro-bar {
+      display: flex; gap: var(--space-sm); flex-wrap: wrap;
+    }
+
+    .macro-chip {
+      font-size: var(--font-size-xs); color: var(--text-secondary);
+      background: var(--bg-surface); border: 1px solid var(--border-color);
+      border-radius: var(--border-radius); padding: 4px 10px;
+    }
+
+    .macro-val { font-weight: 600; color: var(--text-primary); }
 
     .section-title {
       font-size: var(--font-size-sm);
@@ -1177,7 +1217,7 @@ export class RecipeDetailComponent implements OnInit {
     private route: ActivatedRoute,
     private router: Router,
     private recipeService: RecipeService
-  ) {}
+  ) { }
 
   ngOnInit() {
     const id = this.route.snapshot.paramMap.get('id')!;

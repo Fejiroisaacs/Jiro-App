@@ -12,11 +12,28 @@ export interface Recipe {
   base_ingredients: Ingredient[];
   instructions: string | null;
   tags: string[];
+  nutrition: Nutrition | null;
+  dietary_flags: DietaryFlags | null;
   created_at: string;
   updated_at: string;
   latest_rating?: number | null;
   trial_count?: number | null;
   last_cooked?: string | null;
+}
+
+export interface Nutrition {
+  calories?: number | null;
+  protein?: number | null;
+  carbs?: number | null;
+  fat?: number | null;
+}
+
+export interface DietaryFlags {
+  vegan?: boolean;
+  vegetarian?: boolean;
+  gluten_free?: boolean;
+  dairy_free?: boolean;
+  nut_free?: boolean;
 }
 
 export interface Ingredient {
@@ -51,6 +68,8 @@ export interface CreateRecipeRequest {
   base_ingredients?: Ingredient[];
   instructions?: string;
   tags?: string[];
+  nutrition?: Nutrition;
+  dietary_flags?: DietaryFlags;
 }
 
 export interface UpdateRecipeRequest {
@@ -60,6 +79,8 @@ export interface UpdateRecipeRequest {
   base_ingredients?: Ingredient[];
   instructions?: string;
   tags?: string[];
+  nutrition?: Nutrition;
+  dietary_flags?: DietaryFlags;
 }
 
 export interface CreateTrialRequest {
@@ -81,7 +102,7 @@ const API_URL = `${environment.apiUrl}/culinara`;
 
 @Injectable({ providedIn: 'root' })
 export class RecipeService {
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient) { }
 
   listRecipes(search?: string): Observable<Recipe[]> {
     let params = new HttpParams();
