@@ -46,13 +46,14 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR, FormsModule } from '@angular/f
       background: var(--bg-surface);
       color: var(--text-primary);
       font-size: var(--font-size-md);
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
       outline: none;
     }
 
     .jiro-input:focus {
       border-color: var(--color-primary);
-      box-shadow: 0 0 0 3px rgba(122, 59, 46, 0.15);
+      box-shadow: 2px 2px 0px var(--color-primary);
+      transform: translate(-1px, -1px);
     }
 
     .jiro-input::placeholder {
@@ -61,6 +62,11 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR, FormsModule } from '@angular/f
 
     .has-error .jiro-input {
       border-color: var(--color-danger);
+      box-shadow: 0 0 0 1px var(--color-danger);
+    }
+    
+    .has-error .jiro-input:focus {
+      box-shadow: 2px 2px 0px var(--color-danger);
     }
 
     .jiro-error {
@@ -76,8 +82,8 @@ export class JiroInputComponent implements ControlValueAccessor {
   @Input() error = '';
 
   value = '';
-  onChange: (val: string) => void = () => {};
-  onTouched: () => void = () => {};
+  onChange: (val: string) => void = () => { };
+  onTouched: () => void = () => { };
 
   onInput(event: Event) {
     const val = (event.target as HTMLInputElement).value;
