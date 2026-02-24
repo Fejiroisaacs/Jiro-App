@@ -258,8 +258,9 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     .split-title-row h1 { font-size: var(--font-size-2xl); font-weight: 700; }
 
     .title-input {
+      font-family: 'Newsreader', serif;
       font-size: var(--font-size-2xl); font-weight: 700;
-      border: none; border-bottom: 2px solid var(--color-primary);
+      border: none; border-bottom: 2px dashed var(--color-primary);
       background: transparent; color: var(--text-primary);
       outline: none; padding: 0 var(--space-xs);
     }
@@ -292,10 +293,15 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     .tags-display { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 
     .tag-chip {
-      font-size: 11px; font-weight: 500;
-      padding: 2px 8px; border-radius: 10px;
-      background: rgba(122,59,46,0.08); color: var(--color-primary);
-      border: 1px solid rgba(122,59,46,0.18);
+      background: var(--bg-canvas); 
+      color: var(--text-primary);
+      font-size: var(--font-size-xs); 
+      font-weight: 600;
+      padding: 4px 8px; 
+      border-radius: 2px;
+      border: 1px dashed var(--border-color);
+      box-shadow: 1px 1px 0 var(--border-color);
+      white-space: nowrap;
     }
 
     .tag-edit-btn {
@@ -364,9 +370,15 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     .routine-title { display: flex; align-items: center; gap: var(--space-xs); flex: 1; min-width: 0; }
 
     .day-chip {
-      background: rgba(122,59,46,0.12); color: var(--color-primary);
-      font-size: var(--font-size-xs); font-weight: 600;
-      padding: 2px 8px; border-radius: 10px; white-space: nowrap;
+      background: var(--bg-canvas);
+      color: var(--color-primary);
+      font-size: var(--font-size-xs);
+      font-weight: 600;
+      padding: 4px 8px;
+      border-radius: 2px;
+      border: 1px solid var(--border-color);
+      box-shadow: 1px 1px 0 rgba(0,0,0,0.1);
+      white-space: nowrap;
     }
 
     .routine-name {
@@ -414,9 +426,15 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     .item-targets { flex-shrink: 0; }
 
     .target-text {
-      font-size: var(--font-size-xs); font-weight: 600;
-      color: var(--color-primary); background: rgba(122,59,46,0.1);
-      padding: 2px 6px; border-radius: 8px;
+      background: var(--bg-canvas);
+      color: var(--color-primary);
+      font-size: var(--font-size-xs);
+      font-weight: 600;
+      padding: 4px 8px;
+      border-radius: 2px;
+      border: 1px solid var(--border-color);
+      box-shadow: 1px 1px 0 rgba(0,0,0,0.1);
+      white-space: nowrap;
     }
 
     .empty-list {
@@ -438,18 +456,31 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     /* Modal forms */
     .simple-form { display: flex; flex-direction: column; gap: var(--space-md); }
 
-    .form-group { display: flex; flex-direction: column; gap: var(--space-xs); }
+    .form-group { display: flex; flex-direction: column; gap: var(--space-xs); margin-bottom: var(--space-md); }
 
-    .form-label { font-size: var(--font-size-sm); font-weight: 500; color: var(--text-secondary); }
-
-    .form-input {
-      padding: 10px 14px; border: 1px solid var(--border-color);
-      border-radius: var(--border-radius); background: var(--bg-surface);
-      color: var(--text-primary); font-size: var(--font-size-md);
-      outline: none; transition: border-color 0.2s; font-family: inherit; width: 100%; box-sizing: border-box;
+    .form-label { 
+      font-size: var(--font-size-lg); 
+      font-weight: 600; 
+      color: var(--text-primary); 
+      font-family: 'Newsreader', serif;
     }
 
-    .form-input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(122,59,46,0.15); }
+    .form-input {
+      padding: 10px 0; 
+      border: none;
+      border-bottom: 2px dashed var(--border-color);
+      border-radius: 0; 
+      background: transparent;
+      color: var(--text-primary); 
+      font-size: var(--font-size-md);
+      outline: none; 
+      transition: border-color 0.2s; 
+      font-family: inherit; 
+      width: 100%; 
+      box-sizing: border-box;
+    }
+
+    .form-input:focus { border-bottom-color: var(--color-primary); }
 
     .form-actions { display: flex; justify-content: flex-end; gap: var(--space-sm); margin-top: var(--space-xs); }
 

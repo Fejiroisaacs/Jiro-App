@@ -169,12 +169,14 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
       border-radius: var(--border-radius); padding: var(--space-lg);
       display: flex; flex-direction: column; gap: var(--space-sm);
       cursor: pointer; transition: all 0.15s;
+      position: relative;
+      top: 0;
     }
 
     .split-card:hover {
       border-color: var(--color-primary);
       box-shadow: 0 0 0 3px rgba(122,59,46,0.08);
-      transform: translateY(-1px);
+      top: -1px;
     }
 
     .card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-sm); }

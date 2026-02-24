@@ -133,16 +133,30 @@ Chart.register(...registerables);
 
     .form-group { display: flex; flex-direction: column; gap: var(--space-xs); flex: 1; min-width: 120px; }
 
-    .form-label { font-size: var(--font-size-sm); font-weight: 500; color: var(--text-secondary); }
-
-    .form-input {
-      padding: 10px 14px; border: 1px solid var(--border-color);
-      border-radius: var(--border-radius); background: var(--bg-canvas);
-      color: var(--text-primary); font-size: var(--font-size-md);
-      outline: none; font-family: inherit;
+    .form-label { 
+      font-size: var(--font-size-lg); 
+      font-weight: 600; 
+      color: var(--text-primary); 
+      font-family: 'Newsreader', serif;
+      margin-bottom: var(--space-xs);
     }
 
-    .form-input:focus { border-color: var(--color-primary); }
+    .form-input {
+      padding: 10px 0; 
+      border: none;
+      border-bottom: 2px dashed var(--border-color);
+      border-radius: 0; 
+      background: transparent;
+      color: var(--text-primary); 
+      font-size: var(--font-size-md);
+      outline: none; 
+      transition: border-color 0.2s; 
+      font-family: inherit; 
+      width: 100%; 
+      box-sizing: border-box;
+    }
+
+    .form-input:focus { border-bottom-color: var(--color-primary); }
 
     .state-message {
       display: flex; flex-direction: column; align-items: center;
@@ -225,7 +239,7 @@ export class BodyWeightComponent implements OnInit, AfterViewInit, OnDestroy {
   constructor(
     private jymService: JymService,
     public settingsService: SettingsService,
-  ) {}
+  ) { }
 
   ngOnInit() {
     this.jymService.listBodyWeights().subscribe({

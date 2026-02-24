@@ -218,17 +218,34 @@ const MUSCLE_GROUPS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs'
     .muscle-chips { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
 
     .mg-chip {
-      padding: 4px 12px; border: 1px solid var(--border-color);
-      border-radius: 12px; background: none; cursor: pointer;
-      font-size: var(--font-size-xs); color: var(--text-secondary);
-      transition: all 0.15s;
+      padding: 6px 16px; 
+      border: 1px dashed var(--border-color);
+      border-radius: 2px;
+      background: var(--bg-surface); 
+      cursor: pointer;
+      font-size: var(--font-size-sm); 
+      color: var(--text-secondary);
+      font-weight: 500;
+      box-shadow: 2px 2px 0 var(--border-color);
+      transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+      position: relative;
+      top: 0;
+      left: 0;
     }
 
-    .mg-chip:hover { border-color: var(--color-primary); color: var(--color-primary); }
+    .mg-chip:hover { 
+      top: -1px;
+      left: -1px;
+      box-shadow: 3px 3px 0 var(--color-primary);
+      border-color: var(--color-primary); 
+      color: var(--color-primary); 
+    }
 
     .mg-chip.active {
-      background: var(--color-primary); border-color: var(--color-primary);
+      background: var(--color-primary); 
+      border: 1px solid var(--color-primary);
       color: white;
+      box-shadow: 2px 2px 0 rgba(122, 59, 46, 0.4);
     }
 
     .state-message {
@@ -259,9 +276,15 @@ const MUSCLE_GROUPS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs'
     .ex-name { font-size: var(--font-size-md); font-weight: 600; }
 
     .mg-badge {
-      background: rgba(122,59,46,0.12); color: var(--color-primary);
-      font-size: var(--font-size-xs); font-weight: 500;
-      padding: 2px 8px; border-radius: 10px; white-space: nowrap;
+      background: var(--bg-canvas); 
+      color: var(--text-primary);
+      font-size: var(--font-size-xs); 
+      font-weight: 600;
+      padding: 4px 8px; 
+      border-radius: 2px;
+      border: 1px solid var(--border-color);
+      box-shadow: 1px 1px 0 var(--border-color);
+      white-space: nowrap;
     }
 
     .ex-notes {
@@ -276,14 +299,28 @@ const MUSCLE_GROUPS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs'
 
     .icon-btn {
       display: inline-flex; align-items: center; gap: 5px;
-      background: none; border: none; cursor: pointer; padding: 4px 8px;
-      border-radius: 4px; font-size: var(--font-size-xs); font-weight: 500;
-      transition: all 0.15s; color: var(--text-muted);
+      background: var(--bg-surface); border: 1px solid transparent; cursor: pointer; padding: 6px 10px;
+      border-radius: 2px; font-size: var(--font-size-xs); font-weight: 600;
+      transition: all 0.15s cubic-bezier(0.2, 0, 0, 1); color: var(--text-secondary);
+      position: relative;
+      top: 0;
+      left: 0;
     }
 
-    .edit-btn:hover { color: var(--text-primary); background: var(--bg-canvas); }
+    .edit-btn:hover { 
+      color: var(--text-primary); 
+      border-color: var(--border-color);
+      box-shadow: 1px 1px 0 var(--border-color);
+      top: -1px; left: -1px;
+    }
 
-    .delete-btn:hover { color: var(--color-danger); background: rgba(196,74,74,0.08); }
+    .delete-btn:hover { 
+      color: var(--color-danger); 
+      border-color: rgba(196,74,74,0.3);
+      box-shadow: 1px 1px 0 rgba(196,74,74,0.3);
+      background: rgba(196,74,74,0.04);
+      top: -1px; left: -1px;
+    }
 
     .rename-note {
       font-size: var(--font-size-xs); color: var(--text-muted);
@@ -302,18 +339,33 @@ const MUSCLE_GROUPS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs'
 
     .create-form { display: flex; flex-direction: column; gap: var(--space-md); }
 
-    .form-group { display: flex; flex-direction: column; gap: var(--space-xs); }
+    .form-group { display: flex; flex-direction: column; gap: var(--space-xs); margin-bottom: var(--space-md); }
 
-    .form-label { font-size: var(--font-size-sm); font-weight: 500; color: var(--text-secondary); }
-
-    .form-input {
-      padding: 10px 14px; border: 1px solid var(--border-color);
-      border-radius: var(--border-radius); background: var(--bg-surface);
-      color: var(--text-primary); font-size: var(--font-size-md);
-      outline: none; transition: border-color 0.2s; font-family: inherit; width: 100%; box-sizing: border-box;
+    .form-label { 
+      font-size: var(--font-size-lg); 
+      font-weight: 600; 
+      color: var(--text-primary); 
+      font-family: 'Newsreader', serif;
     }
 
-    .form-input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(122,59,46,0.15); }
+    .form-input {
+      padding: 10px 0; 
+      border: none;
+      border-bottom: 2px dashed var(--border-color);
+      border-radius: 0; 
+      background: transparent;
+      color: var(--text-primary); 
+      font-size: var(--font-size-md);
+      outline: none; 
+      transition: border-color 0.2s; 
+      font-family: inherit; 
+      width: 100%; 
+      box-sizing: border-box;
+    }
+
+    .form-input:focus { 
+      border-bottom-color: var(--color-primary); 
+    }
 
     .form-textarea { resize: vertical; min-height: 60px; }
 
@@ -347,7 +399,7 @@ export class ExerciseLibraryComponent implements OnInit {
   newNotes = '';
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
-  constructor(private jymService: JymService, public router: Router) {}
+  constructor(private jymService: JymService, public router: Router) { }
 
   ngOnInit() { this.load(); }
 
