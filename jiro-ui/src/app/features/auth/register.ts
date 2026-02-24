@@ -18,7 +18,7 @@ const USERNAME_PATTERN = /^[a-z0-9_]{3,30}$/;
       <div class="auth-container">
         <div class="auth-header">
           <h1 class="auth-logo">Jiro</h1>
-          <p class="auth-subtitle">JIRO is the GOAT, right?</p>
+          <p class="auth-subtitle">Create an account</p>
         </div>
 
         <jiro-card>
