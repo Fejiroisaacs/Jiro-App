@@ -35,13 +35,14 @@ import { CommonModule } from '@angular/common';
     }
 
     .modal-content {
-      background: var(--bg-surface);
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-color);
       border-radius: var(--border-radius-lg);
       box-shadow: var(--shadow-lg);
       width: 100%;
       max-height: 90vh;
       overflow-y: auto;
-      animation: slideUp 0.2s ease;
+      animation: slideUp 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     }
 
     .modal-header {

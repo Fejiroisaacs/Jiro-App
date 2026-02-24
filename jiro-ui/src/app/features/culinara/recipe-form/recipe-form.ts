@@ -115,9 +115,9 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
               &times;
             </button>
           </div>
-          <button type="button" class="add-link" (click)="addIngredient()">
+          <jiro-button type="button" variant="secondary" (click)="addIngredient()" class="add-ingredient-btn">
             + Add ingredient
-          </button>
+          </jiro-button>
         </div>
       </div>
 
@@ -208,7 +208,7 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
     .recipe-form {
       display: flex;
       flex-direction: column;
-      gap: var(--space-md);
+      gap: var(--space-lg);
       max-width: 100%;
       overflow: hidden;
       box-sizing: border-box;
@@ -217,14 +217,20 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
     .field {
       display: flex;
       flex-direction: column;
-      gap: var(--space-xs);
+      gap: var(--space-sm);
       min-width: 0;
     }
 
     .field-label {
-      font-size: var(--font-size-sm);
-      font-weight: 500;
-      color: var(--text-secondary);
+      font-family: var(--font-family-display);
+      font-size: var(--font-size-md);
+      font-weight: 600;
+      color: var(--text-primary);
+      text-transform: capitalize;
+      letter-spacing: 0.01em;
+      border-bottom: 1px dashed var(--border-color);
+      padding-bottom: 4px;
+      margin-bottom: 4px;
     }
 
     .required {
@@ -263,31 +269,36 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
     .tag-chips {
       display: flex;
       flex-wrap: wrap;
-      gap: var(--space-xs);
+      gap: var(--space-sm);
+      margin-top: var(--space-xs);
     }
 
     .tag-chip {
-      padding: 4px 12px;
+      padding: 6px 14px;
       border: 1px solid var(--border-color);
-      border-radius: 20px;
+      border-radius: 4px; /* Paper label look */
       background: var(--bg-surface);
       color: var(--text-secondary);
       font-size: var(--font-size-xs);
-      font-weight: 500;
+      font-weight: 600;
       cursor: pointer;
-      transition: all 0.15s;
       font-family: inherit;
+      box-shadow: 2px 2px 0px transparent;
+      transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     }
 
     .tag-chip:hover {
       border-color: var(--color-primary);
       color: var(--color-primary);
+      transform: translate(-1px, -1px);
+      box-shadow: 2px 2px 0px rgba(92, 64, 51, 0.15);
     }
 
     .tag-chip--active {
-      background: rgba(122, 59, 46, 0.12);
+      background: var(--color-primary);
       border-color: var(--color-primary);
-      color: var(--color-primary);
+      color: var(--text-on-primary);
+      box-shadow: 2px 2px 0px rgba(92, 64, 51, 0.25);
     }
 
     .custom-tags-row {
@@ -370,7 +381,7 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
     .ingredient-row {
       display: grid;
       grid-template-columns: 1fr 140px 32px;
-      gap: var(--space-xs);
+      gap: var(--space-sm);
       align-items: center;
     }
 
@@ -379,34 +390,27 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
       height: 32px;
       border: 1px solid var(--border-color);
       border-radius: var(--border-radius);
-      background: none;
+      background: var(--bg-surface);
       color: var(--text-muted);
       cursor: pointer;
       font-size: 18px;
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: color 0.15s, border-color 0.15s;
+      transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     }
 
     .remove-btn:hover {
       color: var(--color-danger);
       border-color: var(--color-danger);
+      box-shadow: 2px 2px 0px rgba(193, 88, 42, 0.15);
+      transform: translate(-1px, -1px);
     }
 
-    .add-link {
-      background: none;
-      border: none;
-      color: var(--color-primary);
-      font-size: var(--font-size-sm);
-      cursor: pointer;
-      padding: var(--space-xs) 0;
-      text-align: left;
-      font-weight: 500;
-    }
-
-    .add-link:hover {
-      text-decoration: underline;
+    .add-ingredient-btn {
+      margin-top: var(--space-xs);
+      align-self: flex-start;
+      margin-right: auto;
     }
 
     .form-error {
@@ -441,23 +445,52 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
     }
 
     .macro-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: var(--space-xs);
+      display: flex;
+      justify-content: space-between;
+      gap: var(--space-md);
+      background: var(--bg-surface);
+      padding: var(--space-md);
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      box-shadow: 2px 2px 0px rgba(92, 64, 51, 0.05);
     }
 
-    .macro-field { display: flex; flex-direction: column; gap: 2px; }
+    .macro-field { 
+      display: flex; 
+      flex-direction: column; 
+      gap: 4px; 
+      flex: 1;
+      border-right: 1px solid var(--border-color);
+      padding-right: var(--space-md);
+    }
+    
+    .macro-field:last-child {
+      border-right: none;
+      padding-right: 0;
+    }
 
     .macro-label {
-      font-size: var(--font-size-xs);
-      color: var(--text-muted);
+      font-family: var(--font-family-display);
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
       font-weight: 500;
+      text-align: center;
     }
 
     .macro-input {
       text-align: center;
       -moz-appearance: textfield;
       min-width: 0;
+      border: none !important;
+      box-shadow: none !important;
+      padding: 4px;
+      font-weight: 600;
+      font-size: var(--font-size-lg);
+      background: transparent;
+    }
+
+    .macro-input:focus {
+      background: var(--bg-page);
     }
 
     .macro-input::-webkit-inner-spin-button,
