@@ -28,7 +28,7 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
       <div class="page-header">
         <div>
           <h1>Culinara</h1>
-          <p class="text-secondary">Your recipe lab notebook</p>
+          <p class="text-secondary">Your recipe notebook</p>
         </div>
         <div class="header-right">
           <div class="streak-badge" *ngIf="cookStreak()?.current_streak">
