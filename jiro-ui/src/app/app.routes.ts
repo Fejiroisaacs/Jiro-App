@@ -90,6 +90,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/jym/discover/discover-detail').then(m => m.DiscoverDetailComponent),
       },
       {
+        path: 'jym/how-to',
+        loadComponent: () => import('./features/jym/how-to-use/how-to-use').then(m => m.HowToUseComponent),
+      },
+      {
         path: '',
         redirectTo: 'dashboard',
         pathMatch: 'full',
