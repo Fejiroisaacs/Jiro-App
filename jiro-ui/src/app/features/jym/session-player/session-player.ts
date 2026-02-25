@@ -982,6 +982,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
 
   private clearRestTimer() {
     if (this.restInterval) { clearInterval(this.restInterval); this.restInterval = null; }
+    this.restStartedAt = null;
   }
 
   skipRestTimer() {
@@ -1136,6 +1137,10 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     const block = this.blocks()[blockIndex];
     const row = block.sets[setIndex];
     if (!row.weight || !row.reps) return;
+
+    // Warm up audio NOW, synchronously while the tap gesture is still active.
+    // Safari blocks AudioContext creation/resume in async callbacks (e.g. HTTP responses).
+    this.warmUpAudio();
 
     this.blocks.update(bs => bs.map((b, bi) => bi === blockIndex ? {
       ...b,
