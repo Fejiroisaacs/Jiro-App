@@ -245,7 +245,7 @@ func (s *JymService) GetSplitWithRoutines(ctx context.Context, userID, splitID u
 	}
 
 	rows, err := s.db.Query(ctx,
-		`SELECT r.id, r.split_id, r.name, r.day_order, r.created_at
+		`SELECT r.id, r.user_id, r.split_id, r.name, r.day_order, r.created_at
 		 FROM routines r WHERE r.split_id = $1 ORDER BY r.day_order ASC`,
 		splitID,
 	)
@@ -257,7 +257,7 @@ func (s *JymService) GetSplitWithRoutines(ctx context.Context, userID, splitID u
 	sp.Routines = []models.RoutineWithItems{}
 	for rows.Next() {
 		var rt models.RoutineWithItems
-		if err := rows.Scan(&rt.ID, &rt.SplitID, &rt.Name, &rt.DayOrder, &rt.CreatedAt); err != nil {
+		if err := rows.Scan(&rt.ID, &rt.UserID, &rt.SplitID, &rt.Name, &rt.DayOrder, &rt.CreatedAt); err != nil {
 			return nil, err
 		}
 		rt.Items = []models.RoutineItemWithExercise{}
@@ -499,11 +499,11 @@ func (s *JymService) CreateRoutine(ctx context.Context, userID, splitID uuid.UUI
 
 	rt := &models.Routine{}
 	err := s.db.QueryRow(ctx,
-		`INSERT INTO routines (split_id, name, day_order)
-		 VALUES ($1, $2, $3)
-		 RETURNING id, split_id, name, day_order, created_at`,
-		splitID, req.Name, dayOrder,
-	).Scan(&rt.ID, &rt.SplitID, &rt.Name, &rt.DayOrder, &rt.CreatedAt)
+		`INSERT INTO routines (user_id, split_id, name, day_order)
+		 VALUES ($1, $2, $3, $4)
+		 RETURNING id, user_id, split_id, name, day_order, created_at`,
+		userID, splitID, req.Name, dayOrder,
+	).Scan(&rt.ID, &rt.UserID, &rt.SplitID, &rt.Name, &rt.DayOrder, &rt.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -518,9 +518,9 @@ func (s *JymService) UpdateRoutine(ctx context.Context, userID, routineID uuid.U
 		   day_order = COALESCE($4, day_order)
 		 WHERE id = $1
 		   AND split_id IN (SELECT id FROM splits WHERE user_id = $2)
-		 RETURNING id, split_id, name, day_order, created_at`,
+		 RETURNING id, user_id, split_id, name, day_order, created_at`,
 		routineID, userID, req.Name, req.DayOrder,
-	).Scan(&rt.ID, &rt.SplitID, &rt.Name, &rt.DayOrder, &rt.CreatedAt)
+	).Scan(&rt.ID, &rt.UserID, &rt.SplitID, &rt.Name, &rt.DayOrder, &rt.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrRoutineNotFound
@@ -533,7 +533,10 @@ func (s *JymService) UpdateRoutine(ctx context.Context, userID, routineID uuid.U
 func (s *JymService) DeleteRoutine(ctx context.Context, userID, routineID uuid.UUID) error {
 	res, err := s.db.Exec(ctx,
 		`DELETE FROM routines WHERE id = $1
-		 AND split_id IN (SELECT id FROM splits WHERE user_id = $2)`,
+		 AND (
+		   split_id IN (SELECT id FROM splits WHERE user_id = $2)
+		   OR (split_id IS NULL AND user_id = $2)
+		 )`,
 		routineID, userID,
 	)
 	if err != nil {
@@ -547,13 +550,16 @@ func (s *JymService) DeleteRoutine(ctx context.Context, userID, routineID uuid.U
 
 // ReplaceRoutineItems does a full replace of all items in a routine (for drag-drop saves).
 func (s *JymService) ReplaceRoutineItems(ctx context.Context, userID, routineID uuid.UUID, items []models.ReplaceItemEntry) ([]models.RoutineItemWithExercise, error) {
-	// Verify ownership via split
+	// Verify ownership (split-owned or standalone template)
 	var exists bool
 	err := s.db.QueryRow(ctx,
 		`SELECT EXISTS(
 		   SELECT 1 FROM routines r
-		   JOIN splits s ON r.split_id = s.id
-		   WHERE r.id = $1 AND s.user_id = $2
+		   WHERE r.id = $1
+		   AND (
+		     r.split_id IN (SELECT id FROM splits WHERE user_id = $2)
+		     OR (r.split_id IS NULL AND r.user_id = $2)
+		   )
 		 )`, routineID, userID,
 	).Scan(&exists)
 	if err != nil || !exists {
@@ -1621,4 +1627,185 @@ func (s *JymService) copySplit(ctx context.Context, importerID, splitID uuid.UUI
 
 func intStr(n int) string {
 	return strconv.Itoa(n)
+}
+
+// ─── Routine Templates ────────────────────────────────────────────────────────
+
+// ListTemplates returns all standalone routines (split_id IS NULL) owned by the user,
+// with their exercise items included.
+func (s *JymService) ListTemplates(ctx context.Context, userID uuid.UUID) ([]models.RoutineWithItems, error) {
+	rows, err := s.db.Query(ctx,
+		`SELECT r.id, r.user_id, r.split_id, r.name, r.day_order, r.created_at,
+		        ri.id, ri.routine_id, ri.exercise_id, ri.target_sets, ri.target_reps, ri.order_index,
+		        e.name, e.muscle_group
+		 FROM routines r
+		 LEFT JOIN routine_items ri ON ri.routine_id = r.id
+		 LEFT JOIN exercises e ON e.id = ri.exercise_id
+		 WHERE r.user_id = $1 AND r.split_id IS NULL
+		 ORDER BY r.created_at DESC, ri.order_index ASC`,
+		userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	templateMap := map[uuid.UUID]int{}
+	var templates []models.RoutineWithItems
+
+	for rows.Next() {
+		var rt models.Routine
+		var itemID, routineID, exerciseID *uuid.UUID
+		var targetSets, targetReps, orderIndex *int
+		var exName *string
+		var mg *string
+
+		if err := rows.Scan(
+			&rt.ID, &rt.UserID, &rt.SplitID, &rt.Name, &rt.DayOrder, &rt.CreatedAt,
+			&itemID, &routineID, &exerciseID, &targetSets, &targetReps, &orderIndex,
+			&exName, &mg,
+		); err != nil {
+			return nil, err
+		}
+
+		idx, exists := templateMap[rt.ID]
+		if !exists {
+			templates = append(templates, models.RoutineWithItems{
+				Routine: rt,
+				Items:   []models.RoutineItemWithExercise{},
+			})
+			idx = len(templates) - 1
+			templateMap[rt.ID] = idx
+		}
+
+		if itemID != nil {
+			templates[idx].Items = append(templates[idx].Items, models.RoutineItemWithExercise{
+				RoutineItem: models.RoutineItem{
+					ID:         *itemID,
+					RoutineID:  *routineID,
+					ExerciseID: *exerciseID,
+					TargetSets: *targetSets,
+					TargetReps: *targetReps,
+					OrderIndex: *orderIndex,
+				},
+				ExerciseName: *exName,
+				MuscleGroup:  mg,
+			})
+		}
+	}
+
+	if templates == nil {
+		templates = []models.RoutineWithItems{}
+	}
+	return templates, nil
+}
+
+// CreateTemplateFromSession creates a standalone routine template from a finished session.
+// It groups the session's sets by exercise (preserving first-appearance order) and derives
+// target_sets (number of non-warmup sets logged) and target_reps (rounded average).
+func (s *JymService) CreateTemplateFromSession(ctx context.Context, userID, sessionID uuid.UUID, name string) (*models.RoutineWithItems, error) {
+	// Verify session ownership
+	var ownerID uuid.UUID
+	if err := s.db.QueryRow(ctx,
+		`SELECT user_id FROM sessions WHERE id = $1`, sessionID,
+	).Scan(&ownerID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSessionNotFound
+		}
+		return nil, err
+	}
+	if ownerID != userID {
+		return nil, ErrNotOwner
+	}
+
+	// Aggregate sets per exercise: count non-warmup sets, average reps, preserve order
+	type exAgg struct {
+		exerciseID uuid.UUID
+		targetSets int
+		targetReps int
+		orderIdx   int
+	}
+	rows, err := s.db.Query(ctx,
+		`SELECT exercise_id,
+		        COUNT(*) FILTER (WHERE NOT is_warmup)::int AS target_sets,
+		        ROUND(AVG(reps_performed))::int            AS target_reps
+		 FROM session_sets
+		 WHERE session_id = $1
+		 GROUP BY exercise_id
+		 ORDER BY MIN(created_at) ASC`,
+		sessionID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var exercises []exAgg
+	for i := 0; rows.Next(); i++ {
+		var agg exAgg
+		agg.orderIdx = i
+		if err := rows.Scan(&agg.exerciseID, &agg.targetSets, &agg.targetReps); err != nil {
+			return nil, err
+		}
+		if agg.targetSets == 0 {
+			agg.targetSets = 1 // at least 1 if all were warmups
+		}
+		if agg.targetReps == 0 {
+			agg.targetReps = 8
+		}
+		exercises = append(exercises, agg)
+	}
+	rows.Close()
+
+	if len(exercises) == 0 {
+		return nil, ErrSessionNotFound // session has no sets to template from
+	}
+
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	// Create the standalone routine
+	rt := &models.Routine{}
+	if err := tx.QueryRow(ctx,
+		`INSERT INTO routines (user_id, name, day_order)
+		 VALUES ($1, $2, 1)
+		 RETURNING id, user_id, split_id, name, day_order, created_at`,
+		userID, name,
+	).Scan(&rt.ID, &rt.UserID, &rt.SplitID, &rt.Name, &rt.DayOrder, &rt.CreatedAt); err != nil {
+		return nil, err
+	}
+
+	// Insert items
+	result := &models.RoutineWithItems{Routine: *rt, Items: []models.RoutineItemWithExercise{}}
+	for _, ex := range exercises {
+		var item models.RoutineItemWithExercise
+		var mg *string
+		if err := tx.QueryRow(ctx,
+			`INSERT INTO routine_items (routine_id, exercise_id, target_sets, target_reps, order_index)
+			 VALUES ($1, $2, $3, $4, $5)
+			 RETURNING id, routine_id, exercise_id, target_sets, target_reps, order_index`,
+			rt.ID, ex.exerciseID, ex.targetSets, ex.targetReps, ex.orderIdx,
+		).Scan(
+			&item.ID, &item.RoutineID, &item.ExerciseID,
+			&item.TargetSets, &item.TargetReps, &item.OrderIndex,
+		); err != nil {
+			return nil, err
+		}
+		// Fetch exercise name
+		if err := tx.QueryRow(ctx,
+			`SELECT name, muscle_group FROM exercises WHERE id = $1`, ex.exerciseID,
+		).Scan(&item.ExerciseName, &mg); err != nil {
+			return nil, err
+		}
+		item.MuscleGroup = mg
+		result.Items = append(result.Items, item)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return result, nil
 }

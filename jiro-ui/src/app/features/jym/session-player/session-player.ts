@@ -59,6 +59,13 @@ interface ExerciseBlock {
             <button class="type-btn" [class.active]="settingsService.weightUnit() === 'lbs'" (click)="toggleUnit('lbs')">lbs</button>
             <button class="type-btn" [class.active]="settingsService.weightUnit() === 'kg'" (click)="toggleUnit('kg')">kg</button>
           </div>
+          <button class="save-template-btn" title="Save as Template" (click)="showTemplateSave.set(true)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+              <polyline points="17,21 17,13 7,13 7,21"/>
+              <polyline points="7,3 7,8 15,8"/>
+            </svg>
+          </button>
           <jiro-button variant="secondary" type="button" (click)="showExitConfirm.set(true)">Exit</jiro-button>
           <jiro-button variant="primary" type="button" (click)="finishSession()" [disabled]="finishing()">
             {{ finishing() ? 'Finishing...' : 'Finish' }}
@@ -276,6 +283,33 @@ interface ExerciseBlock {
       </div>
     </jiro-modal>
 
+    <!-- Save as Template modal -->
+    <jiro-modal *ngIf="showTemplateSave()" title="Save as Template" maxWidth="420px" (close)="showTemplateSave.set(false)">
+      <p style="font-size:var(--font-size-sm);color:var(--text-secondary);margin-bottom:var(--space-md);">
+        Give this workout layout a name to reuse it in future sessions.
+      </p>
+      <input
+        class="template-name-input"
+        type="text"
+        [(ngModel)]="templateName"
+        placeholder="e.g. Push Day A"
+        (keydown.enter)="saveAsTemplate()"
+        maxlength="80"
+      />
+      <div *ngIf="templateSaveError()" class="template-save-error">{{ templateSaveError() }}</div>
+      <div style="display:flex;justify-content:flex-end;gap:var(--space-sm);margin-top:var(--space-md)">
+        <jiro-button variant="secondary" type="button" (click)="showTemplateSave.set(false)">Cancel</jiro-button>
+        <jiro-button variant="primary" type="button" [disabled]="!templateName.trim() || templateSaving()" (click)="saveAsTemplate()">
+          {{ templateSaving() ? 'Saving...' : 'Save Template' }}
+        </jiro-button>
+      </div>
+    </jiro-modal>
+
+    <!-- Template saved confirmation -->
+    <div *ngIf="templateSavedName()" class="template-saved-toast">
+      Template "{{ templateSavedName() }}" saved
+    </div>
+
     <!-- Exercise picker overlay -->
     <div *ngIf="showExPicker()" class="overlay">
       <div class="picker-panel">
@@ -358,6 +392,42 @@ interface ExerciseBlock {
     }
 
     .rest-add-btn { border-style: dashed; }
+
+    .save-template-btn {
+      display: flex; align-items: center; justify-content: center;
+      width: 32px; height: 32px; border-radius: var(--border-radius-sm);
+      border: 1px solid rgba(255,255,255,0.25); background: none;
+      color: rgba(255,255,255,0.7); cursor: pointer; transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    .save-template-btn:hover { border-color: rgba(255,255,255,0.7); color: white; }
+
+    .template-name-input {
+      width: 100%; padding: 9px 12px; border: 1px solid var(--border-color);
+      border-radius: var(--border-radius-sm); background: var(--bg-surface);
+      color: var(--text-primary); font-size: var(--font-size-base); font-family: inherit;
+      outline: none; box-sizing: border-box;
+    }
+    .template-name-input:focus { border-color: var(--color-primary); }
+
+    .template-save-error {
+      font-size: var(--font-size-sm); color: #e05c5c; margin-top: var(--space-xs);
+    }
+
+    .template-saved-toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: var(--bg-sidebar); color: var(--text-on-dark);
+      padding: 10px 20px; border-radius: 20px; font-size: var(--font-size-sm);
+      font-weight: 500; z-index: 200; white-space: nowrap;
+      animation: fadeSlideUp 0.25s ease, fadeOut 0.4s ease 2s forwards;
+    }
+    @keyframes fadeSlideUp {
+      from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+      to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+    @keyframes fadeOut {
+      to { opacity: 0; }
+    }
 
     .rest-skip-btn {
       padding: 3px 8px; border-radius: 10px;
@@ -823,6 +893,11 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   showExPicker = signal(false);
   showExitConfirm = signal(false);
   discarding = signal(false);
+  showTemplateSave = signal(false);
+  templateSaving = signal(false);
+  templateSaveError = signal('');
+  templateSavedName = signal('');
+  templateName = '';
   bwSaving = signal(false);
   bwLogged = signal(false);
   bwValue: number | null = null;
@@ -1208,6 +1283,26 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
 
   saveNotes() {
     this.jymService.updateSession(this.sessionId, { notes: this.sessionNotes }).subscribe();
+  }
+
+  saveAsTemplate() {
+    const name = this.templateName.trim();
+    if (!name) return;
+    this.templateSaving.set(true);
+    this.templateSaveError.set('');
+    this.jymService.createTemplateFromSession(this.sessionId, name).subscribe({
+      next: () => {
+        this.showTemplateSave.set(false);
+        this.templateSaving.set(false);
+        this.templateName = '';
+        this.templateSavedName.set(name);
+        setTimeout(() => this.templateSavedName.set(''), 2800);
+      },
+      error: () => {
+        this.templateSaving.set(false);
+        this.templateSaveError.set('Could not save template. Make sure you have logged at least one set.');
+      },
+    });
   }
 
   finishSession() {

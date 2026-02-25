@@ -86,7 +86,8 @@ export interface RoutineItem {
 
 export interface Routine {
   id: string;
-  split_id: string;
+  user_id: string;
+  split_id: string | null;
   name: string;
   day_order: number;
   created_at: string;
@@ -415,5 +416,18 @@ export class JymService {
 
   importPublicSplit(splitId: string): Observable<{ split_id: string }> {
     return this.http.post<{ split_id: string }>(`${API_URL}/public-splits/${splitId}/import`, {});
+  }
+
+  // ── Templates ──────────────────────────────────────────────────────────────
+  listTemplates(): Observable<Routine[]> {
+    return this.http.get<Routine[]>(`${API_URL}/templates`);
+  }
+
+  createTemplateFromSession(sessionId: string, name: string): Observable<Routine> {
+    return this.http.post<Routine>(`${API_URL}/sessions/${sessionId}/template`, { name });
+  }
+
+  deleteTemplate(routineId: string): Observable<void> {
+    return this.http.delete<void>(`${API_URL}/routines/${routineId}`);
   }
 }
