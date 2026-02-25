@@ -104,3 +104,20 @@ type CreateCollectionRequest struct {
 type UpdateCollectionRequest struct {
 	Name *string `json:"name"`
 }
+
+type SharedRecipe struct {
+	ID             uuid.UUID       `json:"id"`
+	ShareToken     string          `json:"share_token"`
+	OwnerID        uuid.UUID       `json:"owner_id"`
+	RecipeID       uuid.UUID       `json:"recipe_id"`
+	RecipeSnapshot json.RawMessage `json:"recipe_snapshot"`
+	CreatedAt      time.Time       `json:"created_at"`
+}
+
+type SharedRecipeResponse struct {
+	ShareToken string          `json:"share_token"`
+	ShareURL   string          `json:"share_url,omitempty"`
+	Recipe     json.RawMessage `json:"recipe"`
+	SharedBy   string          `json:"shared_by,omitempty"`
+	SharedAt   time.Time       `json:"shared_at"`
+}
