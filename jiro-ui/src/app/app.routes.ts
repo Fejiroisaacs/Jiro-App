@@ -116,6 +116,34 @@ export const routes: Routes = [
     path: 'verify-email',
     loadComponent: () => import('./features/auth/verify-email').then(m => m.VerifyEmailComponent),
   },
+  // Admin panel — login at exact /admin, layout handles /admin/*
+  {
+    path: 'admin',
+    pathMatch: 'full',
+    loadComponent: () => import('./features/admin/admin-login').then(m => m.AdminLoginComponent),
+  },
+  {
+    path: 'admin',
+    loadComponent: () => import('./features/admin/admin-layout').then(m => m.AdminLayoutComponent),
+    children: [
+      {
+        path: 'dashboard',
+        loadComponent: () => import('./features/admin/admin-dashboard').then(m => m.AdminDashboardComponent),
+      },
+      {
+        path: 'users',
+        loadComponent: () => import('./features/admin/admin-users').then(m => m.AdminUsersComponent),
+      },
+      {
+        path: 'users/:id',
+        loadComponent: () => import('./features/admin/admin-user-detail').then(m => m.AdminUserDetailComponent),
+      },
+      {
+        path: 'events',
+        loadComponent: () => import('./features/admin/admin-events').then(m => m.AdminEventsComponent),
+      },
+    ],
+  },
   {
     path: '**',
     redirectTo: 'login',

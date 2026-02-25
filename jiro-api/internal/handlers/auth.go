@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/analytics"
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/config"
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/models"
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
 )
 
@@ -19,15 +21,17 @@ type AuthHandler struct {
 	emailService *services.EmailService
 	cfg          *config.Config
 	appBaseURL   string
+	db           *pgxpool.Pool
 }
 
-func NewAuthHandler(authService *services.AuthService, userService *services.UserService, emailService *services.EmailService, cfg *config.Config) *AuthHandler {
+func NewAuthHandler(authService *services.AuthService, userService *services.UserService, emailService *services.EmailService, cfg *config.Config, db *pgxpool.Pool) *AuthHandler {
 	return &AuthHandler{
 		authService:  authService,
 		userService:  userService,
 		emailService: emailService,
 		cfg:          cfg,
 		appBaseURL:   cfg.AppBaseURL,
+		db:           db,
 	}
 }
 
@@ -91,6 +95,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 
 	h.setRefreshCookie(c, user.ID)
+	analytics.TrackEvent(h.db, user.ID, "user.register", nil)
 
 	// Send verification email asynchronously — don't block the response
 	go func() {
@@ -151,6 +156,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	h.setRefreshCookie(c, user.ID)
+	analytics.TrackEvent(h.db, user.ID, "user.login", nil)
 
 	user.PasswordHash = ""
 	c.JSON(http.StatusOK, models.AuthResponse{

@@ -5,20 +5,23 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/analytics"
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/models"
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog/log"
 )
 
 type JymHandler struct {
 	jymService *services.JymService
 	appBaseURL string
+	db         *pgxpool.Pool
 }
 
-func NewJymHandler(jymService *services.JymService, appBaseURL string) *JymHandler {
-	return &JymHandler{jymService: jymService, appBaseURL: appBaseURL}
+func NewJymHandler(jymService *services.JymService, appBaseURL string, db *pgxpool.Pool) *JymHandler {
+	return &JymHandler{jymService: jymService, appBaseURL: appBaseURL, db: db}
 }
 
 // ─── Exercises ────────────────────────────────────────────────────────────────
@@ -264,6 +267,7 @@ func (h *JymHandler) ImportPublicSplit(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to import split"}})
 		return
 	}
+	analytics.TrackEvent(h.db, userID, "split.import", nil)
 	c.JSON(http.StatusOK, models.ImportShareResponse{SplitID: newSplitID.String()})
 }
 
@@ -373,6 +377,7 @@ func (h *JymHandler) StartSession(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to start session"}})
 		return
 	}
+	analytics.TrackEvent(h.db, userID, "session.start", nil)
 	c.JSON(http.StatusCreated, sess)
 }
 
@@ -430,6 +435,10 @@ func (h *JymHandler) UpdateSession(c *gin.Context) {
 		}
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to update session"}})
 		return
+	}
+	// Track session finish when ended_at is set
+	if req.EndedAt != nil {
+		analytics.TrackEvent(h.db, userID, "session.finish", nil)
 	}
 	c.JSON(http.StatusOK, sess)
 }
@@ -692,6 +701,7 @@ func (h *JymHandler) ExportSessions(c *gin.Context) {
 	if err := h.jymService.StreamSessionsCSV(c.Request.Context(), userID, from, to, exerciseID, c.Writer); err != nil {
 		log.Error().Err(err).Msg("failed to stream sessions CSV")
 	}
+	analytics.TrackEvent(h.db, userID, "export.csv", nil)
 }
 
 // ─── Split Shares ─────────────────────────────────────────────────────────────
@@ -712,6 +722,7 @@ func (h *JymHandler) CreateShare(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to create share"}})
 		return
 	}
+	analytics.TrackEvent(h.db, userID, "split.share", nil)
 	c.JSON(http.StatusCreated, resp)
 }
 
@@ -776,5 +787,6 @@ func (h *JymHandler) ImportShare(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to import split"}})
 		return
 	}
+	analytics.TrackEvent(h.db, userID, "split.import", nil)
 	c.JSON(http.StatusCreated, models.ImportShareResponse{SplitID: newSplitID.String()})
 }
