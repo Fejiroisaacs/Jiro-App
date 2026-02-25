@@ -313,18 +313,68 @@ interface ExerciseBlock {
     <!-- Exercise picker overlay -->
     <div *ngIf="showExPicker()" class="overlay">
       <div class="picker-panel">
-        <div class="picker-header">
-          <h3>Add Exercise</h3>
-          <button class="close-btn" (click)="showExPicker.set(false)">✕</button>
-        </div>
-        <input class="picker-search" type="text" [(ngModel)]="exSearch" (input)="filterExercises()" placeholder="Search..." />
-        <div class="picker-list">
-          <button *ngFor="let ex of filteredExercises()" class="picker-item" (click)="pickExercise(ex)">
-            <span class="pi-name">{{ ex.name }}</span>
-            <span *ngIf="ex.muscle_group" class="pi-mg">{{ ex.muscle_group }}</span>
-          </button>
-          <p *ngIf="filteredExercises().length === 0" class="text-secondary" style="padding:var(--space-md);text-align:center">No exercises found</p>
-        </div>
+
+        <!-- Default: search + list -->
+        <ng-container *ngIf="!creatingExercise()">
+          <div class="picker-header">
+            <h3>Add Exercise</h3>
+            <button class="close-btn" (click)="showExPicker.set(false)">✕</button>
+          </div>
+          <input class="picker-search" type="text" [(ngModel)]="exSearch" (input)="filterExercises()" placeholder="Search exercises..." autofocus />
+          <div class="picker-list">
+            <button *ngFor="let ex of filteredExercises()" class="picker-item" (click)="pickExercise(ex)">
+              <span class="pi-name">{{ ex.name }}</span>
+              <span *ngIf="ex.muscle_group" class="pi-mg">{{ ex.muscle_group }}</span>
+            </button>
+            <!-- Create shortcut: always visible at bottom, name pre-filled from search -->
+            <button class="picker-create-btn" (click)="startCreateExercise()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              <span *ngIf="exSearch.trim()">Create "{{ exSearch.trim() }}"</span>
+              <span *ngIf="!exSearch.trim()">New Exercise</span>
+            </button>
+          </div>
+        </ng-container>
+
+        <!-- Create mode: inline mini-form -->
+        <ng-container *ngIf="creatingExercise()">
+          <div class="picker-header">
+            <button class="back-btn" (click)="creatingExercise.set(false)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15,18 9,12 15,6"/>
+              </svg>
+            </button>
+            <h3>New Exercise</h3>
+            <button class="close-btn" (click)="showExPicker.set(false)">✕</button>
+          </div>
+          <div class="create-form">
+            <label class="create-label">Name</label>
+            <input
+              class="picker-search"
+              type="text"
+              [(ngModel)]="newExName"
+              placeholder="e.g. Romanian Deadlift"
+              (keydown.enter)="!newExSaving() && newExName.trim() && createAndPickExercise()"
+              style="margin:0"
+            />
+            <label class="create-label" style="margin-top:var(--space-sm)">Muscle Group <span style="opacity:0.5">(optional)</span></label>
+            <select class="create-select" [(ngModel)]="newExMuscleGroup">
+              <option value="">— None —</option>
+              <option *ngFor="let mg of muscleGroups" [value]="mg">{{ mg }}</option>
+            </select>
+            <div *ngIf="newExError()" class="template-save-error" style="margin-top:var(--space-xs)">{{ newExError() }}</div>
+            <jiro-button
+              variant="primary"
+              type="button"
+              style="margin-top:var(--space-md);width:100%"
+              [disabled]="!newExName.trim() || newExSaving()"
+              (click)="createAndPickExercise()">
+              {{ newExSaving() ? 'Creating...' : 'Create & Add to Session' }}
+            </jiro-button>
+          </div>
+        </ng-container>
+
       </div>
     </div>
   `,
@@ -814,6 +864,40 @@ interface ExerciseBlock {
 
     .pi-mg { font-size: var(--font-size-xs); color: var(--text-muted); }
 
+    .picker-create-btn {
+      display: flex; align-items: center; gap: var(--space-xs);
+      width: 100%; padding: var(--space-sm) var(--space-md);
+      background: none; border: none; border-top: 1px solid var(--border-color);
+      color: var(--color-primary); font-size: var(--font-size-sm);
+      font-weight: 500; cursor: pointer; text-align: left;
+      font-family: inherit; margin-top: var(--space-xs);
+      transition: background 0.15s;
+    }
+    .picker-create-btn:hover { background: rgba(122,59,46,0.06); }
+
+    .back-btn {
+      display: flex; align-items: center; justify-content: center;
+      background: none; border: none; color: var(--text-muted);
+      cursor: pointer; padding: var(--space-xs); margin-right: var(--space-xs);
+    }
+    .back-btn:hover { color: var(--text-primary); }
+
+    .create-form {
+      display: flex; flex-direction: column;
+      padding: var(--space-md) var(--space-lg) var(--space-lg);
+    }
+    .create-label {
+      font-size: var(--font-size-sm); font-weight: 500;
+      color: var(--text-secondary); margin-bottom: 6px; display: block;
+    }
+    .create-select {
+      padding: 10px 14px; border: 1px solid var(--border-color);
+      border-radius: var(--border-radius); background: var(--bg-canvas);
+      color: var(--text-primary); font-size: var(--font-size-md);
+      font-family: inherit; outline: none; width: 100%;
+    }
+    .create-select:focus { border-color: var(--color-primary); }
+
     @keyframes spin { to { transform: rotate(360deg); } }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
@@ -898,6 +982,14 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   templateSaveError = signal('');
   templateSavedName = signal('');
   templateName = '';
+
+  // Inline exercise creation
+  creatingExercise = signal(false);
+  newExName = '';
+  newExMuscleGroup = '';
+  newExSaving = signal(false);
+  newExError = signal('');
+  readonly muscleGroups = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs', 'Glutes', 'Core', 'Cardio', 'Other'];
   bwSaving = signal(false);
   bwLogged = signal(false);
   bwValue: number | null = null;
@@ -1375,8 +1467,41 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
 
   addExercise() {
     this.exSearch = '';
+    this.creatingExercise.set(false);
     this.filteredExercises.set(this.allExercises());
     this.showExPicker.set(true);
+  }
+
+  startCreateExercise() {
+    this.newExName = this.exSearch.trim();
+    this.newExMuscleGroup = '';
+    this.newExError.set('');
+    this.creatingExercise.set(true);
+  }
+
+  createAndPickExercise() {
+    const name = this.newExName.trim();
+    if (!name) return;
+    this.newExSaving.set(true);
+    this.newExError.set('');
+    this.jymService.createExercise({
+      name,
+      muscle_group: this.newExMuscleGroup || undefined,
+    }).subscribe({
+      next: ex => {
+        // Add to local library so it appears in future searches this session
+        const entry = { id: ex.id, name: ex.name, muscle_group: ex.muscle_group };
+        this.allExercises.update(list => [...list, entry]);
+        this.newExSaving.set(false);
+        this.creatingExercise.set(false);
+        this.showExPicker.set(false);
+        this.pickExercise(entry);
+      },
+      error: () => {
+        this.newExSaving.set(false);
+        this.newExError.set('Could not create exercise. The name may already be taken.');
+      },
+    });
   }
 
   filterExercises() {
