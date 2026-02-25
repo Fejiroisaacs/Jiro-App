@@ -843,10 +843,20 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   restTimerDone = signal(false);
   readonly restPresets = [60, 90, 120, 180, 300];
   private restInterval: ReturnType<typeof setInterval> | null = null;
+  private restStartedAt: Date | null = null;
+  private audioCtx: AudioContext | null = null;
 
   private sessionId = '';
   private startedAt = new Date();
   private timerInterval: ReturnType<typeof setInterval> | null = null;
+
+  // Re-sync both timers when the user returns from a locked screen
+  private readonly onVisibilityChange = () => {
+    if (document.visibilityState === 'visible') {
+      this.tickRestTimer();
+      this.updateElapsed();
+    }
+  };
 
   constructor(
     private jymService: JymService,
@@ -859,6 +869,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.sessionId = this.route.snapshot.paramMap.get('id') || '';
     this.startTimer();
+    document.addEventListener('visibilitychange', this.onVisibilityChange);
 
     // Targets passed via router state when starting a routine-based session
     const routerTargets: RoutineItem[] = (history.state?.targets) || [];
@@ -876,25 +887,40 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
         this.sessionType.set(session.session_type || 'normal');
         this.sessionNotes = session.notes || '';
         const existingBlocks = this.buildBlocksFromSets(session.sets || []);
+        const targetsKey = `jiro_session_targets_${this.sessionId}`;
+
+        const buildRoutineBlocks = (targets: RoutineItem[]) => targets.map(t => ({
+          exerciseId: t.exercise_id,
+          exerciseName: t.exercise_name,
+          muscleGroup: t.muscle_group,
+          sets: Array.from({ length: t.target_sets }, (_, i) => ({
+            setNumber: i + 1, weight: '', reps: '', rpe: '',
+            saved: false, isPR: false, saving: false, id: null,
+            ghostWeight: '', ghostReps: String(t.target_reps),
+            isWarmup: false,
+          })),
+          ghostSets: [] as { weight: number; reps: number }[],
+          suggestion: null,
+          exerciseNote: '',
+        }));
 
         if (existingBlocks.length === 0 && routerTargets.length > 0) {
-          // Fresh session with a routine — pre-populate from targets
-          this.blocks.set(routerTargets.map(t => ({
-            exerciseId: t.exercise_id,
-            exerciseName: t.exercise_name,
-            muscleGroup: t.muscle_group,
-            sets: Array.from({ length: t.target_sets }, (_, i) => ({
-              setNumber: i + 1, weight: '', reps: '', rpe: '',
-              saved: false, isPR: false, saving: false, id: null,
-              ghostWeight: '', ghostReps: String(t.target_reps),
-              isWarmup: false,
-            })),
-            ghostSets: [],
-            suggestion: null,
-            exerciseNote: '',
-          })));
+          // Fresh split session — save targets so we can restore on return
+          localStorage.setItem(targetsKey, JSON.stringify(routerTargets));
+          this.blocks.set(buildRoutineBlocks(routerTargets));
         } else {
-          this.blocks.set(existingBlocks);
+          // Returning: merge logged sets with any un-logged routine exercises
+          const savedStr = localStorage.getItem(targetsKey);
+          const savedTargets: RoutineItem[] = savedStr ? JSON.parse(savedStr) : [];
+          if (savedTargets.length > 0 && existingBlocks.length > 0) {
+            const existingIds = new Set(existingBlocks.map(b => b.exerciseId));
+            const missing = buildRoutineBlocks(savedTargets.filter(t => !existingIds.has(t.exercise_id)));
+            this.blocks.set([...existingBlocks, ...missing]);
+          } else if (savedTargets.length > 0 && existingBlocks.length === 0) {
+            this.blocks.set(buildRoutineBlocks(savedTargets));
+          } else {
+            this.blocks.set(existingBlocks);
+          }
         }
 
         this.loading.set(false);
@@ -906,33 +932,57 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     if (this.timerInterval) clearInterval(this.timerInterval);
     this.clearRestTimer();
+    document.removeEventListener('visibilitychange', this.onVisibilityChange);
   }
 
   // ── Rest timer ──────────────────────────────────────────────────
   startRestTimer() {
     this.clearRestTimer();
+    this.warmUpAudio();
+    this.restStartedAt = new Date();
     this.restTimerRemaining.set(this.restTimerDuration());
     this.restTimerDone.set(false);
     this.restTimerActive.set(true);
-    this.restInterval = setInterval(() => {
-      const rem = this.restTimerRemaining() - 1;
-      if (rem <= 0) {
-        this.restTimerRemaining.set(0);
-        this.clearRestTimer();
-        this.restTimerDone.set(true);
-        this.playBeep();
-        setTimeout(() => {
-          this.restTimerActive.set(false);
-          this.restTimerDone.set(false);
-        }, 3000);
-      } else {
-        this.restTimerRemaining.set(rem);
+    // Tick at 500ms so the display snaps quickly after screen unlock
+    this.restInterval = setInterval(() => this.tickRestTimer(), 500);
+  }
+
+  // Call during a user gesture so the AudioContext is created/unlocked while
+  // the browser permits it — avoids the "play blocked, no user gesture" error
+  // that fires when we try to create one from the timer callback.
+  private warmUpAudio() {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      if (!this.audioCtx) {
+        this.audioCtx = new AudioCtx();
       }
-    }, 1000);
+      // Unlock immediately if it was suspended (happens after screen lock)
+      if (this.audioCtx.state === 'suspended') {
+        this.audioCtx.resume();
+      }
+    } catch (_) {}
+  }
+
+  private tickRestTimer() {
+    if (!this.restStartedAt) return;
+    const elapsed = Math.floor((Date.now() - this.restStartedAt.getTime()) / 1000);
+    const rem = Math.max(0, this.restTimerDuration() - elapsed);
+    this.restTimerRemaining.set(rem);
+    if (rem <= 0 && !this.restTimerDone()) {
+      this.clearRestTimer();
+      this.restTimerDone.set(true);
+      this.playBeep();
+      setTimeout(() => {
+        this.restTimerActive.set(false);
+        this.restTimerDone.set(false);
+      }, 3000);
+    }
   }
 
   private clearRestTimer() {
     if (this.restInterval) { clearInterval(this.restInterval); this.restInterval = null; }
+    this.restStartedAt = null;
   }
 
   skipRestTimer() {
@@ -949,24 +999,14 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   }
 
   addRestTime(seconds: number) {
-    this.restTimerRemaining.update(r => r + seconds);
-    this.restTimerDuration.update(d => d + seconds);
     if (this.restTimerDone()) {
-      // Re-arm the countdown after it had finished
-      this.restTimerDone.set(false);
-      this.restTimerActive.set(true);
-      this.restInterval = setInterval(() => {
-        const rem = this.restTimerRemaining() - 1;
-        if (rem <= 0) {
-          this.restTimerRemaining.set(0);
-          this.clearRestTimer();
-          this.restTimerDone.set(true);
-          this.playBeep();
-          setTimeout(() => { this.restTimerActive.set(false); this.restTimerDone.set(false); }, 3000);
-        } else {
-          this.restTimerRemaining.set(rem);
-        }
-      }, 1000);
+      // Re-arm with fresh duration
+      this.restTimerDuration.set(seconds);
+      this.startRestTimer();
+    } else {
+      // Extend: increase duration, shift start back so remaining grows
+      this.restTimerDuration.update(d => d + seconds);
+      this.restTimerRemaining.update(r => r + seconds);
     }
   }
 
@@ -982,34 +1022,50 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   }
 
   private playBeep() {
+    // Vibrate: short-pause-short-pause-long (works even with silent mode on Android)
+    try { navigator.vibrate?.([150, 80, 150, 80, 400]); } catch (_) {}
+
+    // Audio ping: three ascending tones using the pre-warmed context
     try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
-      [0, 0.35].forEach(offset => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain); gain.connect(ctx.destination);
-        osc.type = 'sine'; osc.frequency.value = 880;
-        gain.gain.setValueAtTime(0.35, ctx.currentTime + offset);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + offset + 0.3);
-        osc.start(ctx.currentTime + offset);
-        osc.stop(ctx.currentTime + offset + 0.3);
-      });
+      const ctx = this.audioCtx;
+      if (!ctx) return;
+      // resume() is async — schedule tones only after the context is running
+      const play = () => {
+        const tones = [660, 880, 1100];
+        tones.forEach((freq, i) => {
+          const offset = i * 0.22;
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.type = 'sine';
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.4, ctx.currentTime + offset);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + offset + 0.3);
+          osc.start(ctx.currentTime + offset);
+          osc.stop(ctx.currentTime + offset + 0.35);
+        });
+      };
+      if (ctx.state === 'suspended') {
+        ctx.resume().then(play);
+      } else {
+        play();
+      }
     } catch (_) { /* audio not supported */ }
   }
 
   private startTimer() {
-    this.timerInterval = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - this.startedAt.getTime()) / 1000);
-      const h = Math.floor(elapsed / 3600);
-      const m = Math.floor((elapsed % 3600) / 60);
-      const s = elapsed % 60;
-      this.elapsedDisplay.set(h > 0
-        ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-        : `${m}:${String(s).padStart(2, '0')}`
-      );
-    }, 1000);
+    this.timerInterval = setInterval(() => this.updateElapsed(), 1000);
+  }
+
+  private updateElapsed() {
+    const elapsed = Math.floor((Date.now() - this.startedAt.getTime()) / 1000);
+    const h = Math.floor(elapsed / 3600);
+    const m = Math.floor((elapsed % 3600) / 60);
+    const s = elapsed % 60;
+    this.elapsedDisplay.set(h > 0
+      ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+      : `${m}:${String(s).padStart(2, '0')}`
+    );
   }
 
   private buildBlocksFromSets(sets: import('../../../core/services/jym.service').SessionSet[]): ExerciseBlock[] {
@@ -1082,6 +1138,10 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     const row = block.sets[setIndex];
     if (!row.weight || !row.reps) return;
 
+    // Warm up audio NOW, synchronously while the tap gesture is still active.
+    // Safari blocks AudioContext creation/resume in async callbacks (e.g. HTTP responses).
+    this.warmUpAudio();
+
     this.blocks.update(bs => bs.map((b, bi) => bi === blockIndex ? {
       ...b,
       sets: b.sets.map((s, si) => si === setIndex ? { ...s, saving: true } : s),
@@ -1123,7 +1183,9 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
       next: () => {
         this.blocks.update(bs => bs.map((b, bi) => bi === blockIndex ? {
           ...b,
-          sets: b.sets.filter((_, si) => si !== setIndex),
+          sets: b.sets
+            .filter((_, si) => si !== setIndex)
+            .map((s, i) => ({ ...s, setNumber: i + 1 })),
         } : b));
       },
     });
@@ -1136,7 +1198,10 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   discardSession() {
     this.discarding.set(true);
     this.jymService.deleteSession(this.sessionId).subscribe({
-      next: () => this.router.navigate(['/jym']),
+      next: () => {
+        localStorage.removeItem(`jiro_session_targets_${this.sessionId}`);
+        this.router.navigate(['/jym']);
+      },
       error: () => this.discarding.set(false),
     });
   }
@@ -1151,7 +1216,10 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
       ended_at: new Date().toISOString(),
       notes: this.sessionNotes,
     }).subscribe({
-      next: () => this.router.navigate(['/jym/sessions']),
+      next: () => {
+        localStorage.removeItem(`jiro_session_targets_${this.sessionId}`);
+        this.router.navigate(['/jym/sessions']);
+      },
       error: () => this.finishing.set(false),
     });
   }

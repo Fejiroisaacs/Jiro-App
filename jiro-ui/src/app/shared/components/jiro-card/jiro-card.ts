@@ -17,7 +17,7 @@ import { CommonModule } from '@angular/common';
       border-radius: var(--border-radius-lg);
       padding: var(--space-lg);
       box-shadow: var(--shadow-sm);
-      transition: box-shadow 0.2s ease, transform 0.2s ease;
+      transition: box-shadow 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     }
 
     .jiro-card.clickable {
@@ -26,7 +26,7 @@ import { CommonModule } from '@angular/common';
 
     .jiro-card.clickable:hover {
       box-shadow: var(--shadow-md);
-      transform: translateY(-2px);
+      transform: translate(-2px, -2px);
     }
   `]
 })

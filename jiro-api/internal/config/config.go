@@ -21,6 +21,7 @@ type Config struct {
 	ResendAPIKey    string
 	EmailFrom       string
 	AppBaseURL      string
+	AdminSecret     string
 }
 
 func Load() *Config {
@@ -39,6 +40,7 @@ func Load() *Config {
 		ResendAPIKey:    getEnv("RESEND_API_KEY", ""),
 		EmailFrom:       getEnv("EMAIL_FROM", "noreply@jiro.app"),
 		AppBaseURL:      getEnv("APP_BASE_URL", "http://localhost:4200"),
+		AdminSecret:     getEnv("ADMIN_SECRET", ""),
 	}
 }
 

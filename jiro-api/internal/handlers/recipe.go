@@ -3,18 +3,21 @@ package handlers
 import (
 	"net/http"
 
+	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/analytics"
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/models"
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type RecipeHandler struct {
 	recipeService *services.RecipeService
+	db            *pgxpool.Pool
 }
 
-func NewRecipeHandler(recipeService *services.RecipeService) *RecipeHandler {
-	return &RecipeHandler{recipeService: recipeService}
+func NewRecipeHandler(recipeService *services.RecipeService, db *pgxpool.Pool) *RecipeHandler {
+	return &RecipeHandler{recipeService: recipeService, db: db}
 }
 
 func (h *RecipeHandler) Create(c *gin.Context) {
@@ -36,6 +39,7 @@ func (h *RecipeHandler) Create(c *gin.Context) {
 		return
 	}
 
+	analytics.TrackEvent(h.db, userID, "recipe.create", nil)
 	c.JSON(http.StatusCreated, recipe)
 }
 
@@ -275,6 +279,7 @@ func (h *RecipeHandler) Promote(c *gin.Context) {
 		return
 	}
 
+	analytics.TrackEvent(h.db, userID, "recipe.cook", nil)
 	c.JSON(http.StatusOK, recipe)
 }
 

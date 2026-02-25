@@ -24,13 +24,15 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	recipeService := services.NewRecipeService(db)
 	jymService := services.NewJymService(db)
 	emailService := services.NewEmailService(cfg.ResendAPIKey, cfg.EmailFrom)
+	adminService := services.NewAdminService(db)
 
 	// Handlers
-	authHandler := handlers.NewAuthHandler(authService, userService, emailService, cfg)
+	authHandler := handlers.NewAuthHandler(authService, userService, emailService, cfg, db)
 	userHandler := handlers.NewUserHandler(userService)
 	healthHandler := handlers.NewHealthHandler(db)
-	recipeHandler := handlers.NewRecipeHandler(recipeService)
-	jymHandler := handlers.NewJymHandler(jymService, cfg.AppBaseURL)
+	recipeHandler := handlers.NewRecipeHandler(recipeService, db)
+	jymHandler := handlers.NewJymHandler(jymService, cfg.AppBaseURL, db)
+	adminHandler := handlers.NewAdminHandler(adminService, authService, userService, emailService, cfg.AppBaseURL)
 
 	// Rate limiter
 	rl := middleware.NewRateLimiter()
@@ -153,6 +155,19 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 				// Public split import (auth required)
 				jym.POST("/public-splits/:id/import", jymHandler.ImportPublicSplit)
 			}
+		}
+
+		// Admin routes (protected by X-Admin-Secret header)
+		admin := v1.Group("/admin")
+		admin.Use(middleware.AdminRequired(cfg.AdminSecret))
+		{
+			admin.GET("/stats", adminHandler.GetStats)
+			admin.GET("/users", adminHandler.ListUsers)
+			admin.GET("/users/:id", adminHandler.GetUser)
+			admin.DELETE("/users/:id", adminHandler.DeleteUser)
+			admin.POST("/users/:id/send-password-reset", adminHandler.SendPasswordReset)
+			admin.POST("/users/:id/revoke-sessions", adminHandler.RevokeUserSessions)
+			admin.GET("/events", adminHandler.ListEvents)
 		}
 	}
 

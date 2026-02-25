@@ -49,18 +49,26 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
         </svg>
         PR Wall
       </a>
+      <a routerLink="/jym/how-to" routerLinkActive="current" class="quick-link">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
+        </svg>
+        How to Use
+      </a>
     </div>
   `,
   styles: [`
     :host {
       display: block;
       margin-bottom: var(--space-xl);
+      border-bottom: 2px var(--border-color); /* The literal baseline the folders sit upon */
     }
 
     .quick-nav {
       display: flex;
-      gap: var(--space-sm);
+      gap: 2px; /* Super tight gap to look like adjacent folders */
       flex-wrap: wrap;
+      align-items: flex-end; /* Align to the baseline */
     }
 
     .quick-link {
@@ -70,25 +78,35 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
       font-size: var(--font-size-sm);
       color: var(--text-secondary);
       text-decoration: none;
-      padding: var(--space-xs) var(--space-sm);
-      border-radius: var(--border-radius);
+      padding: var(--space-sm) var(--space-md);
+      background: var(--bg-surface);
       border: 1px solid var(--border-color);
-      background: none;
+      /* Make it a physical tab: round top corners, sharp bottom, connecting to the baseline */
+      border-radius: var(--border-radius-sm) var(--border-radius-sm) 0 0;
+      border-bottom: none; /* Let the host's bottom border act as the line, or overlap it when active */
+      margin-bottom: -2px; /* Pull down to overlap the host bottom border */
+      
       font-family: inherit;
-      transition: all 0.15s;
+      transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+      position: relative;
+      top: 0;
+      z-index: 1; /* Sit behind the baseline initially */
     }
 
     .quick-link:hover {
       color: var(--color-primary);
-      border-color: var(--color-primary);
-      text-decoration: none;
+      background: var(--bg-canvas); /* A slight textural shift on hover */
+      top: -2px; /* Physical lift on hover */
+      z-index: 2;
     }
 
     .quick-link.current {
       color: var(--color-primary);
-      border-color: var(--color-primary);
-      background: rgba(122, 59, 46, 0.06);
+      background: var(--bg-canvas);
       font-weight: 500;
+      /* The active tab comes forward and completely overlaps the baseline */
+      border-bottom: 2px solid var(--bg-canvas); 
+      z-index: 3; 
     }
 
     @media (max-width: 600px) {
@@ -98,7 +116,8 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
         z-index: 40;
         background: var(--bg-canvas);
         margin-bottom: var(--space-lg);
-        padding: var(--space-sm) 0;
+        padding-top: var(--space-sm);
+        border-bottom: 1px solid var(--border-color); /* Thinner on mobile */
       }
 
       .quick-nav {

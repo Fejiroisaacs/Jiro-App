@@ -1,7 +1,7 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { tap, catchError, of } from 'rxjs';
+import { Observable, tap, catchError, of, shareReplay, finalize } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
 export interface User {
@@ -33,6 +33,7 @@ const API_URL = environment.apiUrl;
 export class AuthService {
   private currentUser = signal<User | null>(null);
   private accessToken = signal<string | null>(null);
+  private refreshing$: Observable<AuthResponse | null> | null = null;
 
   user = this.currentUser.asReadonly();
   isAuthenticated = computed(() => !!this.currentUser());
@@ -63,15 +64,22 @@ export class AuthService {
       .pipe(tap(res => this.handleAuth(res)));
   }
 
-  refresh() {
-    return this.http.post<AuthResponse>(`${API_URL}/auth/refresh`, {}, { withCredentials: true })
+  refresh(): Observable<AuthResponse | null> {
+    // Share a single in-flight refresh across all concurrent callers.
+    // Without this, multiple simultaneous 401s each fire their own refresh,
+    // which causes token-rotation failures and silent API hangs.
+    if (this.refreshing$) return this.refreshing$;
+    this.refreshing$ = this.http.post<AuthResponse>(`${API_URL}/auth/refresh`, {}, { withCredentials: true })
       .pipe(
         tap(res => this.handleAuth(res)),
         catchError(() => {
           this.clearAuth();
           return of(null);
-        })
+        }),
+        finalize(() => { this.refreshing$ = null; }),
+        shareReplay(1),
       );
+    return this.refreshing$;
   }
 
   logout() {
