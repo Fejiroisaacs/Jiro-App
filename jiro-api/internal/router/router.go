@@ -122,6 +122,9 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 				jym.DELETE("/routines/:id", jymHandler.DeleteRoutine)
 				jym.PUT("/routines/:id/items", jymHandler.ReplaceRoutineItems)
 
+				// Templates (standalone routines)
+				jym.GET("/templates", jymHandler.ListTemplates)
+
 				// Sessions
 				jym.POST("/sessions", jymHandler.StartSession)
 				jym.GET("/sessions", jymHandler.ListSessions)
@@ -129,6 +132,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 				jym.PATCH("/sessions/:id", jymHandler.UpdateSession)
 				jym.DELETE("/sessions/:id", jymHandler.DeleteSession)
 				jym.GET("/export/sessions.csv", jymHandler.ExportSessions)
+				jym.POST("/sessions/:id/template", jymHandler.CreateTemplateFromSession)
 
 				// Sets
 				jym.POST("/sessions/:id/sets", jymHandler.LogSet)

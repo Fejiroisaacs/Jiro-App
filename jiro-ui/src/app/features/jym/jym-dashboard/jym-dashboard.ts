@@ -1,7 +1,7 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
-import { JymService, Split, SplitSeriesSummary, SessionSummary } from '../../../core/services/jym.service';
+import { JymService, Split, SplitSeriesSummary, SessionSummary, Routine } from '../../../core/services/jym.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
@@ -180,6 +180,23 @@ import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
           </div>
           <a *ngIf="splits().length > 4" routerLink="/jym/splits" class="split-chip more-chip">
             +{{ splits().length - 4 }} more
+          </a>
+        </div>
+      </div>
+
+      <!-- Templates -->
+      <div *ngIf="templates().length > 0" class="templates-section">
+        <div class="splits-summary-header">
+          <h2 class="section-title">Templates</h2>
+          <a routerLink="/jym/templates" class="manage-link">Manage →</a>
+        </div>
+        <div class="splits-row">
+          <div *ngFor="let t of templates().slice(0, 4)" class="split-chip template-chip" (click)="startFromTemplate(t)">
+            <span class="split-chip-name">{{ t.name }}</span>
+            <span class="split-chip-days">{{ t.items.length }} {{ t.items.length === 1 ? 'exercise' : 'exercises' }}</span>
+          </div>
+          <a *ngIf="templates().length > 4" routerLink="/jym/templates" class="split-chip more-chip">
+            +{{ templates().length - 4 }} more
           </a>
         </div>
       </div>
@@ -491,6 +508,7 @@ export class JymDashboardComponent implements OnInit {
     activeSeries = signal<SplitSeriesSummary[]>([]);
     allSessions = signal<SessionSummary[]>([]);
     inProgressSessions = signal<SessionSummary[]>([]);
+    templates = signal<Routine[]>([]);
     loading = signal(true);
 
     hasCompletedSessions = computed(() => this.allSessions().some(s => !!s.ended_at));
@@ -578,11 +596,20 @@ export class JymDashboardComponent implements OnInit {
                 this.inProgressSessions.set(s.filter(sess => !sess.ended_at));
             },
         });
+        this.jymService.listTemplates().subscribe({
+            next: t => this.templates.set(t),
+        });
     }
 
     startFreeSession() {
         this.jymService.startSession({}).subscribe({
             next: s => this.router.navigate(['/jym/session', s.id]),
+        });
+    }
+
+    startFromTemplate(t: Routine) {
+        this.jymService.startSession({ routine_id: t.id }).subscribe({
+            next: s => this.router.navigate(['/jym/session', s.id], { state: { targets: s.targets } }),
         });
     }
 

@@ -112,11 +112,16 @@ type PublicSplitDetail struct {
 // ─── Routine ─────────────────────────────────────────────────────────────────
 
 type Routine struct {
-	ID        uuid.UUID `json:"id"`
-	SplitID   uuid.UUID `json:"split_id"`
-	Name      string    `json:"name"`
-	DayOrder  int       `json:"day_order"`
-	CreatedAt time.Time `json:"created_at"`
+	ID        uuid.UUID  `json:"id"`
+	UserID    uuid.UUID  `json:"user_id"`
+	SplitID   *uuid.UUID `json:"split_id"`
+	Name      string     `json:"name"`
+	DayOrder  int        `json:"day_order"`
+	CreatedAt time.Time  `json:"created_at"`
+}
+
+type CreateTemplateFromSessionRequest struct {
+	Name string `json:"name" binding:"required"`
 }
 
 type RoutineWithItems struct {

@@ -363,6 +363,46 @@ func (h *JymHandler) ReplaceRoutineItems(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+// ─── Templates ────────────────────────────────────────────────────────────────
+
+func (h *JymHandler) ListTemplates(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	templates, err := h.jymService.ListTemplates(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to list templates"}})
+		return
+	}
+	c.JSON(http.StatusOK, templates)
+}
+
+func (h *JymHandler) CreateTemplateFromSession(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	sessionID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid session ID"}})
+		return
+	}
+	var req models.CreateTemplateFromSessionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()}})
+		return
+	}
+	tmpl, err := h.jymService.CreateTemplateFromSession(c.Request.Context(), userID, sessionID, req.Name)
+	if err != nil {
+		if err == services.ErrSessionNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Session not found or has no sets"}})
+			return
+		}
+		if err == services.ErrNotOwner {
+			c.JSON(http.StatusForbidden, models.ErrorResponse{Error: models.ErrorDetail{Code: "FORBIDDEN", Message: "Not your session"}})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to create template"}})
+		return
+	}
+	c.JSON(http.StatusCreated, tmpl)
+}
+
 // ─── Sessions ─────────────────────────────────────────────────────────────────
 
 func (h *JymHandler) StartSession(c *gin.Context) {
