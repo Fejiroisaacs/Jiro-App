@@ -25,6 +25,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	jymService := services.NewJymService(db)
 	emailService := services.NewEmailService(cfg.ResendAPIKey, cfg.EmailFrom)
 	adminService := services.NewAdminService(db)
+	mealPlanService := services.NewMealPlanService(db)
 
 	// Handlers
 	authHandler := handlers.NewAuthHandler(authService, userService, emailService, cfg, db)
@@ -33,6 +34,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	recipeHandler := handlers.NewRecipeHandler(recipeService, db, cfg.AppBaseURL)
 	jymHandler := handlers.NewJymHandler(jymService, cfg.AppBaseURL, db)
 	adminHandler := handlers.NewAdminHandler(adminService, authService, userService, emailService, cfg.AppBaseURL)
+	mealPlanHandler := handlers.NewMealPlanHandler(mealPlanService)
 
 	// Rate limiter
 	rl := middleware.NewRateLimiter()
@@ -94,6 +96,11 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 				// Sharing
 				culinara.POST("/recipes/:id/share", recipeHandler.CreateShare)
 				culinara.POST("/shares/:token/import", recipeHandler.ImportSharedRecipe)
+
+				// Meal Planner
+				culinara.GET("/meal-plan", mealPlanHandler.GetOrCreate)
+				culinara.POST("/meal-plan/:plan_id/entries", mealPlanHandler.AddEntry)
+				culinara.DELETE("/meal-plan/entries/:entry_id", mealPlanHandler.RemoveEntry)
 
 				// Collections
 				culinara.GET("/collections", recipeHandler.ListCollections)
