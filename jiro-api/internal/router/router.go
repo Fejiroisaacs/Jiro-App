@@ -36,7 +36,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	jymHandler := handlers.NewJymHandler(jymService, cfg.AppBaseURL, db)
 	adminHandler := handlers.NewAdminHandler(adminService, authService, userService, emailService, cfg.AppBaseURL)
 	mealPlanHandler := handlers.NewMealPlanHandler(mealPlanService)
-	uploadHandler := handlers.NewUploadHandler(storageService, userService)
+	uploadHandler := handlers.NewUploadHandler(storageService, userService, recipeService)
 
 	// Rate limiter
 	rl := middleware.NewRateLimiter()
@@ -81,10 +81,15 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			protected.PATCH("/user/me", userHandler.UpdateMe)
 			protected.POST("/auth/resend-verification", authHandler.ResendVerification)
 
-			// Upload
+			// Upload — avatar
 			protected.POST("/upload/avatar/presign", uploadHandler.PresignAvatar)
 			protected.PATCH("/upload/avatar/confirm", uploadHandler.ConfirmAvatar)
 			protected.DELETE("/upload/avatar", uploadHandler.DeleteAvatar)
+
+			// Upload — recipe cover image
+			protected.POST("/upload/recipe/:recipe_id/presign", uploadHandler.PresignRecipeImage)
+			protected.PATCH("/upload/recipe/:recipe_id/confirm", uploadHandler.ConfirmRecipeImage)
+			protected.DELETE("/upload/recipe/:recipe_id/image", uploadHandler.DeleteRecipeImage)
 
 			// Culinara (Recipe Module)
 			culinara := protected.Group("/culinara")

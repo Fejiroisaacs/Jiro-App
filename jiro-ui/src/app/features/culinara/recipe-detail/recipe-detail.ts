@@ -9,6 +9,7 @@ import {
   RecipeTrial,
   Collection,
 } from '../../../core/services/recipe.service';
+import { UploadService } from '../../../core/services/upload.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 import { RecipeFormComponent } from '../recipe-form/recipe-form';
@@ -77,6 +78,39 @@ interface CookIngredient {
           <div class="recipe-panel" [class.mobile-hidden]="mobileTab() !== 'recipe'">
             <!-- Back nav -->
             <a routerLink="/culinara" class="back-link">← Culinara</a>
+
+            <!-- Cover photo -->
+            <div class="cover-hero" *ngIf="r.cover_image_url">
+              <img [src]="r.cover_image_url" [alt]="r.title" class="cover-hero-img">
+              <div class="cover-hero-actions">
+                <label class="cover-action-btn" title="Change cover photo">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                  <input type="file" accept="image/jpeg,image/png,image/webp" (change)="onCoverFileChange($event)" style="display:none">
+                </label>
+                <button class="cover-action-btn cover-action-btn--danger" title="Remove cover photo" (click)="removeCoverImage()">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Add cover photo (no cover yet) -->
+            <div class="cover-empty" *ngIf="!r.cover_image_url && !coverUploading()">
+              <label class="cover-add-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                Add cover photo
+                <input type="file" accept="image/jpeg,image/png,image/webp" (change)="onCoverFileChange($event)" style="display:none">
+              </label>
+            </div>
+
+            <!-- Cover upload progress -->
+            <div class="cover-uploading" *ngIf="coverUploading()">
+              <div class="cover-progress-bar">
+                <div class="cover-progress-fill" [style.width.%]="coverProgress()"></div>
+              </div>
+              <span class="cover-progress-label">Uploading {{ coverProgress() }}%</span>
+            </div>
+
+            <p class="cover-error text-secondary" *ngIf="coverError()">{{ coverError() }}</p>
 
             <!-- Header -->
             <div class="panel-header">
@@ -521,6 +555,104 @@ interface CookIngredient {
 
     .back-link:hover {
       color: var(--text-primary);
+    }
+
+    /* Cover photo */
+    .cover-hero {
+      position: relative;
+      border-radius: var(--border-radius);
+      overflow: hidden;
+      height: 220px;
+    }
+
+    .cover-hero-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .cover-hero-actions {
+      position: absolute;
+      top: var(--space-sm);
+      right: var(--space-sm);
+      display: flex;
+      gap: 6px;
+    }
+
+    .cover-action-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.55);
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .cover-action-btn:hover {
+      background: rgba(0, 0, 0, 0.75);
+    }
+
+    .cover-action-btn--danger:hover {
+      background: rgba(180, 40, 40, 0.85);
+    }
+
+    .cover-empty {
+      display: flex;
+    }
+
+    .cover-add-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border: 1px dashed var(--border-color);
+      border-radius: var(--border-radius);
+      color: var(--text-muted);
+      font-size: var(--font-size-sm);
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .cover-add-btn:hover {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+    }
+
+    .cover-uploading {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .cover-progress-bar {
+      flex: 1;
+      height: 4px;
+      background: var(--border-color);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .cover-progress-fill {
+      height: 100%;
+      background: var(--color-primary);
+      transition: width 0.2s;
+    }
+
+    .cover-progress-label {
+      font-size: var(--font-size-xs);
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .cover-error {
+      font-size: var(--font-size-sm);
+      margin-top: calc(-1 * var(--space-xs));
     }
 
     /* Recipe panel */
@@ -1408,10 +1540,15 @@ export class RecipeDetailComponent implements OnInit {
     return Math.round(avg * 10) / 10;
   });
 
+  coverUploading = signal(false);
+  coverProgress = signal(0);
+  coverError = signal('');
+
   constructor(
     private route: ActivatedRoute,
     private router: Router,
     private recipeService: RecipeService,
+    private uploadService: UploadService,
     private elRef: ElementRef
   ) { }
 
@@ -1643,6 +1780,56 @@ export class RecipeDetailComponent implements OnInit {
     navigator.clipboard.writeText(this.shareUrl()).then(() => {
       this.shareCopied.set(true);
       setTimeout(() => this.shareCopied.set(false), 2000);
+    });
+  }
+
+  onCoverFileChange(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!input) return;
+    input.value = '';
+    if (!file) return;
+
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowed.includes(file.type)) {
+      this.coverError.set('Please choose a JPEG, PNG, or WebP image.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      this.coverError.set('Image must be under 5 MB.');
+      return;
+    }
+
+    const r = this.recipe();
+    if (!r) return;
+
+    this.coverError.set('');
+    this.coverUploading.set(true);
+    this.coverProgress.set(0);
+
+    this.uploadService.uploadRecipeImage(r.id, file, pct => this.coverProgress.set(pct)).subscribe({
+      next: (url) => {
+        this.coverUploading.set(false);
+        this.recipe.update(rec => rec ? { ...rec, cover_image_url: url } : rec);
+      },
+      error: () => {
+        this.coverUploading.set(false);
+        this.coverError.set('Upload failed. Please try again.');
+      },
+    });
+  }
+
+  removeCoverImage() {
+    const r = this.recipe();
+    if (!r) return;
+
+    this.uploadService.deleteRecipeImage(r.id).subscribe({
+      next: () => {
+        this.recipe.update(rec => rec ? { ...rec, cover_image_url: null } : rec);
+      },
+      error: () => {
+        this.coverError.set('Failed to remove cover photo.');
+      },
     });
   }
 }

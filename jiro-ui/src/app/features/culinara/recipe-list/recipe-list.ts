@@ -161,6 +161,9 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
           [routerLink]="['/culinara', recipe.id]"
           class="recipe-card">
           <div class="recipe-card-inner">
+            <div class="recipe-cover" *ngIf="recipe.cover_image_url">
+              <img [src]="recipe.cover_image_url" [alt]="recipe.title" class="cover-thumb">
+            </div>
             <div class="recipe-meta">
               <span class="trial-count" *ngIf="recipe.trial_count != null">
                 {{ recipe.trial_count }} {{ recipe.trial_count === 1 ? 'trial' : 'trials' }}
@@ -389,6 +392,20 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
       display: flex;
       flex-direction: column;
       gap: var(--space-sm);
+    }
+
+    .recipe-cover {
+      margin: calc(-1 * var(--space-md)) calc(-1 * var(--space-md)) 0;
+      border-radius: var(--border-radius) var(--border-radius) 0 0;
+      overflow: hidden;
+      height: 160px;
+    }
+
+    .cover-thumb {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
     }
 
     .recipe-meta {

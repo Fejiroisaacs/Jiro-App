@@ -9,6 +9,7 @@ export interface Recipe {
   title: string;
   description: string | null;
   target_image_url: string | null;
+  cover_image_url: string | null;
   base_ingredients: Ingredient[];
   instructions: string | null;
   tags: string[];

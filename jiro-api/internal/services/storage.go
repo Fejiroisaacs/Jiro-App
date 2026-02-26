@@ -57,8 +57,29 @@ func (s *StorageService) PresignAvatarUpload(ctx context.Context, userID uuid.UU
 	objectKey = fmt.Sprintf("avatars/%s/%s%s", userID, uuid.New().String(), ext)
 
 	req, err := s.presign.PresignPutObject(ctx, &s3.PutObjectInput{
-		Bucket: aws.String(s.bucket),
-		Key:    aws.String(objectKey),
+		Bucket:       aws.String(s.bucket),
+		Key:          aws.String(objectKey),
+		CacheControl: aws.String("public, max-age=31536000, immutable"),
+	}, s3.WithPresignExpires(5*time.Minute))
+	if err != nil {
+		return "", "", err
+	}
+
+	return req.URL, objectKey, nil
+}
+
+// PresignRecipeUpload returns a presigned PUT URL and the object key for a recipe cover image upload.
+func (s *StorageService) PresignRecipeUpload(ctx context.Context, userID, recipeID uuid.UUID, ext string) (uploadURL, objectKey string, err error) {
+	if s.client == nil {
+		return "", "", fmt.Errorf("storage not configured")
+	}
+
+	objectKey = fmt.Sprintf("recipes/%s/%s/%s%s", userID, recipeID, uuid.New().String(), ext)
+
+	req, err := s.presign.PresignPutObject(ctx, &s3.PutObjectInput{
+		Bucket:       aws.String(s.bucket),
+		Key:          aws.String(objectKey),
+		CacheControl: aws.String("public, max-age=31536000, immutable"),
 	}, s3.WithPresignExpires(5*time.Minute))
 	if err != nil {
 		return "", "", err

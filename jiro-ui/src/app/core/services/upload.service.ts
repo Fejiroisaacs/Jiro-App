@@ -41,11 +41,44 @@ export class UploadService {
     return this.http.delete<void>(`${API}/upload/avatar`);
   }
 
+  /**
+   * Full recipe cover image upload flow:
+   * 1. Request presign URL from API (validates ownership)
+   * 2. PUT file directly to R2 (bypasses Angular interceptors)
+   * 3. Confirm with API so it saves cover_image_url on the recipe
+   * Returns the final cover_image_url.
+   */
+  uploadRecipeImage(recipeId: string, file: File, onProgress?: (pct: number) => void): Observable<string> {
+    const presignBody = {
+      content_type: file.type,
+      content_length: file.size,
+    };
+
+    return this.http
+      .post<{ upload_url: string; object_key: string }>(`${API}/upload/recipe/${recipeId}/presign`, presignBody)
+      .pipe(
+        switchMap(({ upload_url, object_key }) =>
+          from(this.putToStorage(upload_url, file, onProgress)).pipe(
+            switchMap(() =>
+              this.http
+                .patch<{ cover_image_url: string }>(`${API}/upload/recipe/${recipeId}/confirm`, { object_key })
+                .pipe(map(res => res.cover_image_url))
+            )
+          )
+        )
+      );
+  }
+
+  deleteRecipeImage(recipeId: string): Observable<void> {
+    return this.http.delete<void>(`${API}/upload/recipe/${recipeId}/image`);
+  }
+
   private putToStorage(url: string, file: File, onProgress?: (pct: number) => void): Promise<void> {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('PUT', url);
       xhr.setRequestHeader('Content-Type', file.type);
+      xhr.setRequestHeader('Cache-Control', 'public, max-age=31536000, immutable');
 
       if (onProgress) {
         xhr.upload.onprogress = (e) => {
