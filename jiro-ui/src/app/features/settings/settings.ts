@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService, UserSettings } from '../../core/services/auth.service';
 import { SettingsService } from '../../core/services/settings.service';
+import { UploadService } from '../../core/services/upload.service';
 import { JiroCardComponent } from '../../shared/components/jiro-card/jiro-card';
 import { JiroButtonComponent } from '../../shared/components/jiro-button/jiro-button';
 import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-input';
@@ -38,6 +39,24 @@ import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-inpu
       <!-- Profile -->
       <jiro-card class="settings-section">
         <h2>Profile</h2>
+
+        <!-- Avatar -->
+        <div class="avatar-row">
+          <div class="avatar-preview">
+            <img *ngIf="authService.user()?.avatar_url" [src]="authService.user()!.avatar_url" alt="Avatar" class="avatar-img">
+            <div *ngIf="!authService.user()?.avatar_url" class="avatar-placeholder">
+              {{ (authService.user()?.display_name || authService.user()?.email || '?')[0].toUpperCase() }}
+            </div>
+          </div>
+          <div class="avatar-actions">
+            <label class="avatar-upload-btn">
+              <input type="file" accept="image/jpeg,image/png,image/webp" (change)="onAvatarFileChange($event)" style="display:none">
+              {{ avatarUploading() ? (avatarProgress() + '%') : 'Upload photo' }}
+            </label>
+            <button *ngIf="authService.user()?.avatar_url" class="avatar-remove-btn" (click)="removeAvatar()">Remove</button>
+          </div>
+          <span *ngIf="avatarError()" class="profile-error">{{ avatarError() }}</span>
+        </div>
 
         <div class="profile-form">
           <div class="form-field">
@@ -352,6 +371,82 @@ import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-inpu
     .dark-mode-toggle.active .toggle-thumb {
       transform: translateX(18px);
     }
+
+    /* Avatar */
+    .avatar-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-lg);
+      padding-bottom: var(--space-lg);
+      margin-bottom: var(--space-lg);
+      border-bottom: 1px solid var(--border-color);
+      flex-wrap: wrap;
+    }
+
+    .avatar-preview {
+      flex-shrink: 0;
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      overflow: hidden;
+    }
+
+    .avatar-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .avatar-placeholder {
+      width: 100%;
+      height: 100%;
+      background: var(--color-primary);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      font-weight: 700;
+    }
+
+    .avatar-actions {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+
+    .avatar-upload-btn {
+      display: inline-block;
+      padding: 7px 16px;
+      background: var(--color-primary);
+      color: #fff;
+      border-radius: var(--border-radius);
+      font-size: var(--font-size-sm);
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      text-align: center;
+      min-width: 110px;
+    }
+
+    .avatar-upload-btn:hover { opacity: 0.88; }
+
+    .avatar-remove-btn {
+      background: none;
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      color: var(--text-secondary);
+      font-size: var(--font-size-sm);
+      padding: 6px 16px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .avatar-remove-btn:hover {
+      border-color: var(--color-danger);
+      color: var(--color-danger);
+    }
   `]
 })
 export class SettingsComponent implements OnInit {
@@ -367,6 +462,9 @@ export class SettingsComponent implements OnInit {
   usernamePlaceholder = 'e.g. myusername';
   profileSaving = signal(false);
   profileError = signal<string | null>(null);
+  avatarUploading = signal(false);
+  avatarProgress = signal(0);
+  avatarError = signal<string | null>(null);
 
   themes = [
     { value: 'earth', label: 'Earth', color: '#5C4033' },
@@ -397,7 +495,7 @@ export class SettingsComponent implements OnInit {
     'Pacific/Auckland',
   ];
 
-  constructor(public authService: AuthService, public settingsService: SettingsService) {}
+  constructor(public authService: AuthService, public settingsService: SettingsService, private uploadService: UploadService) {}
 
   ngOnInit() {
     const user = this.authService.user();
@@ -432,6 +530,44 @@ export class SettingsComponent implements OnInit {
         this.saved.set(true);
         setTimeout(() => this.saved.set(false), 2000);
       },
+    });
+  }
+
+  onAvatarFileChange(event: Event) {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowed.includes(file.type)) {
+      this.avatarError.set('Please select a JPEG, PNG, or WebP image.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      this.avatarError.set('Image must be under 5 MB.');
+      return;
+    }
+
+    this.avatarError.set(null);
+    this.avatarUploading.set(true);
+    this.avatarProgress.set(0);
+
+    this.uploadService.uploadAvatar(file, pct => this.avatarProgress.set(pct)).subscribe({
+      next: (avatarUrl) => {
+        this.authService.updateAvatar(avatarUrl);
+        this.avatarUploading.set(false);
+        this.avatarProgress.set(0);
+      },
+      error: () => {
+        this.avatarError.set('Upload failed. Please try again.');
+        this.avatarUploading.set(false);
+      },
+    });
+  }
+
+  removeAvatar() {
+    this.uploadService.deleteAvatar().subscribe({
+      next: () => this.authService.clearAvatar(),
+      error: () => this.avatarError.set('Failed to remove avatar.'),
     });
   }
 

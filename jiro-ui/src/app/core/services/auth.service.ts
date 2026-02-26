@@ -11,6 +11,7 @@ export interface User {
   display_name?: string;
   email_verified: boolean;
   bio?: string;
+  avatar_url?: string;
   settings: UserSettings;
   created_at: string;
   updated_at: string;
@@ -102,6 +103,24 @@ export class AuthService {
         this.currentUser.set(user);
         localStorage.setItem('jiro_user', JSON.stringify(user));
       }));
+  }
+
+  updateAvatar(avatarUrl: string) {
+    const user = this.currentUser();
+    if (user) {
+      const updated = { ...user, avatar_url: avatarUrl };
+      this.currentUser.set(updated);
+      localStorage.setItem('jiro_user', JSON.stringify(updated));
+    }
+  }
+
+  clearAvatar() {
+    const user = this.currentUser();
+    if (user) {
+      const updated = { ...user, avatar_url: undefined };
+      this.currentUser.set(updated);
+      localStorage.setItem('jiro_user', JSON.stringify(updated));
+    }
   }
 
   verifyEmail(token: string) {

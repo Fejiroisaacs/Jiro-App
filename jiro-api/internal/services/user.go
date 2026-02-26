@@ -43,9 +43,9 @@ func (s *UserService) CreateUser(ctx context.Context, email, passwordHash, displ
 	err := s.db.QueryRow(ctx,
 		`INSERT INTO users (email, password_hash, display_name, username, settings)
 		 VALUES ($1, $2, $3, $4, '{"weight_unit":"lbs"}')
-		 RETURNING id, email, username, display_name, email_verified, bio, settings, created_at, updated_at`,
+		 RETURNING id, email, username, display_name, email_verified, bio, avatar_url, settings, created_at, updated_at`,
 		email, passwordHash, displayName, username,
-	).Scan(&user.ID, &user.Email, &user.Username, &user.DisplayName, &user.EmailVerified, &user.Bio, &user.Settings, &user.CreatedAt, &user.UpdatedAt)
+	).Scan(&user.ID, &user.Email, &user.Username, &user.DisplayName, &user.EmailVerified, &user.Bio, &user.AvatarUrl, &user.Settings, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
 		return nil, err
@@ -56,10 +56,10 @@ func (s *UserService) CreateUser(ctx context.Context, email, passwordHash, displ
 func (s *UserService) GetByEmail(ctx context.Context, email string) (*models.User, error) {
 	user := &models.User{}
 	err := s.db.QueryRow(ctx,
-		`SELECT id, email, password_hash, username, display_name, email_verified, bio, settings, created_at, updated_at
+		`SELECT id, email, password_hash, username, display_name, email_verified, bio, avatar_url, settings, created_at, updated_at
 		 FROM users WHERE email = $1`,
 		email,
-	).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Username, &user.DisplayName, &user.EmailVerified, &user.Bio, &user.Settings, &user.CreatedAt, &user.UpdatedAt)
+	).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Username, &user.DisplayName, &user.EmailVerified, &user.Bio, &user.AvatarUrl, &user.Settings, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -73,10 +73,10 @@ func (s *UserService) GetByEmail(ctx context.Context, email string) (*models.Use
 func (s *UserService) GetByID(ctx context.Context, id uuid.UUID) (*models.User, error) {
 	user := &models.User{}
 	err := s.db.QueryRow(ctx,
-		`SELECT id, email, username, display_name, email_verified, bio, settings, created_at, updated_at
+		`SELECT id, email, username, display_name, email_verified, bio, avatar_url, settings, created_at, updated_at
 		 FROM users WHERE id = $1`,
 		id,
-	).Scan(&user.ID, &user.Email, &user.Username, &user.DisplayName, &user.EmailVerified, &user.Bio, &user.Settings, &user.CreatedAt, &user.UpdatedAt)
+	).Scan(&user.ID, &user.Email, &user.Username, &user.DisplayName, &user.EmailVerified, &user.Bio, &user.AvatarUrl, &user.Settings, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -129,9 +129,9 @@ func (s *UserService) UpdateSettings(ctx context.Context, userID uuid.UUID, req 
 	err = s.db.QueryRow(ctx,
 		`UPDATE users SET settings = $1, updated_at = NOW()
 		 WHERE id = $2
-		 RETURNING id, email, username, display_name, email_verified, bio, settings, created_at, updated_at`,
+		 RETURNING id, email, username, display_name, email_verified, bio, avatar_url, settings, created_at, updated_at`,
 		settingsJSON, userID,
-	).Scan(&user.ID, &user.Email, &user.Username, &user.DisplayName, &user.EmailVerified, &user.Bio, &user.Settings, &user.CreatedAt, &user.UpdatedAt)
+	).Scan(&user.ID, &user.Email, &user.Username, &user.DisplayName, &user.EmailVerified, &user.Bio, &user.AvatarUrl, &user.Settings, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
 		return nil, err
@@ -168,9 +168,9 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID uuid.UUID, req *
 		     bio          = COALESCE($3, bio),
 		     updated_at   = NOW()
 		 WHERE id = $4
-		 RETURNING id, email, username, display_name, email_verified, bio, settings, created_at, updated_at`,
+		 RETURNING id, email, username, display_name, email_verified, bio, avatar_url, settings, created_at, updated_at`,
 		req.Username, req.DisplayName, req.Bio, userID,
-	).Scan(&user.ID, &user.Email, &user.Username, &user.DisplayName, &user.EmailVerified, &user.Bio, &user.Settings, &user.CreatedAt, &user.UpdatedAt)
+	).Scan(&user.ID, &user.Email, &user.Username, &user.DisplayName, &user.EmailVerified, &user.Bio, &user.AvatarUrl, &user.Settings, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
 		return nil, err
@@ -181,6 +181,22 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID uuid.UUID, req *
 func (s *UserService) SetEmailVerified(ctx context.Context, userID uuid.UUID) error {
 	_, err := s.db.Exec(ctx,
 		"UPDATE users SET email_verified = true, updated_at = NOW() WHERE id = $1",
+		userID,
+	)
+	return err
+}
+
+func (s *UserService) SetAvatarURL(ctx context.Context, userID uuid.UUID, avatarURL string) error {
+	_, err := s.db.Exec(ctx,
+		"UPDATE users SET avatar_url = $1, updated_at = NOW() WHERE id = $2",
+		avatarURL, userID,
+	)
+	return err
+}
+
+func (s *UserService) ClearAvatarURL(ctx context.Context, userID uuid.UUID) error {
+	_, err := s.db.Exec(ctx,
+		"UPDATE users SET avatar_url = NULL, updated_at = NOW() WHERE id = $1",
 		userID,
 	)
 	return err
