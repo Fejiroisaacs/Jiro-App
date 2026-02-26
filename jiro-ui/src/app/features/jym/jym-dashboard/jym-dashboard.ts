@@ -185,13 +185,22 @@ import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
       </div>
 
       <!-- Templates -->
-      <div *ngIf="templates().length > 0" class="templates-section">
+      <div class="splits-summary">
         <div class="splits-summary-header">
           <h2 class="section-title">Templates</h2>
           <a routerLink="/jym/templates" class="manage-link">Manage →</a>
         </div>
-        <div class="splits-row">
-          <div *ngFor="let t of templates().slice(0, 4)" class="split-chip template-chip" (click)="startFromTemplate(t)">
+        <div *ngIf="loading()" class="state-message">
+          <div class="spinner-lg"></div>
+        </div>
+        <div *ngIf="!loading() && templates().length === 0" class="empty-splits">
+          <p class="text-secondary">No templates yet.</p>
+          <p class="text-secondary" style="font-size:var(--font-size-sm)">
+            Finish a session and tap the save icon to store its layout as a reusable template.
+          </p>
+        </div>
+        <div *ngIf="!loading() && templates().length > 0" class="splits-row">
+          <div *ngFor="let t of templates().slice(0, 4)" class="split-chip" (click)="startFromTemplate(t)">
             <span class="split-chip-name">{{ t.name }}</span>
             <span class="split-chip-days">{{ t.items.length }} {{ t.items.length === 1 ? 'exercise' : 'exercises' }}</span>
           </div>
