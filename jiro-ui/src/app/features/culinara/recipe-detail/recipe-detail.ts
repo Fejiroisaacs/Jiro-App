@@ -114,12 +114,14 @@ interface CookIngredient {
 
             <!-- Share link banner -->
             <div class="share-banner" *ngIf="shareUrl()">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
                 <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
                 <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
               </svg>
-              <span class="share-url-text">{{ shareUrl() }}</span>
-              <button class="share-copy-btn" (click)="copyShareUrl()">{{ shareCopied() ? 'Copied!' : 'Copy' }}</button>
+              <div class="share-url-row">
+                <input class="share-url-input" [value]="shareUrl()" readonly>
+                <button class="share-copy-btn" (click)="copyShareUrl()">{{ shareCopied() ? 'Copied!' : 'Copy' }}</button>
+              </div>
               <button class="share-close-btn" (click)="shareUrl.set('')">✕</button>
             </div>
 
@@ -1280,23 +1282,37 @@ interface CookIngredient {
     .share-banner {
       display: flex;
       align-items: center;
-      gap: var(--space-sm);
+      gap: 6px;
       padding: 10px 14px;
       background: var(--bg-surface-hover);
       border: 1px solid var(--border-color);
       border-radius: var(--border-radius);
       margin-bottom: var(--space-sm);
       font-size: var(--font-size-xs);
+      min-width: 0;
     }
 
-    .share-url-text {
+    .share-url-row {
+      display: flex;
       flex: 1;
       min-width: 0;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .share-url-input {
+      flex: 1;
+      min-width: 0;
+      padding: 4px 8px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      background: var(--bg-canvas);
+      color: var(--text-secondary);
+      font-size: var(--font-size-xs);
+      font-family: monospace;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-      color: var(--text-secondary);
-      font-family: monospace;
     }
 
     .share-copy-btn {
