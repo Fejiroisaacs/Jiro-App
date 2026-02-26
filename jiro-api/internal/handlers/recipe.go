@@ -14,10 +14,11 @@ import (
 type RecipeHandler struct {
 	recipeService *services.RecipeService
 	db            *pgxpool.Pool
+	appBaseURL    string
 }
 
-func NewRecipeHandler(recipeService *services.RecipeService, db *pgxpool.Pool) *RecipeHandler {
-	return &RecipeHandler{recipeService: recipeService, db: db}
+func NewRecipeHandler(recipeService *services.RecipeService, db *pgxpool.Pool, appBaseURL string) *RecipeHandler {
+	return &RecipeHandler{recipeService: recipeService, db: db, appBaseURL: appBaseURL}
 }
 
 func (h *RecipeHandler) Create(c *gin.Context) {
@@ -476,4 +477,82 @@ func (h *RecipeHandler) GetCollectionRecipeIDs(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, strIDs)
+}
+
+// ─── Recipe Sharing ──────────────────────────────────────────────────
+
+// CreateShare generates (or replaces) a share link for a recipe the caller owns.
+// POST /culinara/recipes/:id/share  (auth required)
+func (h *RecipeHandler) CreateShare(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+
+	recipeID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid recipe ID"},
+		})
+		return
+	}
+
+	resp, err := h.recipeService.CreateRecipeShare(c.Request.Context(), userID, recipeID, h.appBaseURL)
+	if err != nil {
+		if err == services.ErrRecipeNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{
+				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Recipe not found"},
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to create share link"},
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+// GetSharedRecipe returns the recipe snapshot for a public share token. No auth required.
+// GET /culinara/shares/:token
+func (h *RecipeHandler) GetSharedRecipe(c *gin.Context) {
+	token := c.Param("token")
+
+	resp, err := h.recipeService.GetSharedRecipeByToken(c.Request.Context(), token)
+	if err != nil {
+		if err == services.ErrSharedRecipeNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{
+				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Share link not found or expired"},
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to fetch shared recipe"},
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, resp)
+}
+
+// ImportSharedRecipe copies a shared recipe into the caller's library.
+// POST /culinara/shares/:token/import  (auth required)
+func (h *RecipeHandler) ImportSharedRecipe(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	token := c.Param("token")
+
+	recipe, err := h.recipeService.ImportSharedRecipe(c.Request.Context(), userID, token)
+	if err != nil {
+		if err == services.ErrSharedRecipeNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{
+				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Share link not found"},
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to import recipe"},
+		})
+		return
+	}
+
+	analytics.TrackEvent(h.db, userID, "recipe.import", nil)
+	c.JSON(http.StatusCreated, recipe)
 }

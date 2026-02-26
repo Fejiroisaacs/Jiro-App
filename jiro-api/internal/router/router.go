@@ -25,14 +25,16 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	jymService := services.NewJymService(db)
 	emailService := services.NewEmailService(cfg.ResendAPIKey, cfg.EmailFrom)
 	adminService := services.NewAdminService(db)
+	mealPlanService := services.NewMealPlanService(db)
 
 	// Handlers
 	authHandler := handlers.NewAuthHandler(authService, userService, emailService, cfg, db)
 	userHandler := handlers.NewUserHandler(userService)
 	healthHandler := handlers.NewHealthHandler(db)
-	recipeHandler := handlers.NewRecipeHandler(recipeService, db)
+	recipeHandler := handlers.NewRecipeHandler(recipeService, db, cfg.AppBaseURL)
 	jymHandler := handlers.NewJymHandler(jymService, cfg.AppBaseURL, db)
 	adminHandler := handlers.NewAdminHandler(adminService, authService, userService, emailService, cfg.AppBaseURL)
+	mealPlanHandler := handlers.NewMealPlanHandler(mealPlanService)
 
 	// Rate limiter
 	rl := middleware.NewRateLimiter()
@@ -48,6 +50,9 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 
 		// Public split share preview (no auth required)
 		v1.GET("/jym/shares/:share_id", jymHandler.GetSharePreview)
+
+		// Public recipe share preview (no auth required)
+		v1.GET("/culinara/shares/:token", recipeHandler.GetSharedRecipe)
 
 		// Public split discovery (no auth required)
 		v1.GET("/jym/public-splits", jymHandler.ListPublicSplits)
@@ -87,6 +92,15 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 				culinara.PUT("/trials/:id", recipeHandler.UpdateTrial)
 				culinara.DELETE("/trials/:id", recipeHandler.DeleteTrial)
 				culinara.POST("/promote/:trial_id", recipeHandler.Promote)
+
+				// Sharing
+				culinara.POST("/recipes/:id/share", recipeHandler.CreateShare)
+				culinara.POST("/shares/:token/import", recipeHandler.ImportSharedRecipe)
+
+				// Meal Planner
+				culinara.GET("/meal-plan", mealPlanHandler.GetOrCreate)
+				culinara.POST("/meal-plan/:plan_id/entries", mealPlanHandler.AddEntry)
+				culinara.DELETE("/meal-plan/entries/:entry_id", mealPlanHandler.RemoveEntry)
 
 				// Collections
 				culinara.GET("/collections", recipeHandler.ListCollections)
