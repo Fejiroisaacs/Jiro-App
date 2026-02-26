@@ -211,6 +211,38 @@ html.theme-rust {
 }
 
 // ========================================
+// Dark mode — html.dark, independent of color theme
+// ========================================
+
+html.dark {
+  --bg-page: #111113;
+  --bg-canvas: #18181b;
+  --bg-surface: #1e1e21;
+  --bg-surface-hover: #28282c;
+  --bg-sidebar: #0d0d0f;
+  --text-primary: #f5f4f2;
+  --text-secondary: #a09890;
+  --text-muted: #706560;
+  --border-color: #2e2e33;
+  --shadow-sm: 2px 2px 0px rgba(0, 0, 0, 0.5);
+  --shadow-md: 4px 4px 0px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 8px 8px 0px rgba(0, 0, 0, 0.5);
+}
+
+// Per-theme dark mode: lighten primary accent so it's readable on dark backgrounds
+html.dark                   { --color-primary: #b07060; --color-primary-hover: #c08070; }
+html.dark.theme-clay        { --color-primary: #c08850; --color-primary-hover: #d09860; }
+html.dark.theme-sand        { --color-primary: #a09070; --color-primary-hover: #b0a080; }
+html.dark.theme-forest      { --color-primary: #70a065; --color-primary-hover: #80b075; }
+html.dark.theme-royal-blue  { --color-primary: #5577e0; --color-primary-hover: #6688f0; }
+html.dark.theme-midnight    { --color-primary: #4060a0; --color-primary-hover: #5070b0; }
+html.dark.theme-crimson     { --color-primary: #d04040; --color-primary-hover: #e05050; }
+html.dark.theme-plum        { --color-primary: #9050b0; --color-primary-hover: #a060c0; }
+html.dark.theme-sage        { --color-primary: #7aaa85; --color-primary-hover: #8abb95; }
+html.dark.theme-slate       { --color-primary: #6a8aaa; --color-primary-hover: #7a9aba; }
+html.dark.theme-rust        { --color-primary: #c05840; --color-primary-hover: #d06850; }
+
+// ========================================
 // Reset & base styles
 // ========================================
 

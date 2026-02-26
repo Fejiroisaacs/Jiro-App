@@ -2,6 +2,7 @@ import { Component, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService, UserSettings } from '../../core/services/auth.service';
+import { SettingsService } from '../../core/services/settings.service';
 import { JiroCardComponent } from '../../shared/components/jiro-card/jiro-card';
 import { JiroButtonComponent } from '../../shared/components/jiro-button/jiro-button';
 import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-input';
@@ -107,7 +108,22 @@ import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-inpu
       <!-- Theme -->
       <jiro-card class="settings-section">
         <h2>Theme</h2>
-        <p class="text-secondary">Choose your visual theme</p>
+
+        <!-- Dark mode toggle -->
+        <div class="setting-row">
+          <div>
+            <label class="setting-label">Dark Mode</label>
+            <p class="text-secondary setting-desc">Switch between light and dark interface</p>
+          </div>
+          <button class="dark-mode-toggle" [class.active]="settingsService.darkMode()" (click)="settingsService.toggleDarkMode()">
+            <span class="toggle-track">
+              <span class="toggle-thumb"></span>
+            </span>
+            <span>{{ settingsService.darkMode() ? 'On' : 'Off' }}</span>
+          </button>
+        </div>
+
+        <p class="text-secondary" style="margin-top: var(--space-md);">Color theme</p>
         <div class="theme-grid">
           <button
             *ngFor="let t of themes"
@@ -297,6 +313,45 @@ import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-inpu
       from { opacity: 0; transform: translateY(8px); }
       to { opacity: 1; transform: translateY(0); }
     }
+
+    .dark-mode-toggle {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-primary);
+      font-size: var(--font-size-sm);
+      font-family: inherit;
+      padding: 0;
+    }
+    .toggle-track {
+      position: relative;
+      width: 40px;
+      height: 22px;
+      background: var(--border-color);
+      border-radius: 11px;
+      transition: background 0.2s;
+      display: block;
+    }
+    .dark-mode-toggle.active .toggle-track {
+      background: var(--color-primary);
+    }
+    .toggle-thumb {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: white;
+      transition: transform 0.2s;
+      display: block;
+    }
+    .dark-mode-toggle.active .toggle-thumb {
+      transform: translateX(18px);
+    }
   `]
 })
 export class SettingsComponent implements OnInit {
@@ -342,7 +397,7 @@ export class SettingsComponent implements OnInit {
     'Pacific/Auckland',
   ];
 
-  constructor(public authService: AuthService) {}
+  constructor(public authService: AuthService, public settingsService: SettingsService) {}
 
   ngOnInit() {
     const user = this.authService.user();

@@ -1,4 +1,4 @@
-import { Injectable, computed, inject } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { AuthService } from './auth.service';
 
 const KG_TO_LBS = 2.20462;
@@ -14,6 +14,18 @@ export class SettingsService {
 
   weightUnit = computed<string>(() => this.parsedSettings()['weight_unit'] ?? 'lbs');
   theme = computed<string>(() => this.parsedSettings()['theme'] ?? 'earth');
+
+  // Dark mode is stored in localStorage — works without a round-trip and persists across sessions
+  private _darkMode = signal<boolean>(
+    typeof localStorage !== 'undefined' && localStorage.getItem('jiro_dark') === '1'
+  );
+  darkMode = this._darkMode.asReadonly();
+
+  toggleDarkMode() {
+    const next = !this._darkMode();
+    this._darkMode.set(next);
+    localStorage.setItem('jiro_dark', next ? '1' : '0');
+  }
 
   /** Convert a stored kg value to the user's preferred display unit. */
   toDisplay(kg: number): number {
