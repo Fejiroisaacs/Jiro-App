@@ -88,6 +88,13 @@ interface CookIngredient {
                     <line x1="6" y1="17" x2="18" y2="17"/>
                   </svg>
                 </button>
+                <button class="icon-btn" title="Share recipe" (click)="shareRecipe()">
+                  <svg *ngIf="!shareLoading()" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                  </svg>
+                  <span *ngIf="shareLoading()" class="btn-spinner"></span>
+                </button>
                 <button class="icon-btn" title="Edit recipe" (click)="showEdit.set(true)">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -103,6 +110,17 @@ interface CookIngredient {
                   </svg>
                 </button>
               </div>
+            </div>
+
+            <!-- Share link banner -->
+            <div class="share-banner" *ngIf="shareUrl()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+              </svg>
+              <span class="share-url-text">{{ shareUrl() }}</span>
+              <button class="share-copy-btn" (click)="copyShareUrl()">{{ shareCopied() ? 'Copied!' : 'Copy' }}</button>
+              <button class="share-close-btn" (click)="shareUrl.set('')">✕</button>
             </div>
 
             <p *ngIf="r.description" class="recipe-desc">{{ r.description }}</p>
@@ -1258,6 +1276,58 @@ interface CookIngredient {
       color: var(--text-secondary);
     }
 
+    /* Share banner */
+    .share-banner {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: 10px 14px;
+      background: var(--bg-surface-hover);
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      margin-bottom: var(--space-sm);
+      font-size: var(--font-size-xs);
+    }
+
+    .share-url-text {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text-secondary);
+      font-family: monospace;
+    }
+
+    .share-copy-btn {
+      flex-shrink: 0;
+      padding: 3px 10px;
+      background: var(--color-primary);
+      color: #fff;
+      border: none;
+      border-radius: var(--border-radius);
+      font-size: var(--font-size-xs);
+      font-family: inherit;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    .share-copy-btn:hover { opacity: 0.88; }
+
+    .share-close-btn {
+      flex-shrink: 0;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 2px 4px;
+      font-size: var(--font-size-sm);
+      line-height: 1;
+      transition: color 0.15s;
+    }
+
+    .share-close-btn:hover { color: var(--text-secondary); }
+
     /* Mobile layout */
     @media (max-width: 767px) {
       .mobile-tabs {
@@ -1300,6 +1370,9 @@ export class RecipeDetailComponent implements OnInit {
   cookNotes = '';
   cookSaving = signal(false);
   groceryAdded = signal(false);
+  shareUrl = signal('');
+  shareLoading = signal(false);
+  shareCopied = signal(false);
 
   latestRating = computed(() => {
     const trials = this.recipe()?.trials;
@@ -1535,5 +1608,25 @@ export class RecipeDetailComponent implements OnInit {
     ShoppingListComponent.addRecipe(r.title, r.base_ingredients);
     this.groceryAdded.set(true);
     setTimeout(() => this.groceryAdded.set(false), 2500);
+  }
+
+  shareRecipe() {
+    const r = this.recipe();
+    if (!r) return;
+    this.shareLoading.set(true);
+    this.recipeService.createRecipeShare(r.id).subscribe({
+      next: (res) => {
+        this.shareUrl.set(res.share_url);
+        this.shareLoading.set(false);
+      },
+      error: () => this.shareLoading.set(false),
+    });
+  }
+
+  copyShareUrl() {
+    navigator.clipboard.writeText(this.shareUrl()).then(() => {
+      this.shareCopied.set(true);
+      setTimeout(() => this.shareCopied.set(false), 2000);
+    });
   }
 }

@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"time"
@@ -576,4 +578,127 @@ func (s *RecipeService) GetCollectionRecipeIDs(ctx context.Context, collectionID
 		ids = append(ids, id)
 	}
 	return ids, nil
+}
+
+// ─── Recipe Sharing ──────────────────────────────────────────────────
+
+var ErrSharedRecipeNotFound = errors.New("shared recipe not found")
+
+// CreateRecipeShare generates a share link for a recipe. Replaces any existing share for the same recipe.
+func (s *RecipeService) CreateRecipeShare(ctx context.Context, userID uuid.UUID, recipeID uuid.UUID, appBaseURL string) (*models.SharedRecipeResponse, error) {
+	// Verify ownership and fetch recipe for snapshot
+	recipe := &models.Recipe{}
+	err := s.db.QueryRow(ctx,
+		`SELECT id, user_id, title, description, target_image_url, base_ingredients, instructions, tags, nutrition, dietary_flags, created_at, updated_at
+		 FROM recipes WHERE id = $1 AND user_id = $2`,
+		recipeID, userID,
+	).Scan(&recipe.ID, &recipe.UserID, &recipe.Title, &recipe.Description, &recipe.TargetImageURL,
+		&recipe.BaseIngredients, &recipe.Instructions, &recipe.Tags, &recipe.Nutrition, &recipe.DietaryFlags,
+		&recipe.CreatedAt, &recipe.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrRecipeNotFound
+		}
+		return nil, err
+	}
+	if recipe.Tags == nil {
+		recipe.Tags = []string{}
+	}
+
+	// Generate 32-char hex token
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return nil, err
+	}
+	token := hex.EncodeToString(b)
+
+	snapshot, err := json.Marshal(recipe)
+	if err != nil {
+		return nil, err
+	}
+
+	// Delete any existing share for this recipe by this owner, then insert fresh
+	_, _ = s.db.Exec(ctx, "DELETE FROM shared_recipes WHERE recipe_id = $1 AND owner_id = $2", recipeID, userID)
+
+	var createdAt time.Time
+	err = s.db.QueryRow(ctx,
+		`INSERT INTO shared_recipes (share_token, owner_id, recipe_id, recipe_snapshot)
+		 VALUES ($1, $2, $3, $4) RETURNING created_at`,
+		token, userID, recipeID, snapshot,
+	).Scan(&createdAt)
+	if err != nil {
+		return nil, err
+	}
+
+	return &models.SharedRecipeResponse{
+		ShareToken: token,
+		ShareURL:   appBaseURL + "/culinara/share/" + token,
+		Recipe:     snapshot,
+		SharedAt:   createdAt,
+	}, nil
+}
+
+// GetSharedRecipeByToken returns the recipe snapshot for a public share link.
+func (s *RecipeService) GetSharedRecipeByToken(ctx context.Context, token string) (*models.SharedRecipeResponse, error) {
+	var resp models.SharedRecipeResponse
+	err := s.db.QueryRow(ctx,
+		`SELECT sr.share_token, sr.recipe_snapshot, sr.created_at,
+		        COALESCE(u.display_name, u.email) AS shared_by
+		 FROM shared_recipes sr
+		 JOIN users u ON sr.owner_id = u.id
+		 WHERE sr.share_token = $1`,
+		token,
+	).Scan(&resp.ShareToken, &resp.Recipe, &resp.SharedAt, &resp.SharedBy)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSharedRecipeNotFound
+		}
+		return nil, err
+	}
+	return &resp, nil
+}
+
+// ImportSharedRecipe copies the snapshot into a new recipe owned by the importing user.
+func (s *RecipeService) ImportSharedRecipe(ctx context.Context, userID uuid.UUID, token string) (*models.Recipe, error) {
+	var snapshot json.RawMessage
+	err := s.db.QueryRow(ctx,
+		"SELECT recipe_snapshot FROM shared_recipes WHERE share_token = $1", token,
+	).Scan(&snapshot)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSharedRecipeNotFound
+		}
+		return nil, err
+	}
+
+	var src models.Recipe
+	if err := json.Unmarshal(snapshot, &src); err != nil {
+		return nil, err
+	}
+
+	ingredients := src.BaseIngredients
+	if ingredients == nil {
+		ingredients = json.RawMessage("[]")
+	}
+	tags := src.Tags
+	if tags == nil {
+		tags = []string{}
+	}
+
+	recipe := &models.Recipe{}
+	err = s.db.QueryRow(ctx,
+		`INSERT INTO recipes (user_id, title, description, base_ingredients, instructions, tags, nutrition, dietary_flags)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		 RETURNING id, user_id, title, description, target_image_url, base_ingredients, instructions, tags, nutrition, dietary_flags, created_at, updated_at`,
+		userID, src.Title, src.Description, ingredients, src.Instructions, tags, src.Nutrition, src.DietaryFlags,
+	).Scan(&recipe.ID, &recipe.UserID, &recipe.Title, &recipe.Description, &recipe.TargetImageURL,
+		&recipe.BaseIngredients, &recipe.Instructions, &recipe.Tags, &recipe.Nutrition, &recipe.DietaryFlags,
+		&recipe.CreatedAt, &recipe.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	if recipe.Tags == nil {
+		recipe.Tags = []string{}
+	}
+	return recipe, nil
 }

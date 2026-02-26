@@ -30,7 +30,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	authHandler := handlers.NewAuthHandler(authService, userService, emailService, cfg, db)
 	userHandler := handlers.NewUserHandler(userService)
 	healthHandler := handlers.NewHealthHandler(db)
-	recipeHandler := handlers.NewRecipeHandler(recipeService, db)
+	recipeHandler := handlers.NewRecipeHandler(recipeService, db, cfg.AppBaseURL)
 	jymHandler := handlers.NewJymHandler(jymService, cfg.AppBaseURL, db)
 	adminHandler := handlers.NewAdminHandler(adminService, authService, userService, emailService, cfg.AppBaseURL)
 
@@ -48,6 +48,9 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 
 		// Public split share preview (no auth required)
 		v1.GET("/jym/shares/:share_id", jymHandler.GetSharePreview)
+
+		// Public recipe share preview (no auth required)
+		v1.GET("/culinara/shares/:token", recipeHandler.GetSharedRecipe)
 
 		// Public split discovery (no auth required)
 		v1.GET("/jym/public-splits", jymHandler.ListPublicSplits)
@@ -87,6 +90,10 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 				culinara.PUT("/trials/:id", recipeHandler.UpdateTrial)
 				culinara.DELETE("/trials/:id", recipeHandler.DeleteTrial)
 				culinara.POST("/promote/:trial_id", recipeHandler.Promote)
+
+				// Sharing
+				culinara.POST("/recipes/:id/share", recipeHandler.CreateShare)
+				culinara.POST("/shares/:token/import", recipeHandler.ImportSharedRecipe)
 
 				// Collections
 				culinara.GET("/collections", recipeHandler.ListCollections)

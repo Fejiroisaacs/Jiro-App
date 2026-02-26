@@ -149,6 +149,10 @@ export const routes: Routes = [
     ],
   },
   {
+    path: 'culinara/share/:token',
+    loadComponent: () => import('./features/culinara/recipe-share/recipe-share').then(m => m.RecipeShareComponent),
+  },
+  {
     path: '**',
     redirectTo: 'login',
   },

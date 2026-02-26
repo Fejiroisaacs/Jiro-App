@@ -98,6 +98,14 @@ export interface UpdateTrialRequest {
   rating?: number;
 }
 
+export interface SharedRecipeResponse {
+  share_token: string;
+  share_url: string;
+  recipe: Recipe;
+  shared_by: string;
+  shared_at: string;
+}
+
 const API_URL = `${environment.apiUrl}/culinara`;
 
 export interface CookStreak {
@@ -190,5 +198,18 @@ export class RecipeService {
 
   getCollectionRecipeIds(collectionId: string): Observable<string[]> {
     return this.http.get<string[]>(`${API_URL}/collections/${collectionId}/recipe-ids`);
+  }
+
+  // ─── Sharing ──────────────────────────────────────
+  createRecipeShare(recipeId: string): Observable<SharedRecipeResponse> {
+    return this.http.post<SharedRecipeResponse>(`${API_URL}/recipes/${recipeId}/share`, {});
+  }
+
+  getSharedRecipe(token: string): Observable<SharedRecipeResponse> {
+    return this.http.get<SharedRecipeResponse>(`${API_URL}/shares/${token}`);
+  }
+
+  importSharedRecipe(token: string): Observable<Recipe> {
+    return this.http.post<Recipe>(`${API_URL}/shares/${token}/import`, {});
   }
 }
