@@ -190,9 +190,26 @@ export interface SessionSet {
   muscle_group: string | null;
 }
 
+export interface SessionAttachment {
+  id: string;
+  session_id: string;
+  user_id: string;
+  exercise_id: string | null;
+  object_key: string;
+  file_url: string;
+  file_type: string;
+  label: string | null;
+  created_at: string;
+}
+
+export interface ExerciseFormCheck extends SessionAttachment {
+  session_date: string;
+}
+
 export interface SessionWithSets extends Session {
   routine_name: string | null;
   sets: SessionSet[];
+  attachments: SessionAttachment[];
 }
 
 export interface StartSessionResponse extends Session {
@@ -429,5 +446,10 @@ export class JymService {
 
   deleteTemplate(routineId: string): Observable<void> {
     return this.http.delete<void>(`${API_URL}/routines/${routineId}`);
+  }
+
+  // ── Form Checks ────────────────────────────────────────────────────────────
+  listExerciseFormChecks(exerciseId: string): Observable<ExerciseFormCheck[]> {
+    return this.http.get<ExerciseFormCheck[]>(`${API_URL}/exercises/${exerciseId}/form-checks`);
   }
 }

@@ -73,6 +73,41 @@ export class UploadService {
     return this.http.delete<void>(`${API}/upload/recipe/${recipeId}/image`);
   }
 
+  /**
+   * Full session attachment upload flow:
+   * 1. Request presign URL from API (validates ownership)
+   * 2. PUT file directly to R2
+   * 3. Confirm with API so it creates the session_attachments row
+   * Returns the created SessionAttachment.
+   */
+  uploadSessionAttachment(sessionId: string, file: File, exerciseId?: string | null, label?: string, onProgress?: (pct: number) => void): Observable<import('./jym.service').SessionAttachment> {
+    const presignBody = {
+      content_type: file.type,
+      content_length: file.size,
+    };
+
+    return this.http
+      .post<{ upload_url: string; object_key: string }>(`${API}/upload/session/${sessionId}/presign`, presignBody)
+      .pipe(
+        switchMap(({ upload_url, object_key }) =>
+          from(this.putToStorage(upload_url, file, onProgress)).pipe(
+            switchMap(() =>
+              this.http
+                .patch<import('./jym.service').SessionAttachment>(`${API}/upload/session/${sessionId}/confirm`, {
+                  object_key,
+                  exercise_id: exerciseId || null,
+                  label: label || null,
+                })
+            )
+          )
+        )
+      );
+  }
+
+  deleteSessionAttachment(attachmentId: string): Observable<void> {
+    return this.http.delete<void>(`${API}/upload/session/attachments/${attachmentId}`);
+  }
+
   private putToStorage(url: string, file: File, onProgress?: (pct: number) => void): Promise<void> {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();

@@ -33,10 +33,10 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	userHandler := handlers.NewUserHandler(userService)
 	healthHandler := handlers.NewHealthHandler(db)
 	recipeHandler := handlers.NewRecipeHandler(recipeService, db, cfg.AppBaseURL)
-	jymHandler := handlers.NewJymHandler(jymService, cfg.AppBaseURL, db)
+	jymHandler := handlers.NewJymHandler(jymService, storageService, cfg.AppBaseURL, db)
 	adminHandler := handlers.NewAdminHandler(adminService, authService, userService, emailService, cfg.AppBaseURL)
 	mealPlanHandler := handlers.NewMealPlanHandler(mealPlanService)
-	uploadHandler := handlers.NewUploadHandler(storageService, userService, recipeService)
+	uploadHandler := handlers.NewUploadHandler(storageService, userService, recipeService, jymService)
 
 	// Rate limiter
 	rl := middleware.NewRateLimiter()
@@ -91,6 +91,11 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			protected.PATCH("/upload/recipe/:recipe_id/confirm", uploadHandler.ConfirmRecipeImage)
 			protected.DELETE("/upload/recipe/:recipe_id/image", uploadHandler.DeleteRecipeImage)
 
+			// Upload — session attachments
+			protected.POST("/upload/session/:session_id/presign", uploadHandler.PresignSessionAttachment)
+			protected.PATCH("/upload/session/:session_id/confirm", uploadHandler.ConfirmSessionAttachment)
+			protected.DELETE("/upload/session/attachments/:attachment_id", uploadHandler.DeleteSessionAttachment)
+
 			// Culinara (Recipe Module)
 			culinara := protected.Group("/culinara")
 			{
@@ -133,6 +138,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 				jym.GET("/exercises/:id", jymHandler.GetExercise)
 				jym.PUT("/exercises/:id", jymHandler.UpdateExercise)
 				jym.DELETE("/exercises/:id", jymHandler.DeleteExercise)
+				jym.GET("/exercises/:id/form-checks", jymHandler.GetExerciseFormChecks)
 				jym.GET("/prs", jymHandler.GetPRs)
 
 				// Splits

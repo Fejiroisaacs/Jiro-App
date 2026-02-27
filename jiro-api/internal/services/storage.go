@@ -88,6 +88,26 @@ func (s *StorageService) PresignRecipeUpload(ctx context.Context, userID, recipe
 	return req.URL, objectKey, nil
 }
 
+// PresignSessionUpload returns a presigned PUT URL and the object key for a session attachment upload.
+func (s *StorageService) PresignSessionUpload(ctx context.Context, userID, sessionID uuid.UUID, ext string) (uploadURL, objectKey string, err error) {
+	if s.client == nil {
+		return "", "", fmt.Errorf("storage not configured")
+	}
+
+	objectKey = fmt.Sprintf("sessions/%s/%s/%s%s", userID, sessionID, uuid.New().String(), ext)
+
+	req, err := s.presign.PresignPutObject(ctx, &s3.PutObjectInput{
+		Bucket:       aws.String(s.bucket),
+		Key:          aws.String(objectKey),
+		CacheControl: aws.String("public, max-age=31536000, immutable"),
+	}, s3.WithPresignExpires(5*time.Minute))
+	if err != nil {
+		return "", "", err
+	}
+
+	return req.URL, objectKey, nil
+}
+
 // DeleteObject removes an object from storage by key.
 func (s *StorageService) DeleteObject(ctx context.Context, objectKey string) error {
 	if s.client == nil {

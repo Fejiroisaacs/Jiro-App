@@ -1,10 +1,11 @@
-import { Component, OnInit, signal, inject } from '@angular/core';
+import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
 import { JymService, SessionSummary, SessionWithSets } from '../../../core/services/jym.service';
 import { SettingsService } from '../../../core/services/settings.service';
+import { UploadService } from '../../../core/services/upload.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 
@@ -112,11 +113,65 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
                 <span class="detail-notes-label">Notes</span>
                 <p class="detail-notes-text">{{ detail()!.notes }}</p>
               </div>
+
+              <!-- Attachments panel -->
+              <div *ngIf="detail()!.attachments.length > 0" class="attachments-panel" (click)="$event.stopPropagation()">
+                <div class="attachments-header">
+                  <span class="section-label">Form Check / Photos</span>
+                </div>
+
+                <div class="attachments-grid">
+                  <div *ngFor="let a of detail()!.attachments" class="attachment-item">
+                    <video
+                      *ngIf="a.file_type === 'video/mp4' || a.file_type === 'video/webm'"
+                      [src]="a.file_url"
+                      class="attachment-media"
+                      controls
+                      preload="none"
+                      (click)="$event.stopPropagation()">
+                    </video>
+                    <img
+                      *ngIf="a.file_type === 'image/jpeg' || a.file_type === 'image/png'"
+                      [src]="a.file_url"
+                      [alt]="a.label || 'Attachment'"
+                      class="attachment-media attachment-img" />
+                    <div class="attachment-footer">
+                      <span class="attachment-label">{{ a.label || (a.file_type.startsWith('video') ? 'Video' : 'Photo') }}</span>
+                      <button class="attachment-delete-btn"
+                        [disabled]="deletingAttachment().has(a.id)"
+                        (click)="$event.stopPropagation(); confirmingAttachmentId.set(a.id)"
+                        title="Delete">
+                        <svg *ngIf="!deletingAttachment().has(a.id)" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                        <div *ngIf="deletingAttachment().has(a.id)" class="spinner-xs"></div>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Delete attachment confirmation -->
+    <jiro-modal *ngIf="confirmingAttachmentId()" title="Delete Clip?" maxWidth="400px" (close)="confirmingAttachmentId.set(null)">
+      <div class="delete-confirm">
+        <p class="text-secondary" style="font-size: var(--font-size-sm);">
+          This will permanently remove the clip. This cannot be undone.
+        </p>
+        <div class="form-actions" style="margin-top: var(--space-lg);">
+          <jiro-button variant="secondary" type="button" (click)="confirmingAttachmentId.set(null)">Cancel</jiro-button>
+          <jiro-button variant="danger" type="button"
+            [disabled]="deletingAttachment().has(confirmingAttachmentId()!)"
+            (click)="deleteAttachment($event, confirmingAttachmentId()!)">
+            {{ deletingAttachment().has(confirmingAttachmentId()!) ? 'Deleting...' : 'Delete' }}
+          </jiro-button>
+        </div>
+      </div>
+    </jiro-modal>
 
     <!-- Delete session confirmation -->
     <jiro-modal *ngIf="deletingSession()" title="Delete Session?" maxWidth="420px" (close)="deletingSession.set(null)">
@@ -325,6 +380,73 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       line-height: 1.6; white-space: pre-wrap; margin: 0;
     }
 
+    /* ─── Attachments ─────────────────────────────────────────── */
+
+    .attachments-panel {
+      margin-top: var(--space-md);
+      padding-top: var(--space-md);
+      border-top: 1px solid var(--border-color);
+    }
+
+    .attachments-header {
+      margin-bottom: var(--space-sm);
+    }
+
+    .section-label {
+      font-size: var(--font-size-xs); text-transform: uppercase;
+      letter-spacing: 0.5px; color: var(--text-muted); font-weight: 500;
+    }
+
+    .attachments-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: var(--space-sm);
+      margin-top: var(--space-sm);
+    }
+
+    .attachment-item {
+      border-radius: var(--border-radius); overflow: hidden;
+      border: 1px solid var(--border-color); background: var(--bg-surface);
+    }
+
+    .attachment-media {
+      width: 100%; display: block;
+      max-height: 200px; object-fit: cover;
+    }
+
+    .attachment-img { cursor: zoom-in; }
+
+    .attachment-footer {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 4px 6px 4px 8px;
+    }
+
+    .attachment-label {
+      font-size: var(--font-size-xs); color: var(--text-secondary);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      flex: 1; min-width: 0;
+    }
+
+    .attachment-delete-btn {
+      flex-shrink: 0; width: 20px; height: 20px;
+      display: flex; align-items: center; justify-content: center;
+      background: none; border: none; border-radius: 4px;
+      color: var(--text-muted); cursor: pointer; padding: 0;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .attachment-delete-btn:hover:not(:disabled) {
+      background: rgba(196,74,74,0.1); color: var(--color-danger);
+    }
+
+    .attachment-delete-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .spinner-xs {
+      width: 10px; height: 10px; border: 1.5px solid var(--border-color);
+      border-top-color: var(--color-primary); border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
     @keyframes spin { to { transform: rotate(360deg); } }
 
     @keyframes slideDown {
@@ -359,6 +481,8 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
         top: var(--space-sm);
         right: var(--space-sm);
       }
+
+      .attachments-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
     }
   `]
 })
@@ -370,6 +494,8 @@ export class SessionHistoryComponent implements OnInit {
   detailLoading = signal(false);
   deletingSession = signal<SessionSummary | null>(null);
   deletingInProgress = signal(false);
+  deletingAttachment = signal<Set<string>>(new Set());
+  confirmingAttachmentId = signal<string | null>(null);
   exporting = signal(false);
   exportFrom = '';
   exportTo = '';
@@ -378,6 +504,7 @@ export class SessionHistoryComponent implements OnInit {
     private jymService: JymService,
     public router: Router,
     public settingsService: SettingsService,
+    private uploadService: UploadService,
   ) {}
 
   ngOnInit() {
@@ -453,6 +580,21 @@ export class SessionHistoryComponent implements OnInit {
         onSuccess?.();
       },
       error: () => onError?.(),
+    });
+  }
+
+  deleteAttachment(event: Event, id: string) {
+    event.stopPropagation();
+    this.deletingAttachment.update(s => new Set([...s, id]));
+    this.uploadService.deleteSessionAttachment(id).subscribe({
+      next: () => {
+        this.detail.update(d => d ? { ...d, attachments: d.attachments.filter(a => a.id !== id) } : d);
+        this.deletingAttachment.update(s => { const n = new Set(s); n.delete(id); return n; });
+        this.confirmingAttachmentId.set(null);
+      },
+      error: () => {
+        this.deletingAttachment.update(s => { const n = new Set(s); n.delete(id); return n; });
+      },
     });
   }
 

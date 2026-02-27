@@ -16,12 +16,13 @@ import (
 
 type JymHandler struct {
 	jymService *services.JymService
+	storage    *services.StorageService
 	appBaseURL string
 	db         *pgxpool.Pool
 }
 
-func NewJymHandler(jymService *services.JymService, appBaseURL string, db *pgxpool.Pool) *JymHandler {
-	return &JymHandler{jymService: jymService, appBaseURL: appBaseURL, db: db}
+func NewJymHandler(jymService *services.JymService, storage *services.StorageService, appBaseURL string, db *pgxpool.Pool) *JymHandler {
+	return &JymHandler{jymService: jymService, storage: storage, appBaseURL: appBaseURL, db: db}
 }
 
 // ─── Exercises ────────────────────────────────────────────────────────────────
@@ -111,7 +112,8 @@ func (h *JymHandler) DeleteExercise(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid exercise ID"}})
 		return
 	}
-	if err := h.jymService.DeleteExercise(c.Request.Context(), userID, exerciseID); err != nil {
+	objectKeys, err := h.jymService.DeleteExercise(c.Request.Context(), userID, exerciseID)
+	if err != nil {
 		if err == services.ErrExerciseNotFound {
 			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Exercise not found"}})
 			return
@@ -119,7 +121,28 @@ func (h *JymHandler) DeleteExercise(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to delete exercise"}})
 		return
 	}
+	for _, key := range objectKeys {
+		h.storage.DeleteObject(c.Request.Context(), key)
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "Exercise deleted"})
+}
+
+// GET /jym/exercises/:id/form-checks
+// Returns all session attachments tied to this exercise for the current user,
+// enriched with the session date for the form-progression gallery.
+func (h *JymHandler) GetExerciseFormChecks(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	exerciseID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid exercise ID"}})
+		return
+	}
+	checks, err := h.jymService.ListFormChecks(c.Request.Context(), userID, exerciseID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to load form checks"}})
+		return
+	}
+	c.JSON(http.StatusOK, checks)
 }
 
 // ─── Splits ───────────────────────────────────────────────────────────────────
@@ -490,6 +513,9 @@ func (h *JymHandler) DeleteSession(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid session ID"}})
 		return
 	}
+	// Collect R2 object keys before the DB row (and its cascaded attachments) is removed.
+	objectKeys, _ := h.jymService.GetSessionAttachmentKeys(c.Request.Context(), userID, sessionID)
+
 	if err := h.jymService.DeleteSession(c.Request.Context(), userID, sessionID); err != nil {
 		if err == services.ErrSessionNotFound {
 			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Session not found"}})
@@ -497,6 +523,10 @@ func (h *JymHandler) DeleteSession(c *gin.Context) {
 		}
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to delete session"}})
 		return
+	}
+	// Best-effort R2 cleanup — ignore individual errors so the response is never blocked.
+	for _, key := range objectKeys {
+		h.storage.DeleteObject(c.Request.Context(), key)
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Session deleted"})
 }
