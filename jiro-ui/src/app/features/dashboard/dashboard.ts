@@ -141,10 +141,10 @@ export class DashboardComponent {
       available: false,
     },
     {
-      name: 'Folio',
+      name: 'Journaly',
       description: 'Personal knowledge base. Organize and share your thoughts.',
-      icon: '/icons/folio-icon.svg',
-      route: '/folio',
+      icon: '/icons/journaly-icon.svg',
+      route: '/journaly',
       color: 'rgba(122, 103, 65, 0.15)',
       available: false,
     },

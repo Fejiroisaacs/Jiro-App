@@ -55,8 +55,8 @@ import { SettingsService } from '../../core/services/settings.service';
           </a>
           
           <a class="nav-item disabled">
-            <img src="/icons/folio-icon.svg" width="28" height="28" alt="Folio" />
-            <span *ngIf="!collapsed()" class="nav-label">Folio</span>
+            <img src="/icons/journaly-icon.svg" width="28" height="28" alt="Journaly" />
+            <span *ngIf="!collapsed()" class="nav-label">Journaly</span>
           </a>
 
           <a class="nav-item disabled">
