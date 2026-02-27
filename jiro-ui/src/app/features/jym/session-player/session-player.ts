@@ -73,6 +73,7 @@ interface ExerciseBlock {
             {{ finishing() ? 'Finishing...' : 'Finish' }}
           </jiro-button>
         </div>
+        <p *ngIf="emptySessionError()" class="empty-session-error">{{ emptySessionError() }}</p>
       </div>
       <!-- Rest timer row — expands the bar after logging a set -->
       <div *ngIf="restTimerActive()" class="rest-row" [class.rest-done]="restTimerDone()">
@@ -575,6 +576,11 @@ interface ExerciseBlock {
     .player-body { max-width: 700px; overflow-x: hidden; }
 
     /* Notes panel */
+    .empty-session-error {
+      margin: var(--space-xs) var(--space-md) 0;
+      font-size: var(--font-size-sm); color: var(--color-danger); text-align: right;
+    }
+
     .notes-panel { margin-bottom: var(--space-md); }
 
     .notes-input {
@@ -1051,6 +1057,7 @@ interface ExerciseBlock {
 export class SessionPlayerComponent implements OnInit, OnDestroy {
   loading = signal(true);
   finishing = signal(false);
+  emptySessionError = signal<string | null>(null);
   showExPicker = signal(false);
   showExitConfirm = signal(false);
   discarding = signal(false);
@@ -1506,6 +1513,12 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   }
 
   finishSession() {
+    const hasSavedSets = this.blocks().some(b => b.sets.some(s => s.saved));
+    if (!hasSavedSets && !this.sessionNotes.trim()) {
+      this.emptySessionError.set('Nothing to save — log at least one set or add session notes first.');
+      return;
+    }
+    this.emptySessionError.set(null);
     this.finishing.set(true);
     this.jymService.updateSession(this.sessionId, {
       ended_at: new Date().toISOString(),
