@@ -459,6 +459,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       .export-row { flex-wrap: wrap; align-items: flex-start; }
       .date-field { flex: 1; min-width: 120px; }
       .date-input { width: 100%; box-sizing: border-box; }
+      .export-row ::ng-deep .jiro-btn { width: 100%; flex-basis: 100%; }
 
       .session-card-header {
         flex-direction: column;
