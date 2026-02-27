@@ -108,7 +108,7 @@ export class UploadService {
     return this.http.delete<void>(`${API}/upload/session/attachments/${attachmentId}`);
   }
 
-  private putToStorage(url: string, file: File, onProgress?: (pct: number) => void): Promise<void> {
+  putToStorage(url: string, file: File, onProgress?: (pct: number) => void): Promise<void> {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('PUT', url);
