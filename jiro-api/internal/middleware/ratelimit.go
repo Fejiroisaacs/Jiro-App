@@ -77,10 +77,31 @@ func (rl *RateLimiter) allow(key string, capacity float64, ratePerSec float64) b
 }
 
 // RateLimitByIP applies rate limiting keyed by client IP.
-// capacity: max burst size, perMinute: sustained requests per minute.
+// capacity equals the burst size; perMinute is the sustained refill rate.
 func RateLimitByIP(rl *RateLimiter, perMinute float64) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		key := "ip:" + c.ClientIP()
+		if !rl.allow(key, perMinute, perMinute/60.0) {
+			c.AbortWithStatusJSON(http.StatusTooManyRequests, models.ErrorResponse{
+				Error: models.ErrorDetail{Code: "RATE_LIMITED", Message: "Too many requests, please try again later"},
+			})
+			return
+		}
+		c.Next()
+	}
+}
+
+// RateLimitByUser applies rate limiting keyed by the authenticated user ID.
+// Falls back to client IP when no user ID is present in the context.
+// capacity equals the burst size; perMinute is the sustained refill rate.
+func RateLimitByUser(rl *RateLimiter, perMinute float64) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var key string
+		if uid, exists := c.Get("user_id"); exists {
+			key = "user:" + uid.(interface{ String() string }).String()
+		} else {
+			key = "ip:" + c.ClientIP()
+		}
 		if !rl.allow(key, perMinute, perMinute/60.0) {
 			c.AbortWithStatusJSON(http.StatusTooManyRequests, models.ErrorResponse{
 				Error: models.ErrorDetail{Code: "RATE_LIMITED", Message: "Too many requests, please try again later"},
