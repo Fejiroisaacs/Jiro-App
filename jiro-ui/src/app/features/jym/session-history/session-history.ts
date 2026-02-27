@@ -109,9 +109,10 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
                 </div>
               </div>
 
-              <div *ngIf="detail()!.notes" class="detail-notes">
+              <div class="detail-notes">
                 <span class="detail-notes-label">Notes</span>
-                <p class="detail-notes-text">{{ detail()!.notes }}</p>
+                <p class="detail-notes-text" *ngIf="detail()!.notes">{{ detail()!.notes }}</p>
+                <p class="detail-notes-text text-muted" *ngIf="!detail()!.notes" style="font-style: italic;">No notes for this session.</p>
               </div>
 
               <!-- Attachments panel -->

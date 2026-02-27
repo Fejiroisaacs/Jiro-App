@@ -25,6 +25,7 @@ export interface SetHistory {
   est_1rm: number;
   is_pr: boolean;
   session_type: string;
+  exercise_note: string | null;
 }
 
 export interface ExerciseWithHistory extends Exercise {

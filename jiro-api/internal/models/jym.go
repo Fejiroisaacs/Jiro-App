@@ -26,7 +26,8 @@ type SetHistory struct {
 	Reps        int       `json:"reps"`
 	Est1RM      float64   `json:"est_1rm"`
 	IsPR        bool      `json:"is_pr"`
-	SessionType string    `json:"session_type"`
+	SessionType  string  `json:"session_type"`
+	ExerciseNote *string `json:"exercise_note"`
 }
 
 type ExerciseWithHistory struct {
