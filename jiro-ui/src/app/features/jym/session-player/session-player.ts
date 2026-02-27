@@ -136,7 +136,7 @@ interface ExerciseBlock {
             {{ bwSaving() ? '...' : 'Log' }}
           </button>
         </div>
-        <span *ngIf="bwLogged()" class="bw-logged">✓ {{ bwValue }} kg logged</span>
+        <span *ngIf="bwLogged()" class="bw-logged">✓ {{ bwValue }} {{ settingsService.unitLabel() }} logged</span>
       </div>
 
       <!-- Session body -->
