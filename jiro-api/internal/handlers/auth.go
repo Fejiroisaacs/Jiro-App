@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -99,7 +100,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	// Send verification email asynchronously — don't block the response
 	go func() {
-		rawToken, err := h.authService.CreateEmailVerification(c.Request.Context(), user.ID)
+		rawToken, err := h.authService.CreateEmailVerification(context.Background(), user.ID)
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to create email verification token")
 			return
