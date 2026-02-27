@@ -2,17 +2,22 @@ import { Component, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef, sig
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
-import { JymService, ExerciseWithHistory, SetHistory } from '../../../core/services/jym.service';
+import { JymService, ExerciseWithHistory, SetHistory, ExerciseFormCheck } from '../../../core/services/jym.service';
 import { SettingsService } from '../../../core/services/settings.service';
+import { UploadService } from '../../../core/services/upload.service';
+import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
+import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 
 Chart.register(...registerables);
 
 type ChartType = '1rm' | 'volume' | 'maxweight' | 'repsatweight';
+type SectionTab = 'history' | 'form';
+type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
 
 @Component({
   selector: 'app-exercise-detail',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, JiroModalComponent, JiroButtonComponent],
   template: `
     <div class="exercise-detail">
       <!-- Back -->
@@ -99,10 +104,21 @@ type ChartType = '1rm' | 'volume' | 'maxweight' | 'repsatweight';
           </div>
         </div>
 
-        <!-- History table -->
-        <div class="history-section">
-          <h2 class="section-title">Set History</h2>
+        <!-- Section tabs + content -->
+        <div class="section-panel">
+        <div class="section-tabs-bar">
+          <button class="section-tab" [class.active]="activeSection() === 'history'" (click)="setSection('history')">
+            Set History
+            <span class="tab-count">{{ exercise()!.history.length }}</span>
+          </button>
+          <button class="section-tab" [class.active]="activeSection() === 'form'" (click)="setSection('form')">
+            Form Progression
+            <span *ngIf="formChecks().length > 0" class="tab-count">{{ formChecks().length }}</span>
+          </button>
+        </div>
 
+        <!-- ── History tab ─────────────────────────────────────────── -->
+        <div *ngIf="activeSection() === 'history'" class="tab-panel">
           <div *ngIf="exercise()!.history.length === 0" class="no-history">
             <p class="text-secondary">No sets logged yet. Start a session and log this exercise.</p>
           </div>
@@ -110,15 +126,27 @@ type ChartType = '1rm' | 'volume' | 'maxweight' | 'repsatweight';
           <table *ngIf="exercise()!.history.length > 0" class="history-table">
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Weight</th>
-                <th>Reps</th>
-                <th>Est. 1RM</th>
+                <th class="th-sort" (click)="sortBy('date')">
+                  Date
+                  <svg class="sort-chevron" [class.col-active]="sortCol() === 'date'" [class.dir-asc]="sortCol() === 'date' && sortDir() === 'asc'" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg>
+                </th>
+                <th class="th-sort" (click)="sortBy('weight')">
+                  Weight
+                  <svg class="sort-chevron" [class.col-active]="sortCol() === 'weight'" [class.dir-asc]="sortCol() === 'weight' && sortDir() === 'asc'" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg>
+                </th>
+                <th class="th-sort" (click)="sortBy('reps')">
+                  Reps
+                  <svg class="sort-chevron" [class.col-active]="sortCol() === 'reps'" [class.dir-asc]="sortCol() === 'reps' && sortDir() === 'asc'" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg>
+                </th>
+                <th class="th-sort" (click)="sortBy('est_1rm')">
+                  Est. 1RM
+                  <svg class="sort-chevron" [class.col-active]="sortCol() === 'est_1rm'" [class.dir-asc]="sortCol() === 'est_1rm' && sortDir() === 'asc'" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg>
+                </th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let entry of exercise()!.history" [class.is-pr]="entry.is_pr">
+              <tr *ngFor="let entry of pagedHistory()" [class.is-pr]="entry.is_pr">
                 <td class="date-cell">{{ formatDate(entry.date) }}</td>
                 <td class="weight-cell">{{ settingsService.toDisplay(entry.weight) | number:'1.1-1' }} {{ settingsService.unitLabel() }}</td>
                 <td>{{ entry.reps }} reps</td>
@@ -129,12 +157,107 @@ type ChartType = '1rm' | 'volume' | 'maxweight' | 'repsatweight';
               </tr>
             </tbody>
           </table>
+
+          <div *ngIf="historyTotalPages() > 1" class="pagination">
+            <button class="page-btn" [disabled]="historyPage() === 0" (click)="historyPage.set(historyPage() - 1)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15,18 9,12 15,6"/>
+              </svg>
+            </button>
+            <span class="page-info">{{ historyPage() + 1 }} / {{ historyTotalPages() }}</span>
+            <button class="page-btn" [disabled]="historyPage() === historyTotalPages() - 1" (click)="historyPage.set(historyPage() + 1)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9,18 15,12 9,6"/>
+              </svg>
+            </button>
+          </div>
         </div>
+
+        <!-- ── Form tab ────────────────────────────────────────────── -->
+        <div *ngIf="activeSection() === 'form'" class="tab-panel">
+          <div *ngIf="formChecksLoading()" class="fc-loading">
+            <div class="spinner-sm"></div>
+            <span>Loading clips...</span>
+          </div>
+
+          <div *ngIf="!formChecksLoading() && groupedFormChecks().length === 0" class="no-history">
+            <p class="text-secondary">No form check clips yet. Tap "+ Form Check" during a session to add one.</p>
+          </div>
+
+          <div *ngIf="!formChecksLoading() && groupedFormChecks().length > 0" class="fc-groups">
+            <div *ngFor="let group of pagedFormGroups()" class="fc-group">
+              <div class="fc-group-date">{{ group.date }}</div>
+              <div class="fc-grid">
+                <div *ngFor="let item of group.items" class="fc-item">
+                  <div class="fc-media-wrap">
+                    <video *ngIf="item.file_type.startsWith('video')"
+                      [src]="item.file_url" controls playsinline class="fc-media">
+                    </video>
+                    <img *ngIf="item.file_type.startsWith('image')"
+                      [src]="item.file_url" [alt]="item.label || 'Form check'" class="fc-media" />
+                    <button class="fc-delete-btn"
+                      [disabled]="deletingFormCheck().has(item.id)"
+                      (click)="confirmingDeleteId.set(item.id)"
+                      title="Delete clip">
+                      <svg *ngIf="!deletingFormCheck().has(item.id)" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                      </svg>
+                      <div *ngIf="deletingFormCheck().has(item.id)" class="spinner-xs"></div>
+                    </button>
+                  </div>
+                  <p *ngIf="item.label" class="fc-label">{{ item.label }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div *ngIf="formTotalPages() > 1" class="pagination">
+            <button class="page-btn" [disabled]="formPage() === 0" (click)="formPage.set(formPage() - 1)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15,18 9,12 15,6"/>
+              </svg>
+            </button>
+            <span class="page-info">{{ formPage() + 1 }} / {{ formTotalPages() }}</span>
+            <button class="page-btn" [disabled]="formPage() === formTotalPages() - 1" (click)="formPage.set(formPage() + 1)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9,18 15,12 9,6"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        </div><!-- /section-panel -->
       </div>
     </div>
+
+    <!-- Delete form check confirmation -->
+    <jiro-modal *ngIf="confirmingDeleteId()" title="Delete Clip?" maxWidth="400px" (close)="confirmingDeleteId.set(null)">
+      <div class="delete-confirm">
+        <p class="text-secondary" style="font-size: var(--font-size-sm);">
+          This will permanently remove the clip. This cannot be undone.
+        </p>
+        <div class="confirm-actions">
+          <jiro-button variant="secondary" type="button" (click)="confirmingDeleteId.set(null)">Cancel</jiro-button>
+          <jiro-button variant="danger" type="button"
+            [disabled]="deletingFormCheck().has(confirmingDeleteId()!)"
+            (click)="deleteFormCheck(confirmingDeleteId()!)">
+            {{ deletingFormCheck().has(confirmingDeleteId()!) ? 'Deleting...' : 'Delete' }}
+          </jiro-button>
+        </div>
+      </div>
+    </jiro-modal>
   `,
   styles: [`
     :host { display: block; }
+
+    .delete-confirm { display: flex; flex-direction: column; gap: var(--space-md); }
+
+    .confirm-actions {
+      display: flex; justify-content: flex-end; gap: var(--space-sm);
+      margin-top: var(--space-xs);
+    }
+
+    .confirm-actions ::ng-deep .jiro-btn { width: auto; }
 
     .exercise-detail { max-width: 900px; width: 100%; overflow-x: hidden; }
 
@@ -189,8 +312,6 @@ type ChartType = '1rm' | 'volume' | 'maxweight' | 'repsatweight';
       padding: var(--space-md); background: var(--bg-surface);
       border: 1px solid var(--border-color); border-radius: var(--border-radius);
     }
-
-    .section-title { font-size: var(--font-size-lg); font-weight: 600; margin-bottom: var(--space-md); }
 
     .plateau-banner {
       display: flex; align-items: flex-start; gap: var(--space-sm);
@@ -259,6 +380,55 @@ type ChartType = '1rm' | 'volume' | 'maxweight' | 'repsatweight';
       display: flex; align-items: center; justify-content: center; height: 100%;
     }
 
+    /* ── Section tabs ── */
+    .section-tabs-bar {
+      display: flex;
+      border-bottom: 2px solid var(--border-color);
+      margin-bottom: 0;
+    }
+
+    .section-tab {
+      display: flex; align-items: center; gap: var(--space-xs);
+      padding: var(--space-sm) var(--space-lg);
+      background: none; border: none; cursor: pointer;
+      font-size: var(--font-size-sm); font-weight: 500;
+      color: var(--text-muted);
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: color 0.15s, border-color 0.15s;
+    }
+
+    .section-tab:hover { color: var(--text-primary); }
+
+    .section-tab.active {
+      color: var(--color-primary);
+      border-bottom-color: var(--color-primary);
+    }
+
+    .tab-count {
+      font-size: var(--font-size-xs);
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      padding: 1px 7px; border-radius: 10px;
+      font-weight: 400;
+    }
+
+    .section-tab.active .tab-count {
+      background: rgba(122,59,46,0.1);
+      border-color: rgba(122,59,46,0.2);
+      color: var(--color-primary);
+    }
+
+    /* ── Section panel (tabs + content as one unit) ── */
+    .section-panel { display: flex; flex-direction: column; }
+
+    /* ── Tab panel ── */
+    .tab-panel {
+      padding-top: var(--space-md);
+      animation: fadeIn 0.15s ease;
+    }
+
     /* ── History ── */
     .no-history {
       padding: var(--space-xl); text-align: center;
@@ -277,6 +447,23 @@ type ChartType = '1rm' | 'volume' | 'maxweight' | 'repsatweight';
       color: var(--text-muted); background: var(--bg-canvas);
       border-bottom: 1px solid var(--border-color);
     }
+
+    .th-sort {
+      cursor: pointer; user-select: none;
+      white-space: nowrap;
+    }
+
+    .th-sort:hover { color: var(--text-primary); }
+
+    .sort-chevron {
+      margin-left: 3px; vertical-align: middle;
+      opacity: 0.25; transition: transform 0.15s, opacity 0.15s;
+      color: var(--text-muted);
+    }
+
+    .sort-chevron.col-active { opacity: 1; color: var(--color-primary); }
+
+    .sort-chevron.dir-asc { transform: rotate(180deg); }
 
     .history-table td {
       padding: var(--space-sm) var(--space-md);
@@ -298,7 +485,100 @@ type ChartType = '1rm' | 'volume' | 'maxweight' | 'repsatweight';
 
     .pr-badge { width: 24px; height: 24px; display: block; margin: auto; }
 
+    /* ── Pagination ── */
+    .pagination {
+      display: flex; align-items: center; justify-content: center;
+      gap: var(--space-md); margin-top: var(--space-lg);
+      padding-top: var(--space-md);
+      border-top: 1px solid var(--border-color);
+    }
+
+    .page-btn {
+      display: flex; align-items: center; justify-content: center;
+      width: 32px; height: 32px;
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      cursor: pointer; transition: all 0.15s;
+    }
+
+    .page-btn:hover:not(:disabled) { border-color: var(--color-primary); color: var(--color-primary); }
+
+    .page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    .page-info { font-size: var(--font-size-sm); color: var(--text-secondary); min-width: 60px; text-align: center; }
+
+    /* ── Form Progression ── */
+    .fc-loading {
+      display: flex; align-items: center; gap: var(--space-sm);
+      color: var(--text-secondary); font-size: var(--font-size-sm);
+    }
+
+    .spinner-sm {
+      width: 16px; height: 16px; border: 2px solid var(--border-color);
+      border-top-color: var(--color-primary); border-radius: 50%;
+      animation: spin 0.8s linear infinite; flex-shrink: 0;
+    }
+
+    .fc-groups { display: flex; flex-direction: column; gap: var(--space-xl); }
+
+    .fc-group-date {
+      font-size: var(--font-size-sm); font-weight: 600; color: var(--text-secondary);
+      margin-bottom: var(--space-sm);
+      padding-bottom: var(--space-xs); border-bottom: 1px solid var(--border-color);
+    }
+
+    .fc-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: var(--space-md);
+    }
+
+    .fc-item { display: flex; flex-direction: column; gap: 4px; }
+
+    .fc-media-wrap { position: relative; }
+
+    .fc-media {
+      width: 100%; border-radius: var(--border-radius);
+      border: 1px solid var(--border-color);
+      object-fit: cover; max-height: 240px; display: block;
+      background: var(--bg-canvas);
+    }
+
+    .fc-delete-btn {
+      position: absolute; top: 6px; right: 6px;
+      width: 24px; height: 24px;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.55); color: #fff;
+      border: none; border-radius: 50%; cursor: pointer;
+      padding: 0; transition: background 0.15s;
+    }
+
+    .fc-delete-btn:hover:not(:disabled) { background: rgba(196,74,74,0.85); }
+
+    .fc-delete-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .spinner-xs {
+      width: 10px; height: 10px; border: 1.5px solid rgba(255,255,255,0.4);
+      border-top-color: #fff; border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    .fc-label {
+      font-size: var(--font-size-xs); color: var(--text-secondary); margin: 0; line-height: 1.4;
+    }
+
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 600px) {
+      .section-tab { padding: var(--space-sm) var(--space-md); }
+      .fc-grid { grid-template-columns: 1fr 1fr; }
+    }
   `]
 })
 export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy {
@@ -311,10 +591,86 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
   uniqueWeights = signal<number[]>([]);
   chartEmpty = signal(false);
 
+  activeSection = signal<SectionTab>('history');
+
+  sortCol = signal<SortCol>('date');
+  sortDir = signal<'asc' | 'desc'>('desc');
+
+  readonly HISTORY_PAGE_SIZE = 25;
+  readonly FORM_PAGE_SIZE = 3;
+
+  historyPage = signal(0);
+  formPage = signal(0);
+
+  formChecks = signal<ExerciseFormCheck[]>([]);
+  formChecksLoading = signal(true);
+  deletingFormCheck = signal<Set<string>>(new Set());
+  confirmingDeleteId = signal<string | null>(null);
+
+  groupedFormChecks = computed(() => {
+    const checks = this.formChecks();
+    if (checks.length === 0) return [];
+    const byDate = new Map<string, ExerciseFormCheck[]>();
+    for (const c of checks) {
+      const date = this.formatDate(c.session_date);
+      const arr = byDate.get(date) ?? [];
+      arr.push(c);
+      byDate.set(date, arr);
+    }
+    const seen = new Set<string>();
+    const result: { date: string; items: ExerciseFormCheck[] }[] = [];
+    for (const c of checks) {
+      const date = this.formatDate(c.session_date);
+      if (!seen.has(date)) {
+        seen.add(date);
+        result.push({ date, items: byDate.get(date)! });
+      }
+    }
+    return result;
+  });
+
+  sortedHistory = computed(() => {
+    const ex = this.exercise();
+    if (!ex) return [];
+    const col = this.sortCol();
+    const dir = this.sortDir();
+    const copy = [...ex.history];
+    copy.sort((a, b) => {
+      let cmp = 0;
+      if      (col === 'date')    cmp = new Date(a.date).getTime() - new Date(b.date).getTime();
+      else if (col === 'weight')  cmp = a.weight - b.weight;
+      else if (col === 'reps')    cmp = a.reps - b.reps;
+      else if (col === 'est_1rm') cmp = a.est_1rm - b.est_1rm;
+      return dir === 'asc' ? cmp : -cmp;
+    });
+    return copy;
+  });
+
+  pagedHistory = computed(() => {
+    const start = this.historyPage() * this.HISTORY_PAGE_SIZE;
+    return this.sortedHistory().slice(start, start + this.HISTORY_PAGE_SIZE);
+  });
+
+  historyTotalPages = computed(() => {
+    const len = this.sortedHistory().length;
+    return len === 0 ? 1 : Math.ceil(len / this.HISTORY_PAGE_SIZE);
+  });
+
+  pagedFormGroups = computed(() => {
+    const groups = this.groupedFormChecks();
+    const start = this.formPage() * this.FORM_PAGE_SIZE;
+    return groups.slice(start, start + this.FORM_PAGE_SIZE);
+  });
+
+  formTotalPages = computed(() => {
+    const groups = this.groupedFormChecks();
+    if (groups.length === 0) return 1;
+    return Math.ceil(groups.length / this.FORM_PAGE_SIZE);
+  });
+
   plateauStatus = computed<'plateau' | 'decline' | null>(() => {
     const ex = this.exercise();
     if (!ex || ex.history.length === 0) return null;
-    // Build per-session max weight (no deloads), chronological
     const bySession = new Map<string, { date: string; weight: number }>();
     for (const h of ex.history) {
       if (h.session_type === 'deload') continue;
@@ -340,6 +696,7 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
     private route: ActivatedRoute,
     private router: Router,
     public settingsService: SettingsService,
+    private uploadService: UploadService,
   ) {}
 
   ngOnInit() {
@@ -354,6 +711,10 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
       },
       error: () => this.loading.set(false),
     });
+    this.jymService.listExerciseFormChecks(id).subscribe({
+      next: checks => { this.formChecks.set(checks); this.formChecksLoading.set(false); },
+      error: () => this.formChecksLoading.set(false),
+    });
   }
 
   ngAfterViewInit() {
@@ -365,10 +726,40 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
     this.chart?.destroy();
   }
 
+  setSection(s: SectionTab) {
+    this.activeSection.set(s);
+    this.historyPage.set(0);
+    this.formPage.set(0);
+  }
+
+  deleteFormCheck(id: string) {
+    this.deletingFormCheck.update(s => new Set([...s, id]));
+    this.uploadService.deleteSessionAttachment(id).subscribe({
+      next: () => {
+        this.formChecks.update(list => list.filter(c => c.id !== id));
+        this.deletingFormCheck.update(s => { const n = new Set(s); n.delete(id); return n; });
+        this.confirmingDeleteId.set(null);
+      },
+      error: () => {
+        this.deletingFormCheck.update(s => { const n = new Set(s); n.delete(id); return n; });
+      },
+    });
+  }
+
+  sortBy(col: SortCol) {
+    if (this.sortCol() === col) {
+      this.sortDir.set(this.sortDir() === 'asc' ? 'desc' : 'asc');
+    } else {
+      this.sortCol.set(col);
+      this.sortDir.set('desc');
+    }
+    this.historyPage.set(0);
+  }
+
   switchChart(type: ChartType) {
     this.selectedChart.set(type);
     if (type === 'repsatweight' && this.selectedWeight() === null && this.uniqueWeights().length > 0) {
-      this.selectedWeight.set(this.uniqueWeights()[0]); // default to heaviest
+      this.selectedWeight.set(this.uniqueWeights()[0]);
     }
     setTimeout(() => this.maybeDrawChart(), 0);
   }
@@ -593,7 +984,7 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
     for (const h of (this.exercise()?.history ?? [])) {
       if (h.session_type !== 'deload') weights.add(h.weight);
     }
-    return Array.from(weights).sort((a, b) => b - a); // heaviest first
+    return Array.from(weights).sort((a, b) => b - a);
   }
 
   formatDate(iso: string): string {

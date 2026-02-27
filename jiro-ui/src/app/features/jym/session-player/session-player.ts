@@ -7,7 +7,9 @@ import {
   RoutineItem,
   CreateSetRequest,
   SetHistory,
+  SessionAttachment,
 } from '../../../core/services/jym.service';
+import { UploadService } from '../../../core/services/upload.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
@@ -257,6 +259,38 @@ interface ExerciseBlock {
 
             <!-- Add set -->
             <button class="add-set-btn" (click)="addSet(bi)">+ Add Set</button>
+
+            <!-- Form check upload -->
+            <div class="form-check-row">
+              <label [for]="canUploadFormCheck(bi, block.exerciseId) ? 'fc-input-' + block.exerciseId : ''"
+                     class="form-check-btn"
+                     [class.fc-uploading]="isFormCheckUploading(block.exerciseId)"
+                     [class.fc-disabled]="!canUploadFormCheck(bi, block.exerciseId)"
+                     [title]="formCheckBtnTitle(bi, block.exerciseId)">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                  <circle cx="12" cy="13" r="4"/>
+                </svg>
+                {{ isFormCheckUploading(block.exerciseId) ? 'Uploading...' : '+ Form Check' }}
+              </label>
+              <input type="file" [id]="'fc-input-' + block.exerciseId"
+                accept="video/mp4,video/webm,image/jpeg,image/png"
+                style="display:none"
+                (change)="onFormCheckFileChange($event, bi)">
+              <div *ngIf="isFormCheckUploading(block.exerciseId)" class="fc-progress-bar">
+                <div class="fc-progress-fill" [style.width.%]="getFormCheckProgress(block.exerciseId)"></div>
+              </div>
+              <ng-container *ngIf="getFirstAttachment(block.exerciseId) as clip">
+                <a [href]="clip.file_url" target="_blank" class="fc-clip-link">
+                  <img *ngIf="clip.file_type.startsWith('image/')" [src]="clip.file_url" class="fc-thumb" alt="form check">
+                  <span *ngIf="!clip.file_type.startsWith('image/')" class="fc-thumb-video">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+                    </svg>
+                  </span>
+                </a>
+              </ng-container>
+            </div>
           </ng-container>
         </div>
 
@@ -969,6 +1003,49 @@ interface ExerciseBlock {
       .bw-panel { flex-wrap: wrap; }
       .bw-label { flex: 0 0 100%; }
     }
+
+    /* ── Form check ── */
+    .form-check-row {
+      display: flex; align-items: center; gap: var(--space-sm);
+      padding: var(--space-xs) var(--space-lg);
+      border-top: 1px solid var(--border-color);
+    }
+
+    .form-check-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: var(--font-size-xs); color: var(--text-muted);
+      cursor: pointer; padding: 4px 10px; border-radius: var(--border-radius);
+      border: 1px dashed var(--border-color); background: none;
+      white-space: nowrap; transition: all 0.15s; font-family: inherit;
+    }
+
+    .form-check-btn:hover,
+    .form-check-btn.fc-uploading { color: var(--color-primary); border-color: var(--color-primary); }
+
+    .form-check-btn.fc-disabled {
+      opacity: 0.4; cursor: not-allowed; pointer-events: none;
+    }
+
+    .fc-progress-bar {
+      flex: 1; height: 4px; background: var(--border-color);
+      border-radius: 2px; overflow: hidden;
+    }
+
+    .fc-progress-fill {
+      height: 100%; background: var(--color-primary); transition: width 0.3s;
+    }
+
+    .fc-count {
+      font-size: var(--font-size-xs); color: var(--text-secondary); white-space: nowrap;
+    }
+
+    .fc-clip-link { display: inline-flex; align-items: center; text-decoration: none; }
+    .fc-thumb { width: 32px; height: 32px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border-color); }
+    .fc-thumb-video {
+      width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
+      background: var(--surface-secondary); border-radius: 4px; border: 1px solid var(--border-color);
+      color: var(--text-secondary);
+    }
   `]
 })
 export class SessionPlayerComponent implements OnInit, OnDestroy {
@@ -1017,6 +1094,11 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   private startedAt = new Date();
   private timerInterval: ReturnType<typeof setInterval> | null = null;
 
+  // Form check upload state (keyed by exerciseId)
+  formCheckUploading = signal<Map<string, boolean>>(new Map());
+  formCheckProgressMap = signal<Map<string, number>>(new Map());
+  blockAttachments = signal<Map<string, SessionAttachment[]>>(new Map());
+
   // Re-sync both timers when the user returns from a locked screen
   private readonly onVisibilityChange = () => {
     if (document.visibilityState === 'visible') {
@@ -1027,6 +1109,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
 
   constructor(
     private jymService: JymService,
+    private uploadService: UploadService,
     private route: ActivatedRoute,
     private router: Router,
     public settingsService: SettingsService,
@@ -1089,6 +1172,17 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
             this.blocks.set(existingBlocks);
           }
         }
+
+        // Populate form check counts from existing attachments
+        const amap = new Map<string, SessionAttachment[]>();
+        for (const a of session.attachments ?? []) {
+          if (a.exercise_id) {
+            const arr = amap.get(a.exercise_id) ?? [];
+            arr.push(a);
+            amap.set(a.exercise_id, arr);
+          }
+        }
+        this.blockAttachments.set(amap);
 
         this.loading.set(false);
       },
@@ -1346,6 +1440,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   deleteSet(blockIndex: number, setIndex: number) {
     const row = this.blocks()[blockIndex].sets[setIndex];
     if (!row.id) return;
+    const exerciseId = this.blocks()[blockIndex].exerciseId;
     this.jymService.deleteSet(row.id).subscribe({
       next: () => {
         this.blocks.update(bs => bs.map((b, bi) => bi === blockIndex ? {
@@ -1354,8 +1449,21 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
             .filter((_, si) => si !== setIndex)
             .map((s, i) => ({ ...s, setNumber: i + 1 })),
         } : b));
+        // If this exercise now has no saved sets, remove any stale form check attachment.
+        if (this.savedCount(blockIndex) === 0) {
+          this.deleteStaleFormChecks(exerciseId);
+        }
       },
     });
+  }
+
+  private deleteStaleFormChecks(exerciseId: string) {
+    const attachments = this.blockAttachments().get(exerciseId);
+    if (!attachments || attachments.length === 0) return;
+    for (const att of attachments) {
+      this.uploadService.deleteSessionAttachment(att.id).subscribe();
+    }
+    this.blockAttachments.update(m => { const n = new Map(m); n.delete(exerciseId); return n; });
   }
 
   exitSession() {
@@ -1545,6 +1653,62 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
             ghostReps: ghostReps ?? s.ghostReps,
           } : s),
         } : b));
+      },
+    });
+  }
+
+  // ── Form check helpers ──────────────────────────────────────────
+  isFormCheckUploading(exerciseId: string): boolean {
+    return this.formCheckUploading().get(exerciseId) ?? false;
+  }
+
+  getFormCheckProgress(exerciseId: string): number {
+    return this.formCheckProgressMap().get(exerciseId) ?? 0;
+  }
+
+  getFormCheckCount(exerciseId: string): number {
+    return this.blockAttachments().get(exerciseId)?.length ?? 0;
+  }
+
+  getFirstAttachment(exerciseId: string): SessionAttachment | null {
+    return this.blockAttachments().get(exerciseId)?.[0] ?? null;
+  }
+
+  canUploadFormCheck(bi: number, exerciseId: string): boolean {
+    return this.savedCount(bi) > 0 && this.getFormCheckCount(exerciseId) < 1 && !this.isFormCheckUploading(exerciseId);
+  }
+
+  formCheckBtnTitle(bi: number, exerciseId: string): string {
+    if (this.savedCount(bi) === 0) return 'Log at least one set first';
+    if (this.getFormCheckCount(exerciseId) >= 1) return 'One clip per exercise per session';
+    return '';
+  }
+
+  onFormCheckFileChange(event: Event, blockIndex: number) {
+    const block = this.blocks()[blockIndex];
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file || !block) return;
+    input.value = ''; // reset so the same file can be re-selected
+
+    const exId = block.exerciseId;
+    this.formCheckUploading.update(m => { const n = new Map(m); n.set(exId, true); return n; });
+    this.formCheckProgressMap.update(m => { const n = new Map(m); n.set(exId, 0); return n; });
+
+    this.uploadService.uploadSessionAttachment(
+      this.sessionId, file, exId, undefined,
+      (pct) => this.formCheckProgressMap.update(m => { const n = new Map(m); n.set(exId, pct); return n; })
+    ).subscribe({
+      next: attachment => {
+        this.blockAttachments.update(m => {
+          const n = new Map(m);
+          n.set(exId, [...(n.get(exId) ?? []), attachment]);
+          return n;
+        });
+        this.formCheckUploading.update(m => { const n = new Map(m); n.set(exId, false); return n; });
+      },
+      error: () => {
+        this.formCheckUploading.update(m => { const n = new Map(m); n.set(exId, false); return n; });
       },
     });
   }

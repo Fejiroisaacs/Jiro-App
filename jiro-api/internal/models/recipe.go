@@ -13,6 +13,7 @@ type Recipe struct {
 	Title           string          `json:"title"`
 	Description     *string         `json:"description"`
 	TargetImageURL  *string         `json:"target_image_url"`
+	CoverImageURL   *string         `json:"cover_image_url"`
 	BaseIngredients json.RawMessage `json:"base_ingredients"`
 	Instructions    *string         `json:"instructions"`
 	Tags            []string        `json:"tags"`

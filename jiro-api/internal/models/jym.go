@@ -306,6 +306,7 @@ type SessionWithSets struct {
 	Session
 	RoutineName *string                  `json:"routine_name"`
 	Sets        []SessionSetWithExercise `json:"sets"`
+	Attachments []SessionAttachment      `json:"attachments"`
 }
 
 type CreateSessionRequest struct {
@@ -317,6 +318,27 @@ type UpdateSessionRequest struct {
 	EndedAt     *time.Time `json:"ended_at"`
 	Notes       *string    `json:"notes"`
 	SessionType *string    `json:"session_type"`
+}
+
+// ─── SessionAttachment ───────────────────────────────────────────────────────
+
+type SessionAttachment struct {
+	ID         uuid.UUID  `json:"id"`
+	SessionID  uuid.UUID  `json:"session_id"`
+	UserID     uuid.UUID  `json:"user_id"`
+	ExerciseID *uuid.UUID `json:"exercise_id"`
+	ObjectKey  string     `json:"object_key"`
+	FileURL    string     `json:"file_url"`
+	FileType   string     `json:"file_type"`
+	Label      *string    `json:"label"`
+	CreatedAt  time.Time  `json:"created_at"`
+}
+
+// ExerciseFormCheck is a session attachment enriched with its session date,
+// used for the exercise form-progression gallery.
+type ExerciseFormCheck struct {
+	SessionAttachment
+	SessionDate time.Time `json:"session_date"`
 }
 
 // ─── SessionSet ──────────────────────────────────────────────────────────────

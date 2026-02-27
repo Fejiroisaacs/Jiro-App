@@ -169,15 +169,55 @@ func (s *JymService) UpdateExercise(ctx context.Context, userID, exerciseID uuid
 	return ex, nil
 }
 
-func (s *JymService) DeleteExercise(ctx context.Context, userID, exerciseID uuid.UUID) error {
-	res, err := s.db.Exec(ctx, `DELETE FROM exercises WHERE id = $1 AND user_id = $2`, exerciseID, userID)
+// DeleteExercise removes the exercise and all associated session_attachment rows,
+// returning the R2 object keys so the caller can clean up object storage.
+func (s *JymService) DeleteExercise(ctx context.Context, userID, exerciseID uuid.UUID) ([]string, error) {
+	tx, err := s.db.Begin(ctx)
 	if err != nil {
-		return err
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	// Collect object keys for this exercise's form-check attachments
+	rows, err := tx.Query(ctx,
+		`SELECT object_key FROM session_attachments WHERE exercise_id = $1 AND user_id = $2`,
+		exerciseID, userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	var keys []string
+	for rows.Next() {
+		var k string
+		if err := rows.Scan(&k); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		keys = append(keys, k)
+	}
+	rows.Close()
+
+	// Delete the attachment rows
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM session_attachments WHERE exercise_id = $1 AND user_id = $2`,
+		exerciseID, userID,
+	); err != nil {
+		return nil, err
+	}
+
+	// Delete the exercise itself
+	res, err := tx.Exec(ctx, `DELETE FROM exercises WHERE id = $1 AND user_id = $2`, exerciseID, userID)
+	if err != nil {
+		return nil, err
 	}
 	if res.RowsAffected() == 0 {
-		return ErrExerciseNotFound
+		return nil, ErrExerciseNotFound
 	}
-	return nil
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return keys, nil
 }
 
 // ─── Splits ──────────────────────────────────────────────────────────────────
@@ -763,7 +803,107 @@ func (s *JymService) GetSession(ctx context.Context, userID, sessionID uuid.UUID
 		}
 		sess.Sets = append(sess.Sets, set)
 	}
+
+	// Load attachments
+	aRows, err := s.db.Query(ctx,
+		`SELECT id, session_id, user_id, exercise_id, object_key, file_url, file_type, label, created_at
+		 FROM session_attachments
+		 WHERE session_id = $1
+		 ORDER BY created_at ASC`,
+		sessionID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer aRows.Close()
+
+	sess.Attachments = []models.SessionAttachment{}
+	for aRows.Next() {
+		var a models.SessionAttachment
+		if err := aRows.Scan(&a.ID, &a.SessionID, &a.UserID, &a.ExerciseID, &a.ObjectKey, &a.FileURL, &a.FileType, &a.Label, &a.CreatedAt); err != nil {
+			return nil, err
+		}
+		sess.Attachments = append(sess.Attachments, a)
+	}
+
 	return sess, nil
+}
+
+func (s *JymService) CreateAttachment(ctx context.Context, userID, sessionID uuid.UUID, exerciseID *uuid.UUID, objectKey, fileURL, fileType string, label *string) (*models.SessionAttachment, error) {
+	a := &models.SessionAttachment{}
+	err := s.db.QueryRow(ctx,
+		`INSERT INTO session_attachments (session_id, user_id, exercise_id, object_key, file_url, file_type, label)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)
+		 RETURNING id, session_id, user_id, exercise_id, object_key, file_url, file_type, label, created_at`,
+		sessionID, userID, exerciseID, objectKey, fileURL, fileType, label,
+	).Scan(&a.ID, &a.SessionID, &a.UserID, &a.ExerciseID, &a.ObjectKey, &a.FileURL, &a.FileType, &a.Label, &a.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return a, nil
+}
+
+func (s *JymService) GetAttachment(ctx context.Context, userID, attachmentID uuid.UUID) (*models.SessionAttachment, error) {
+	a := &models.SessionAttachment{}
+	err := s.db.QueryRow(ctx,
+		`SELECT id, session_id, user_id, exercise_id, object_key, file_url, file_type, label, created_at
+		 FROM session_attachments WHERE id = $1 AND user_id = $2`,
+		attachmentID, userID,
+	).Scan(&a.ID, &a.SessionID, &a.UserID, &a.ExerciseID, &a.ObjectKey, &a.FileURL, &a.FileType, &a.Label, &a.CreatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSessionNotFound
+		}
+		return nil, err
+	}
+	return a, nil
+}
+
+func (s *JymService) DeleteAttachment(ctx context.Context, userID, attachmentID uuid.UUID) (*models.SessionAttachment, error) {
+	a := &models.SessionAttachment{}
+	err := s.db.QueryRow(ctx,
+		`DELETE FROM session_attachments WHERE id = $1 AND user_id = $2
+		 RETURNING id, session_id, user_id, exercise_id, object_key, file_url, file_type, label, created_at`,
+		attachmentID, userID,
+	).Scan(&a.ID, &a.SessionID, &a.UserID, &a.ExerciseID, &a.ObjectKey, &a.FileURL, &a.FileType, &a.Label, &a.CreatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSessionNotFound
+		}
+		return nil, err
+	}
+	return a, nil
+}
+
+func (s *JymService) ListFormChecks(ctx context.Context, userID, exerciseID uuid.UUID) ([]models.ExerciseFormCheck, error) {
+	rows, err := s.db.Query(ctx,
+		`SELECT sa.id, sa.session_id, sa.user_id, sa.exercise_id,
+		        sa.object_key, sa.file_url, sa.file_type, sa.label, sa.created_at,
+		        s.started_at AS session_date
+		 FROM session_attachments sa
+		 JOIN sessions s ON sa.session_id = s.id
+		 WHERE sa.exercise_id = $1 AND sa.user_id = $2
+		 ORDER BY s.started_at DESC, sa.created_at ASC`,
+		exerciseID, userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := []models.ExerciseFormCheck{}
+	for rows.Next() {
+		var fc models.ExerciseFormCheck
+		if err := rows.Scan(
+			&fc.ID, &fc.SessionID, &fc.UserID, &fc.ExerciseID,
+			&fc.ObjectKey, &fc.FileURL, &fc.FileType, &fc.Label, &fc.CreatedAt,
+			&fc.SessionDate,
+		); err != nil {
+			return nil, err
+		}
+		result = append(result, fc)
+	}
+	return result, nil
 }
 
 func (s *JymService) UpdateSession(ctx context.Context, userID, sessionID uuid.UUID, req *models.UpdateSessionRequest) (*models.Session, error) {
@@ -795,6 +935,29 @@ func (s *JymService) DeleteSession(ctx context.Context, userID, sessionID uuid.U
 		return ErrSessionNotFound
 	}
 	return nil
+}
+
+// GetSessionAttachmentKeys returns the R2 object_key for every attachment
+// belonging to the given session and user. Used by DeleteSession to clean up
+// storage before the DB row is removed.
+func (s *JymService) GetSessionAttachmentKeys(ctx context.Context, userID, sessionID uuid.UUID) ([]string, error) {
+	rows, err := s.db.Query(ctx,
+		`SELECT object_key FROM session_attachments WHERE session_id = $1 AND user_id = $2`,
+		sessionID, userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var keys []string
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err != nil {
+			return nil, err
+		}
+		keys = append(keys, key)
+	}
+	return keys, nil
 }
 
 // ─── Sets ─────────────────────────────────────────────────────────────────────

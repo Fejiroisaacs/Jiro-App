@@ -15,6 +15,7 @@ type User struct {
 	DisplayName   *string         `json:"display_name"`
 	EmailVerified bool            `json:"email_verified"`
 	Bio           *string         `json:"bio"`
+	AvatarUrl     *string         `json:"avatar_url"`
 	Settings      json.RawMessage `json:"settings"`
 	CreatedAt     time.Time       `json:"created_at"`
 	UpdatedAt     time.Time       `json:"updated_at"`

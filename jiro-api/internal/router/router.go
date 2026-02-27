@@ -26,15 +26,17 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	emailService := services.NewEmailService(cfg.ResendAPIKey, cfg.EmailFrom)
 	adminService := services.NewAdminService(db)
 	mealPlanService := services.NewMealPlanService(db)
+	storageService := services.NewStorageService(cfg.StorageEndpoint, cfg.StorageBucket, cfg.StorageAccessKey, cfg.StorageSecretKey, cfg.StoragePublicURL)
 
 	// Handlers
 	authHandler := handlers.NewAuthHandler(authService, userService, emailService, cfg, db)
 	userHandler := handlers.NewUserHandler(userService)
 	healthHandler := handlers.NewHealthHandler(db)
 	recipeHandler := handlers.NewRecipeHandler(recipeService, db, cfg.AppBaseURL)
-	jymHandler := handlers.NewJymHandler(jymService, cfg.AppBaseURL, db)
+	jymHandler := handlers.NewJymHandler(jymService, storageService, cfg.AppBaseURL, db)
 	adminHandler := handlers.NewAdminHandler(adminService, authService, userService, emailService, cfg.AppBaseURL)
 	mealPlanHandler := handlers.NewMealPlanHandler(mealPlanService)
+	uploadHandler := handlers.NewUploadHandler(storageService, userService, recipeService, jymService)
 
 	// Rate limiter
 	rl := middleware.NewRateLimiter()
@@ -42,21 +44,19 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	// Routes
 	v1 := r.Group("/api/v1")
 	{
-		// Health (no auth)
+		// Health (no auth, no rate limit)
 		v1.GET("/health", healthHandler.Check)
 
-		// Public profile lookup (no auth required)
-		v1.GET("/profiles/:username", userHandler.GetPublicProfile)
-
-		// Public split share preview (no auth required)
-		v1.GET("/jym/shares/:share_id", jymHandler.GetSharePreview)
-
-		// Public recipe share preview (no auth required)
-		v1.GET("/culinara/shares/:token", recipeHandler.GetSharedRecipe)
-
-		// Public split discovery (no auth required)
-		v1.GET("/jym/public-splits", jymHandler.ListPublicSplits)
-		v1.GET("/jym/public-splits/:id", jymHandler.GetPublicSplit)
+		// Public routes (rate limited by IP: 60/min)
+		public := v1.Group("")
+		public.Use(middleware.RateLimitByIP(rl, 60))
+		{
+			public.GET("/profiles/:username", userHandler.GetPublicProfile)
+			public.GET("/jym/shares/:share_id", jymHandler.GetSharePreview)
+			public.GET("/culinara/shares/:token", recipeHandler.GetSharedRecipe)
+			public.GET("/jym/public-splits", jymHandler.ListPublicSplits)
+			public.GET("/jym/public-splits/:id", jymHandler.GetPublicSplit)
+		}
 
 		// Auth routes (rate limited by IP: 10/min)
 		auth := v1.Group("/auth")
@@ -71,13 +71,29 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			auth.POST("/reset-password", authHandler.ResetPassword)
 		}
 
-		// Protected routes (require JWT)
+		// Protected routes (require JWT, rate limited by user: 300/min)
 		protected := v1.Group("")
 		protected.Use(middleware.AuthRequired(authService))
+		protected.Use(middleware.RateLimitByUser(rl, 300))
 		{
 			protected.GET("/user/me", userHandler.GetMe)
 			protected.PATCH("/user/me", userHandler.UpdateMe)
 			protected.POST("/auth/resend-verification", authHandler.ResendVerification)
+
+			// Upload — avatar (presign tighter: 20/min per user)
+			protected.POST("/upload/avatar/presign", middleware.RateLimitByUser(rl, 20), uploadHandler.PresignAvatar)
+			protected.PATCH("/upload/avatar/confirm", uploadHandler.ConfirmAvatar)
+			protected.DELETE("/upload/avatar", uploadHandler.DeleteAvatar)
+
+			// Upload — recipe cover image (presign tighter: 20/min per user)
+			protected.POST("/upload/recipe/:recipe_id/presign", middleware.RateLimitByUser(rl, 20), uploadHandler.PresignRecipeImage)
+			protected.PATCH("/upload/recipe/:recipe_id/confirm", uploadHandler.ConfirmRecipeImage)
+			protected.DELETE("/upload/recipe/:recipe_id/image", uploadHandler.DeleteRecipeImage)
+
+			// Upload — session attachments (presign tighter: 20/min per user)
+			protected.POST("/upload/session/:session_id/presign", middleware.RateLimitByUser(rl, 20), uploadHandler.PresignSessionAttachment)
+			protected.PATCH("/upload/session/:session_id/confirm", uploadHandler.ConfirmSessionAttachment)
+			protected.DELETE("/upload/session/attachments/:attachment_id", uploadHandler.DeleteSessionAttachment)
 
 			// Culinara (Recipe Module)
 			culinara := protected.Group("/culinara")
@@ -121,6 +137,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 				jym.GET("/exercises/:id", jymHandler.GetExercise)
 				jym.PUT("/exercises/:id", jymHandler.UpdateExercise)
 				jym.DELETE("/exercises/:id", jymHandler.DeleteExercise)
+				jym.GET("/exercises/:id/form-checks", jymHandler.GetExerciseFormChecks)
 				jym.GET("/prs", jymHandler.GetPRs)
 
 				// Splits

@@ -101,7 +101,8 @@ import { SettingsService } from '../../core/services/settings.service';
 
             <div class="user-menu" (click)="showMenu.set(!showMenu())">
               <div class="user-avatar">
-                {{ userInitial() }}
+                <img *ngIf="authService.user()?.avatar_url" [src]="authService.user()!.avatar_url" alt="avatar" class="user-avatar-img">
+                <span *ngIf="!authService.user()?.avatar_url">{{ userInitial() }}</span>
               </div>
               <span class="user-email" *ngIf="authService.user() as user">
                 {{ user.display_name || user.email }}
@@ -348,6 +349,13 @@ import { SettingsService } from '../../core/services/settings.service';
       justify-content: center;
       font-size: var(--font-size-sm);
       font-weight: 600;
+      overflow: hidden;
+    }
+
+    .user-avatar-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
     }
 
     .user-email {

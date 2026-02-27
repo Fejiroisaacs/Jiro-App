@@ -26,6 +26,29 @@ Just like FeJiro, get it? :)
 | Object Storage | Cloudflare R2 (planned) |
 | Hosting | GCP Cloud Run (API) + Firebase Hosting (frontend) |
 
+## API Security
+
+### Rate Limiting
+
+All limits use an in-process token bucket (burst = limit, refill = limit/min). Exceeding a limit returns `429 RATE_LIMITED`.
+
+| Route group | Key | Limit |
+| ----------- | --- | ----- |
+| `POST /auth/*` (login, register, reset…) | Client IP | 10 req/min |
+| Public read endpoints (profiles, shares, public splits) | Client IP | 60 req/min |
+| All authenticated (`/api/v1/*` with JWT) | User ID | 300 req/min |
+| Upload presign (`/upload/*/presign`) | User ID | 20 req/min (additive) |
+| `GET /health` | — | none |
+| Admin (`/admin/*`) | — | none (secret header required) |
+
+The presign limit is additive — a user must satisfy **both** the 300/min general limit and the 20/min presign limit to generate a new upload URL.
+
+### Authentication
+
+- JWT access tokens expire after **15 minutes**
+- Refresh tokens are httpOnly cookies, valid for **7 days**, SHA-256 hashed in the database
+- Passwords hashed with **Argon2id**
+
 ## Repos
 
 ```text
