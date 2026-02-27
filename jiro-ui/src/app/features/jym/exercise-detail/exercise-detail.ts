@@ -11,7 +11,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
 Chart.register(...registerables);
 
 type ChartType = '1rm' | 'volume' | 'maxweight' | 'repsatweight';
-type SectionTab = 'history' | 'form';
+type SectionTab = 'history' | 'form' | 'notes';
 type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
 
 @Component({
@@ -114,6 +114,10 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
           <button class="section-tab" [class.active]="activeSection() === 'form'" (click)="setSection('form')">
             Form Progression
             <span *ngIf="formChecks().length > 0" class="tab-count">{{ formChecks().length }}</span>
+          </button>
+          <button class="section-tab" [class.active]="activeSection() === 'notes'" (click)="setSection('notes')">
+            Notes
+            <span *ngIf="sessionNotes().length > 0" class="tab-count">{{ sessionNotes().length }}</span>
           </button>
         </div>
 
@@ -223,6 +227,19 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
                 <polyline points="9,18 15,12 9,6"/>
               </svg>
             </button>
+          </div>
+        </div>
+
+        <!-- ── Notes tab ────────────────────────────────────────── -->
+        <div *ngIf="activeSection() === 'notes'" class="tab-panel">
+          <div *ngIf="sessionNotes().length === 0" class="no-history">
+            <p class="text-secondary">No notes yet. Add a note for this exercise during a session.</p>
+          </div>
+          <div *ngIf="sessionNotes().length > 0" class="notes-list">
+            <div *ngFor="let n of sessionNotes()" class="notes-item">
+              <span class="notes-item-date">{{ formatDate(n.date) }}</span>
+              <p class="notes-item-text">{{ n.exercise_note }}</p>
+            </div>
           </div>
         </div>
 
@@ -570,6 +587,18 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
 
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    .notes-list { display: flex; flex-direction: column; gap: var(--space-sm); padding: var(--space-md); }
+    .notes-item {
+      padding: var(--space-sm) var(--space-md);
+      background: var(--bg-canvas); border: 1px solid var(--border-color);
+      border-radius: var(--border-radius-sm);
+    }
+    .notes-item-date {
+      display: block; font-size: var(--font-size-xs); color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;
+    }
+    .notes-item-text { margin: 0; font-size: var(--font-size-sm); color: var(--text-primary); line-height: 1.5; }
+
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(4px); }
       to   { opacity: 1; transform: translateY(0); }
@@ -668,6 +697,16 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
     return Math.ceil(groups.length / this.FORM_PAGE_SIZE);
   });
 
+  sessionNotes = computed(() => {
+    const history = this.exercise()?.history ?? [];
+    const seen = new Set<string>();
+    return history.filter(h => {
+      if (!h.exercise_note || seen.has(h.session_id)) return false;
+      seen.add(h.session_id);
+      return true;
+    });
+  });
+
   plateauStatus = computed<'plateau' | 'decline' | null>(() => {
     const ex = this.exercise();
     if (!ex || ex.history.length === 0) return null;
@@ -731,6 +770,7 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
     this.historyPage.set(0);
     this.formPage.set(0);
   }
+
 
   deleteFormCheck(id: string) {
     this.deletingFormCheck.update(s => new Set([...s, id]));

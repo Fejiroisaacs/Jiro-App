@@ -109,9 +109,10 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
                 </div>
               </div>
 
-              <div *ngIf="detail()!.notes" class="detail-notes">
+              <div class="detail-notes">
                 <span class="detail-notes-label">Notes</span>
-                <p class="detail-notes-text">{{ detail()!.notes }}</p>
+                <p class="detail-notes-text" *ngIf="detail()!.notes">{{ detail()!.notes }}</p>
+                <p class="detail-notes-text text-muted" *ngIf="!detail()!.notes" style="font-style: italic;">No notes for this session.</p>
               </div>
 
               <!-- Attachments panel -->
@@ -458,6 +459,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       .export-row { flex-wrap: wrap; align-items: flex-start; }
       .date-field { flex: 1; min-width: 120px; }
       .date-input { width: 100%; box-sizing: border-box; }
+      .export-row ::ng-deep .jiro-btn { width: 100%; flex-basis: 100%; }
 
       .session-card-header {
         flex-direction: column;

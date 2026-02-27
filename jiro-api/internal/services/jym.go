@@ -111,7 +111,7 @@ func (s *JymService) GetExerciseWithHistory(ctx context.Context, userID, exercis
 
 	// Fetch last 100 sets for this exercise with session_type
 	rows, err := s.db.Query(ctx,
-		`SELECT ss.session_id, s.started_at, ss.weight, ss.reps_performed, ss.is_pr, s.session_type
+		`SELECT ss.session_id, s.started_at, ss.weight, ss.reps_performed, ss.is_pr, s.session_type, ss.exercise_note
 		 FROM session_sets ss
 		 JOIN sessions s ON ss.session_id = s.id
 		 WHERE ss.exercise_id = $1 AND s.user_id = $2
@@ -128,7 +128,7 @@ func (s *JymService) GetExerciseWithHistory(ctx context.Context, userID, exercis
 	var bestWeight float64
 	for rows.Next() {
 		var h models.SetHistory
-		if err := rows.Scan(&h.SessionID, &h.Date, &h.Weight, &h.Reps, &h.IsPR, &h.SessionType); err != nil {
+		if err := rows.Scan(&h.SessionID, &h.Date, &h.Weight, &h.Reps, &h.IsPR, &h.SessionType, &h.ExerciseNote); err != nil {
 			return nil, err
 		}
 		h.Est1RM = epley1RM(h.Weight, h.Reps)
