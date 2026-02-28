@@ -139,7 +139,8 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       [ownUserId]="currentUserId()"
       (close)="closeDayModal()"
       (newEntry)="onDayModalNew()"
-      (editEntry)="onDayModalEdit($event)">
+      (editEntry)="onDayModalEdit($event)"
+      (deleteEntry)="onDayModalDelete($event)">
     </journal-day-modal>
 
     <!-- Members modal -->
@@ -508,6 +509,11 @@ export class JournalGroupComponent implements OnInit {
   onDayModalEdit(id: string) {
     this.closeDayModal();
     this.router.navigate(['/journal', id, 'edit']);
+  }
+
+  onDayModalDelete(id: string) {
+    const entry = this.entries().find(e => e.id === id);
+    if (entry) this.confirmDelete(entry);
   }
 
   isOwner(): boolean {

@@ -128,7 +128,8 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       [initialEntry]="dayModalInitEntry()"
       (close)="closeDayModal()"
       (newEntry)="onDayModalNew()"
-      (editEntry)="onDayModalEdit($event)">
+      (editEntry)="onDayModalEdit($event)"
+      (deleteEntry)="onDayModalDelete($event)">
     </journal-day-modal>
 
     <!-- Delete confirm -->
@@ -278,6 +279,11 @@ export class JournalHomeComponent implements OnInit {
   onDayModalEdit(id: string) {
     this.closeDayModal();
     this.router.navigate(['/journal', id, 'edit']);
+  }
+
+  onDayModalDelete(id: string) {
+    const entry = this.entries().find(e => e.id === id);
+    if (entry) this.confirmDelete(entry);
   }
 
   confirmDelete(e: JournalEntry) { this.deleteTarget.set(e); }
