@@ -8,9 +8,9 @@ Just like FeJiro, get it? :)
 
 | Module | Status | Description |
 | ------ | ------ | ----------- |
-| **Culinara** | Done | Recipe management, cook mode, trial logging, shopping list |
-| **Jym** | Done | Gym tracking — splits, sessions, sets, PRs, body weight |
-| **Journaly** | Done | Private journaling, group journals, collections, week view, image attachments |
+| **Culinara** | Done | Recipe management, cook mode, trial logging, meal planner, collections, cook streak, grocery list, public discover, recipe sharing |
+| **Jym** | Done | Gym tracking — splits, routines, sessions, sets, PRs, 1RM, body weight, templates, series, session export, public splits |
+| **Journaly** | Done | Private journaling, group journals, collections, calendar view, image attachments |
 | **Echo** | Planned | Reminders and recurring tasks |
 | **Ledger** | Planned | Finance tracking — income, expenses, budgets, net worth |
 
@@ -22,7 +22,7 @@ Just like FeJiro, get it? :)
 | Frontend | Angular 21, Signals, CSS custom properties |
 | Auth | JWT (15 min) + httpOnly refresh cookie (7 days) |
 | Database | PostgreSQL via Docker (local) / Neon (production) |
-| Email | Resend (planned — password reset, notifications) |
+| Email | Resend (password reset, email verification) |
 | Object Storage | Cloudflare R2 (avatars, recipe covers, journal images, session attachments) |
 | Hosting | GCP Cloud Run (API) + Firebase Hosting (frontend) |
 
@@ -35,7 +35,7 @@ All limits use an in-process token bucket (burst = limit, refill = limit/min). E
 | Route group | Key | Limit |
 | ----------- | --- | ----- |
 | `POST /auth/*` (login, register, reset…) | Client IP | 10 req/min |
-| Public read endpoints (profiles, shares, public splits) | Client IP | 60 req/min |
+| Public read endpoints (profiles, shares, public splits, recipe discover) | Client IP | 60 req/min |
 | All authenticated (`/api/v1/*` with JWT) | User ID | 300 req/min |
 | Upload presign (`/upload/*/presign`) | User ID | 20 req/min (additive) |
 | `GET /health` | — | none |
@@ -48,6 +48,7 @@ The presign limit is additive — a user must satisfy **both** the 300/min gener
 - JWT access tokens expire after **15 minutes**
 - Refresh tokens are httpOnly cookies, valid for **7 days**, SHA-256 hashed in the database
 - Passwords hashed with **Argon2id**
+- Email verification required on registration; password reset via Resend
 
 ## Repos
 
@@ -136,5 +137,5 @@ New migration files must be applied manually. Open the [Neon SQL Editor](https:/
 Or use psql:
 
 ```bash
-psql "postgresql://user:pass@host/dbname?sslmode=require" -f jiro-api/migrations/000011_example.up.sql
+psql "postgresql://user:pass@host/dbname?sslmode=require" -f jiro-api/migrations/000027_example.up.sql
 ```
