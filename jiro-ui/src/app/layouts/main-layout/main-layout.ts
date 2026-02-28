@@ -54,9 +54,9 @@ import { SettingsService } from '../../core/services/settings.service';
             <span *ngIf="!collapsed()" class="nav-label">Ledger</span>
           </a>
           
-          <a class="nav-item disabled">
-            <img src="/icons/folio-icon.svg" width="28" height="28" alt="Folio" />
-            <span *ngIf="!collapsed()" class="nav-label">Folio</span>
+          <a routerLink="/journal" routerLinkActive="active" class="nav-item">
+            <img src="/icons/journaly-icon.svg" width="28" height="28" alt="Journaly" />
+            <span *ngIf="!collapsed()" class="nav-label">Journaly</span>
           </a>
 
           <a class="nav-item disabled">
@@ -144,6 +144,10 @@ import { SettingsService } from '../../core/services/settings.service';
         <a routerLink="/jym" routerLinkActive="active" class="mobile-nav-item">
           <img src="/icons/jym-icon.svg" width="28" height="28" alt="Jym" />
           <span>Jym</span>
+        </a>
+        <a routerLink="/journal" routerLinkActive="active" class="mobile-nav-item">
+          <img src="/icons/journaly-icon.svg" width="28" height="28" alt="Journaly" />
+          <span>Journaly</span>
         </a>
         <a routerLink="/settings" routerLinkActive="active" class="mobile-nav-item">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

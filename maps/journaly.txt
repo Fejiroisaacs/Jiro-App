@@ -1,0 +1,32 @@
+ROOT (Journaly - The Reflection Space)
+ ├──  Home Dashboard (The Feed)
+ │    ├──  Streak Banner Display (Top)
+ │    │
+ │    ├──  Tab 1: Private Journal
+ │    │    ├── Calendar View (Highlight active days)
+ │    │    ├── Private Entry Stream
+ │    │    └── Filters (Mood, Tag, Date range)
+ │    │
+ │    ├──  Tab 2: Groups (Shared Journals)
+ │    │    ├── List of Groups
+ │    │    ├── Create New Group
+ │    │    └── Group Detail View (Feed of all members' entries)
+ │    │         ├── Manage Members (Invite via Email)
+ │    │         └── Post to Group
+ │    │
+ │    └──  Tab 3: Collections (Thematic Grouping)
+ │         ├── Grid of Collections (Cover image, count)
+ │         ├── Create New Collection
+ │         └── Collection Detail View (Entries assigned to collection)
+ │
+ ├──  Entry Editor (The Canvas)
+ │    ├──  Write Body Content
+ │    ├──  Mood Picker (Horizontal scroll of 8 mood chips)
+ │    ├──  Tag Input (Type-and-enter chips)
+ │    ├──  Image Uploads (Up to 3 per entry)
+ │    └──  Assign to Collection (Multi-select dropdown)
+ │
+ └──  Quick Access (Floating/Bottom Nav)
+      ├── Home
+      ├── Groups
+      └── New Entry FAB (Floating Action Button)

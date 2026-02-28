@@ -23,6 +23,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	userService := services.NewUserService(db)
 	recipeService := services.NewRecipeService(db)
 	jymService := services.NewJymService(db)
+	journalService := services.NewJournalService(db)
 	emailService := services.NewEmailService(cfg.ResendAPIKey, cfg.EmailFrom)
 	adminService := services.NewAdminService(db)
 	mealPlanService := services.NewMealPlanService(db)
@@ -37,6 +38,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	adminHandler := handlers.NewAdminHandler(adminService, authService, userService, emailService, cfg.AppBaseURL)
 	mealPlanHandler := handlers.NewMealPlanHandler(mealPlanService)
 	uploadHandler := handlers.NewUploadHandler(storageService, userService, recipeService, jymService)
+	journalHandler := handlers.NewJournalHandler(journalService, emailService, storageService, cfg.AppBaseURL)
 
 	// Rate limiter
 	rl := middleware.NewRateLimiter()
@@ -191,6 +193,50 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 				jym.POST("/public-splits/:id/import", jymHandler.ImportPublicSplit)
 			}
 		}
+
+		// Journaly (Journal Module)
+		journal := protected.Group("/journal")
+		{
+			// Private entries
+			journal.POST("/entries", journalHandler.CreateEntry)
+			journal.GET("/entries", journalHandler.ListEntries)
+			journal.GET("/entries/:id", journalHandler.GetEntry)
+			journal.PUT("/entries/:id", journalHandler.UpdateEntry)
+			journal.DELETE("/entries/:id", journalHandler.DeleteEntry)
+
+			// Streak & calendar
+			journal.GET("/streak", journalHandler.GetStreak)
+			journal.GET("/calendar", journalHandler.GetCalendar)
+
+			// Images
+			journal.POST("/entries/:id/images/presign", middleware.RateLimitByUser(rl, 20), journalHandler.PresignImage)
+			journal.POST("/entries/:id/images/confirm", journalHandler.ConfirmImage)
+			journal.DELETE("/images/:image_id", journalHandler.DeleteImage)
+
+			// Groups
+			journal.POST("/groups", journalHandler.CreateGroup)
+			journal.GET("/groups", journalHandler.ListGroups)
+			journal.GET("/groups/:id", journalHandler.GetGroup)
+			journal.PUT("/groups/:id", journalHandler.UpdateGroup)
+			journal.DELETE("/groups/:id", journalHandler.DeleteGroup)
+			journal.POST("/groups/:id/invite", journalHandler.InviteMember)
+			journal.DELETE("/groups/:id/members/:user_id", journalHandler.RemoveMember)
+			journal.POST("/groups/:id/entries", journalHandler.CreateGroupEntry)
+			journal.GET("/groups/:id/entries", journalHandler.ListGroupEntries)
+			journal.GET("/groups/:id/calendar", journalHandler.GetGroupCalendar)
+
+			// Collections
+			journal.POST("/collections", journalHandler.CreateCollection)
+			journal.GET("/collections", journalHandler.ListCollections)
+			journal.GET("/collections/:id", journalHandler.GetCollection)
+			journal.PUT("/collections/:id", journalHandler.UpdateCollection)
+			journal.DELETE("/collections/:id", journalHandler.DeleteCollection)
+			journal.POST("/collections/:id/entries", journalHandler.AddEntryToCollection)
+			journal.DELETE("/collections/:id/entries/:entry_id", journalHandler.RemoveEntryFromCollection)
+		}
+
+		// Public journal invite acceptance (no auth required)
+		public.POST("/journal/groups/join", journalHandler.JoinGroup)
 
 		// Admin routes (protected by X-Admin-Secret header)
 		admin := v1.Group("/admin")

@@ -12,7 +12,7 @@ Just like FeJiro, get it? :)
 | **Jym** | Done | Gym tracking — splits, sessions, sets, PRs, body weight |
 | **Echo** | Planned | Reminders and recurring tasks |
 | **Ledger** | Planned | Finance tracking — income, expenses, budgets, net worth |
-| **Folio** | Planned | Journaling and reflections |
+| **Journaly** | Planned | Journaling and reflections |
 
 ## Stack
 

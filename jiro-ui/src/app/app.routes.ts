@@ -101,12 +101,46 @@ export const routes: Routes = [
         path: 'jym/how-to',
         loadComponent: () => import('./features/jym/how-to-use/how-to-use').then(m => m.HowToUseComponent),
       },
+      // ── Journaly ──────────────────────────────────────────────────────────
+      {
+        path: 'journal',
+        loadComponent: () => import('./features/journal/journal-home/journal-home').then(m => m.JournalHomeComponent),
+      },
+      {
+        path: 'journal/new',
+        loadComponent: () => import('./features/journal/journal-editor/journal-editor').then(m => m.JournalEditorComponent),
+      },
+      {
+        path: 'journal/:id/edit',
+        loadComponent: () => import('./features/journal/journal-editor/journal-editor').then(m => m.JournalEditorComponent),
+      },
+      {
+        path: 'journal/groups',
+        loadComponent: () => import('./features/journal/journal-groups-list/journal-groups-list').then(m => m.JournalGroupsListComponent),
+      },
+      {
+        path: 'journal/groups/:id',
+        loadComponent: () => import('./features/journal/journal-group/journal-group').then(m => m.JournalGroupComponent),
+      },
+      {
+        path: 'journal/collections',
+        loadComponent: () => import('./features/journal/journal-collections-list/journal-collections-list').then(m => m.JournalCollectionsListComponent),
+      },
+      {
+        path: 'journal/collections/:id',
+        loadComponent: () => import('./features/journal/journal-collection/journal-collection').then(m => m.JournalCollectionComponent),
+      },
       {
         path: '',
         redirectTo: 'dashboard',
         pathMatch: 'full',
       },
     ],
+  },
+  // Journal join — public route (no auth guard; component redirects to login if needed)
+  {
+    path: 'journal/join',
+    loadComponent: () => import('./features/journal/journal-join/journal-join').then(m => m.JournalJoinComponent),
   },
   {
     path: 'jym/share/:share_id',
