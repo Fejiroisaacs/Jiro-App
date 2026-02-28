@@ -2,6 +2,12 @@ import { Routes } from '@angular/router';
 import { authGuard, guestGuard } from './core/guards/auth.guard';
 
 export const routes: Routes = [
+  // Public landing page — component redirects to /dashboard if already authenticated
+  {
+    path: '',
+    pathMatch: 'full',
+    loadComponent: () => import('./features/landing/landing').then(m => m.LandingComponent),
+  },
   {
     path: 'login',
     canActivate: [guestGuard],
@@ -129,11 +135,6 @@ export const routes: Routes = [
       {
         path: 'journal/collections/:id',
         loadComponent: () => import('./features/journal/journal-collection/journal-collection').then(m => m.JournalCollectionComponent),
-      },
-      {
-        path: '',
-        redirectTo: 'dashboard',
-        pathMatch: 'full',
       },
     ],
   },
