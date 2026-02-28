@@ -159,6 +159,22 @@ interface CookIngredient {
               <button class="share-close-btn" (click)="shareUrl.set('')">✕</button>
             </div>
 
+            <!-- Public toggle -->
+            <div class="public-toggle-row">
+              <div class="public-toggle-info">
+                <span class="public-toggle-label">Share publicly</span>
+                <span class="public-toggle-sub">Visible to anyone in Discover</span>
+              </div>
+              <button
+                class="toggle-switch"
+                [class.toggle-switch--on]="isPublic()"
+                [disabled]="publicToggling()"
+                (click)="togglePublic()"
+                [title]="isPublic() ? 'Make private' : 'Make public'">
+                <span class="toggle-thumb"></span>
+              </button>
+            </div>
+
             <p *ngIf="r.description" class="recipe-desc">{{ r.description }}</p>
 
             <!-- Tags -->
@@ -1410,6 +1426,43 @@ interface CookIngredient {
       color: var(--text-secondary);
     }
 
+    /* Public toggle */
+    .public-toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-sm);
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border-color);
+      margin-bottom: var(--space-sm);
+    }
+    .public-toggle-info { display: flex; flex-direction: column; gap: 2px; }
+    .public-toggle-label { font-size: var(--font-size-sm); font-weight: 500; color: var(--text-primary); }
+    .public-toggle-sub { font-size: var(--font-size-xs); color: var(--text-secondary); }
+
+    .toggle-switch {
+      position: relative;
+      width: 40px; height: 22px;
+      border: none; border-radius: 11px;
+      background: var(--border-color);
+      cursor: pointer;
+      transition: background 0.2s;
+      flex-shrink: 0;
+      padding: 0;
+    }
+    .toggle-switch--on { background: var(--color-primary); }
+    .toggle-switch:disabled { opacity: 0.5; cursor: not-allowed; }
+    .toggle-thumb {
+      position: absolute;
+      top: 3px; left: 3px;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: #fff;
+      transition: transform 0.2s;
+      display: block;
+    }
+    .toggle-switch--on .toggle-thumb { transform: translateX(18px); }
+
     /* Share banner */
     .share-banner {
       display: flex;
@@ -1521,6 +1574,8 @@ export class RecipeDetailComponent implements OnInit {
   shareUrl = signal('');
   shareLoading = signal(false);
   shareCopied = signal(false);
+  isPublic = signal(false);
+  publicToggling = signal(false);
 
   latestRating = computed(() => {
     const trials = this.recipe()?.trials;
@@ -1566,7 +1621,7 @@ export class RecipeDetailComponent implements OnInit {
   ngOnInit() {
     const id = this.route.snapshot.paramMap.get('id')!;
     this.recipeService.getRecipe(id).subscribe({
-      next: (r) => { this.recipe.set(r); this.loading.set(false); this.loadRecipeCollections(r.id); },
+      next: (r) => { this.recipe.set(r); this.isPublic.set(r.is_public); this.loading.set(false); this.loadRecipeCollections(r.id); },
       error: () => this.loading.set(false),
     });
     this.recipeService.listCollections().subscribe({
@@ -1780,6 +1835,17 @@ export class RecipeDetailComponent implements OnInit {
     navigator.clipboard.writeText(this.shareUrl()).then(() => {
       this.shareCopied.set(true);
       setTimeout(() => this.shareCopied.set(false), 2000);
+    });
+  }
+
+  togglePublic() {
+    const r = this.recipe();
+    if (!r || this.publicToggling()) return;
+    const next = !this.isPublic();
+    this.publicToggling.set(true);
+    this.recipeService.setPublic(r.id, next).subscribe({
+      next: () => { this.isPublic.set(next); this.publicToggling.set(false); },
+      error: () => this.publicToggling.set(false),
     });
   }
 

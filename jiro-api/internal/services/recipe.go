@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"strconv"
 	"time"
 
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/models"
@@ -42,10 +43,10 @@ func (s *RecipeService) CreateRecipe(ctx context.Context, userID uuid.UUID, req 
 	err := s.db.QueryRow(ctx,
 		`INSERT INTO recipes (user_id, title, description, target_image_url, base_ingredients, instructions, tags, nutrition, dietary_flags)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		 RETURNING id, user_id, title, description, target_image_url, cover_image_url, base_ingredients, instructions, tags, nutrition, dietary_flags, created_at, updated_at`,
+		 RETURNING id, user_id, title, description, target_image_url, cover_image_url, base_ingredients, instructions, tags, nutrition, dietary_flags, is_public, created_at, updated_at`,
 		userID, req.Title, req.Description, req.TargetImageURL, ingredients, req.Instructions, tags, req.Nutrition, req.DietaryFlags,
 	).Scan(&recipe.ID, &recipe.UserID, &recipe.Title, &recipe.Description, &recipe.TargetImageURL, &recipe.CoverImageURL,
-		&recipe.BaseIngredients, &recipe.Instructions, &recipe.Tags, &recipe.Nutrition, &recipe.DietaryFlags, &recipe.CreatedAt, &recipe.UpdatedAt)
+		&recipe.BaseIngredients, &recipe.Instructions, &recipe.Tags, &recipe.Nutrition, &recipe.DietaryFlags, &recipe.IsPublic, &recipe.CreatedAt, &recipe.UpdatedAt)
 
 	if err != nil {
 		return nil, err
@@ -56,7 +57,7 @@ func (s *RecipeService) CreateRecipe(ctx context.Context, userID uuid.UUID, req 
 func (s *RecipeService) ListRecipes(ctx context.Context, userID uuid.UUID, search string) ([]models.Recipe, error) {
 	query := `
 		SELECT r.id, r.user_id, r.title, r.description, r.target_image_url, r.cover_image_url, r.base_ingredients, r.instructions, r.tags,
-		       r.nutrition, r.dietary_flags,
+		       r.nutrition, r.dietary_flags, r.is_public,
 		       r.created_at, r.updated_at,
 		       (SELECT rt.rating FROM recipe_trials rt WHERE rt.recipe_id = r.id ORDER BY rt.date_cooked DESC LIMIT 1) as latest_rating,
 		       (SELECT COUNT(*) FROM recipe_trials rt WHERE rt.recipe_id = r.id) as trial_count,
@@ -83,7 +84,7 @@ func (s *RecipeService) ListRecipes(ctx context.Context, userID uuid.UUID, searc
 	for rows.Next() {
 		var r models.Recipe
 		err := rows.Scan(&r.ID, &r.UserID, &r.Title, &r.Description, &r.TargetImageURL, &r.CoverImageURL,
-			&r.BaseIngredients, &r.Instructions, &r.Tags, &r.Nutrition, &r.DietaryFlags,
+			&r.BaseIngredients, &r.Instructions, &r.Tags, &r.Nutrition, &r.DietaryFlags, &r.IsPublic,
 			&r.CreatedAt, &r.UpdatedAt,
 			&r.LatestRating, &r.TrialCount, &r.LastCooked)
 		if err != nil {
@@ -104,11 +105,11 @@ func (s *RecipeService) ListRecipes(ctx context.Context, userID uuid.UUID, searc
 func (s *RecipeService) GetRecipe(ctx context.Context, userID, recipeID uuid.UUID) (*models.RecipeWithTrials, error) {
 	recipe := &models.RecipeWithTrials{}
 	err := s.db.QueryRow(ctx,
-		`SELECT id, user_id, title, description, target_image_url, cover_image_url, base_ingredients, instructions, tags, nutrition, dietary_flags, created_at, updated_at
+		`SELECT id, user_id, title, description, target_image_url, cover_image_url, base_ingredients, instructions, tags, nutrition, dietary_flags, is_public, created_at, updated_at
 		 FROM recipes WHERE id = $1 AND user_id = $2`,
 		recipeID, userID,
 	).Scan(&recipe.ID, &recipe.UserID, &recipe.Title, &recipe.Description, &recipe.TargetImageURL, &recipe.CoverImageURL,
-		&recipe.BaseIngredients, &recipe.Instructions, &recipe.Tags, &recipe.Nutrition, &recipe.DietaryFlags, &recipe.CreatedAt, &recipe.UpdatedAt)
+		&recipe.BaseIngredients, &recipe.Instructions, &recipe.Tags, &recipe.Nutrition, &recipe.DietaryFlags, &recipe.IsPublic, &recipe.CreatedAt, &recipe.UpdatedAt)
 	if recipe.Tags == nil {
 		recipe.Tags = []string{}
 	}
@@ -165,10 +166,10 @@ func (s *RecipeService) UpdateRecipe(ctx context.Context, userID, recipeID uuid.
 			dietary_flags = COALESCE($10, dietary_flags),
 			updated_at = NOW()
 		 WHERE id = $1 AND user_id = $2
-		 RETURNING id, user_id, title, description, target_image_url, cover_image_url, base_ingredients, instructions, tags, nutrition, dietary_flags, created_at, updated_at`,
+		 RETURNING id, user_id, title, description, target_image_url, cover_image_url, base_ingredients, instructions, tags, nutrition, dietary_flags, is_public, created_at, updated_at`,
 		recipeID, userID, req.Title, req.Description, req.TargetImageURL, req.BaseIngredients, req.Instructions, tagsArg, req.Nutrition, req.DietaryFlags,
 	).Scan(&recipe.ID, &recipe.UserID, &recipe.Title, &recipe.Description, &recipe.TargetImageURL, &recipe.CoverImageURL,
-		&recipe.BaseIngredients, &recipe.Instructions, &recipe.Tags, &recipe.Nutrition, &recipe.DietaryFlags, &recipe.CreatedAt, &recipe.UpdatedAt)
+		&recipe.BaseIngredients, &recipe.Instructions, &recipe.Tags, &recipe.Nutrition, &recipe.DietaryFlags, &recipe.IsPublic, &recipe.CreatedAt, &recipe.UpdatedAt)
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -599,11 +600,11 @@ func (s *RecipeService) CreateRecipeShare(ctx context.Context, userID uuid.UUID,
 	// Verify ownership and fetch recipe for snapshot
 	recipe := &models.Recipe{}
 	err := s.db.QueryRow(ctx,
-		`SELECT id, user_id, title, description, target_image_url, cover_image_url, base_ingredients, instructions, tags, nutrition, dietary_flags, created_at, updated_at
+		`SELECT id, user_id, title, description, target_image_url, cover_image_url, base_ingredients, instructions, tags, nutrition, dietary_flags, is_public, created_at, updated_at
 		 FROM recipes WHERE id = $1 AND user_id = $2`,
 		recipeID, userID,
 	).Scan(&recipe.ID, &recipe.UserID, &recipe.Title, &recipe.Description, &recipe.TargetImageURL, &recipe.CoverImageURL,
-		&recipe.BaseIngredients, &recipe.Instructions, &recipe.Tags, &recipe.Nutrition, &recipe.DietaryFlags,
+		&recipe.BaseIngredients, &recipe.Instructions, &recipe.Tags, &recipe.Nutrition, &recipe.DietaryFlags, &recipe.IsPublic,
 		&recipe.CreatedAt, &recipe.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -668,6 +669,93 @@ func (s *RecipeService) GetSharedRecipeByToken(ctx context.Context, token string
 	return &resp, nil
 }
 
+// SetPublicStatus updates the is_public flag for a recipe (owner only).
+func (s *RecipeService) SetPublicStatus(ctx context.Context, userID, recipeID uuid.UUID, isPublic bool) error {
+	result, err := s.db.Exec(ctx,
+		"UPDATE recipes SET is_public = $1 WHERE id = $2 AND user_id = $3",
+		isPublic, recipeID, userID,
+	)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() == 0 {
+		return ErrRecipeNotFound
+	}
+	return nil
+}
+
+// ListPublicRecipes returns publicly shared recipes with optional full-text search.
+func (s *RecipeService) ListPublicRecipes(ctx context.Context, search string, limit, offset int) ([]models.Recipe, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+
+	query := `
+		SELECT id, user_id, title, description, target_image_url, cover_image_url, base_ingredients, instructions, tags,
+		       nutrition, dietary_flags, is_public, created_at, updated_at
+		FROM recipes
+		WHERE is_public = TRUE`
+
+	args := []interface{}{}
+	argIdx := 1
+
+	if search != "" {
+		query += ` AND (title ILIKE $` + strconv.Itoa(argIdx) + ` OR description ILIKE $` + strconv.Itoa(argIdx) + `)`
+		args = append(args, "%"+search+"%")
+		argIdx++
+	}
+
+	query += ` ORDER BY created_at DESC LIMIT $` + strconv.Itoa(argIdx) + ` OFFSET $` + strconv.Itoa(argIdx+1)
+	args = append(args, limit, offset)
+
+	rows, err := s.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var recipes []models.Recipe
+	for rows.Next() {
+		var r models.Recipe
+		if err := rows.Scan(&r.ID, &r.UserID, &r.Title, &r.Description, &r.TargetImageURL, &r.CoverImageURL,
+			&r.BaseIngredients, &r.Instructions, &r.Tags, &r.Nutrition, &r.DietaryFlags, &r.IsPublic,
+			&r.CreatedAt, &r.UpdatedAt); err != nil {
+			return nil, err
+		}
+		if r.Tags == nil {
+			r.Tags = []string{}
+		}
+		recipes = append(recipes, r)
+	}
+	if recipes == nil {
+		recipes = []models.Recipe{}
+	}
+	return recipes, nil
+}
+
+// GetPublicRecipe returns a single publicly shared recipe by ID.
+func (s *RecipeService) GetPublicRecipe(ctx context.Context, recipeID uuid.UUID) (*models.Recipe, error) {
+	recipe := &models.Recipe{}
+	err := s.db.QueryRow(ctx,
+		`SELECT id, user_id, title, description, target_image_url, cover_image_url, base_ingredients, instructions, tags,
+		        nutrition, dietary_flags, is_public, created_at, updated_at
+		 FROM recipes WHERE id = $1 AND is_public = TRUE`,
+		recipeID,
+	).Scan(&recipe.ID, &recipe.UserID, &recipe.Title, &recipe.Description, &recipe.TargetImageURL, &recipe.CoverImageURL,
+		&recipe.BaseIngredients, &recipe.Instructions, &recipe.Tags, &recipe.Nutrition, &recipe.DietaryFlags, &recipe.IsPublic,
+		&recipe.CreatedAt, &recipe.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrRecipeNotFound
+		}
+		return nil, err
+	}
+	if recipe.Tags == nil {
+		recipe.Tags = []string{}
+	}
+	return recipe, nil
+}
+
 // ImportSharedRecipe copies the snapshot into a new recipe owned by the importing user.
 func (s *RecipeService) ImportSharedRecipe(ctx context.Context, userID uuid.UUID, token string) (*models.Recipe, error) {
 	var snapshot json.RawMessage
@@ -699,12 +787,36 @@ func (s *RecipeService) ImportSharedRecipe(ctx context.Context, userID uuid.UUID
 	err = s.db.QueryRow(ctx,
 		`INSERT INTO recipes (user_id, title, description, cover_image_url, base_ingredients, instructions, tags, nutrition, dietary_flags)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		 RETURNING id, user_id, title, description, target_image_url, cover_image_url, base_ingredients, instructions, tags, nutrition, dietary_flags, created_at, updated_at`,
+		 RETURNING id, user_id, title, description, target_image_url, cover_image_url, base_ingredients, instructions, tags, nutrition, dietary_flags, is_public, created_at, updated_at`,
 		userID, src.Title, src.Description, src.CoverImageURL, ingredients, src.Instructions, tags, src.Nutrition, src.DietaryFlags,
 	).Scan(&recipe.ID, &recipe.UserID, &recipe.Title, &recipe.Description, &recipe.TargetImageURL, &recipe.CoverImageURL,
-		&recipe.BaseIngredients, &recipe.Instructions, &recipe.Tags, &recipe.Nutrition, &recipe.DietaryFlags,
+		&recipe.BaseIngredients, &recipe.Instructions, &recipe.Tags, &recipe.Nutrition, &recipe.DietaryFlags, &recipe.IsPublic,
 		&recipe.CreatedAt, &recipe.UpdatedAt)
 	if err != nil {
+		return nil, err
+	}
+	if recipe.Tags == nil {
+		recipe.Tags = []string{}
+	}
+	return recipe, nil
+}
+
+// ImportPublicRecipe copies a public recipe into the importing user's library.
+func (s *RecipeService) ImportPublicRecipe(ctx context.Context, userID, recipeID uuid.UUID) (*models.Recipe, error) {
+	recipe := &models.Recipe{}
+	err := s.db.QueryRow(ctx,
+		`INSERT INTO recipes (user_id, title, description, cover_image_url, base_ingredients, instructions, tags, nutrition, dietary_flags)
+		 SELECT $1, title, description, cover_image_url, base_ingredients, instructions, tags, nutrition, dietary_flags
+		 FROM recipes WHERE id = $2 AND is_public = TRUE
+		 RETURNING id, user_id, title, description, target_image_url, cover_image_url, base_ingredients, instructions, tags, nutrition, dietary_flags, is_public, created_at, updated_at`,
+		userID, recipeID,
+	).Scan(&recipe.ID, &recipe.UserID, &recipe.Title, &recipe.Description, &recipe.TargetImageURL, &recipe.CoverImageURL,
+		&recipe.BaseIngredients, &recipe.Instructions, &recipe.Tags, &recipe.Nutrition, &recipe.DietaryFlags, &recipe.IsPublic,
+		&recipe.CreatedAt, &recipe.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrRecipeNotFound
+		}
 		return nil, err
 	}
 	if recipe.Tags == nil {

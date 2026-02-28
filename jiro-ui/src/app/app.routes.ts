@@ -44,6 +44,14 @@ export const routes: Routes = [
         loadComponent: () => import('./features/culinara/meal-planner/meal-planner').then(m => m.MealPlannerComponent),
       },
       {
+        path: 'culinara/discover',
+        loadComponent: () => import('./features/culinara/discover/discover').then(m => m.DiscoverComponent),
+      },
+      {
+        path: 'culinara/discover/:id',
+        loadComponent: () => import('./features/culinara/discover/discover-detail').then(m => m.CulinaraDiscoverDetailComponent),
+      },
+      {
         path: 'culinara/:id',
         loadComponent: () => import('./features/culinara/recipe-detail/recipe-detail').then(m => m.RecipeDetailComponent),
       },
@@ -184,6 +192,10 @@ export const routes: Routes = [
       {
         path: 'events',
         loadComponent: () => import('./features/admin/admin-events').then(m => m.AdminEventsComponent),
+      },
+      {
+        path: 'feedback',
+        loadComponent: () => import('./features/admin/admin-feedback').then(m => m.AdminFeedbackComponent),
       },
     ],
   },

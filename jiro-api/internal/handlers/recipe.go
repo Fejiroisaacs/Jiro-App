@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/analytics"
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/models"
@@ -531,6 +532,129 @@ func (h *RecipeHandler) GetSharedRecipe(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, resp)
+}
+
+// SetPublicStatus toggles is_public on a recipe the caller owns.
+// PATCH /culinara/recipes/:id/public  (auth required)
+func (h *RecipeHandler) SetPublicStatus(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+
+	recipeID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid recipe ID"},
+		})
+		return
+	}
+
+	var req models.SetPublicRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()},
+		})
+		return
+	}
+
+	if err := h.recipeService.SetPublicStatus(c.Request.Context(), userID, recipeID, req.IsPublic); err != nil {
+		if err == services.ErrRecipeNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{
+				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Recipe not found"},
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to update recipe"},
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"is_public": req.IsPublic})
+}
+
+// ListPublicRecipes returns publicly shared recipes. No auth required.
+// GET /culinara/discover
+func (h *RecipeHandler) ListPublicRecipes(c *gin.Context) {
+	search := c.Query("q")
+	limit := 20
+	offset := 0
+	if l := c.Query("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 {
+			limit = v
+		}
+	}
+	if o := c.Query("offset"); o != "" {
+		if v, err := strconv.Atoi(o); err == nil && v >= 0 {
+			offset = v
+		}
+	}
+
+	recipes, err := h.recipeService.ListPublicRecipes(c.Request.Context(), search, limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to list public recipes"},
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, recipes)
+}
+
+// GetPublicRecipe returns a single publicly shared recipe by ID. No auth required.
+// GET /culinara/discover/:id
+func (h *RecipeHandler) GetPublicRecipe(c *gin.Context) {
+	recipeID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid recipe ID"},
+		})
+		return
+	}
+
+	recipe, err := h.recipeService.GetPublicRecipe(c.Request.Context(), recipeID)
+	if err != nil {
+		if err == services.ErrRecipeNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{
+				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Recipe not found"},
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to get recipe"},
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, recipe)
+}
+
+// ImportPublicRecipe copies a public discover recipe into the caller's library.
+// POST /culinara/discover/:id/import  (auth required)
+func (h *RecipeHandler) ImportPublicRecipe(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	recipeID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "BAD_REQUEST", Message: "Invalid recipe ID"},
+		})
+		return
+	}
+
+	recipe, err := h.recipeService.ImportPublicRecipe(c.Request.Context(), userID, recipeID)
+	if err != nil {
+		if err == services.ErrRecipeNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{
+				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Recipe not found or is not public"},
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to import recipe"},
+		})
+		return
+	}
+
+	analytics.TrackEvent(h.db, userID, "recipe.import_public", nil)
+	c.JSON(http.StatusCreated, recipe)
 }
 
 // ImportSharedRecipe copies a shared recipe into the caller's library.

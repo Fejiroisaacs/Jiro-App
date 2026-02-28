@@ -15,6 +15,7 @@ export interface Recipe {
   tags: string[];
   nutrition: Nutrition | null;
   dietary_flags: DietaryFlags | null;
+  is_public: boolean;
   created_at: string;
   updated_at: string;
   latest_rating?: number | null;
@@ -201,6 +202,21 @@ export class RecipeService {
     return this.http.get<string[]>(`${API_URL}/collections/${collectionId}/recipe-ids`);
   }
 
+  // ─── Public / Discover ────────────────────────────
+  setPublic(recipeId: string, isPublic: boolean): Observable<{ is_public: boolean }> {
+    return this.http.patch<{ is_public: boolean }>(`${API_URL}/recipes/${recipeId}/public`, { is_public: isPublic });
+  }
+
+  listPublicRecipes(search?: string, limit = 20, offset = 0): Observable<Recipe[]> {
+    let params = new HttpParams().set('limit', limit.toString()).set('offset', offset.toString());
+    if (search) params = params.set('q', search);
+    return this.http.get<Recipe[]>(`${environment.apiUrl}/culinara/discover`, { params });
+  }
+
+  getPublicRecipe(id: string): Observable<Recipe> {
+    return this.http.get<Recipe>(`${environment.apiUrl}/culinara/discover/${id}`);
+  }
+
   // ─── Sharing ──────────────────────────────────────
   createRecipeShare(recipeId: string): Observable<SharedRecipeResponse> {
     return this.http.post<SharedRecipeResponse>(`${API_URL}/recipes/${recipeId}/share`, {});
@@ -212,5 +228,9 @@ export class RecipeService {
 
   importSharedRecipe(token: string): Observable<Recipe> {
     return this.http.post<Recipe>(`${API_URL}/shares/${token}/import`, {});
+  }
+
+  importPublicRecipe(id: string): Observable<Recipe> {
+    return this.http.post<Recipe>(`${API_URL}/discover/${id}/import`, {});
   }
 }
