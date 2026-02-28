@@ -19,6 +19,7 @@ type Recipe struct {
 	Tags            []string        `json:"tags"`
 	Nutrition       json.RawMessage `json:"nutrition"`
 	DietaryFlags    json.RawMessage `json:"dietary_flags"`
+	IsPublic        bool            `json:"is_public"`
 	CreatedAt       time.Time       `json:"created_at"`
 	UpdatedAt       time.Time       `json:"updated_at"`
 	// Computed fields (from list query)
@@ -104,6 +105,10 @@ type CreateCollectionRequest struct {
 
 type UpdateCollectionRequest struct {
 	Name *string `json:"name"`
+}
+
+type SetPublicRequest struct {
+	IsPublic bool `json:"is_public"`
 }
 
 type SharedRecipe struct {

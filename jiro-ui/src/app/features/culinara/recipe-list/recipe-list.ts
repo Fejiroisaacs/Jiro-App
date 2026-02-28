@@ -44,6 +44,13 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
             </div>
           </div>
           <div class="header-actions">
+          <a routerLink="/culinara/discover" class="shopping-link">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            Discover
+          </a>
           <a routerLink="/culinara/meal-planner" class="shopping-link">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
@@ -652,6 +659,7 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
 
       .header-actions {
         justify-content: flex-end;
+        flex-wrap: wrap;
       }
     }
   `]

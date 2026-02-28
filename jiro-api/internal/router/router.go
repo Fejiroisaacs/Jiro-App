@@ -24,6 +24,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	recipeService := services.NewRecipeService(db)
 	jymService := services.NewJymService(db)
 	journalService := services.NewJournalService(db)
+	feedbackService := services.NewFeedbackService(db)
 	emailService := services.NewEmailService(cfg.ResendAPIKey, cfg.EmailFrom)
 	adminService := services.NewAdminService(db)
 	mealPlanService := services.NewMealPlanService(db)
@@ -36,6 +37,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	recipeHandler := handlers.NewRecipeHandler(recipeService, db, cfg.AppBaseURL)
 	jymHandler := handlers.NewJymHandler(jymService, storageService, cfg.AppBaseURL, db)
 	adminHandler := handlers.NewAdminHandler(adminService, authService, userService, emailService, cfg.AppBaseURL)
+	feedbackHandler := handlers.NewFeedbackHandler(feedbackService)
 	mealPlanHandler := handlers.NewMealPlanHandler(mealPlanService)
 	uploadHandler := handlers.NewUploadHandler(storageService, userService, recipeService, jymService)
 	journalHandler := handlers.NewJournalHandler(journalService, emailService, storageService, cfg.AppBaseURL)
@@ -56,6 +58,8 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			public.GET("/profiles/:username", userHandler.GetPublicProfile)
 			public.GET("/jym/shares/:share_id", jymHandler.GetSharePreview)
 			public.GET("/culinara/shares/:token", recipeHandler.GetSharedRecipe)
+			public.GET("/culinara/discover", recipeHandler.ListPublicRecipes)
+			public.GET("/culinara/discover/:id", recipeHandler.GetPublicRecipe)
 			public.GET("/jym/public-splits", jymHandler.ListPublicSplits)
 			public.GET("/jym/public-splits/:id", jymHandler.GetPublicSplit)
 		}
@@ -97,6 +101,9 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			protected.PATCH("/upload/session/:session_id/confirm", uploadHandler.ConfirmSessionAttachment)
 			protected.DELETE("/upload/session/attachments/:attachment_id", uploadHandler.DeleteSessionAttachment)
 
+			// Feedback
+			protected.POST("/feedback", feedbackHandler.Submit)
+
 			// Culinara (Recipe Module)
 			culinara := protected.Group("/culinara")
 			{
@@ -114,11 +121,15 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 				// Sharing
 				culinara.POST("/recipes/:id/share", recipeHandler.CreateShare)
 				culinara.POST("/shares/:token/import", recipeHandler.ImportSharedRecipe)
+				culinara.POST("/discover/:id/import", recipeHandler.ImportPublicRecipe)
 
 				// Meal Planner
 				culinara.GET("/meal-plan", mealPlanHandler.GetOrCreate)
 				culinara.POST("/meal-plan/:plan_id/entries", mealPlanHandler.AddEntry)
 				culinara.DELETE("/meal-plan/entries/:entry_id", mealPlanHandler.RemoveEntry)
+
+				// Public toggle
+				culinara.PATCH("/recipes/:id/public", recipeHandler.SetPublicStatus)
 
 				// Collections
 				culinara.GET("/collections", recipeHandler.ListCollections)
@@ -249,6 +260,8 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			admin.POST("/users/:id/send-password-reset", adminHandler.SendPasswordReset)
 			admin.POST("/users/:id/revoke-sessions", adminHandler.RevokeUserSessions)
 			admin.GET("/events", adminHandler.ListEvents)
+			admin.GET("/feedback", feedbackHandler.List)
+			admin.DELETE("/feedback/:id", feedbackHandler.Delete)
 		}
 	}
 

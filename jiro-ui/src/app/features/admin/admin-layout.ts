@@ -14,6 +14,7 @@ import { AdminService } from '../../core/services/admin.service';
           <a class="nav-link" routerLink="/admin/dashboard" routerLinkActive="active">Dashboard</a>
           <a class="nav-link" routerLink="/admin/users" routerLinkActive="active">Users</a>
           <a class="nav-link" routerLink="/admin/events" routerLinkActive="active">Events</a>
+          <a class="nav-link" routerLink="/admin/feedback" routerLinkActive="active">Feedback</a>
         </div>
         <button class="logout-btn" (click)="logout()">Log out</button>
       </nav>

@@ -73,6 +73,15 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
             <div class="tag-list" *ngIf="e.tags?.length">
               <span class="tag-chip" *ngFor="let t of (e.tags || [])">{{ t }}</span>
             </div>
+            <div class="card-delete-row" *ngIf="canEdit(e)" (click)="$event.stopPropagation()">
+              <button class="card-delete-btn" (click)="deleteEntry.emit(e.id)" aria-label="Delete entry">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                  <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+                </svg>
+                Delete
+              </button>
+            </div>
           </div>
 
           <div class="list-footer">
@@ -105,6 +114,9 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
             <span class="tag-chip" *ngFor="let t of (expanded()!.tags || [])">{{ t }}</span>
           </div>
           <div class="exp-actions" *ngIf="canEdit(expanded()!)">
+            <jiro-button variant="danger" type="button" (click)="deleteEntry.emit(expanded()!.id)">
+              Delete
+            </jiro-button>
             <jiro-button variant="primary" type="button" (click)="editEntry.emit(expanded()!.id)">
               Edit Entry
             </jiro-button>
@@ -268,6 +280,34 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
       flex-shrink: 0;
     }
 
+    .card-delete-row {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: var(--space-xs);
+      padding-top: var(--space-xs);
+      border-top: 1px solid var(--border-color);
+    }
+    .card-delete-btn {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 0.7rem;
+      font-family: inherit;
+      color: var(--text-secondary);
+      padding: 2px 4px;
+      border-radius: var(--border-radius-sm);
+      opacity: 0.6;
+      transition: color 0.12s, opacity 0.12s, background 0.12s;
+    }
+    .card-delete-btn:hover {
+      color: var(--color-danger);
+      opacity: 1;
+      background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+    }
+
     .list-footer { display: flex; justify-content: center; padding-top: var(--space-sm); }
 
     /* ── Expand loading ─────────────────────────────────── */
@@ -318,7 +358,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
     .exp-img:hover { opacity: 0.88; }
     .exp-actions {
       display: flex;
-      justify-content: flex-end;
+      justify-content: space-between;
       margin-top: var(--space-lg);
       padding-top: var(--space-md);
       border-top: 1px solid var(--border-color);
@@ -412,6 +452,7 @@ export class JournalDayModalComponent implements OnChanges {
   @Input() ownUserId: string | null = null;
   @Output() close = new EventEmitter<void>();
   @Output() editEntry = new EventEmitter<string>();
+  @Output() deleteEntry = new EventEmitter<string>();
   @Output() newEntry = new EventEmitter<void>();
 
   expanded = signal<JournalEntry | null>(null);
@@ -423,6 +464,10 @@ export class JournalDayModalComponent implements OnChanges {
     if (changes['date']) this.expanded.set(null);
     if (changes['initialEntry'] && this.initialEntry) {
       this.expandEntry(this.initialEntry);
+    }
+    if (changes['entries'] && this.expanded()) {
+      const stillExists = this.entries.some(e => e.id === this.expanded()!.id);
+      if (!stillExists) this.expanded.set(null);
     }
   }
 

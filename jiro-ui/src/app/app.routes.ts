@@ -2,6 +2,12 @@ import { Routes } from '@angular/router';
 import { authGuard, guestGuard } from './core/guards/auth.guard';
 
 export const routes: Routes = [
+  // Public landing page — component redirects to /dashboard if already authenticated
+  {
+    path: '',
+    pathMatch: 'full',
+    loadComponent: () => import('./features/landing/landing').then(m => m.LandingComponent),
+  },
   {
     path: 'login',
     canActivate: [guestGuard],
@@ -36,6 +42,14 @@ export const routes: Routes = [
       {
         path: 'culinara/meal-planner',
         loadComponent: () => import('./features/culinara/meal-planner/meal-planner').then(m => m.MealPlannerComponent),
+      },
+      {
+        path: 'culinara/discover',
+        loadComponent: () => import('./features/culinara/discover/discover').then(m => m.DiscoverComponent),
+      },
+      {
+        path: 'culinara/discover/:id',
+        loadComponent: () => import('./features/culinara/discover/discover-detail').then(m => m.CulinaraDiscoverDetailComponent),
       },
       {
         path: 'culinara/:id',
@@ -130,11 +144,6 @@ export const routes: Routes = [
         path: 'journal/collections/:id',
         loadComponent: () => import('./features/journal/journal-collection/journal-collection').then(m => m.JournalCollectionComponent),
       },
-      {
-        path: '',
-        redirectTo: 'dashboard',
-        pathMatch: 'full',
-      },
     ],
   },
   // Journal join — public route (no auth guard; component redirects to login if needed)
@@ -183,6 +192,10 @@ export const routes: Routes = [
       {
         path: 'events',
         loadComponent: () => import('./features/admin/admin-events').then(m => m.AdminEventsComponent),
+      },
+      {
+        path: 'feedback',
+        loadComponent: () => import('./features/admin/admin-feedback').then(m => m.AdminFeedbackComponent),
       },
     ],
   },

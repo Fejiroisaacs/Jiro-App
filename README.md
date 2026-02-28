@@ -10,9 +10,9 @@ Just like FeJiro, get it? :)
 | ------ | ------ | ----------- |
 | **Culinara** | Done | Recipe management, cook mode, trial logging, shopping list |
 | **Jym** | Done | Gym tracking — splits, sessions, sets, PRs, body weight |
+| **Journaly** | Done | Private journaling, group journals, collections, week view, image attachments |
 | **Echo** | Planned | Reminders and recurring tasks |
 | **Ledger** | Planned | Finance tracking — income, expenses, budgets, net worth |
-| **Journaly** | Planned | Journaling and reflections |
 
 ## Stack
 
@@ -23,7 +23,7 @@ Just like FeJiro, get it? :)
 | Auth | JWT (15 min) + httpOnly refresh cookie (7 days) |
 | Database | PostgreSQL via Docker (local) / Neon (production) |
 | Email | Resend (planned — password reset, notifications) |
-| Object Storage | Cloudflare R2 (planned) |
+| Object Storage | Cloudflare R2 (avatars, recipe covers, journal images, session attachments) |
 | Hosting | GCP Cloud Run (API) + Firebase Hosting (frontend) |
 
 ## API Security

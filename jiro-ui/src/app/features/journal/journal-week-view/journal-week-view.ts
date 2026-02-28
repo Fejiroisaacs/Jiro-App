@@ -71,7 +71,18 @@ export function currentWeekBounds(): { from: string; to: string } {
             <span class="wv-day-num">{{ day.getDate() }}</span>
           </div>
 
-          <!-- Sticky notes + add button -->
+          <!-- Add button (always visible at top) -->
+          <button
+            class="wv-add"
+            (click)="dayClick.emit(iso(day))"
+            aria-label="Add entry for this day">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="12" y1="5" x2="12" y2="19"/>
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+          </button>
+
+          <!-- Sticky notes -->
           <div class="wv-day-body">
             <div
               *ngFor="let e of entriesByDay()[iso(day)]"
@@ -83,16 +94,6 @@ export function currentWeekBounds(): { from: string; to: string } {
               <div class="wv-note-body">{{ noteExcerpt(e.body) }}</div>
               <span class="wv-note-mood" *ngIf="e.mood">{{ moodLabel(e.mood) }}</span>
             </div>
-
-            <button
-              class="wv-add"
-              (click)="dayClick.emit(iso(day))"
-              aria-label="Add entry for this day">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <line x1="12" y1="5" x2="12" y2="19"/>
-                <line x1="5" y1="12" x2="19" y2="12"/>
-              </svg>
-            </button>
           </div>
 
         </div>
@@ -200,7 +201,11 @@ export function currentWeekBounds(): { from: string; to: string } {
       flex-direction: column;
       gap: 5px;
       flex: 1;
+      max-height: 200px;
+      overflow-y: auto;
+      scrollbar-width: none;
     }
+    .wv-day-body::-webkit-scrollbar { display: none; }
 
     /* ── Sticky note ─────────────────────────────────────── */
     .wv-note {

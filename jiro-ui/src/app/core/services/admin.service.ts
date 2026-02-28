@@ -100,4 +100,23 @@ export class AdminService {
     if (userId) params = params.set('user_id', userId);
     return this.http.get<AnalyticsEvent[]>(`${this.base}/events`, { headers: this.headers(), params });
   }
+
+  listFeedback(offset = 0): Observable<FeedbackItem[]> {
+    const params = new HttpParams().set('limit', '20').set('offset', offset.toString());
+    return this.http.get<FeedbackItem[]>(`${this.base}/feedback`, { headers: this.headers(), params });
+  }
+
+  deleteFeedback(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/feedback/${id}`, { headers: this.headers() });
+  }
+}
+
+export interface FeedbackItem {
+  id: string;
+  user_id: string;
+  type: string;
+  message: string;
+  created_at: string;
+  username: string;
+  email: string;
 }

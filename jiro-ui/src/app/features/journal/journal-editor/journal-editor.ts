@@ -65,7 +65,7 @@ import { UploadService } from '../../../core/services/upload.service';
           [(ngModel)]="body"
           (focus)="immersive.set(true)"
           (blur)="onBodyBlur()"
-          rows="14"
+          rows="8"
           aria-label="Journal entry body"></textarea>
 
         <!-- ── Toolbar ───────────────────────────────────────────────── -->
@@ -161,6 +161,18 @@ import { UploadService } from '../../../core/services/upload.service';
         </div>
 
         <p class="save-error" *ngIf="saveError()">{{ saveError() }}</p>
+
+        <!-- Bottom save -->
+        <div class="bottom-save">
+          <jiro-button
+            variant="primary"
+            type="button"
+            [disabled]="!body.trim() || saving()"
+            (click)="save()">
+            {{ saving() ? 'Saving...' : (editId ? 'Save' : 'Publish') }}
+          </jiro-button>
+        </div>
+
       </div>
 
     </div>
@@ -239,7 +251,7 @@ import { UploadService } from '../../../core/services/upload.service';
       color: var(--text-primary);
       width: 100%;
       resize: vertical;
-      min-height: 260px;
+      min-height: 140px;
       padding: var(--space-sm) 0;
     }
     .body-textarea:focus { outline: none; }
@@ -250,11 +262,11 @@ import { UploadService } from '../../../core/services/upload.service';
       background: var(--bg-surface);
       border: 1px solid var(--border-color);
       border-radius: var(--border-radius);
-      padding: var(--space-lg);
+      padding: var(--space-md) var(--space-lg);
       display: flex;
       flex-direction: column;
-      gap: var(--space-lg);
-      margin-top: var(--space-md);
+      gap: var(--space-md);
+      margin-top: 0;
     }
 
     .toolbar-section { display: flex; flex-direction: column; gap: var(--space-sm); }
@@ -403,6 +415,8 @@ import { UploadService } from '../../../core/services/upload.service';
     }
 
     .save-error { font-size: var(--font-size-sm); color: var(--color-danger); }
+
+    .bottom-save { display: flex; justify-content: flex-end; padding-bottom: var(--space-xl); }
 
     /* State */
     .state-center { display: flex; justify-content: center; padding: var(--space-xl) 0; }
