@@ -49,14 +49,14 @@ import { SettingsService } from '../../core/services/settings.service';
             <span *ngIf="!collapsed()" class="nav-label">Culinara</span>
           </a>
 
-          <a class="nav-item disabled">
-            <img src="/icons/ledger-icon.svg" width="28" height="28" alt="Ledger" />
-            <span *ngIf="!collapsed()" class="nav-label">Ledger</span>
-          </a>
-          
           <a routerLink="/journal" routerLinkActive="active" class="nav-item">
             <img src="/icons/journaly-icon.svg" width="28" height="28" alt="Journaly" />
             <span *ngIf="!collapsed()" class="nav-label">Journaly</span>
+          </a>
+
+          <a class="nav-item disabled">
+            <img src="/icons/ledger-icon.svg" width="28" height="28" alt="Ledger" />
+            <span *ngIf="!collapsed()" class="nav-label">Ledger</span>
           </a>
 
           <a class="nav-item disabled">
