@@ -1,13 +1,15 @@
 import { Component, signal, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { SettingsService } from '../../core/services/settings.service';
+import { FeedbackService } from '../../core/services/feedback.service';
 
 @Component({
   selector: 'app-main-layout',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [CommonModule, FormsModule, RouterOutlet, RouterLink, RouterLinkActive],
   template: `
     <div class="layout" [class.sidebar-collapsed]="collapsed()">
       <!-- Sidebar -->
@@ -126,6 +128,45 @@ import { SettingsService } from '../../core/services/settings.service';
         <main class="content">
           <router-outlet></router-outlet>
         </main>
+      </div>
+
+      <!-- Feedback FAB -->
+      <button class="feedback-fab" (click)="feedbackOpen.set(!feedbackOpen())" title="Send feedback">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+        <span>Feedback</span>
+      </button>
+
+      <!-- Feedback backdrop (click-outside to close) -->
+      <div class="feedback-backdrop" *ngIf="feedbackOpen()" (click)="feedbackOpen.set(false)"></div>
+
+      <!-- Feedback panel -->
+      <div class="feedback-panel" *ngIf="feedbackOpen()">
+        <div class="fp-header">
+          <span class="fp-title">Send Feedback</span>
+          <button class="fp-close" (click)="feedbackOpen.set(false)">✕</button>
+        </div>
+        <div class="fp-type-row">
+          <button class="fp-type-btn" [class.fp-type-btn--active]="feedbackType === 'bug'" (click)="feedbackType = 'bug'">Bug</button>
+          <button class="fp-type-btn" [class.fp-type-btn--active]="feedbackType === 'feature'" (click)="feedbackType = 'feature'">Feature</button>
+          <button class="fp-type-btn" [class.fp-type-btn--active]="feedbackType === 'other'" (click)="feedbackType = 'other'">Other</button>
+        </div>
+        <textarea
+          class="fp-textarea"
+          [(ngModel)]="feedbackMessage"
+          placeholder="Describe the bug, feature request, or anything on your mind..."
+          rows="4">
+        </textarea>
+        <div class="fp-footer">
+          <span class="fp-toast" *ngIf="feedbackToast()">{{ feedbackToast() }}</span>
+          <button
+            class="fp-submit"
+            [disabled]="!feedbackMessage.trim() || feedbackSending()"
+            (click)="submitFeedback()">
+            {{ feedbackSending() ? 'Sending...' : 'Send' }}
+          </button>
+        </div>
       </div>
 
       <!-- Mobile bottom navigation -->
@@ -473,6 +514,96 @@ import { SettingsService } from '../../core/services/settings.service';
       text-decoration: none;
     }
 
+    /* ── Feedback backdrop ── */
+    .feedback-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+    }
+
+    /* ── Feedback FAB ── */
+    .feedback-fab {
+      position: fixed;
+      bottom: var(--space-xl);
+      right: var(--space-xl);
+      z-index: 201;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 16px;
+      background: var(--color-primary);
+      color: #fff;
+      border: none;
+      border-radius: 24px;
+      font-size: var(--font-size-sm);
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+      transition: opacity 0.15s, transform 0.15s;
+    }
+    .feedback-fab:hover { opacity: 0.9; transform: translateY(-1px); }
+
+    .feedback-panel {
+      position: fixed;
+      bottom: calc(var(--space-xl) + 50px);
+      right: var(--space-xl);
+      z-index: 201;
+      width: 320px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      box-shadow: var(--shadow-md);
+      padding: var(--space-md);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+    }
+
+    .fp-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .fp-title { font-size: var(--font-size-md); font-weight: 600; color: var(--text-primary); }
+    .fp-close {
+      background: none; border: none; cursor: pointer;
+      color: var(--text-secondary); font-size: 16px; line-height: 1; padding: 2px 4px;
+    }
+    .fp-close:hover { color: var(--text-primary); }
+
+    .fp-type-row { display: flex; gap: 6px; }
+    .fp-type-btn {
+      flex: 1; padding: 6px 4px; border: 1px solid var(--border-color);
+      border-radius: var(--border-radius); background: var(--bg-surface);
+      color: var(--text-secondary); font-size: var(--font-size-xs); font-weight: 500;
+      font-family: inherit; cursor: pointer; transition: all 0.15s; white-space: nowrap;
+    }
+    .fp-type-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
+    .fp-type-btn--active {
+      background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+      border-color: var(--color-primary); color: var(--color-primary);
+    }
+
+    .fp-textarea {
+      width: 100%; padding: 10px 12px; border: 1px solid var(--border-color);
+      border-radius: var(--border-radius); background: var(--bg-surface);
+      color: var(--text-primary); font-size: var(--font-size-sm); font-family: inherit;
+      resize: vertical; outline: none; box-sizing: border-box;
+    }
+    .fp-textarea:focus { border-color: var(--color-primary); }
+
+    .fp-footer { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-sm); }
+    .fp-toast { font-size: var(--font-size-xs); color: var(--color-primary); flex: 1; }
+
+    .fp-submit {
+      padding: 8px 20px; background: var(--color-primary); color: #fff;
+      border: none; border-radius: var(--border-radius); font-size: var(--font-size-sm);
+      font-weight: 600; font-family: inherit; cursor: pointer; transition: opacity 0.15s;
+    }
+    .fp-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+    .fp-submit:not(:disabled):hover { opacity: 0.88; }
+
     /* ── Mobile responsive ── */
     @media (max-width: 768px) {
       .sidebar { display: none; }
@@ -490,6 +621,9 @@ import { SettingsService } from '../../core/services/settings.service';
       }
 
       .mobile-nav { display: flex; }
+
+      .feedback-fab { bottom: calc(60px + env(safe-area-inset-bottom) + 6px); right: 8px; }
+      .feedback-panel { bottom: calc(60px + env(safe-area-inset-bottom) + 88px); right: var(--space-md); left: var(--space-md); width: auto; }
     }
   `]
 })
@@ -497,7 +631,18 @@ export class MainLayoutComponent {
   collapsed = signal(false);
   showMenu = signal(false);
 
-  constructor(public authService: AuthService, public settingsService: SettingsService) {
+  // Feedback FAB
+  feedbackOpen = signal(false);
+  feedbackType: 'bug' | 'feature' | 'other' = 'bug';
+  feedbackMessage = '';
+  feedbackSending = signal(false);
+  feedbackToast = signal('');
+
+  constructor(
+    public authService: AuthService,
+    public settingsService: SettingsService,
+    private feedbackService: FeedbackService,
+  ) {
     effect(() => {
       const theme = settingsService.theme();
       const dark = settingsService.darkMode();
@@ -520,5 +665,26 @@ export class MainLayoutComponent {
 
   resendVerification() {
     this.authService.resendVerification().subscribe();
+  }
+
+  submitFeedback() {
+    if (!this.feedbackMessage.trim() || this.feedbackSending()) return;
+    this.feedbackSending.set(true);
+    this.feedbackService.submit({ type: this.feedbackType, message: this.feedbackMessage.trim() }).subscribe({
+      next: () => {
+        this.feedbackSending.set(false);
+        this.feedbackMessage = '';
+        this.feedbackToast.set('Thanks for your feedback!');
+        setTimeout(() => {
+          this.feedbackToast.set('');
+          this.feedbackOpen.set(false);
+        }, 2000);
+      },
+      error: () => {
+        this.feedbackSending.set(false);
+        this.feedbackToast.set('Failed to send. Try again.');
+        setTimeout(() => this.feedbackToast.set(''), 3000);
+      },
+    });
   }
 }
