@@ -29,10 +29,8 @@ See `docs/ECHO-DESIGN-DOC.md` for the full design. High-level planned features:
 
 ---
 
-## Journaling module — planned
+## Journaly
 
-- Daily journal entries with mood tagging
-- Free-form text with optional structured prompts
-- Entry streaks and calendar view
-- Private by default, no sharing
-- Attach images to journal entries (object key: `journal/{user_id}/{entry_id}/{uuid}.{ext}`, max 3 per entry, 10 MB each)
+- **Prompted entries** — optional daily writing prompts shown above the body textarea (e.g. "What are you grateful for today?")
+- **Mood trend chart** — bar or line chart on the home page showing mood distribution over the last 30 days
+- **Collection cover images** — upload a custom cover image for each collection
