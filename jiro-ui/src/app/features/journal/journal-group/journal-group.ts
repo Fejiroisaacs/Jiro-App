@@ -11,13 +11,14 @@ import {
 } from '../../../core/services/journal.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { JournalWeekViewComponent, toISO, currentWeekBounds } from '../journal-week-view/journal-week-view';
+import { JournalDayModalComponent } from '../journal-day-modal/journal-day-modal';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 
 @Component({
   selector: 'app-journal-group',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, JournalWeekViewComponent, JiroButtonComponent, JiroModalComponent],
+  imports: [CommonModule, FormsModule, RouterLink, JournalWeekViewComponent, JournalDayModalComponent, JiroButtonComponent, JiroModalComponent],
   template: `
     <div class="group-page">
 
@@ -73,8 +74,8 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
           [showAuthor]="true"
           [memberMap]="memberMap()"
           [loading]="loadingEntries()"
-          (dayClick)="showNewEntry.set(true)"
-          (entryClick)="onEntryClick($event)"
+          (dayClick)="openDayModal($event)"
+          (entryClick)="openEntryModal($event)"
           (weekChange)="onWeekChange($event)">
         </journal-week-view>
 
@@ -126,6 +127,20 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       </div>
 
     </div>
+
+    <!-- Day modal -->
+    <journal-day-modal
+      *ngIf="dayModalDate()"
+      [date]="dayModalDate()!"
+      [entries]="dayModalEntries()"
+      [initialEntry]="dayModalInitEntry()"
+      [showAuthor]="true"
+      [memberMap]="memberMap()"
+      [ownUserId]="currentUserId()"
+      (close)="closeDayModal()"
+      (newEntry)="onDayModalNew()"
+      (editEntry)="onDayModalEdit($event)">
+    </journal-day-modal>
 
     <!-- Members modal -->
     <jiro-modal *ngIf="showMembers()" title="Members" (close)="showMembers.set(false)">
@@ -402,6 +417,16 @@ export class JournalGroupComponent implements OnInit {
     return map;
   });
 
+  dayModalDate = signal<string | null>(null);
+  dayModalInitEntry = signal<JournalEntry | null>(null);
+  dayModalEntries = computed(() => {
+    const date = this.dayModalDate();
+    if (!date) return [];
+    return this.entries().filter(e => toISO(new Date(e.created_at)) === date);
+  });
+
+  currentUserId = computed(() => this.auth.user()?.id ?? null);
+
   showMembers = signal(false);
   showNewEntry = signal(false);
   confirmDeleteGroup = signal(false);
@@ -460,11 +485,29 @@ export class JournalGroupComponent implements OnInit {
     this.weekTo.set(range.to);
   }
 
-  onEntryClick(e: JournalEntry) {
-    if (this.isOwnEntry(e)) {
-      this.router.navigate(['/journal', e.id, 'edit']);
-    }
-    // Other members' entries are readable in the feed below
+  openDayModal(date: string) {
+    this.dayModalInitEntry.set(null);
+    this.dayModalDate.set(date);
+  }
+
+  openEntryModal(entry: JournalEntry) {
+    this.dayModalInitEntry.set(entry);
+    this.dayModalDate.set(toISO(new Date(entry.created_at)));
+  }
+
+  closeDayModal() {
+    this.dayModalDate.set(null);
+    this.dayModalInitEntry.set(null);
+  }
+
+  onDayModalNew() {
+    this.closeDayModal();
+    this.showNewEntry.set(true);
+  }
+
+  onDayModalEdit(id: string) {
+    this.closeDayModal();
+    this.router.navigate(['/journal', id, 'edit']);
   }
 
   isOwner(): boolean {

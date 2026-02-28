@@ -548,7 +548,7 @@ export class JournalEditorComponent implements OnInit {
 
     if (this.editId) {
       this.svc.updateEntry(this.editId, req).subscribe({
-        next: () => { this.saving.set(false); this.router.navigate(['/journal']); },
+        next: () => { this.saving.set(false); this.router.navigate([this.backRoute()]); },
         error: (err: any) => { this.saving.set(false); this.saveError.set(err?.error?.message ?? 'Failed to save.'); },
       });
     } else {
@@ -613,7 +613,12 @@ export class JournalEditorComponent implements OnInit {
     });
   }
 
-  goBack() { this.router.navigate(['/journal']); }
+  goBack() { this.router.navigate([this.backRoute()]); }
+
+  private backRoute(): string {
+    const groupId = this.entry()?.group_id;
+    return groupId ? `/journal/groups/${groupId}` : '/journal';
+  }
 
   @HostListener('document:keydown.escape')
   onEscape() { this.lightboxUrl.set(null); this.immersive.set(false); }

@@ -66,7 +66,7 @@ export function currentWeekBounds(): { from: string; to: string } {
           [class.wv-day--today]="isToday(day)">
 
           <!-- Day header -->
-          <div class="wv-day-hdr">
+          <div class="wv-day-hdr" (click)="dayClick.emit(iso(day))" role="button" [attr.aria-label]="'View entries for ' + dayAbbr(day) + ' ' + day.getDate()">
             <span class="wv-day-name">{{ dayAbbr(day) }}</span>
             <span class="wv-day-num">{{ day.getDate() }}</span>
           </div>

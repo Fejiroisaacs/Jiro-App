@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -9,14 +9,15 @@ import {
   MOODS,
 } from '../../../core/services/journal.service';
 import { JournalQuickNavComponent } from '../journal-quick-nav/journal-quick-nav';
-import { JournalWeekViewComponent } from '../journal-week-view/journal-week-view';
+import { JournalWeekViewComponent, toISO } from '../journal-week-view/journal-week-view';
+import { JournalDayModalComponent } from '../journal-day-modal/journal-day-modal';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 
 @Component({
   selector: 'app-journal-home',
   standalone: true,
-  imports: [CommonModule, FormsModule, JournalQuickNavComponent, JournalWeekViewComponent, JiroButtonComponent, JiroModalComponent],
+  imports: [CommonModule, FormsModule, JournalQuickNavComponent, JournalWeekViewComponent, JournalDayModalComponent, JiroButtonComponent, JiroModalComponent],
   template: `
     <div class="journal-home">
 
@@ -52,8 +53,8 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       <journal-week-view
         [entries]="entries()"
         [loading]="loadingEntries()"
-        (dayClick)="router.navigate(['/journal/new'])"
-        (entryClick)="router.navigate(['/journal', $event.id, 'edit'])">
+        (dayClick)="openDayModal($event)"
+        (entryClick)="openEntryModal($event)">
       </journal-week-view>
 
       <!-- Filters -->
@@ -118,6 +119,17 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       </div>
 
     </div>
+
+    <!-- Day modal -->
+    <journal-day-modal
+      *ngIf="dayModalDate()"
+      [date]="dayModalDate()!"
+      [entries]="dayModalEntries()"
+      [initialEntry]="dayModalInitEntry()"
+      (close)="closeDayModal()"
+      (newEntry)="onDayModalNew()"
+      (editEntry)="onDayModalEdit($event)">
+    </journal-day-modal>
 
     <!-- Delete confirm -->
     <jiro-modal *ngIf="deleteTarget()" title="Delete Entry" (close)="deleteTarget.set(null)">
@@ -214,6 +226,14 @@ export class JournalHomeComponent implements OnInit {
   deleteTarget = signal<JournalEntry | null>(null);
   deleting = signal(false);
 
+  dayModalDate = signal<string | null>(null);
+  dayModalInitEntry = signal<JournalEntry | null>(null);
+  dayModalEntries = computed(() => {
+    const date = this.dayModalDate();
+    if (!date) return [];
+    return this.entries().filter(e => toISO(new Date(e.created_at)) === date);
+  });
+
   constructor(private svc: JournalService, public router: Router) {}
 
   ngOnInit() {
@@ -234,6 +254,31 @@ export class JournalHomeComponent implements OnInit {
   }
 
   onFilterChange() { this.loadEntries(); }
+
+  openDayModal(date: string) {
+    this.dayModalInitEntry.set(null);
+    this.dayModalDate.set(date);
+  }
+
+  openEntryModal(entry: JournalEntry) {
+    this.dayModalInitEntry.set(entry);
+    this.dayModalDate.set(toISO(new Date(entry.created_at)));
+  }
+
+  closeDayModal() {
+    this.dayModalDate.set(null);
+    this.dayModalInitEntry.set(null);
+  }
+
+  onDayModalNew() {
+    this.closeDayModal();
+    this.router.navigate(['/journal/new']);
+  }
+
+  onDayModalEdit(id: string) {
+    this.closeDayModal();
+    this.router.navigate(['/journal', id, 'edit']);
+  }
 
   confirmDelete(e: JournalEntry) { this.deleteTarget.set(e); }
 
