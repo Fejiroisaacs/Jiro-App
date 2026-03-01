@@ -1526,7 +1526,26 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     }).subscribe({
       next: () => {
         localStorage.removeItem(`jiro_session_targets_${this.sessionId}`);
-        this.router.navigate(['/jym/sessions']);
+        const durationSeconds = Math.floor((Date.now() - this.startedAt.getTime()) / 1000);
+        this.router.navigate(['/jym/session-summary'], {
+          state: {
+            durationSeconds,
+            sessionType: this.sessionType(),
+            weightUnit: this.settingsService.weightUnit(),
+            routineName: null,
+            blocks: this.blocks().map(b => ({
+              exerciseName: b.exerciseName,
+              muscleGroup: b.muscleGroup,
+              sets: b.sets.map(s => ({
+                weight: parseFloat(s.weight) || 0,
+                reps: parseInt(s.reps, 10) || 0,
+                saved: s.saved,
+                isPR: s.isPR,
+                isWarmup: s.isWarmup,
+              })),
+            })),
+          },
+        });
       },
       error: () => this.finishing.set(false),
     });

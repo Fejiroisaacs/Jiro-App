@@ -218,6 +218,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	}
 
 	secure := h.cfg.Environment == "production"
+	c.SetSameSite(http.SameSiteStrictMode)
 	c.SetCookie("refresh_token", "", -1, "/api/v1/auth", "", secure, true)
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
 }
@@ -232,6 +233,7 @@ func (h *AuthHandler) setRefreshCookie(c *gin.Context, userID uuid.UUID) {
 
 	maxAge := int(h.cfg.RefreshTokenTTL.Seconds())
 	secure := h.cfg.Environment == "production"
+	c.SetSameSite(http.SameSiteStrictMode)
 	c.SetCookie("refresh_token", rawToken, maxAge, "/api/v1/auth", "", secure, true)
 }
 

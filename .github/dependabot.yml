@@ -1,0 +1,15 @@
+version: 2
+updates:
+  # Maintain dependencies for npm
+  - package-ecosystem: "npm"
+    directory: "/jiro-ui"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    
+  # Maintain dependencies for Go
+  - package-ecosystem: "gomod"
+    directory: "/jiro-api"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10

@@ -88,6 +88,10 @@ export const routes: Routes = [
         loadComponent: () => import('./features/jym/session-history/session-history').then(m => m.SessionHistoryComponent),
       },
       {
+        path: 'jym/session-summary',
+        loadComponent: () => import('./features/jym/session-summary/session-summary').then(m => m.SessionSummaryComponent),
+      },
+      {
         path: 'jym/bodyweight',
         loadComponent: () => import('./features/jym/body-weight/body-weight').then(m => m.BodyWeightComponent),
       },
