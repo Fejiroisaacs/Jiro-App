@@ -1,7 +1,11 @@
 package main
 
 import (
+	"context"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/config"
@@ -31,11 +35,36 @@ func main() {
 	// Setup router
 	r := router.Setup(db, cfg)
 
-	// Start server
+	// Wrap in http.Server to set timeouts and enable graceful shutdown
 	addr := ":" + cfg.Port
-	log.Info().Str("address", addr).Str("environment", cfg.Environment).Msg("Server listening")
+	srv := &http.Server{
+		Addr:         addr,
+		Handler:      r,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
 
-	if err := r.Run(addr); err != nil {
-		log.Fatal().Err(err).Msg("Server failed to start")
+	// Start server in a goroutine so we can listen for shutdown signals
+	go func() {
+		log.Info().Str("address", addr).Str("environment", cfg.Environment).Msg("Server listening")
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal().Err(err).Msg("Server failed")
+		}
+	}()
+
+	// Block until we receive SIGTERM or SIGINT
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
+	<-quit
+
+	log.Info().Msg("Shutdown signal received, draining in-flight requests...")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Error().Err(err).Msg("Server forced to shutdown before drain completed")
+	} else {
+		log.Info().Msg("Server shut down cleanly")
 	}
 }
