@@ -305,6 +305,20 @@ input, button, textarea, select {
   touch-action: manipulation;
 }
 
+// iOS Safari auto-zoom prevention.
+// Safari zooms the page whenever a focused input has font-size < 16px.
+// Scoped to touch devices (hover:none + pointer:coarse) so desktop
+// appearance is completely unchanged even though !important is used.
+@media (hover: none) and (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"])
+       :not([type="range"]):not([type="button"])
+       :not([type="submit"]):not([type="reset"]):not([type="file"]),
+  textarea,
+  select {
+    font-size: 1rem !important;
+  }
+}
+
 // ========================================
 // Utility classes
 // ========================================
