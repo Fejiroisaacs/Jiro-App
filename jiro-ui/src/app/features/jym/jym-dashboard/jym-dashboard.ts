@@ -7,10 +7,10 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
 
 @Component({
-    selector: 'app-jym-dashboard',
-    standalone: true,
-    imports: [CommonModule, RouterLink, JiroButtonComponent, JiroModalComponent, JymQuickNavComponent],
-    template: `
+  selector: 'app-jym-dashboard',
+  standalone: true,
+  imports: [CommonModule, RouterLink, JiroButtonComponent, JiroModalComponent, JymQuickNavComponent],
+  template: `
     <div class="jym-dash">
       <!-- Header -->
       <div class="page-header">
@@ -174,9 +174,16 @@ import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
           <a routerLink="/jym/splits" class="manage-link">Create your first split →</a>
         </div>
         <div *ngIf="!loading() && splits().length > 0" class="splits-row">
-          <div *ngFor="let split of splits().slice(0, 4)" class="split-chip" (click)="router.navigate(['/jym/splits', split.id])">
-            <span class="split-chip-name">{{ split.name }}</span>
-            <span class="split-chip-days">{{ split.routine_count || 0 }} {{ (split.routine_count || 0) === 1 ? 'day' : 'days' }}</span>
+          <div *ngFor="let split of splits().slice(0, 4)" class="split-chip">
+            <div class="split-chip-info" (click)="router.navigate(['/jym/splits', split.id])">
+              <span class="split-chip-name">{{ split.name }}</span>
+              <span class="split-chip-days">{{ split.routine_count || 0 }} {{ (split.routine_count || 0) === 1 ? 'day' : 'days' }}</span>
+            </div>
+            <button class="split-start-btn" title="Start workout from this split" (click)="startFromSplit(split.id)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                <polygon points="5,3 19,12 5,21"/>
+              </svg>
+            </button>
           </div>
           <a *ngIf="splits().length > 4" routerLink="/jym/splits" class="split-chip more-chip">
             +{{ splits().length - 4 }} more
@@ -230,7 +237,7 @@ import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
       </jiro-modal>
     </div>
   `,
-    styles: [`
+  styles: [`
     :host { display: block; }
 
     .jym-dash { max-width: 1000px; width: 100%; }
@@ -367,15 +374,31 @@ import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
       padding: var(--space-sm) var(--space-md);
       background: var(--bg-surface); border: 1px solid var(--border-color);
       border-radius: var(--border-radius); cursor: pointer;
-      transition: all 0.15s; display: flex; flex-direction: column; gap: 2px;
+      transition: all 0.15s; display: flex; flex-direction: row;
+      align-items: center; gap: var(--space-sm);
       min-width: 120px;
     }
 
     .split-chip:hover { border-color: var(--color-primary); background: rgba(122,59,46,0.04); }
 
+    .split-chip-info { display: flex; flex-direction: column; gap: 2px; flex: 1; cursor: pointer; }
+
     .split-chip-name { font-size: var(--font-size-sm); font-weight: 600; }
 
     .split-chip-days { font-size: var(--font-size-xs); color: var(--text-muted); }
+
+    .split-start-btn {
+      width: 30px; height: 30px; border-radius: 50%;
+      background: rgba(122,59,46,0.08); border: 1px solid transparent;
+      color: var(--color-primary); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; transition: all 0.15s;
+    }
+
+    .split-start-btn:hover {
+      background: var(--color-primary); color: white;
+      border-color: var(--color-primary);
+    }
 
     .more-chip {
       align-items: center; justify-content: center; text-decoration: none;
@@ -513,179 +536,179 @@ import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
   `]
 })
 export class JymDashboardComponent implements OnInit {
-    splits = signal<Split[]>([]);
-    activeSeries = signal<SplitSeriesSummary[]>([]);
-    allSessions = signal<SessionSummary[]>([]);
-    inProgressSessions = signal<SessionSummary[]>([]);
-    templates = signal<Routine[]>([]);
-    loading = signal(true);
+  splits = signal<Split[]>([]);
+  activeSeries = signal<SplitSeriesSummary[]>([]);
+  allSessions = signal<SessionSummary[]>([]);
+  inProgressSessions = signal<SessionSummary[]>([]);
+  templates = signal<Routine[]>([]);
+  loading = signal(true);
 
-    hasCompletedSessions = computed(() => this.allSessions().some(s => !!s.ended_at));
+  hasCompletedSessions = computed(() => this.allSessions().some(s => !!s.ended_at));
 
-    heatmapDays = computed(() => {
-        const sessions = this.allSessions();
-        const countByDay = new Map<string, number>();
-        for (const s of sessions) {
-            if (!s.ended_at) continue;
-            const key = new Date(s.started_at).toISOString().slice(0, 10);
-            countByDay.set(key, (countByDay.get(key) || 0) + 1);
-        }
-        const today = new Date(); today.setHours(0, 0, 0, 0);
-        const todayDow = (today.getDay() + 6) % 7;
-        const start = new Date(today);
-        start.setDate(today.getDate() - todayDow - 15 * 7);
-        const end = new Date(today);
-        end.setDate(today.getDate() + (6 - todayDow));
-        const days: { date: string; count: number; label: string; future: boolean }[] = [];
-        const d = new Date(start);
-        while (d <= end) {
-            const key = d.toISOString().slice(0, 10);
-            days.push({
-                date: key,
-                count: countByDay.get(key) || 0,
-                label: d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }),
-                future: d > today,
-            });
-            d.setDate(d.getDate() + 1);
-        }
-        return days;
+  heatmapDays = computed(() => {
+    const sessions = this.allSessions();
+    const countByDay = new Map<string, number>();
+    for (const s of sessions) {
+      if (!s.ended_at) continue;
+      const key = new Date(s.started_at).toISOString().slice(0, 10);
+      countByDay.set(key, (countByDay.get(key) || 0) + 1);
+    }
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const todayDow = (today.getDay() + 6) % 7;
+    const start = new Date(today);
+    start.setDate(today.getDate() - todayDow - 15 * 7);
+    const end = new Date(today);
+    end.setDate(today.getDate() + (6 - todayDow));
+    const days: { date: string; count: number; label: string; future: boolean }[] = [];
+    const d = new Date(start);
+    while (d <= end) {
+      const key = d.toISOString().slice(0, 10);
+      days.push({
+        date: key,
+        count: countByDay.get(key) || 0,
+        label: d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }),
+        future: d > today,
+      });
+      d.setDate(d.getDate() + 1);
+    }
+    return days;
+  });
+
+  muscleGroupStats = computed(() => {
+    const sessions = this.allSessions();
+    const now = Date.now();
+    const cutoff28 = now - 28 * 86400000;
+    const mgMap = new Map<string, { lastMs: number; sessionsLast28: number }>();
+    for (const s of sessions) {
+      if (!s.ended_at || !s.muscle_groups?.length) continue;
+      const ms = new Date(s.started_at).getTime();
+      for (const mg of s.muscle_groups) {
+        const cur = mgMap.get(mg);
+        mgMap.set(mg, {
+          lastMs: cur ? Math.max(cur.lastMs, ms) : ms,
+          sessionsLast28: (cur?.sessionsLast28 || 0) + (ms >= cutoff28 ? 1 : 0),
+        });
+      }
+    }
+    return Array.from(mgMap.entries())
+      .map(([name, { lastMs, sessionsLast28 }]) => ({
+        name,
+        daysSinceLast: Math.floor((now - lastMs) / 86400000),
+        sessionsLast28,
+      }))
+      .sort((a, b) => a.daysSinceLast - b.daysSinceLast);
+  });
+
+  maxMgCount = computed(() => {
+    const stats = this.muscleGroupStats();
+    return stats.length > 0 ? Math.max(...stats.map(s => s.sessionsLast28), 1) : 1;
+  });
+
+  discardingSession = signal<SessionSummary | null>(null);
+  discardingInProgress = signal(false);
+  showRoutinePicker = signal(false);
+  loadingRoutines = signal(false);
+  pickerRoutines = signal<{ id: string; name: string; day_order: number }[]>([]);
+
+  private selectedSeriesId = '';
+
+  constructor(private jymService: JymService, public router: Router) { }
+
+  ngOnInit() {
+    this.jymService.listSplits().subscribe({
+      next: s => { this.splits.set(s); this.loading.set(false); },
+      error: () => this.loading.set(false),
     });
-
-    muscleGroupStats = computed(() => {
-        const sessions = this.allSessions();
-        const now = Date.now();
-        const cutoff28 = now - 28 * 86400000;
-        const mgMap = new Map<string, { lastMs: number; sessionsLast28: number }>();
-        for (const s of sessions) {
-            if (!s.ended_at || !s.muscle_groups?.length) continue;
-            const ms = new Date(s.started_at).getTime();
-            for (const mg of s.muscle_groups) {
-                const cur = mgMap.get(mg);
-                mgMap.set(mg, {
-                    lastMs: cur ? Math.max(cur.lastMs, ms) : ms,
-                    sessionsLast28: (cur?.sessionsLast28 || 0) + (ms >= cutoff28 ? 1 : 0),
-                });
-            }
-        }
-        return Array.from(mgMap.entries())
-            .map(([name, { lastMs, sessionsLast28 }]) => ({
-                name,
-                daysSinceLast: Math.floor((now - lastMs) / 86400000),
-                sessionsLast28,
-            }))
-            .sort((a, b) => a.daysSinceLast - b.daysSinceLast);
+    this.jymService.listSeries().subscribe({
+      next: s => this.activeSeries.set(s.filter(sr => !sr.ended_at)),
     });
-
-    maxMgCount = computed(() => {
-        const stats = this.muscleGroupStats();
-        return stats.length > 0 ? Math.max(...stats.map(s => s.sessionsLast28), 1) : 1;
+    this.jymService.listSessions().subscribe({
+      next: s => {
+        this.allSessions.set(s);
+        this.inProgressSessions.set(s.filter(sess => !sess.ended_at));
+      },
     });
+    this.jymService.listTemplates().subscribe({
+      next: t => this.templates.set(t),
+    });
+  }
 
-    discardingSession = signal<SessionSummary | null>(null);
-    discardingInProgress = signal(false);
-    showRoutinePicker = signal(false);
-    loadingRoutines = signal(false);
-    pickerRoutines = signal<{ id: string; name: string; day_order: number }[]>([]);
+  startFreeSession() {
+    this.jymService.startSession({}).subscribe({
+      next: s => this.router.navigate(['/jym/session', s.id]),
+    });
+  }
 
-    private selectedSeriesId = '';
+  startFromTemplate(t: Routine) {
+    this.jymService.startSession({ routine_id: t.id }).subscribe({
+      next: s => this.router.navigate(['/jym/session', s.id], { state: { targets: s.targets } }),
+    });
+  }
 
-    constructor(private jymService: JymService, public router: Router) { }
+  confirmDiscardSession(s: SessionSummary) {
+    this.discardingSession.set(s);
+  }
 
-    ngOnInit() {
-        this.jymService.listSplits().subscribe({
-            next: s => { this.splits.set(s); this.loading.set(false); },
-            error: () => this.loading.set(false),
-        });
-        this.jymService.listSeries().subscribe({
-            next: s => this.activeSeries.set(s.filter(sr => !sr.ended_at)),
-        });
-        this.jymService.listSessions().subscribe({
-            next: s => {
-                this.allSessions.set(s);
-                this.inProgressSessions.set(s.filter(sess => !sess.ended_at));
-            },
-        });
-        this.jymService.listTemplates().subscribe({
-            next: t => this.templates.set(t),
-        });
-    }
+  doDiscardSession() {
+    const s = this.discardingSession();
+    if (!s) return;
+    this.discardingInProgress.set(true);
+    this.jymService.deleteSession(s.id).subscribe({
+      next: () => {
+        this.inProgressSessions.update(list => list.filter(x => x.id !== s.id));
+        this.discardingSession.set(null);
+        this.discardingInProgress.set(false);
+      },
+      error: () => this.discardingInProgress.set(false),
+    });
+  }
 
-    startFreeSession() {
-        this.jymService.startSession({}).subscribe({
-            next: s => this.router.navigate(['/jym/session', s.id]),
-        });
-    }
+  formatSessionTime(iso: string): string {
+    const diff = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins}m ago`;
+    const h = Math.floor(mins / 60);
+    return `${h}h ${mins % 60}m ago`;
+  }
 
-    startFromTemplate(t: Routine) {
-        this.jymService.startSession({ routine_id: t.id }).subscribe({
-            next: s => this.router.navigate(['/jym/session', s.id], { state: { targets: s.targets } }),
-        });
-    }
+  startFromSeriesSplit(splitId: string, seriesId: string) {
+    this.selectedSeriesId = seriesId;
+    this.startFromSplit(splitId);
+  }
 
-    confirmDiscardSession(s: SessionSummary) {
-        this.discardingSession.set(s);
-    }
+  startFromSplit(splitId: string) {
+    this.loadingRoutines.set(true);
+    this.showRoutinePicker.set(true);
+    this.jymService.getSplit(splitId).subscribe({
+      next: s => {
+        this.pickerRoutines.set(s.routines.map(r => ({ id: r.id, name: r.name, day_order: r.day_order })));
+        this.loadingRoutines.set(false);
+      },
+      error: () => { this.loadingRoutines.set(false); this.showRoutinePicker.set(false); },
+    });
+  }
 
-    doDiscardSession() {
-        const s = this.discardingSession();
-        if (!s) return;
-        this.discardingInProgress.set(true);
-        this.jymService.deleteSession(s.id).subscribe({
-            next: () => {
-                this.inProgressSessions.update(list => list.filter(x => x.id !== s.id));
-                this.discardingSession.set(null);
-                this.discardingInProgress.set(false);
-            },
-            error: () => this.discardingInProgress.set(false),
-        });
-    }
+  startWithRoutine(routineId: string) {
+    this.showRoutinePicker.set(false);
+    this.jymService.startSession({
+      routine_id: routineId,
+      ...(this.selectedSeriesId ? { series_id: this.selectedSeriesId } : {}),
+    }).subscribe({
+      next: s => this.router.navigate(['/jym/session', s.id], { state: { targets: s.targets } }),
+    });
+  }
 
-    formatSessionTime(iso: string): string {
-        const diff = Date.now() - new Date(iso).getTime();
-        const mins = Math.floor(diff / 60000);
-        if (mins < 60) return `${mins}m ago`;
-        const h = Math.floor(mins / 60);
-        return `${h}h ${mins % 60}m ago`;
-    }
+  startFreeWithSplit() {
+    this.showRoutinePicker.set(false);
+    this.jymService.startSession({
+      ...(this.selectedSeriesId ? { series_id: this.selectedSeriesId } : {}),
+    }).subscribe({
+      next: s => this.router.navigate(['/jym/session', s.id]),
+    });
+  }
 
-    startFromSeriesSplit(splitId: string, seriesId: string) {
-        this.selectedSeriesId = seriesId;
-        this.startFromSplit(splitId);
-    }
-
-    startFromSplit(splitId: string) {
-        this.loadingRoutines.set(true);
-        this.showRoutinePicker.set(true);
-        this.jymService.getSplit(splitId).subscribe({
-            next: s => {
-                this.pickerRoutines.set(s.routines.map(r => ({ id: r.id, name: r.name, day_order: r.day_order })));
-                this.loadingRoutines.set(false);
-            },
-            error: () => { this.loadingRoutines.set(false); this.showRoutinePicker.set(false); },
-        });
-    }
-
-    startWithRoutine(routineId: string) {
-        this.showRoutinePicker.set(false);
-        this.jymService.startSession({
-            routine_id: routineId,
-            ...(this.selectedSeriesId ? { series_id: this.selectedSeriesId } : {}),
-        }).subscribe({
-            next: s => this.router.navigate(['/jym/session', s.id], { state: { targets: s.targets } }),
-        });
-    }
-
-    startFreeWithSplit() {
-        this.showRoutinePicker.set(false);
-        this.jymService.startSession({
-            ...(this.selectedSeriesId ? { series_id: this.selectedSeriesId } : {}),
-        }).subscribe({
-            next: s => this.router.navigate(['/jym/session', s.id]),
-        });
-    }
-
-    progressWeeks(sr: SplitSeriesSummary): number {
-        const days = Math.floor((Date.now() - new Date(sr.started_at).getTime()) / 86400000);
-        return Math.floor(days / 7);
-    }
+  progressWeeks(sr: SplitSeriesSummary): number {
+    const days = Math.floor((Date.now() - new Date(sr.started_at).getTime()) / 86400000);
+    return Math.floor(days / 7);
+  }
 }
