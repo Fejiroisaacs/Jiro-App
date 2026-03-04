@@ -17,6 +17,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(middleware.CORS(cfg.CORSOrigins))
+	r.Use(middleware.SecurityHeaders(cfg.Environment))
 
 	// Services
 	authService := services.NewAuthService(db, cfg)
@@ -29,9 +30,11 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	adminService := services.NewAdminService(db)
 	mealPlanService := services.NewMealPlanService(db)
 	storageService := services.NewStorageService(cfg.StorageEndpoint, cfg.StorageBucket, cfg.StorageAccessKey, cfg.StorageSecretKey, cfg.StoragePublicURL)
+	ledgerService := services.NewLedgerService(db)
 
 	// Handlers
-	authHandler := handlers.NewAuthHandler(authService, userService, emailService, cfg, db)
+	authHandler := handlers.NewAuthHandler(authService, userService, emailService, ledgerService, cfg, db)
+	ledgerHandler := handlers.NewLedgerHandler(ledgerService)
 	userHandler := handlers.NewUserHandler(userService)
 	healthHandler := handlers.NewHealthHandler(db)
 	recipeHandler := handlers.NewRecipeHandler(recipeService, db, cfg.AppBaseURL)
@@ -202,6 +205,41 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 
 				// Public split import (auth required)
 				jym.POST("/public-splits/:id/import", jymHandler.ImportPublicSplit)
+			}
+
+			// Ledger (Finance Module)
+			ledger := protected.Group("/ledger")
+			{
+				// Accounts
+				ledger.POST("/accounts", ledgerHandler.CreateAccount)
+				ledger.GET("/accounts", ledgerHandler.ListAccounts)
+				ledger.GET("/accounts/:id", ledgerHandler.GetAccount)
+				ledger.PATCH("/accounts/:id", ledgerHandler.UpdateAccount)
+				ledger.DELETE("/accounts/:id", ledgerHandler.DeleteAccount)
+
+				// Transactions
+				ledger.POST("/transactions", ledgerHandler.CreateTransaction)
+				ledger.GET("/transactions", ledgerHandler.ListTransactions)
+				ledger.GET("/transactions/:id", ledgerHandler.GetTransaction)
+				ledger.PATCH("/transactions/:id", ledgerHandler.UpdateTransaction)
+				ledger.DELETE("/transactions/:id", ledgerHandler.DeleteTransaction)
+
+				// Categories
+				ledger.POST("/categories", ledgerHandler.CreateCategory)
+				ledger.GET("/categories", ledgerHandler.ListCategories)
+				ledger.PATCH("/categories/:id", ledgerHandler.UpdateCategory)
+				ledger.DELETE("/categories/:id", ledgerHandler.DeleteCategory)
+
+				// Budgets
+				ledger.POST("/budgets", ledgerHandler.CreateBudget)
+				ledger.GET("/budgets", ledgerHandler.ListBudgets)
+				ledger.DELETE("/budgets/:id", ledgerHandler.DeleteBudget)
+
+				// Summary, Net Worth, Comparison
+				ledger.GET("/summary", ledgerHandler.GetSummary)
+				ledger.GET("/networth", ledgerHandler.GetNetWorth)
+				ledger.POST("/networth/snapshot", ledgerHandler.CreateSnapshot)
+				ledger.GET("/compare", ledgerHandler.GetComparison)
 			}
 		}
 

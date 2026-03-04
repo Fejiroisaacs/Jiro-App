@@ -978,18 +978,31 @@ func (s *JymService) LogSet(ctx context.Context, userID, sessionID uuid.UUID, re
 
 	isWarmup := req.IsWarmup != nil && *req.IsWarmup
 
-	// PR check: skipped for deload sessions and warmup sets
+	// A PR is: strictly higher weight than ever before, OR same weight with more reps.
 	var isPR bool
-	if sessionType != "deload" && !isWarmup {
-		var maxWeight float64
-		s.db.QueryRow(ctx,
-			`SELECT COALESCE(MAX(ss.weight), 0) FROM session_sets ss
-			 JOIN sessions s ON ss.session_id = s.id
-			 WHERE ss.exercise_id = $1 AND s.user_id = $2 AND ss.is_warmup = false`,
-			req.ExerciseID, userID,
-		).Scan(&maxWeight)
-		isPR = req.Weight > maxWeight
-	}
+	var bestWeight float64
+	var bestReps int
+	// Fetch historical best: highest weight ever, and max reps achieved at that weight.
+	// COALESCE on aggregates guarantees exactly one row even when there is no history.
+	s.db.QueryRow(ctx,
+		`SELECT
+				COALESCE(MAX(ss.weight), 0),
+				COALESCE(MAX(ss.reps_performed) FILTER (
+					WHERE ss.weight = (
+						SELECT MAX(ss2.weight)
+						FROM session_sets ss2
+						JOIN sessions s2 ON ss2.session_id = s2.id
+						WHERE ss2.exercise_id = $1 AND s2.user_id = $2
+						AND ss2.is_warmup = false
+					)
+				), 0)
+			FROM session_sets ss
+			JOIN sessions s ON ss.session_id = s.id
+			WHERE ss.exercise_id = $1 AND s.user_id = $2 AND ss.is_warmup = false`,
+		req.ExerciseID, userID,
+	).Scan(&bestWeight, &bestReps)
+	isPR = req.Weight > bestWeight ||
+		(req.Weight == bestWeight && req.RepsPerformed > bestReps)
 
 	set := &models.SessionSet{}
 	err := s.db.QueryRow(ctx,

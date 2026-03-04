@@ -248,13 +248,14 @@ export class JymQuickNavComponent implements AfterViewInit, OnDestroy {
   closeMore() { this.showMore.set(false); }
 
   ngAfterViewInit() {
-    if (window.innerWidth <= 600) {
-      const el = this.navStrip.nativeElement;
-      setTimeout(() => {
-        el.scrollTo({ left: 60, behavior: 'smooth' });
-        setTimeout(() => el.scrollTo({ left: 0, behavior: 'smooth' }), 600);
-      }, 400);
-    }
+    setTimeout(() => this.scrollActiveIntoView());
+  }
+
+  private scrollActiveIntoView() {
+    const nav = this.navStrip.nativeElement;
+    const active = nav.querySelector('.current') as HTMLElement | null;
+    if (!active) return;
+    nav.scrollLeft = active.offsetLeft - nav.offsetWidth / 2 + active.offsetWidth / 2;
   }
 
   ngOnDestroy() { }

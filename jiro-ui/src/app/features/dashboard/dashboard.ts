@@ -146,7 +146,7 @@ export class DashboardComponent {
       icon: '/icons/ledger-icon.svg',
       route: '/ledger',
       color: 'rgba(122, 103, 65, 0.15)',
-      available: false,
+      available: true,
     },
     {
       name: 'Echo',

@@ -98,7 +98,11 @@ func RateLimitByUser(rl *RateLimiter, perMinute float64) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var key string
 		if uid, exists := c.Get("user_id"); exists {
-			key = "user:" + uid.(interface{ String() string }).String()
+			if userID, ok := uid.(interface{ String() string }); ok {
+				key = "user:" + userID.String()
+			} else {
+				key = "ip:" + c.ClientIP()
+			}
 		} else {
 			key = "ip:" + c.ClientIP()
 		}

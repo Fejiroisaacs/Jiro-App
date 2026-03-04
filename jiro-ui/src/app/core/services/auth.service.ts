@@ -1,7 +1,7 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { Observable, tap, catchError, of, shareReplay, finalize } from 'rxjs';
+import { Observable, tap, catchError, of, shareReplay, finalize, firstValueFrom } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
 export interface User {
@@ -34,10 +34,12 @@ const API_URL = environment.apiUrl;
 export class AuthService {
   private currentUser = signal<User | null>(null);
   private accessToken = signal<string | null>(null);
+  private initialized = signal<boolean>(false);
   private refreshing$: Observable<AuthResponse | null> | null = null;
 
   user = this.currentUser.asReadonly();
   isAuthenticated = computed(() => !!this.currentUser());
+  isInitialized = this.initialized.asReadonly();
 
   constructor(private http: HttpClient, private router: Router) {
     // Restore from localStorage on init
@@ -51,6 +53,23 @@ export class AuthService {
 
   getToken(): string | null {
     return this.accessToken();
+  }
+
+  /** Called by APP_INITIALIZER. Silently rotates the token if a session exists.
+   *  Failure is non-fatal — localStorage state is kept so sessions persist across
+   *  browser close. The interceptor handles any subsequent 401s lazily. */
+  async init(): Promise<void> {
+    if (!this.accessToken()) {
+      this.initialized.set(true);
+      return;
+    }
+    await firstValueFrom(
+      this.http.post<AuthResponse>(`${API_URL}/auth/refresh`, {}, { withCredentials: true }).pipe(
+        tap(res => this.handleAuth(res)),
+        catchError(() => of(null)),
+      )
+    ).catch(() => {});
+    this.initialized.set(true);
   }
 
   register(email: string, password: string, displayName: string, username?: string) {
@@ -84,6 +103,7 @@ export class AuthService {
   }
 
   logout() {
+    if (!this.currentUser()) return; // already logged out — prevent duplicate navigation
     this.http.post(`${API_URL}/auth/logout`, {}, { withCredentials: true }).subscribe();
     this.clearAuth();
     this.router.navigate(['/login']);
