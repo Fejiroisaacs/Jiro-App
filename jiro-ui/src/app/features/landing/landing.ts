@@ -1,11 +1,28 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, HostListener, ElementRef, ViewChild, inject, OnInit } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { trigger, transition, style, animate, query, stagger } from '@angular/animations';
 import { AuthService } from '../../core/services/auth.service';
+
+const bentoAnimation = trigger('bentoEntrance', [
+  transition(':enter', [
+    query('.l-card', [
+      style({ opacity: 0, transform: 'translateY(40px) scale(0.98)' })
+    ], { optional: true }),
+    query('.l-card', [
+      stagger('120ms', [
+        animate('600ms cubic-bezier(0.16, 1, 0.3, 1)',
+          style({ opacity: 1, transform: 'translateY(0) scale(1)' })
+        )
+      ])
+    ], { optional: true })
+  ])
+]);
 
 @Component({
   selector: 'app-landing',
   standalone: true,
   imports: [RouterLink],
+  animations: [bentoAnimation],
   template: `
     <div class="landing">
 
@@ -40,7 +57,7 @@ import { AuthService } from '../../core/services/auth.service';
 
         <!-- Hero Dashboard Mockup -->
         <div class="l-hero-mockup-wrapper">
-          <div class="l-dashboard-mockup">
+          <div class="l-dashboard-mockup" #dashboardMockup>
             <!-- Sidebar -->
             <div class="l-mock-sidebar">
               <div class="l-mock-brand">
@@ -118,10 +135,10 @@ import { AuthService } from '../../core/services/auth.service';
           <p class="l-section-label">The Modules</p>
           <h2 class="l-section-title">Every corner of your life, covered.</h2>
 
-          <div class="l-bento">
+          <div class="l-bento" [@bentoEntrance]>
 
             <!-- Culinara — large -->
-            <div class="l-card l-card--culinara">
+            <div class="l-card l-card--culinara" (mousemove)="onCardHover($event)" (mouseleave)="onCardLeave($event)">
               <div class="l-card-content">
                 <div class="l-card-icon">
                   <img src="/icons/culinara-icon.svg" width="24" height="24" alt="Culinara" />
@@ -149,7 +166,7 @@ import { AuthService } from '../../core/services/auth.service';
             </div>
 
             <!-- Journaly — tall -->
-            <div class="l-card l-card--journaly">
+            <div class="l-card l-card--journaly" (mousemove)="onCardHover($event)" (mouseleave)="onCardLeave($event)">
               <div class="l-card-content">
                 <div class="l-card-icon">
                   <img src="/icons/journaly-icon.svg" width="24" height="24" alt="Journaly" />
@@ -182,7 +199,7 @@ import { AuthService } from '../../core/services/auth.service';
             </div>
 
             <!-- Jym — medium -->
-            <div class="l-card l-card--jym">
+            <div class="l-card l-card--jym" (mousemove)="onCardHover($event)" (mouseleave)="onCardLeave($event)">
               <div class="l-card-content">
                 <div class="l-card-icon">
                   <img src="/icons/jym-icon.svg" width="24" height="24" alt="Jym" />
@@ -208,7 +225,7 @@ import { AuthService } from '../../core/services/auth.service';
             </div>
 
             <!-- Ledger — medium -->
-            <div class="l-card l-card--ledger">
+            <div class="l-card l-card--ledger" (mousemove)="onCardHover($event)" (mouseleave)="onCardLeave($event)">
               <div class="l-card-content">
                 <div class="l-card-icon">
                   <img src="/icons/ledger-icon.svg" width="24" height="24" alt="Ledger" />
@@ -243,7 +260,7 @@ import { AuthService } from '../../core/services/auth.service';
             </div>
 
             <!-- Echo — small -->
-            <div class="l-card l-card--echo">
+            <div class="l-card l-card--echo" (mousemove)="onCardHover($event)" (mouseleave)="onCardLeave($event)">
               <div class="l-card-content">
                 <div class="l-card-icon">
                   <img src="/icons/echo-icon.svg" width="24" height="24" alt="Echo" />
@@ -530,10 +547,7 @@ import { AuthService } from '../../core/services/auth.service';
       overflow: hidden;
       transform: rotateX(8deg) rotateY(-4deg) rotateZ(2deg) scale(0.95);
       transform-style: preserve-3d;
-      transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .l-hero-mockup-wrapper:hover .l-dashboard-mockup {
-      transform: rotateX(2deg) rotateY(-1deg) rotateZ(0.5deg) scale(1);
+      transition: transform 0.1s ease-out;
     }
     /* Abstract Sidebar */
     .l-mock-sidebar {
@@ -643,6 +657,8 @@ import { AuthService } from '../../core/services/auth.service';
 
     /* Card base */
     .l-card {
+      --mouse-x: 50%;
+      --mouse-y: 50%;
       background: var(--bg-canvas);
       border: 1px solid var(--border-color);
       border-radius: calc(var(--border-radius) * 1.5);
@@ -654,6 +670,22 @@ import { AuthService } from '../../core/services/auth.service';
       overflow: hidden;
       position: relative;
     }
+    .l-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: radial-gradient(
+        circle at var(--mouse-x) var(--mouse-y),
+        rgba(255,255,255,0.07) 0%,
+        transparent 60%
+      );
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s;
+      z-index: 1;
+    }
+    .l-card:hover::after { opacity: 1; }
     .l-card:hover {
       border-color: var(--color-primary);
       box-shadow: 0 8px 32px rgba(0,0,0,0.08);
@@ -843,6 +875,11 @@ import { AuthService } from '../../core/services/auth.service';
       transform: scaleY(1.1);
       transform-origin: bottom;
     }
+    @keyframes prPulse {
+      0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary) 60%, transparent); }
+      70%  { box-shadow: 0 0 0 10px transparent; }
+      100% { box-shadow: 0 0 0 0 transparent; }
+    }
     .mjym-pr-badge {
       display: flex;
       align-items: center;
@@ -857,10 +894,10 @@ import { AuthService } from '../../core/services/auth.service';
       border-radius: 99px;
       padding: 4px 10px 4px 6px;
       transition: transform 0.3s, box-shadow 0.3s;
+      animation: prPulse 2.5s infinite cubic-bezier(0.16, 1, 0.3, 1);
     }
     .l-card--jym:hover .mjym-pr-badge {
       transform: translateY(-4px) scale(1.05);
-      box-shadow: 0 8px 16px color-mix(in srgb, var(--color-primary) 15%, transparent);
     }
     .mjym-pr-badge img { display: block; flex-shrink: 0; }
     .l-mockup-jym { flex-shrink: 0; width: 100%; }
@@ -1000,6 +1037,8 @@ export class LandingComponent implements OnInit {
   private auth = inject(AuthService);
   private router = inject(Router);
 
+  @ViewChild('dashboardMockup') dashboardMockup!: ElementRef;
+
   weekDots = [true, true, true, false, true, true, false];
   barHeights = [30, 42, 38, 50, 65, 55, 48];
 
@@ -1007,6 +1046,35 @@ export class LandingComponent implements OnInit {
     if (this.auth.isAuthenticated()) {
       this.router.navigate(['/dashboard'], { replaceUrl: true });
     }
+  }
+
+  @HostListener('document:mousemove', ['$event'])
+  onMouseMove(event: MouseEvent) {
+    if (!this.dashboardMockup) return;
+    if (!window.matchMedia('(hover: hover)').matches) return;
+
+    const xPos = (event.clientX / window.innerWidth - 0.5) * 2;
+    const yPos = (event.clientY / window.innerHeight - 0.5) * 2;
+    const rotateX = yPos * -10;
+    const rotateY = xPos * 10;
+
+    this.dashboardMockup.nativeElement.style.transform =
+      `rotateX(${rotateX}deg) rotateY(${rotateY}deg) rotateZ(2deg) scale(0.95)`;
+  }
+
+  onCardHover(event: MouseEvent) {
+    const card = event.currentTarget as HTMLElement;
+    const rect = card.getBoundingClientRect();
+    const x = (((event.clientX - rect.left) / rect.width) * 100).toFixed(1);
+    const y = (((event.clientY - rect.top) / rect.height) * 100).toFixed(1);
+    card.style.setProperty('--mouse-x', `${x}%`);
+    card.style.setProperty('--mouse-y', `${y}%`);
+  }
+
+  onCardLeave(event: MouseEvent) {
+    const card = event.currentTarget as HTMLElement;
+    card.style.setProperty('--mouse-x', '50%');
+    card.style.setProperty('--mouse-y', '50%');
   }
 
   scrollToModules() {
