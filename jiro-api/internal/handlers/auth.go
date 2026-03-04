@@ -17,22 +17,24 @@ import (
 )
 
 type AuthHandler struct {
-	authService  *services.AuthService
-	userService  *services.UserService
-	emailService *services.EmailService
-	cfg          *config.Config
-	appBaseURL   string
-	db           *pgxpool.Pool
+	authService   *services.AuthService
+	userService   *services.UserService
+	emailService  *services.EmailService
+	ledgerService *services.LedgerService
+	cfg           *config.Config
+	appBaseURL    string
+	db            *pgxpool.Pool
 }
 
-func NewAuthHandler(authService *services.AuthService, userService *services.UserService, emailService *services.EmailService, cfg *config.Config, db *pgxpool.Pool) *AuthHandler {
+func NewAuthHandler(authService *services.AuthService, userService *services.UserService, emailService *services.EmailService, ledgerService *services.LedgerService, cfg *config.Config, db *pgxpool.Pool) *AuthHandler {
 	return &AuthHandler{
-		authService:  authService,
-		userService:  userService,
-		emailService: emailService,
-		cfg:          cfg,
-		appBaseURL:   cfg.AppBaseURL,
-		db:           db,
+		authService:   authService,
+		userService:   userService,
+		emailService:  emailService,
+		ledgerService: ledgerService,
+		cfg:           cfg,
+		appBaseURL:    cfg.AppBaseURL,
+		db:            db,
 	}
 }
 
@@ -97,6 +99,9 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	h.setRefreshCookie(c, user.ID)
 	analytics.TrackEvent(h.db, user.ID, "user.register", nil)
+
+	// Seed default ledger categories asynchronously
+	go h.ledgerService.SeedDefaultCategories(context.Background(), user.ID)
 
 	// Send verification email asynchronously — don't block the response
 	go func() {

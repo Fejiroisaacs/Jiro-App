@@ -119,6 +119,31 @@ export const routes: Routes = [
         path: 'jym/how-to',
         loadComponent: () => import('./features/jym/how-to-use/how-to-use').then(m => m.HowToUseComponent),
       },
+      // ── Ledger ────────────────────────────────────────────────────────────
+      {
+        path: 'ledger',
+        loadComponent: () => import('./features/ledger/ledger-hub/ledger-hub').then(m => m.LedgerHubComponent),
+      },
+      {
+        path: 'ledger/transactions',
+        loadComponent: () => import('./features/ledger/transactions/transaction-log').then(m => m.TransactionLogComponent),
+      },
+      {
+        path: 'ledger/accounts',
+        loadComponent: () => import('./features/ledger/accounts/accounts-page').then(m => m.AccountsPageComponent),
+      },
+      {
+        path: 'ledger/budgets',
+        loadComponent: () => import('./features/ledger/budgets/budgets-page').then(m => m.BudgetsPageComponent),
+      },
+      {
+        path: 'ledger/networth',
+        loadComponent: () => import('./features/ledger/networth/networth-page').then(m => m.NetWorthPageComponent),
+      },
+      {
+        path: 'ledger/compare',
+        loadComponent: () => import('./features/ledger/compare/comparison-page').then(m => m.ComparisonPageComponent),
+      },
       // ── Journaly ──────────────────────────────────────────────────────────
       {
         path: 'journal',
