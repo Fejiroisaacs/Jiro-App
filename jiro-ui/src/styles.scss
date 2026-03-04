@@ -310,9 +310,7 @@ input, button, textarea, select {
 // Scoped to touch devices (hover:none + pointer:coarse) so desktop
 // appearance is completely unchanged even though !important is used.
 @media (hover: none) and (pointer: coarse) {
-  input:not([type="checkbox"]):not([type="radio"])
-       :not([type="range"]):not([type="button"])
-       :not([type="submit"]):not([type="reset"]):not([type="file"]),
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="file"]),
   textarea,
   select {
     font-size: 1rem !important;
