@@ -34,18 +34,40 @@ func Load() *Config {
 		log.Warn().Msg("No .env file found, using environment variables")
 	}
 
+	env := getEnv("ENVIRONMENT", "development")
+	isProd := env == "production"
+
+	jwtSecret := getEnv("JWT_SECRET", "change-me-in-production")
+	databaseURL := getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/jiro?sslmode=disable")
+	adminSecret := getEnv("ADMIN_SECRET", "")
+
+	if isProd {
+		if jwtSecret == "" || jwtSecret == "change-me-in-production" {
+			log.Fatal().Msg("JWT_SECRET must be set to a strong secret in production (generate with: openssl rand -hex 32)")
+		}
+		if len(jwtSecret) < 32 {
+			log.Fatal().Msg("JWT_SECRET must be at least 32 characters")
+		}
+		if databaseURL == "" || strings.Contains(databaseURL, "localhost") {
+			log.Fatal().Msg("DATABASE_URL must be set to a production database in production")
+		}
+		if adminSecret == "" {
+			log.Fatal().Msg("ADMIN_SECRET must be set in production")
+		}
+	}
+
 	return &Config{
 		Port:            getEnv("PORT", "8080"),
-		DatabaseURL:     getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/jiro?sslmode=disable"),
-		JWTSecret:       getEnv("JWT_SECRET", "change-me-in-production"),
+		DatabaseURL:     databaseURL,
+		JWTSecret:       jwtSecret,
 		AccessTokenTTL:  getDuration("JWT_ACCESS_TTL_MINUTES", 15),
 		RefreshTokenTTL: getDuration("JWT_REFRESH_TTL_DAYS", 7*24*60), // 7 days in minutes
 		CORSOrigins:     strings.Split(getEnv("CORS_ORIGINS", "http://localhost:4200"), ","),
-		Environment:     getEnv("ENVIRONMENT", "development"),
+		Environment:     env,
 		ResendAPIKey:     getEnv("RESEND_API_KEY", ""),
 		EmailFrom:        getEnv("EMAIL_FROM", "noreply@jiro.app"),
 		AppBaseURL:       getEnv("APP_BASE_URL", "http://localhost:4200"),
-		AdminSecret:      getEnv("ADMIN_SECRET", ""),
+		AdminSecret:      adminSecret,
 		StorageEndpoint:  getEnv("STORAGE_ENDPOINT", ""),
 		StorageBucket:    getEnv("STORAGE_BUCKET", ""),
 		StorageAccessKey: getEnv("STORAGE_ACCESS_KEY", ""),
