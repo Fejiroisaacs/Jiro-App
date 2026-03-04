@@ -55,14 +55,20 @@ export class AuthService {
     return this.accessToken();
   }
 
-  /** Called by APP_INITIALIZER. Validates the stored session with the server
-   *  before any route guard runs, so `isAuthenticated` reflects server truth. */
+  /** Called by APP_INITIALIZER. Silently rotates the token if a session exists.
+   *  Failure is non-fatal — localStorage state is kept so sessions persist across
+   *  browser close. The interceptor handles any subsequent 401s lazily. */
   async init(): Promise<void> {
     if (!this.accessToken()) {
       this.initialized.set(true);
       return;
     }
-    await firstValueFrom(this.refresh()).catch(() => {});
+    await firstValueFrom(
+      this.http.post<AuthResponse>(`${API_URL}/auth/refresh`, {}, { withCredentials: true }).pipe(
+        tap(res => this.handleAuth(res)),
+        catchError(() => of(null)),
+      )
+    ).catch(() => {});
     this.initialized.set(true);
   }
 
