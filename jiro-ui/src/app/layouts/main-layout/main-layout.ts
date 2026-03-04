@@ -56,7 +56,7 @@ import { FeedbackService } from '../../core/services/feedback.service';
             <span *ngIf="!collapsed()" class="nav-label">Journaly</span>
           </a>
 
-          <a class="nav-item disabled">
+          <a routerLink="/ledger" routerLinkActive="active" class="nav-item">
             <img src="/icons/ledger-icon.svg" width="28" height="28" alt="Ledger" />
             <span *ngIf="!collapsed()" class="nav-label">Ledger</span>
           </a>
@@ -189,6 +189,10 @@ import { FeedbackService } from '../../core/services/feedback.service';
         <a routerLink="/journal" routerLinkActive="active" class="mobile-nav-item">
           <img src="/icons/journaly-icon.svg" width="28" height="28" alt="Journaly" />
           <span>Journaly</span>
+        </a>
+        <a routerLink="/ledger" routerLinkActive="active" class="mobile-nav-item">
+          <img src="/icons/ledger-icon.svg" width="28" height="28" alt="Ledger" />
+          <span>Ledger</span>
         </a>
         <a routerLink="/settings" routerLinkActive="active" class="mobile-nav-item">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
