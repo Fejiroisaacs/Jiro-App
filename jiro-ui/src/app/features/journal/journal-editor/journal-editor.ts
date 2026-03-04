@@ -30,6 +30,7 @@ import { UploadService } from '../../../core/services/upload.service';
         <div class="editor-topbar-title">
           <span *ngIf="!editId">New Entry</span>
           <span *ngIf="editId">Edit Entry</span>
+          <span class="for-date-badge" *ngIf="forDate && !editId">for {{ formatForDate() }}</span>
         </div>
         <div class="editor-topbar-actions">
           <jiro-button
@@ -220,6 +221,17 @@ import { UploadService } from '../../../core/services/upload.service';
       flex: 1;
       font-weight: 600;
       font-size: var(--font-size-md);
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+    .for-date-badge {
+      font-size: var(--font-size-xs);
+      font-weight: 500;
+      color: var(--color-primary);
+      background: rgba(122,59,46,0.1);
+      padding: 2px 8px;
+      border-radius: 10px;
     }
     .editor-topbar-actions { flex-shrink: 0; }
 
@@ -476,6 +488,7 @@ export class JournalEditorComponent implements OnInit {
   mood = '';
   tags: string[] = [];
   tagDraft = '';
+  forDate: string | null = null;
 
   images = signal<JournalImage[]>([]);
   uploading = signal(false);
@@ -492,10 +505,11 @@ export class JournalEditorComponent implements OnInit {
     private route: ActivatedRoute,
     private router: Router,
     private uploadSvc: UploadService,
-  ) {}
+  ) { }
 
   ngOnInit() {
     this.editId = this.route.snapshot.paramMap.get('id');
+    this.forDate = this.route.snapshot.queryParamMap.get('date');
     this.svc.listCollections().subscribe(c => this.collections.set(c));
 
     if (this.editId) {
@@ -553,12 +567,15 @@ export class JournalEditorComponent implements OnInit {
     this.tagDraft = '';
     this.saving.set(true);
     this.saveError.set('');
-    const req = {
+    const req: any = {
       title: this.title.trim() || undefined,
       body: this.body.trim(),
       mood: this.mood || undefined,
       tags: this.tags,
     };
+    if (this.forDate && !this.editId) {
+      req.created_at = this.forDate + 'T12:00:00Z';
+    }
 
     if (this.editId) {
       this.svc.updateEntry(this.editId, req).subscribe({
@@ -636,4 +653,10 @@ export class JournalEditorComponent implements OnInit {
 
   @HostListener('document:keydown.escape')
   onEscape() { this.lightboxUrl.set(null); this.immersive.set(false); }
+
+  formatForDate(): string {
+    if (!this.forDate) return '';
+    const d = new Date(this.forDate + 'T12:00:00');
+    return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+  }
 }

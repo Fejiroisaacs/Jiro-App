@@ -235,7 +235,7 @@ export class JournalHomeComponent implements OnInit {
     return this.entries().filter(e => toISO(new Date(e.created_at)) === date);
   });
 
-  constructor(private svc: JournalService, public router: Router) {}
+  constructor(private svc: JournalService, public router: Router) { }
 
   ngOnInit() {
     this.svc.getStreak().subscribe(s => this.streak.set(s));
@@ -272,8 +272,9 @@ export class JournalHomeComponent implements OnInit {
   }
 
   onDayModalNew() {
+    const date = this.dayModalDate();
     this.closeDayModal();
-    this.router.navigate(['/journal/new']);
+    this.router.navigate(['/journal/new'], date ? { queryParams: { date } } : {});
   }
 
   onDayModalEdit(id: string) {

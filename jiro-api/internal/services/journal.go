@@ -16,14 +16,14 @@ import (
 )
 
 var (
-	ErrJournalEntryNotFound    = errors.New("journal entry not found")
-	ErrJournalGroupNotFound    = errors.New("journal group not found")
+	ErrJournalEntryNotFound      = errors.New("journal entry not found")
+	ErrJournalGroupNotFound      = errors.New("journal group not found")
 	ErrJournalCollectionNotFound = errors.New("journal collection not found")
-	ErrJournalImageNotFound    = errors.New("journal image not found")
-	ErrNotGroupMember          = errors.New("not a member of this group")
-	ErrAlreadyGroupMember      = errors.New("already a member of this group")
-	ErrInvalidMood             = errors.New("invalid mood value")
-	ErrImageLimitReached       = errors.New("entry already has 3 images")
+	ErrJournalImageNotFound      = errors.New("journal image not found")
+	ErrNotGroupMember            = errors.New("not a member of this group")
+	ErrAlreadyGroupMember        = errors.New("already a member of this group")
+	ErrInvalidMood               = errors.New("invalid mood value")
+	ErrImageLimitReached         = errors.New("entry already has 3 images")
 )
 
 var validMoods = map[string]bool{
@@ -50,13 +50,33 @@ func (s *JournalService) CreateEntry(ctx context.Context, userID uuid.UUID, grou
 	if tags == nil {
 		tags = []string{}
 	}
+
+	// Parse optional created_at for backdated entries
+	var createdAt interface{}
+	if req.CreatedAt != nil && *req.CreatedAt != "" {
+		t, err := time.Parse(time.RFC3339, *req.CreatedAt)
+		if err == nil {
+			createdAt = t
+		}
+	}
+
 	entry := &models.JournalEntry{}
-	err := s.db.QueryRow(ctx,
-		`INSERT INTO journal_entries (user_id, group_id, title, body, mood, tags)
-		 VALUES ($1, $2, $3, $4, $5, $6)
-		 RETURNING id, user_id, group_id, title, body, mood, tags, created_at, updated_at`,
-		userID, groupID, req.Title, req.Body, req.Mood, tags,
-	).Scan(&entry.ID, &entry.UserID, &entry.GroupID, &entry.Title, &entry.Body, &entry.Mood, &entry.Tags, &entry.CreatedAt, &entry.UpdatedAt)
+	var err error
+	if createdAt != nil {
+		err = s.db.QueryRow(ctx,
+			`INSERT INTO journal_entries (user_id, group_id, title, body, mood, tags, created_at)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7)
+			 RETURNING id, user_id, group_id, title, body, mood, tags, created_at, updated_at`,
+			userID, groupID, req.Title, req.Body, req.Mood, tags, createdAt,
+		).Scan(&entry.ID, &entry.UserID, &entry.GroupID, &entry.Title, &entry.Body, &entry.Mood, &entry.Tags, &entry.CreatedAt, &entry.UpdatedAt)
+	} else {
+		err = s.db.QueryRow(ctx,
+			`INSERT INTO journal_entries (user_id, group_id, title, body, mood, tags)
+			 VALUES ($1, $2, $3, $4, $5, $6)
+			 RETURNING id, user_id, group_id, title, body, mood, tags, created_at, updated_at`,
+			userID, groupID, req.Title, req.Body, req.Mood, tags,
+		).Scan(&entry.ID, &entry.UserID, &entry.GroupID, &entry.Title, &entry.Body, &entry.Mood, &entry.Tags, &entry.CreatedAt, &entry.UpdatedAt)
+	}
 	if err != nil {
 		return nil, err
 	}
