@@ -486,7 +486,7 @@ import { FeedbackService } from '../../core/services/feedback.service';
       display: none;
       position: fixed;
       bottom: 0; left: 0; right: 0;
-      height: 60px;
+      height: calc(60px + env(safe-area-inset-bottom));
       background: var(--bg-sidebar);
       border-top: 1px solid rgba(255, 255, 255, 0.1);
       z-index: 200;
