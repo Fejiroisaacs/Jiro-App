@@ -1,12 +1,11 @@
 import { Component, inject, OnInit } from '@angular/core';
-import { NgFor } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 
 @Component({
   selector: 'app-landing',
   standalone: true,
-  imports: [RouterLink, NgFor],
+  imports: [RouterLink],
   template: `
     <div class="landing">
 
@@ -38,6 +37,76 @@ import { AuthService } from '../../core/services/auth.service';
             <a class="l-btn l-btn--ghost" (click)="scrollToModules()">Explore modules</a>
           </div>
         </div>
+
+        <!-- Hero Dashboard Mockup -->
+        <div class="l-hero-mockup-wrapper">
+          <div class="l-dashboard-mockup">
+            <!-- Sidebar -->
+            <div class="l-mock-sidebar">
+              <div class="l-mock-brand">
+                <div class="l-mock-logo-mark">J</div><div class="l-mock-line w-12"></div>
+              </div>
+              <div class="l-mock-menu">
+                <div class="l-mock-menu-item l-mock-menu-item--active"><div class="l-mock-icon"></div><div class="l-mock-line w-16"></div></div>
+                <div class="l-mock-menu-label"><div class="l-mock-line w-10"></div></div>
+                <div class="l-mock-menu-item"><img src="/icons/culinara-icon.svg" width="16" height="16" alt="" style="opacity:0.75;border-radius:4px;flex-shrink:0"><div class="l-mock-line w-20"></div></div>
+                <div class="l-mock-menu-item"><img src="/icons/jym-icon.svg" width="16" height="16" alt="" style="opacity:0.75;border-radius:4px;flex-shrink:0"><div class="l-mock-line w-10"></div></div>
+                <div class="l-mock-menu-item"><img src="/icons/journaly-icon.svg" width="16" height="16" alt="" style="opacity:0.75;border-radius:4px;flex-shrink:0"><div class="l-mock-line w-18"></div></div>
+                <div class="l-mock-menu-item"><img src="/icons/ledger-icon.svg" width="16" height="16" alt="" style="opacity:0.75;border-radius:4px;flex-shrink:0"><div class="l-mock-line w-16"></div></div>
+              </div>
+            </div>
+            <!-- Main Area -->
+            <div class="l-mock-main">
+              <div class="l-mock-header">
+                <div class="l-mock-greeting">
+                  <div class="l-mock-h1"></div>
+                  <div class="l-mock-sub"></div>
+                </div>
+                <div class="l-mock-avatar"></div>
+              </div>
+              <div class="l-mock-grid">
+                <!-- Culinara recap -->
+                <div class="l-mock-card">
+                  <div class="l-mock-card-header"><div class="l-mock-icon-bg"></div></div>
+                  <div class="l-mock-card-body">
+                    <div class="l-mock-line w-full" style="height:9px;opacity:0.85"></div>
+                    <div class="l-mock-mini-stars">
+                      <div class="l-mock-star l-mock-star--on"></div>
+                      <div class="l-mock-star l-mock-star--on"></div>
+                      <div class="l-mock-star l-mock-star--on"></div>
+                      <div class="l-mock-star l-mock-star--on"></div>
+                      <div class="l-mock-star"></div>
+                    </div>
+                  </div>
+                </div>
+                <!-- Jym recap -->
+                <div class="l-mock-card">
+                  <div class="l-mock-card-header"><div class="l-mock-icon-bg"></div></div>
+                  <div class="l-mock-card-body">
+                    <div class="l-mock-line w-3-4" style="height:8px;opacity:0.8"></div>
+                    <div class="l-mock-mini-bars">
+                      <div class="l-mock-mini-bar" style="height:10px"></div>
+                      <div class="l-mock-mini-bar" style="height:14px"></div>
+                      <div class="l-mock-mini-bar" style="height:11px"></div>
+                      <div class="l-mock-mini-bar l-mock-mini-bar--peak" style="height:20px"></div>
+                      <div class="l-mock-mini-bar" style="height:16px"></div>
+                      <div class="l-mock-mini-bar" style="height:13px"></div>
+                    </div>
+                  </div>
+                </div>
+                <!-- Journaly recap -->
+                <div class="l-mock-card">
+                  <div class="l-mock-card-header"><div class="l-mock-icon-bg"></div></div>
+                  <div class="l-mock-card-body">
+                    <div class="l-mock-streak-display">12</div>
+                    <div class="l-mock-line w-2-3" style="height:6px;opacity:0.45"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Decorative orbs -->
         <div class="l-orb l-orb--1"></div>
         <div class="l-orb l-orb--2"></div>
@@ -89,6 +158,11 @@ import { AuthService } from '../../core/services/auth.service';
                 <p class="l-card-desc">Private reflections or shared journals. Track your mood, write daily, watch your streak grow.</p>
               </div>
               <div class="l-card-mockup l-mockup-journaly">
+                <div class="mj-entry-preview">
+                  <div class="mj-entry-date">Mar 3, 2026</div>
+                  <div class="mj-entry-line mj-entry-line--full"></div>
+                  <div class="mj-entry-line mj-entry-line--three-quarter"></div>
+                </div>
                 <div class="mj-streak">
                   <span class="mj-streak-num">12</span>
                   <span class="mj-streak-label">day streak</span>
@@ -100,7 +174,9 @@ import { AuthService } from '../../core/services/auth.service';
                   <span class="mj-mood" style="background: rgba(16,185,129,0.15); color: #059669;">Energised</span>
                 </div>
                 <div class="mj-week">
-                  <div *ngFor="let d of weekDots" class="mj-dot" [class.mj-dot--filled]="d"></div>
+                  @for (d of weekDots; track d; let i = $index) {
+                    <div class="mj-dot" [class.mj-dot--filled]="d"></div>
+                  }
                 </div>
               </div>
             </div>
@@ -115,13 +191,54 @@ import { AuthService } from '../../core/services/auth.service';
                 <p class="l-card-desc">Log sets, track volume, and visualise your strength journey with PR detection and progress charts.</p>
               </div>
               <div class="l-card-mockup l-mockup-jym">
+                <div class="mjym-top">
+                  <div class="mjym-exercise">Bench Press</div>
+                  <div class="mjym-set-row"><span class="mjym-set-num">Set 3</span><span class="mjym-set-data">180 lb × 5</span><span class="mjym-set-pr">PR</span></div>
+                </div>
                 <div class="mjym-bar-chart">
-                  <div *ngFor="let h of barHeights; let i = index" class="mjym-bar" [style.height.px]="h" [class.mjym-bar--pr]="i === 4"></div>
+                  @for (h of barHeights; track h; let i = $index) {
+                    <div class="mjym-bar" [style.height.px]="h" [class.mjym-bar--pr]="i === 4"></div>
+                  }
                 </div>
                 <div class="mjym-pr-badge">
-      <img src="/icons/badge-icon.svg" width="28" height="28" alt="PR badge" />
-      <span>+5 kg</span>
-    </div>
+                  <img src="/icons/badge-icon.svg" width="28" height="28" alt="PR badge" />
+                  <span>+5 kg</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Ledger — medium -->
+            <div class="l-card l-card--ledger">
+              <div class="l-card-content">
+                <div class="l-card-icon">
+                  <img src="/icons/ledger-icon.svg" width="24" height="24" alt="Ledger" />
+                </div>
+                <h3 class="l-card-name">Ledger</h3>
+                <p class="l-card-desc">Track spending, set budgets, and watch your net worth grow over time.</p>
+              </div>
+              <div class="l-card-mockup l-mockup-ledger">
+                <div class="ml-networth">
+                  <div class="ml-nw-label">Net Worth</div>
+                  <div class="ml-nw-value">$12,840</div>
+                  <div class="ml-nw-delta">↑ +$340 this month</div>
+                </div>
+                <div class="ml-txn-list">
+                  <div class="ml-txn">
+                    <div class="ml-txn-dot ml-txn-dot--income"></div>
+                    <div class="ml-txn-body"><div class="ml-txn-name">Salary</div><div class="ml-txn-date">Mar 1</div></div>
+                    <div class="ml-txn-amt ml-txn-amt--income">+$2,400</div>
+                  </div>
+                  <div class="ml-txn">
+                    <div class="ml-txn-dot ml-txn-dot--expense"></div>
+                    <div class="ml-txn-body"><div class="ml-txn-name">Groceries</div><div class="ml-txn-date">Mar 2</div></div>
+                    <div class="ml-txn-amt ml-txn-amt--expense">−$85</div>
+                  </div>
+                  <div class="ml-txn">
+                    <div class="ml-txn-dot ml-txn-dot--expense"></div>
+                    <div class="ml-txn-body"><div class="ml-txn-name">Coffee</div><div class="ml-txn-date">Mar 3</div></div>
+                    <div class="ml-txn-amt ml-txn-amt--expense">−$6</div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -380,6 +497,118 @@ import { AuthService } from '../../core/services/auth.service';
       animation: fadeUp 0.65s 0.15s ease both;
     }
 
+    /* ── Hero Mockup ───────────────────────────────────────────────────────── */
+    .l-hero-mockup-wrapper {
+      position: relative;
+      margin: 60px auto 0;
+      max-width: 900px;
+      perspective: 1200px;
+      z-index: 2;
+      animation: fadeUp 1s 0.25s cubic-bezier(0.16, 1, 0.3, 1) both,
+                 heroFloat 7s 1.25s ease-in-out infinite;
+    }
+    .l-hero-mockup-wrapper:hover {
+      animation: fadeUp 1s 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    .l-hero-mockup-wrapper::before {
+      content: '';
+      position: absolute;
+      bottom: -15%; left: 10%; right: 10%; height: 40%;
+      background: radial-gradient(ellipse at center, color-mix(in srgb, var(--color-primary) 30%, transparent) 0%, transparent 70%);
+      filter: blur(40px);
+      z-index: -1;
+      opacity: 0.6;
+      transform: scaleY(0.5);
+    }
+    .l-dashboard-mockup {
+      display: flex;
+      height: 480px;
+      background: var(--bg-surface);
+      border: 1px solid color-mix(in srgb, var(--border-color) 80%, transparent);
+      border-radius: 16px;
+      box-shadow: 0 32px 64px rgba(0,0,0,0.12), 0 0 0 1px rgba(255,255,255,0.05) inset;
+      overflow: hidden;
+      transform: rotateX(8deg) rotateY(-4deg) rotateZ(2deg) scale(0.95);
+      transform-style: preserve-3d;
+      transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .l-hero-mockup-wrapper:hover .l-dashboard-mockup {
+      transform: rotateX(2deg) rotateY(-1deg) rotateZ(0.5deg) scale(1);
+    }
+    /* Abstract Sidebar */
+    .l-mock-sidebar {
+      width: 200px;
+      border-right: 1px solid var(--border-color);
+      background: color-mix(in srgb, var(--bg-canvas) 50%, transparent);
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+    }
+    .l-mock-brand { display: flex; align-items: center; gap: 8px; }
+    .l-mock-logo-mark { font-weight: 800; color: var(--color-primary); font-size: 1.2rem; }
+    .l-mock-line { height: 6px; border-radius: 4px; background: var(--border-color); }
+    .w-12 { width: 48px; } .w-16 { width: 64px; } .w-10 { width: 40px; } .w-20 { width: 80px; } .w-18 { width: 72px; } .w-24 { width: 96px; }
+    .w-full { width: 100%; } .w-3-4 { width: 75%; } .w-2-3 { width: 66%; } .w-5-6 { width: 83%; } .w-1-2 { width: 50%; }
+    .l-mock-menu { display: flex; flex-direction: column; gap: 12px; }
+    .l-mock-menu-item { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 8px; }
+    .l-mock-menu-item--active { background: color-mix(in srgb, var(--color-primary) 10%, transparent); }
+    .l-mock-menu-item--active .l-mock-icon { background: var(--color-primary); opacity: 0.8; }
+    .l-mock-menu-item--active .l-mock-line { background: var(--color-primary); opacity: 0.8; }
+    .l-mock-menu-label { padding: 4px 12px; opacity: 0.6; margin-top: 16px; }
+    .l-mock-icon { width: 16px; height: 16px; border-radius: 4px; background: var(--border-color); }
+    /* Abstract Main Content */
+    .l-mock-main {
+      flex: 1;
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 40px;
+      background: var(--bg-canvas);
+    }
+    .l-mock-header { display: flex; justify-content: space-between; align-items: flex-start; }
+    .l-mock-greeting { display: flex; flex-direction: column; gap: 12px; }
+    .l-mock-h1 { width: 180px; height: 24px; border-radius: 6px; background: var(--text-primary); opacity: 0.9; }
+    .l-mock-sub { width: 120px; height: 8px; border-radius: 4px; background: var(--text-secondary); opacity: 0.5; }
+    .l-mock-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--border-color); }
+    .l-mock-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .l-mock-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    }
+    .l-mock-card-header { display: flex; align-items: center; }
+    .l-mock-icon-bg { width: 32px; height: 32px; border-radius: 8px; background: color-mix(in srgb, var(--text-primary) 10%, transparent); }
+    .l-mock-card-body { display: flex; flex-direction: column; gap: 8px; }
+    .l-mock-mini-stars { display: flex; gap: 3px; margin-top: 4px; }
+    .l-mock-star { width: 8px; height: 8px; border-radius: 50%; background: var(--border-color); }
+    .l-mock-star--on { background: #f59e0b; }
+    .l-mock-mini-bars { display: flex; align-items: flex-end; gap: 3px; height: 24px; margin-top: 4px; }
+    .l-mock-mini-bar { flex: 1; background: color-mix(in srgb, var(--color-primary) 30%, transparent); border-radius: 2px 2px 0 0; }
+    .l-mock-mini-bar--peak { background: var(--color-primary); }
+    .l-mock-streak-display { font-size: 1.6rem; font-weight: 800; color: var(--color-primary); line-height: 1; margin-top: 2px; }
+
+    @media (max-width: 900px) {
+      .l-hero-mockup-wrapper {
+        transform: scale(0.82);
+        transform-origin: top center;
+        margin-top: 20px;
+        margin-bottom: -86px; /* compensate: 480 * (1-0.82) ≈ 86px */
+      }
+      .l-dashboard-mockup { transform: rotateX(0) rotateY(0) rotateZ(0) scale(1); }
+      .l-hero-mockup-wrapper:hover .l-dashboard-mockup { transform: scale(1); }
+    }
+    @media (max-width: 600px) {
+      .l-hero-mockup-wrapper {
+        display: none;
+      }
+    }
+
     /* ── Section shared ────────────────────────────────────────────────────── */
     .l-section-label {
       font-size: var(--font-size-xs);
@@ -447,15 +676,17 @@ import { AuthService } from '../../core/services/auth.service';
       grid-row: 1 / 3;
     }
 
-    /* Jym: col 1–2, row 2 */
+    /* Jym: col 1, row 2 */
     .l-card--jym {
-      grid-column: 1 / 3;
+      grid-column: 1;
       grid-row: 2;
-      flex-direction: row;
-      gap: var(--space-xl);
-      align-items: center;
     }
-    .l-card--jym .l-card-content { flex: 1; }
+
+    /* Ledger: col 2, row 2 */
+    .l-card--ledger {
+      grid-column: 2;
+      grid-row: 2;
+    }
 
     /* Echo: removed from bento, shown inline */
     .l-card--echo {
@@ -509,6 +740,12 @@ import { AuthService } from '../../core/services/auth.service';
       display: flex;
       flex-direction: column;
       gap: 8px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s;
+    }
+    .l-card--culinara:hover .mc-recipe-card {
+      transform: translateY(-4px) scale(1.02);
+      box-shadow: 0 16px 40px rgba(0,0,0,0.1);
     }
     .mc-recipe-tag {
       font-size: 0.65rem;
@@ -542,6 +779,11 @@ import { AuthService } from '../../core/services/auth.service';
       border: 1px solid color-mix(in srgb, var(--color-primary) 20%, transparent);
       border-radius: var(--border-radius-sm);
       padding: var(--space-sm) var(--space-md);
+      box-shadow: 0 4px 12px color-mix(in srgb, var(--color-primary) 10%, transparent);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .l-card--journaly:hover .mj-streak {
+      transform: scale(1.05) rotate(2deg);
     }
     .mj-streak-num { font-size: 2rem; font-weight: 800; color: var(--color-primary); line-height: 1; }
     .mj-streak-label { font-size: var(--font-size-xs); color: var(--text-secondary); }
@@ -561,9 +803,22 @@ import { AuthService } from '../../core/services/auth.service';
       transition: background 0.2s;
     }
     .mj-dot--filled { background: var(--color-primary); }
+    .mj-entry-preview {
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius-sm);
+      padding: var(--space-xs) var(--space-sm);
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .mj-entry-date { font-size: 0.6rem; font-weight: 700; color: var(--color-primary); text-transform: uppercase; letter-spacing: 0.5px; }
+    .mj-entry-line { height: 5px; border-radius: 3px; background: var(--border-color); opacity: 0.7; }
+    .mj-entry-line--full { width: 100%; }
+    .mj-entry-line--three-quarter { width: 75%; }
 
     /* ── Jym mockup ────────────────────────────────────────────────────────── */
-    .l-mockup-jym { flex-shrink: 0; width: 180px; }
+    .l-mockup-jym { flex-shrink: 0; width: 100%; }
     .mjym-bar-chart {
       display: flex;
       align-items: flex-end;
@@ -575,10 +830,18 @@ import { AuthService } from '../../core/services/auth.service';
       flex: 1;
       background: color-mix(in srgb, var(--color-primary) 25%, transparent);
       border-radius: 3px 3px 0 0;
-      transition: background 0.2s;
+      transition: background 0.2s, transform 0.3s, opacity 0.3s;
     }
     .mjym-bar--pr {
       background: var(--color-primary);
+    }
+    .l-card--jym:hover .mjym-bar {
+      opacity: 0.8;
+    }
+    .l-card--jym:hover .mjym-bar--pr {
+      opacity: 1;
+      transform: scaleY(1.1);
+      transform-origin: bottom;
     }
     .mjym-pr-badge {
       display: flex;
@@ -593,8 +856,52 @@ import { AuthService } from '../../core/services/auth.service';
       border: 1px solid color-mix(in srgb, var(--color-primary) 25%, transparent);
       border-radius: 99px;
       padding: 4px 10px 4px 6px;
+      transition: transform 0.3s, box-shadow 0.3s;
+    }
+    .l-card--jym:hover .mjym-pr-badge {
+      transform: translateY(-4px) scale(1.05);
+      box-shadow: 0 8px 16px color-mix(in srgb, var(--color-primary) 15%, transparent);
     }
     .mjym-pr-badge img { display: block; flex-shrink: 0; }
+    .l-mockup-jym { flex-shrink: 0; width: 100%; }
+    .mjym-top { margin-bottom: 8px; }
+    .mjym-exercise { font-size: 0.72rem; font-weight: 700; color: var(--text-primary); opacity: 0.85; margin-bottom: 4px; }
+    .mjym-set-row { display: flex; align-items: center; gap: 6px; font-size: 0.68rem; }
+    .mjym-set-num { color: var(--text-secondary); }
+    .mjym-set-data { font-weight: 600; color: var(--text-primary); }
+    .mjym-set-pr { background: var(--color-primary); color: #fff; font-size: 0.6rem; font-weight: 700; padding: 1px 5px; border-radius: 99px; }
+
+    /* ── Ledger mockup ─────────────────────────────────────────────────────── */
+    .l-mockup-ledger { display: flex; flex-direction: column; gap: var(--space-sm); width: 100%; margin-top: auto; }
+    .ml-networth {
+      background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+      border: 1px solid color-mix(in srgb, var(--color-primary) 20%, transparent);
+      border-radius: var(--border-radius-sm);
+      padding: var(--space-sm) var(--space-md);
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .l-card--ledger:hover .ml-networth { transform: translateY(-3px); }
+    .ml-nw-label { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); }
+    .ml-nw-value { font-size: 1.4rem; font-weight: 800; color: var(--text-primary); line-height: 1.2; }
+    .ml-nw-delta { font-size: 0.68rem; color: #16a34a; font-weight: 600; margin-top: 2px; }
+    .ml-txn-list { display: flex; flex-direction: column; gap: 0; }
+    .ml-txn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .ml-txn:last-child { border-bottom: none; }
+    .ml-txn-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .ml-txn-dot--income { background: #16a34a; }
+    .ml-txn-dot--expense { background: #dc2626; }
+    .ml-txn-body { flex: 1; display: flex; flex-direction: column; gap: 1px; }
+    .ml-txn-name { font-weight: 600; color: var(--text-primary); font-size: 0.72rem; }
+    .ml-txn-date { font-size: 0.62rem; color: var(--text-secondary); }
+    .ml-txn-amt { font-weight: 700; font-size: 0.72rem; flex-shrink: 0; }
+    .ml-txn-amt--income { color: #16a34a; }
+    .ml-txn-amt--expense { color: #dc2626; }
 
     /* ── Why Jiro ──────────────────────────────────────────────────────────── */
     .l-why { padding: 80px 0; }
@@ -656,6 +963,10 @@ import { AuthService } from '../../core/services/auth.service';
       from { opacity: 0; transform: translateY(16px); }
       to   { opacity: 1; transform: translateY(0); }
     }
+    @keyframes heroFloat {
+      0%, 100% { transform: translateY(0px); }
+      50%       { transform: translateY(-10px); }
+    }
 
     /* ── Responsive ────────────────────────────────────────────────────────── */
     @media (max-width: 900px) {
@@ -665,8 +976,8 @@ import { AuthService } from '../../core/services/auth.service';
       .l-card--culinara { grid-column: 1 / 3; flex-direction: column; }
       .l-card--culinara .l-mockup-culinara { width: 100%; }
       .l-card--journaly { grid-column: 1; grid-row: auto; }
-      .l-card--jym { grid-column: 2; grid-row: auto; flex-direction: column; }
-      .l-card--jym .l-mockup-jym { width: 100%; }
+      .l-card--jym { grid-column: 2; grid-row: auto; }
+      .l-card--ledger { grid-column: 1; grid-row: auto; }
       .l-card--echo { grid-column: 1 / 3; }
       .l-pillars { grid-template-columns: 1fr; gap: var(--space-lg); }
     }
@@ -677,6 +988,7 @@ import { AuthService } from '../../core/services/auth.service';
       .l-card--culinara,
       .l-card--journaly,
       .l-card--jym,
+      .l-card--ledger,
       .l-card--echo { grid-column: 1; grid-row: auto; flex-direction: column; }
       .l-card--culinara .l-mockup-culinara,
       .l-card--jym .l-mockup-jym { width: 100%; }
