@@ -24,6 +24,7 @@ import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
             <a href="#exercise-library" (click)="scrollTo('exercise-library', $event)">3. The Exercise Library</a>
             <a href="#body-weight" (click)="scrollTo('body-weight', $event)">4. Body Weight Tracking</a>
             <a href="#discover-share" (click)="scrollTo('discover-share', $event)">5. Discover & Share (Community)</a>
+            <a href="#additional-features" (click)="scrollTo('additional-features', $event)">6. Additional Pro Features</a>
           </nav>
         </div>
 
@@ -32,6 +33,8 @@ import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
           <p>When you first open the Jym app, you'll land on the Dashboard. This is your high-level overview of your current fitness journey.</p>
           <ul>
             <li><strong>Current Active Series:</strong> If you are currently running a training program (e.g., "Summer Cut Split"), it will be highlighted here, showing your progress in weeks or sessions.</li>
+            <li><strong>Activity Heatmap:</strong> A calendar view showing your workout frequency and consistency over time.</li>
+            <li><strong>Muscle Breakdown:</strong> A dynamic chart providing visual feedback on your training volume distribution across different muscle groups.</li>
             <li><strong>Quick Stats & Recents:</strong> A summary of your recent workouts and any personal records broken.</li>
             <li><strong>Bottom Navigation:</strong> Use the bottom tab bar to quickly jump to Home, Culinara, Jym, or Settings. Within Jym, use the textured file folder tabs at the top to navigate sub-views.</li>
           </ul>
@@ -46,6 +49,7 @@ import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
           <ul>
             <li><strong>Viewing Splits:</strong> Click the "Splits" tab to view all your custom routines.</li>
             <li><strong>Creating a Split:</strong> Click the <code>+ New Split</code> button. Give it a name, description, and some descriptive tags.</li>
+            <li><strong>Public Sharing:</strong> You can choose to make any split <strong>Public</strong>. Public splits will be visible and available for the entire Jiro community to import from the <strong>Discover</strong> page.</li>
           </ul>
           <img src="/images/jym-guide/jym_splits_view_1771965001478.png" alt="Jym Splits List" class="guide-img" loading="lazy" />
 
@@ -66,7 +70,8 @@ import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
             <ul>
               <li>Click <code>Start</code> on the index card of your chosen split and select the routine (e.g., <em>Push</em>) for the day.</li>
               <li><strong>The Session Player:</strong> A live workout interface will overlay, showing a session timer, your target exercises, and letting you log physical weights, reps, and RPE as you progress.</li>
-              <li>Once finished, conclude the session to record the data directly into your Session History and PR Tracker.</li>
+              <li><strong>Micro-logging:</strong> You can quickly log your Body Weight or add session notes directly within the active player without losing your workout context.</li>
+              <li><strong>Completion Summary:</strong> Once finished, conclude the session to record the data. The Session Summary provides a breakdown of your total duration, volume lifted, muscle focus, and automatically highlights any newly broken PRs.</li>
             </ul>
             <img src="/images/jym-guide/jym_session_player_view_1771988024345.png" alt="Jym Session Player View" class="guide-img" loading="lazy" />
           </div>
@@ -104,7 +109,7 @@ import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
           <p>The Exercise Library is your personal database of movements.</p>
           <ul>
             <li><strong>Filtering:</strong> Use the search bar or the muscle group chips to quickly find specific exercises.</li>
-            <li><strong>Adding Custom Exercises:</strong> Click the <code>+</code> button in the top right to define a new movement. The app uses an intelligent PR tracker, so making sure you record exercises consistently is key.</li>
+            <li><strong>Adding Custom Exercises:</strong> Click the <code>+</code> button in the top right to define a new movement. You can select the primary muscle group (e.g., "Chest") and append specific technique notes. The app uses an intelligent PR tracker, so recording exercises consistently is key.</li>
             <li><strong>Exercise Details & Est. 1RM Tracking:</strong> Clicking on any existing exercise (e.g., <em>Barbell Bench Press</em>) opens its detailed view containing progression insights:
               <ul>
                 <li><strong>Progression Chart:</strong> A visual line graph showing your Estimated 1 Rep Max progression curve over time based on the sets you've logged.</li>
@@ -140,6 +145,18 @@ import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
             <li>To share your own routine, go to your Splits, find the routine, and use the Share icon to generate a unique public link or post it to the Discover wall.</li>
           </ul>
           <img src="/images/jym-guide/jym_discover_view_1771985365660.png" alt="Jym Discover Community" class="guide-img" loading="lazy" />
+        </section>
+
+        <hr class="divider" />
+
+        <section class="guide-section" id="additional-features">
+          <h2>6. Additional Pro Features</h2>
+          <p>Beyond the core workout tracking, Jym offers several advanced features that might not be immediately obvious but are crucial for serious lifters:</p>
+          <ul>
+            <li><strong>Form Checks & Video Analysis:</strong> You can upload or record form check videos for individual exercises. This capability is accessible both from within a live workout session and directly from the Exercise Library's detail view, allowing you to review your technique over time.</li>
+            <li><strong>Session Templates:</strong> Instead of building a new routine from scratch, you have the ability to save any completed workout session as a reusable <strong>Template</strong>. You can then launch future workouts directly from this template structure.</li>
+            <li><strong>Contextual Notes:</strong> During a live session, you can take high-level <strong>Session Notes</strong> to describe how the entire workout felt (e.g., "Felt energized, slept 8 hours"). Additionally, you can log specific <strong>Exercise Notes</strong> under individual movements (e.g., "Raise the bench one notch" or "Focus on the eccentric phase") to remind yourself for next time.</li>
+          </ul>
         </section>
         
         <div style="height: 60px;"></div>

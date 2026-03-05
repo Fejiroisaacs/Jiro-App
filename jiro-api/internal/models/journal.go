@@ -9,16 +9,16 @@ import (
 // ─── Domain structs ────────────────────────────────────────────────────────
 
 type JournalEntry struct {
-	ID        uuid.UUID  `json:"id"`
-	UserID    uuid.UUID  `json:"user_id"`
-	GroupID   *uuid.UUID `json:"group_id"`
-	Title     *string    `json:"title"`
-	Body      string     `json:"body"`
-	Mood      *string    `json:"mood"`
-	Tags      []string   `json:"tags"`
+	ID        uuid.UUID      `json:"id"`
+	UserID    uuid.UUID      `json:"user_id"`
+	GroupID   *uuid.UUID     `json:"group_id"`
+	Title     *string        `json:"title"`
+	Body      string         `json:"body"`
+	Mood      *string        `json:"mood"`
+	Tags      []string       `json:"tags"`
 	Images    []JournalImage `json:"images,omitempty"`
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
 }
 
 type JournalImage struct {
@@ -53,23 +53,24 @@ type JournalGroupMember struct {
 }
 
 type JournalCollection struct {
-	ID             uuid.UUID `json:"id"`
-	UserID         uuid.UUID `json:"user_id"`
-	Name           string    `json:"name"`
-	Description    *string   `json:"description"`
-	CoverImageURL  *string   `json:"cover_image_url"`
-	EntryCount     int       `json:"entry_count"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ID            uuid.UUID `json:"id"`
+	UserID        uuid.UUID `json:"user_id"`
+	Name          string    `json:"name"`
+	Description   *string   `json:"description"`
+	CoverImageURL *string   `json:"cover_image_url"`
+	EntryCount    int       `json:"entry_count"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 // ─── Request types ─────────────────────────────────────────────────────────
 
 type CreateJournalEntryRequest struct {
-	Title   *string  `json:"title"`
-	Body    string   `json:"body" binding:"required"`
-	Mood    *string  `json:"mood"`
-	Tags    []string `json:"tags"`
+	Title     *string  `json:"title"`
+	Body      string   `json:"body" binding:"required"`
+	Mood      *string  `json:"mood"`
+	Tags      []string `json:"tags"`
+	CreatedAt *string  `json:"created_at"`
 }
 
 type UpdateJournalEntryRequest struct {

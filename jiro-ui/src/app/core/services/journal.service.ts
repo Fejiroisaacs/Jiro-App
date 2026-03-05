@@ -84,6 +84,7 @@ export interface CreateEntryRequest {
   body: string;
   mood?: string;
   tags?: string[];
+  created_at?: string;
 }
 
 export interface UpdateEntryRequest {
@@ -104,21 +105,21 @@ export interface ListEntriesParams {
 }
 
 export const MOODS = [
-  { value: 'happy',     label: 'Happy',     emoji: '😊' },
-  { value: 'calm',      label: 'Calm',      emoji: '😌' },
+  { value: 'happy', label: 'Happy', emoji: '😊' },
+  { value: 'calm', label: 'Calm', emoji: '😌' },
   { value: 'energised', label: 'Energised', emoji: '⚡' },
-  { value: 'grateful',  label: 'Grateful',  emoji: '🙏' },
-  { value: 'anxious',   label: 'Anxious',   emoji: '😰' },
-  { value: 'sad',       label: 'Sad',       emoji: '😔' },
-  { value: 'tired',     label: 'Tired',     emoji: '😴' },
-  { value: 'stressed',  label: 'Stressed',  emoji: '😤' },
+  { value: 'grateful', label: 'Grateful', emoji: '🙏' },
+  { value: 'anxious', label: 'Anxious', emoji: '😰' },
+  { value: 'sad', label: 'Sad', emoji: '😔' },
+  { value: 'tired', label: 'Tired', emoji: '😴' },
+  { value: 'stressed', label: 'Stressed', emoji: '😤' },
 ] as const;
 
 // ─── Service ───────────────────────────────────────────────────────────────────
 
 @Injectable({ providedIn: 'root' })
 export class JournalService {
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient) { }
 
   // Entries
   createEntry(req: CreateEntryRequest): Observable<JournalEntry> {
@@ -127,12 +128,12 @@ export class JournalService {
 
   listEntries(params: ListEntriesParams = {}): Observable<JournalEntry[]> {
     let p = new HttpParams();
-    if (params.q)      p = p.set('q', params.q);
-    if (params.mood)   p = p.set('mood', params.mood);
-    if (params.tag)    p = p.set('tag', params.tag);
-    if (params.from)   p = p.set('from', params.from);
-    if (params.to)     p = p.set('to', params.to);
-    if (params.limit)  p = p.set('limit', params.limit);
+    if (params.q) p = p.set('q', params.q);
+    if (params.mood) p = p.set('mood', params.mood);
+    if (params.tag) p = p.set('tag', params.tag);
+    if (params.from) p = p.set('from', params.from);
+    if (params.to) p = p.set('to', params.to);
+    if (params.limit) p = p.set('limit', params.limit);
     if (params.offset) p = p.set('offset', params.offset);
     return this.http.get<JournalEntry[]>(`${API_URL}/entries`, { params: p });
   }

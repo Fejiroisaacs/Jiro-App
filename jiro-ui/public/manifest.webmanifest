@@ -9,16 +9,16 @@
   "theme_color": "#7A3B2E",
   "icons": [
     {
-      "src": "/icons/pwa-icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "/icons/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
       "purpose": "any"
     },
     {
       "src": "/icons/pwa-icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "maskable"
+      "purpose": "any maskable"
     }
   ],
   "categories": ["health", "fitness", "food"],

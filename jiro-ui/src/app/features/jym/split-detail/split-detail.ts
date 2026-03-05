@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
-import { JymService, SplitWithRoutines, Routine, RoutineItem, Exercise } from '../../../core/services/jym.service';
+import { JymService, SplitWithRoutines, Routine, RoutineItem, Exercise, CreateSeriesRequest } from '../../../core/services/jym.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 
@@ -70,6 +70,12 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
           </div>
         </div>
         <div class="header-btns">
+          <jiro-button variant="secondary" type="button" (click)="openSeriesModal()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="5,3 19,12 5,21" fill="currentColor" stroke="none"/>
+            </svg>
+            Start Series
+          </jiro-button>
           <jiro-button variant="secondary" type="button" [disabled]="sharing()" (click)="shareSplit()">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
@@ -195,8 +201,8 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     <!-- Exercise Picker Modal -->
     <jiro-modal *ngIf="showExPicker()" title="Add Exercise" maxWidth="480px" (close)="showExPicker.set(false)">
       <div class="ex-picker">
-        <input class="form-input" type="text" [(ngModel)]="exSearch" (input)="filterExercises()" placeholder="Search exercises..." />
-        <div class="ex-picker-list">
+        <input *ngIf="!creatingExercise()" class="form-input" type="text" [(ngModel)]="exSearch" (input)="filterExercises()" placeholder="Search exercises..." />
+        <div *ngIf="!creatingExercise()" class="ex-picker-list">
           <button
             *ngFor="let ex of filteredExercises()"
             class="ex-pick-btn"
@@ -205,8 +211,33 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
             <span class="ex-pick-muscle" *ngIf="ex.muscle_group">{{ ex.muscle_group }}</span>
           </button>
           <div *ngIf="filteredExercises().length === 0" class="no-results">
-            <p class="text-secondary">No exercises found.</p>
-            <p class="text-secondary" style="font-size:var(--font-size-sm)">Add exercises in the Exercise Library first.</p>
+            <p class="text-secondary">No exercises match "{{ exSearch }}".</p>
+          </div>
+        </div>
+
+        <!-- Create new exercise inline -->
+        <button *ngIf="!creatingExercise() && !pickerSelectedEx()" class="create-ex-inline-btn" (click)="startCreateExercise()">
+          + Create New Exercise{{ exSearch.trim() ? ' "' + exSearch.trim() + '"' : '' }}
+        </button>
+
+        <div *ngIf="creatingExercise()" class="inline-create-form">
+          <div class="form-group">
+            <label class="form-label">Exercise Name *</label>
+            <input class="form-input" type="text" [(ngModel)]="newExName" placeholder="e.g. Bulgarian Split Squat" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Muscle Group</label>
+            <select class="form-input" [(ngModel)]="newExMuscleGroup">
+              <option value="">None</option>
+              <option *ngFor="let mg of muscleGroups" [value]="mg">{{ mg }}</option>
+            </select>
+          </div>
+          <p *ngIf="newExError()" class="create-ex-error">{{ newExError() }}</p>
+          <div class="form-actions">
+            <jiro-button variant="secondary" type="button" (click)="creatingExercise.set(false)">Cancel</jiro-button>
+            <jiro-button variant="primary" type="button" [disabled]="newExSaving() || !newExName.trim()" (click)="createAndPickExercise()">
+              {{ newExSaving() ? 'Creating...' : 'Create & Select' }}
+            </jiro-button>
           </div>
         </div>
 
@@ -227,6 +258,38 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
           </jiro-button>
         </div>
       </div>
+    </jiro-modal>
+
+    <!-- Start Series Modal -->
+    <jiro-modal *ngIf="showSeriesModal()" title="Start Series" maxWidth="440px" (close)="showSeriesModal.set(false)">
+      <form class="simple-form" (ngSubmit)="createSeries()">
+        <div class="form-group">
+          <label class="form-label">Series Name</label>
+          <input class="form-input" type="text" [(ngModel)]="seriesName" name="seriesName" placeholder="e.g. Cut Phase 1" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Duration</label>
+          <div class="dur-options">
+            <button type="button" class="dur-btn" [class.active]="seriesDuration === 'open'" (click)="seriesDuration = 'open'">Open-ended</button>
+            <button type="button" class="dur-btn" [class.active]="seriesDuration === 'weeks'" (click)="seriesDuration = 'weeks'">Weeks</button>
+            <button type="button" class="dur-btn" [class.active]="seriesDuration === 'sessions'" (click)="seriesDuration = 'sessions'">Sessions</button>
+          </div>
+        </div>
+        <div class="form-group" *ngIf="seriesDuration === 'weeks'">
+          <label class="form-label">Target Weeks</label>
+          <input class="form-input" type="number" [(ngModel)]="seriesTargetWeeks" name="targetWeeks" min="1" max="52" />
+        </div>
+        <div class="form-group" *ngIf="seriesDuration === 'sessions'">
+          <label class="form-label">Target Sessions</label>
+          <input class="form-input" type="number" [(ngModel)]="seriesTargetSessions" name="targetSessions" min="1" max="200" />
+        </div>
+        <div class="form-actions">
+          <jiro-button variant="secondary" type="button" (click)="showSeriesModal.set(false)">Cancel</jiro-button>
+          <jiro-button variant="primary" type="submit" [disabled]="creatingSeries() || !seriesName.trim()">
+            {{ creatingSeries() ? 'Starting...' : 'Start Series' }}
+          </jiro-button>
+        </div>
+      </form>
     </jiro-modal>
   `,
   styles: [`
@@ -520,6 +583,24 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
     .target-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md); }
 
+    .create-ex-inline-btn {
+      width: 100%; padding: var(--space-sm) var(--space-md);
+      background: none; border: 1px dashed var(--border-color);
+      border-radius: var(--border-radius); color: var(--color-primary);
+      font-size: var(--font-size-sm); font-weight: 500; cursor: pointer;
+      text-align: center; transition: all 0.15s; font-family: inherit;
+    }
+
+    .create-ex-inline-btn:hover { border-color: var(--color-primary); background: rgba(122,59,46,0.05); }
+
+    .inline-create-form {
+      background: var(--bg-canvas); border: 1px solid var(--border-color);
+      border-radius: var(--border-radius); padding: var(--space-md);
+      display: flex; flex-direction: column; gap: var(--space-sm);
+    }
+
+    .create-ex-error { font-size: var(--font-size-xs); color: var(--color-danger); margin: 0; }
+
     /* Share panel */
     .header-btns { display: flex; gap: var(--space-sm); align-items: center; }
     .header-btns ::ng-deep .jiro-btn { width: auto; }
@@ -557,6 +638,25 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     }
     .share-revoke-btn:hover { color: var(--color-danger); }
 
+    /* Series modal */
+    .simple-form { display: flex; flex-direction: column; gap: var(--space-md); }
+
+    .dur-options { display: flex; gap: var(--space-xs); }
+
+    .dur-btn {
+      flex: 1; padding: 8px 12px; border: 1px solid var(--border-color);
+      border-radius: var(--border-radius); background: var(--bg-surface);
+      color: var(--text-secondary); font-size: var(--font-size-sm);
+      cursor: pointer; transition: all 0.15s; font-family: inherit;
+    }
+
+    .dur-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+    .dur-btn.active {
+      background: rgba(122,59,46,0.1); border-color: var(--color-primary);
+      color: var(--color-primary); font-weight: 500;
+    }
+
     @media (max-width: 600px) {
       .header-btns {
         flex-direction: column;
@@ -579,6 +679,14 @@ export class SplitDetailComponent implements OnInit {
   showAddRoutine = signal(false);
   showExPicker = signal(false);
 
+  // Series creation
+  showSeriesModal = signal(false);
+  creatingSeries = signal(false);
+  seriesName = '';
+  seriesDuration: 'open' | 'weeks' | 'sessions' = 'open';
+  seriesTargetWeeks = 8;
+  seriesTargetSessions = 20;
+
   editName = '';
   editingTags = signal(false);
   editTagsRaw = '';
@@ -598,6 +706,14 @@ export class SplitDetailComponent implements OnInit {
   pickerSets = 3;
   pickerReps = 8;
   private pickerRoutineIndex = 0;
+
+  // Inline exercise creation
+  creatingExercise = signal(false);
+  newExName = '';
+  newExMuscleGroup = '';
+  newExSaving = signal(false);
+  newExError = signal('');
+  readonly muscleGroups = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs', 'Glutes', 'Core', 'Cardio', 'Other'];
 
   private splitId = '';
 
@@ -734,6 +850,7 @@ export class SplitDetailComponent implements OnInit {
     this.pickerRoutineIndex = routineIndex;
     this.pickerSelectedEx.set(null);
     this.exSearch = '';
+    this.creatingExercise.set(false);
     this.filteredExercises.set(this.allExercises());
     this.showExPicker.set(true);
   }
@@ -749,6 +866,39 @@ export class SplitDetailComponent implements OnInit {
     this.pickerSelectedEx.set(ex);
     this.pickerSets = 3;
     this.pickerReps = 8;
+    this.creatingExercise.set(false);
+  }
+
+  startCreateExercise() {
+    this.newExName = this.exSearch.trim();
+    this.newExMuscleGroup = '';
+    this.newExError.set('');
+    this.creatingExercise.set(true);
+  }
+
+  createAndPickExercise() {
+    const name = this.newExName.trim();
+    if (!name) return;
+    this.newExSaving.set(true);
+    this.newExError.set('');
+    this.jymService.createExercise({
+      name,
+      muscle_group: this.newExMuscleGroup || undefined,
+    }).subscribe({
+      next: ex => {
+        // Add to local exercise list
+        this.allExercises.update(list => [...list, ex]);
+        this.filteredExercises.set(this.allExercises());
+        this.newExSaving.set(false);
+        this.creatingExercise.set(false);
+        // Auto-select the newly created exercise
+        this.addExerciseToRoutine(ex);
+      },
+      error: () => {
+        this.newExSaving.set(false);
+        this.newExError.set('Could not create exercise. The name may already be taken.');
+      },
+    });
   }
 
   confirmAddExercise() {
@@ -825,5 +975,34 @@ export class SplitDetailComponent implements OnInit {
       target_reps: item.target_reps,
     }));
     this.jymService.replaceRoutineItems(routine.id, entries).subscribe();
+  }
+
+  openSeriesModal() {
+    const s = this.split();
+    this.seriesName = s ? s.name + ' Run' : '';
+    this.seriesDuration = 'open';
+    this.seriesTargetWeeks = 8;
+    this.seriesTargetSessions = 20;
+    this.showSeriesModal.set(true);
+  }
+
+  createSeries() {
+    if (!this.seriesName.trim()) return;
+    this.creatingSeries.set(true);
+    const req: CreateSeriesRequest = {
+      split_id: this.splitId,
+      name: this.seriesName.trim(),
+      duration_type: this.seriesDuration,
+      ...(this.seriesDuration === 'weeks' ? { target_weeks: this.seriesTargetWeeks } : {}),
+      ...(this.seriesDuration === 'sessions' ? { target_sessions: this.seriesTargetSessions } : {}),
+    };
+    this.jymService.createSeries(req).subscribe({
+      next: sr => {
+        this.showSeriesModal.set(false);
+        this.creatingSeries.set(false);
+        this.router.navigate(['/jym/series', sr.id]);
+      },
+      error: () => this.creatingSeries.set(false),
+    });
   }
 }
