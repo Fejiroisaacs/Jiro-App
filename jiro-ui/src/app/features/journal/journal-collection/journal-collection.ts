@@ -10,11 +10,12 @@ import {
 } from '../../../core/services/journal.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
+import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
 
 @Component({
   selector: 'app-journal-collection',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, JiroButtonComponent, JiroModalComponent],
+  imports: [CommonModule, FormsModule, RouterLink, JiroButtonComponent, JiroModalComponent, SafeHtmlPipe],
   template: `
     <div class="collection-page">
 
@@ -80,7 +81,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
             <div class="entry-card-top">
               <div class="entry-meta">
                 <span class="entry-date">{{ formatDate(e.created_at) }}</span>
-                <span class="mood-chip" *ngIf="e.mood">{{ moodEmoji(e.mood) }} {{ moodLabel(e.mood) }}</span>
+                <span class="mood-chip" *ngIf="e.mood"><span [innerHTML]="moodIcon(e.mood) | safeHtml"></span> {{ moodLabel(e.mood) }}</span>
               </div>
               <div class="entry-card-actions" (click)="$event.stopPropagation()">
                 <button
@@ -191,7 +192,8 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     .entry-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-xs); }
     .entry-meta { display: flex; align-items: center; gap: var(--space-sm); }
     .entry-date { font-size: var(--font-size-xs); color: var(--text-secondary); }
-    .mood-chip { font-size: var(--font-size-xs); padding: 2px 8px; background: color-mix(in srgb, var(--color-primary) 12%, transparent); color: var(--color-primary); border-radius: 99px; }
+    .mood-chip { display: inline-flex; align-items: center; gap: 4px; font-size: var(--font-size-xs); padding: 2px 8px; background: color-mix(in srgb, var(--color-primary) 12%, transparent); color: var(--color-primary); border-radius: 99px; }
+    .mood-chip svg { width: 12px; height: 12px; }
     .entry-card-actions { display: flex; gap: var(--space-xs); opacity: 0; transition: opacity 0.15s; }
     .entry-card:hover .entry-card-actions { opacity: 1; }
     .icon-btn { background: none; border: none; cursor: pointer; padding: 4px; border-radius: var(--border-radius-sm); color: var(--text-secondary); display: flex; align-items: center; transition: color 0.12s, background 0.12s; }
@@ -237,7 +239,7 @@ export class JournalCollectionComponent implements OnInit {
     private svc: JournalService,
     private route: ActivatedRoute,
     public router: Router,
-  ) {}
+  ) { }
 
   ngOnInit() {
     this.collId = this.route.snapshot.paramMap.get('id') ?? '';
@@ -306,6 +308,6 @@ export class JournalCollectionComponent implements OnInit {
     return body.length > 180 ? body.slice(0, 180) + '...' : body;
   }
 
-  moodEmoji(value: string): string { return MOODS.find(m => m.value === value)?.emoji ?? ''; }
+  moodIcon(value: string): string { return MOODS.find(m => m.value === value)?.icon ?? ''; }
   moodLabel(value: string): string { return MOODS.find(m => m.value === value)?.label ?? value; }
 }
