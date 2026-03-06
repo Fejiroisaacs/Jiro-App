@@ -489,6 +489,7 @@ export class JournalEditorComponent implements OnInit {
   tags: string[] = [];
   tagDraft = '';
   forDate: string | null = null;
+  groupId: string | null = null;
 
   images = signal<JournalImage[]>([]);
   uploading = signal(false);
@@ -510,6 +511,7 @@ export class JournalEditorComponent implements OnInit {
   ngOnInit() {
     this.editId = this.route.snapshot.paramMap.get('id');
     this.forDate = this.route.snapshot.queryParamMap.get('date');
+    this.groupId = this.route.snapshot.queryParamMap.get('group');
     this.svc.listCollections().subscribe(c => this.collections.set(c));
 
     if (this.editId) {
@@ -582,6 +584,17 @@ export class JournalEditorComponent implements OnInit {
         next: () => { this.saving.set(false); this.router.navigate([this.backRoute()]); },
         error: (err: any) => { this.saving.set(false); this.saveError.set(err?.error?.message ?? 'Failed to save.'); },
       });
+    } else if (this.groupId) {
+      this.svc.createGroupEntry(this.groupId, req).subscribe({
+        next: e => {
+          Array.from(this.selectedCollections).forEach(cid =>
+            this.svc.addEntryToCollection(cid, e.id).subscribe()
+          );
+          this.saving.set(false);
+          this.router.navigate([`/journal/groups/${this.groupId}`]);
+        },
+        error: (err: any) => { this.saving.set(false); this.saveError.set(err?.error?.message ?? 'Failed to save.'); },
+      });
     } else {
       this.svc.createEntry(req).subscribe({
         next: e => {
@@ -647,7 +660,7 @@ export class JournalEditorComponent implements OnInit {
   goBack() { this.router.navigate([this.backRoute()]); }
 
   private backRoute(): string {
-    const groupId = this.entry()?.group_id;
+    const groupId = this.entry()?.group_id || this.groupId;
     return groupId ? `/journal/groups/${groupId}` : '/journal';
   }
 

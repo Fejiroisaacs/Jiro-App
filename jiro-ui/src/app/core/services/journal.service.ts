@@ -34,6 +34,7 @@ export interface JournalGroup {
   owner_id: string;
   name: string;
   members: JournalGroupMember[];
+  member_count: number;
   created_at: string;
   updated_at: string;
 }

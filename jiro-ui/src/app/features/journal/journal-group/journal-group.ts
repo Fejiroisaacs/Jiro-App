@@ -14,11 +14,12 @@ import { JournalWeekViewComponent, toISO, currentWeekBounds } from '../journal-w
 import { JournalDayModalComponent } from '../journal-day-modal/journal-day-modal';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
+import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
 
 @Component({
   selector: 'app-journal-group',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, JournalWeekViewComponent, JournalDayModalComponent, JiroButtonComponent, JiroModalComponent],
+  imports: [CommonModule, FormsModule, RouterLink, JournalWeekViewComponent, JournalDayModalComponent, JiroButtonComponent, JiroModalComponent, SafeHtmlPipe],
   template: `
     <div class="group-page">
 
@@ -47,7 +48,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
             </svg>
             Members
           </jiro-button>
-          <jiro-button variant="primary" type="button" (click)="showNewEntry.set(true)">
+          <jiro-button variant="primary" type="button" (click)="writeEntry()">
             + Write
           </jiro-button>
         </div>
@@ -87,7 +88,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
         <div *ngIf="!loadingEntries() && weekEntries().length === 0" class="state-center">
           <h3>No entries this week</h3>
           <p class="text-secondary">Click any day above or use "Write" to add an entry.</p>
-          <jiro-button variant="primary" type="button" (click)="showNewEntry.set(true)">Write Entry</jiro-button>
+          <jiro-button variant="primary" type="button" (click)="writeEntry()">Write Entry</jiro-button>
         </div>
 
         <div class="entries-feed" *ngIf="!loadingEntries() && weekEntries().length > 0">
@@ -98,7 +99,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
                 <span class="author-name">{{ authorName(e) }}</span>
                 <span class="entry-date text-secondary">{{ formatDate(e.created_at) }}</span>
               </div>
-              <span class="mood-chip" *ngIf="e.mood">{{ moodEmoji(e.mood) }}</span>
+              <span class="mood-chip" *ngIf="e.mood" [innerHTML]="moodIcon(e.mood) | safeHtml"></span>
               <!-- Edit/delete for own entries -->
               <div class="entry-actions" *ngIf="isOwnEntry(e)">
                 <button class="icon-btn" (click)="router.navigate(['/journal', e.id, 'edit'])" aria-label="Edit">
@@ -209,29 +210,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       </div>
     </jiro-modal>
 
-    <!-- New Entry modal -->
-    <jiro-modal *ngIf="showNewEntry()" title="Write Entry" (close)="showNewEntry.set(false)">
-      <div class="modal-form">
-        <input type="text" class="form-control" [(ngModel)]="newTitle" placeholder="Title (optional)" maxlength="255" />
-        <textarea class="form-control body-area" [(ngModel)]="newBody" placeholder="What's on your mind?" rows="6"></textarea>
-        <div class="mood-row-modal">
-          <button
-            *ngFor="let m of moods"
-            class="mood-chip-sm"
-            [class.selected]="newMood === m.value"
-            (click)="newMood = (newMood === m.value ? '' : m.value)"
-            type="button">
-            {{ m.emoji }}
-          </button>
-        </div>
-      </div>
-      <div class="modal-actions">
-        <jiro-button variant="secondary" type="button" (click)="showNewEntry.set(false)">Cancel</jiro-button>
-        <jiro-button variant="primary" type="button" [disabled]="!newBody.trim() || postingEntry()" (click)="postEntry()">
-          {{ postingEntry() ? 'Posting...' : 'Post' }}
-        </jiro-button>
-      </div>
-    </jiro-modal>
+
 
     <!-- Delete entry confirm -->
     <jiro-modal *ngIf="deleteTarget()" title="Delete Entry" (close)="deleteTarget.set(null)">
@@ -306,7 +285,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     .author-info { display: flex; flex-direction: column; gap: 1px; flex: 1; }
     .author-name { font-weight: 600; font-size: var(--font-size-sm); }
     .entry-date { font-size: var(--font-size-xs); }
-    .mood-chip { font-size: 1.1rem; margin-left: auto; }
+    .mood-chip { display: inline-flex; align-items: center; margin-left: auto; color: var(--text-secondary); }
     .entry-actions { display: flex; gap: 4px; }
     .icon-btn {
       background: none; border: none; cursor: pointer; padding: 4px; border-radius: var(--border-radius-sm);
@@ -365,11 +344,12 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     .mood-row-modal { display: flex; gap: var(--space-xs); overflow-x: auto; scrollbar-width: none; }
     .mood-row-modal::-webkit-scrollbar { display: none; }
     .mood-chip-sm {
-      font-size: 1.3rem; padding: 6px; border: 1.5px solid var(--border-color); border-radius: var(--border-radius-sm);
+      padding: 6px; border: 1.5px solid var(--border-color); border-radius: var(--border-radius-sm);
       background: none; cursor: pointer; flex-shrink: 0; min-width: 44px; min-height: 44px;
-      transition: border-color 0.15s; display: flex; align-items: center; justify-content: center;
+      color: var(--text-primary);
+      transition: border-color 0.15s, color 0.15s; display: flex; align-items: center; justify-content: center;
     }
-    .mood-chip-sm.selected { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 12%, transparent); }
+    .mood-chip-sm.selected { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 12%, transparent); color: var(--color-primary); }
     .modal-actions { display: flex; justify-content: flex-end; gap: var(--space-sm); }
 
     /* Lightbox */
@@ -388,7 +368,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
   `]
 })
 export class JournalGroupComponent implements OnInit {
-  moods = MOODS;
   groupId = '';
 
   group = signal<JournalGroup | null>(null);
@@ -429,7 +408,7 @@ export class JournalGroupComponent implements OnInit {
   currentUserId = computed(() => this.auth.user()?.id ?? null);
 
   showMembers = signal(false);
-  showNewEntry = signal(false);
+
   confirmDeleteGroup = signal(false);
 
   inviteEmail = '';
@@ -440,10 +419,7 @@ export class JournalGroupComponent implements OnInit {
   renameVal = '';
   renaming = signal(false);
 
-  newTitle = '';
-  newBody = '';
-  newMood = '';
-  postingEntry = signal(false);
+
 
   deleteTarget = signal<JournalEntry | null>(null);
   deleting = signal(false);
@@ -458,7 +434,7 @@ export class JournalGroupComponent implements OnInit {
     private route: ActivatedRoute,
     public router: Router,
     private auth: AuthService,
-  ) {}
+  ) { }
 
   ngOnInit() {
     this.groupId = this.route.snapshot.paramMap.get('id') ?? '';
@@ -502,8 +478,9 @@ export class JournalGroupComponent implements OnInit {
   }
 
   onDayModalNew() {
+    const date = this.dayModalDate();
     this.closeDayModal();
-    this.showNewEntry.set(true);
+    this.writeEntry(date ?? undefined);
   }
 
   onDayModalEdit(id: string) {
@@ -587,24 +564,10 @@ export class JournalGroupComponent implements OnInit {
     });
   }
 
-  postEntry() {
-    if (!this.newBody.trim()) return;
-    this.postingEntry.set(true);
-    this.svc.createGroupEntry(this.groupId, {
-      body: this.newBody.trim(),
-      title: this.newTitle.trim() || undefined,
-      mood: this.newMood || undefined,
-    }).subscribe({
-      next: e => {
-        this.entries.update(es => [e, ...es]);
-        this.newTitle = '';
-        this.newBody = '';
-        this.newMood = '';
-        this.showNewEntry.set(false);
-        this.postingEntry.set(false);
-      },
-      error: () => this.postingEntry.set(false),
-    });
+  writeEntry(date?: string) {
+    const params: any = { group: this.groupId };
+    if (date) params.date = date;
+    this.router.navigate(['/journal/new'], { queryParams: params });
   }
 
   confirmDelete(e: JournalEntry) { this.deleteTarget.set(e); }
@@ -649,7 +612,7 @@ export class JournalGroupComponent implements OnInit {
     return new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
-  moodEmoji(value: string): string {
-    return MOODS.find(m => m.value === value)?.emoji ?? '';
+  moodIcon(value: string): string {
+    return MOODS.find(m => m.value === value)?.icon ?? '';
   }
 }
