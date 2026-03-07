@@ -1,7 +1,6 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, input, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router, RouterModule } from '@angular/router';
-import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
+import { Router } from '@angular/router';
 import { JymService, SplitSeriesSummary } from '../../../core/services/jym.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
@@ -9,18 +8,17 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 @Component({
   selector: 'app-series-list',
   standalone: true,
-  imports: [CommonModule, RouterModule, JiroButtonComponent, JiroModalComponent, JymQuickNavComponent],
+  imports: [CommonModule, JiroButtonComponent, JiroModalComponent],
   template: `
     <div class="series-list">
+      @if (!embedded()) {
       <div class="page-header">
         <div>
           <h1>My Series</h1>
           <p class="text-secondary">Structured program runs and progression tracking</p>
         </div>
       </div>
-
-      <!-- Quick nav -->
-      <jym-quick-nav></jym-quick-nav>
+      }
 
       <div *ngIf="loading()" class="state-message">
         <div class="spinner-lg"></div>
@@ -118,12 +116,12 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       <div *ngIf="!loading() && series().length === 0" class="state-message">
         <h3>No series yet</h3>
         <p class="text-secondary">Start a series from any of your splits to track structured progression.</p>
-        <a routerLink="/jym/splits" class="start-link">Go to Splits →</a>
+        <a (click)="goToSplits.emit()" class="start-link">Go to Splits →</a>
       </div>
 
       <!-- Start a new series CTA (shown when series exist) -->
       <div *ngIf="!loading() && series().length > 0" class="start-cta">
-        <a routerLink="/jym/splits" class="start-link">
+        <a (click)="goToSplits.emit()" class="start-link">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
@@ -314,6 +312,8 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
   `]
 })
 export class SeriesListComponent implements OnInit {
+  embedded = input(false);
+  goToSplits = output<void>();
   series = signal<SplitSeriesSummary[]>([]);
   loading = signal(true);
 

@@ -32,6 +32,14 @@ export const routes: Routes = [
         loadComponent: () => import('./features/settings/settings').then(m => m.SettingsComponent),
       },
       {
+        path: 'guide',
+        loadComponent: () => import('./features/guide/guide').then(m => m.GuideComponent),
+      },
+      {
+        path: 'guide/jym',
+        loadComponent: () => import('./features/guide/jym-guide').then(m => m.JymGuideComponent),
+      },
+      {
         path: 'culinara',
         loadComponent: () => import('./features/culinara/recipe-list/recipe-list').then(m => m.RecipeListComponent),
       },
@@ -59,21 +67,31 @@ export const routes: Routes = [
         path: 'jym',
         loadComponent: () => import('./features/jym/jym-dashboard/jym-dashboard').then(m => m.JymDashboardComponent),
       },
+      // ── Jym container pages (consolidate sub-sections) ──────────────────────
       {
-        path: 'jym/templates',
-        loadComponent: () => import('./features/jym/templates/templates').then(m => m.JymTemplatesComponent),
+        path: 'jym/exercises',
+        loadComponent: () => import('./features/jym/jym-exercises/jym-exercises').then(m => m.JymExercisesComponent),
       },
       {
-        path: 'jym/splits',
-        loadComponent: () => import('./features/jym/split-list/split-list').then(m => m.SplitListComponent),
+        path: 'jym/plan',
+        loadComponent: () => import('./features/jym/jym-plan/jym-plan').then(m => m.JymPlanComponent),
       },
+      {
+        path: 'jym/track',
+        loadComponent: () => import('./features/jym/jym-track/jym-track').then(m => m.JymTrackComponent),
+      },
+      // ── Jym legacy redirects (old flat routes → new container routes) ────────
+      { path: 'jym/train', redirectTo: 'jym/exercises', pathMatch: 'full' },
+      { path: 'jym/prs', redirectTo: 'jym/exercises', pathMatch: 'full' },
+      { path: 'jym/splits', redirectTo: 'jym/plan', pathMatch: 'full' },
+      { path: 'jym/series', redirectTo: 'jym/plan', pathMatch: 'full' },
+      { path: 'jym/templates', redirectTo: 'jym/plan', pathMatch: 'full' },
+      { path: 'jym/sessions', redirectTo: 'jym/track', pathMatch: 'full' },
+      { path: 'jym/bodyweight', redirectTo: 'jym/track', pathMatch: 'full' },
+      // ── Jym drill-down pages (push navigation, bottom nav stays visible) ────
       {
         path: 'jym/splits/:id',
         loadComponent: () => import('./features/jym/split-detail/split-detail').then(m => m.SplitDetailComponent),
-      },
-      {
-        path: 'jym/exercises',
-        loadComponent: () => import('./features/jym/exercise-library/exercise-library').then(m => m.ExerciseLibraryComponent),
       },
       {
         path: 'jym/exercises/:id',
@@ -84,28 +102,12 @@ export const routes: Routes = [
         loadComponent: () => import('./features/jym/session-player/session-player').then(m => m.SessionPlayerComponent),
       },
       {
-        path: 'jym/sessions',
-        loadComponent: () => import('./features/jym/session-history/session-history').then(m => m.SessionHistoryComponent),
-      },
-      {
         path: 'jym/session-summary',
         loadComponent: () => import('./features/jym/session-summary/session-summary').then(m => m.SessionSummaryComponent),
       },
       {
-        path: 'jym/bodyweight',
-        loadComponent: () => import('./features/jym/body-weight/body-weight').then(m => m.BodyWeightComponent),
-      },
-      {
-        path: 'jym/series',
-        loadComponent: () => import('./features/jym/series-list/series-list').then(m => m.SeriesListComponent),
-      },
-      {
         path: 'jym/series/:id',
         loadComponent: () => import('./features/jym/series-detail/series-detail').then(m => m.SeriesDetailComponent),
-      },
-      {
-        path: 'jym/prs',
-        loadComponent: () => import('./features/jym/pr-wall/pr-wall').then(m => m.PrWallComponent),
       },
       {
         path: 'jym/discover',

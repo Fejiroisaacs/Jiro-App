@@ -4,12 +4,10 @@ import { Router, RouterLink } from '@angular/router';
 import { JymService, Split, SplitSeriesSummary, SessionSummary, Routine } from '../../../core/services/jym.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
-import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
-
 @Component({
   selector: 'app-jym-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterLink, JiroButtonComponent, JiroModalComponent, JymQuickNavComponent],
+  imports: [CommonModule, RouterLink, JiroButtonComponent, JiroModalComponent],
   template: `
     <div class="jym-dash">
       <!-- Header -->
@@ -24,9 +22,6 @@ import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
           </jiro-button>
         </div>
       </div>
-
-      <!-- Quick nav -->
-      <jym-quick-nav></jym-quick-nav>
 
       <!-- Activity Stats -->
       <div *ngIf="hasCompletedSessions()" class="stats-section">
@@ -203,7 +198,7 @@ import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
         <div *ngIf="!loading() && templates().length === 0" class="empty-splits">
           <p class="text-secondary">No templates yet.</p>
           <p class="text-secondary" style="font-size:var(--font-size-sm)">
-            Finish a session and tap the save icon to store its layout as a reusable template.
+            During a session, tap the save icon to store its layout as a reusable template.
           </p>
         </div>
         <div *ngIf="!loading() && templates().length > 0" class="splits-row">

@@ -1,25 +1,23 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, signal, computed, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
-import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
 import { JymService, ExercisePR } from '../../../core/services/jym.service';
 import { SettingsService } from '../../../core/services/settings.service';
 
 @Component({
   selector: 'app-pr-wall',
   standalone: true,
-  imports: [CommonModule, JymQuickNavComponent],
+  imports: [CommonModule],
   template: `
     <div class="pr-wall">
-      <div class="page-header">
-        <div>
-          <h1>PR Wall</h1>
-          <p class="text-secondary">Your best lifts, all in one place</p>
+      @if (!embedded()) {
+        <div class="page-header">
+          <div>
+            <h1>PR Wall</h1>
+            <p class="text-secondary">Your best lifts, all in one place</p>
+          </div>
         </div>
-      </div>
-
-      <!-- Quick nav -->
-      <jym-quick-nav></jym-quick-nav>
+      }
 
       <!-- Loading -->
       <div *ngIf="loading()" class="state-message">
@@ -204,6 +202,7 @@ import { SettingsService } from '../../../core/services/settings.service';
   `]
 })
 export class PrWallComponent implements OnInit {
+  embedded = input(false);
   loading = signal(true);
   prs = signal<ExercisePR[]>([]);
 

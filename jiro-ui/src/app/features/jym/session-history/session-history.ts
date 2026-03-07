@@ -1,8 +1,7 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, input, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
 import { JymService, SessionSummary, SessionWithSets } from '../../../core/services/jym.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { UploadService } from '../../../core/services/upload.service';
@@ -12,32 +11,43 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 @Component({
   selector: 'app-session-history',
   standalone: true,
-  imports: [CommonModule, FormsModule, JiroButtonComponent, JiroModalComponent, JymQuickNavComponent],
+  imports: [CommonModule, FormsModule, JiroButtonComponent, JiroModalComponent],
   template: `
     <div class="session-history">
       <!-- Header -->
       <div class="page-header">
+        @if (!embedded()) {
         <div>
           <h1>Session History</h1>
           <p class="text-secondary">Your logged workouts</p>
         </div>
+        }
         <div class="header-actions">
           <jiro-button variant="primary" type="button" (click)="startNew()">+ New Session</jiro-button>
         </div>
       </div>
 
-      <!-- Quick nav -->
-      <jym-quick-nav></jym-quick-nav>
-
       <!-- Export row -->
       <div class="export-row">
-        <div class="date-field">
-          <label class="date-label">From</label>
-          <input type="date" class="date-input" [(ngModel)]="exportFrom" />
-        </div>
-        <div class="date-field">
-          <label class="date-label">To</label>
-          <input type="date" class="date-input" [(ngModel)]="exportTo" />
+        <div class="date-range">
+          <div class="date-field">
+            <label class="date-label">From</label>
+            <div class="date-wrapper">
+              <input type="date" class="date-input" [(ngModel)]="exportFrom" />
+              @if (!exportFrom) {
+                <span class="date-placeholder">Select date</span>
+              }
+            </div>
+          </div>
+          <div class="date-field">
+            <label class="date-label">To</label>
+            <div class="date-wrapper">
+              <input type="date" class="date-input" [(ngModel)]="exportTo" />
+              @if (!exportTo) {
+                <span class="date-placeholder">Select date</span>
+              }
+            </div>
+          </div>
         </div>
         <jiro-button variant="secondary" type="button" [disabled]="exporting()" (click)="downloadCSV()">
           {{ exporting() ? 'Exporting...' : 'Export CSV' }}
@@ -215,14 +225,18 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     .header-actions ::ng-deep .jiro-btn { width: auto; }
 
     .export-row {
-      display: flex; align-items: flex-end; gap: var(--space-sm);
+      display: flex; flex-direction: column; gap: var(--space-sm);
       margin-bottom: var(--space-lg);
     }
 
-    .export-row ::ng-deep .jiro-btn { width: auto; }
+    .export-row ::ng-deep .jiro-btn { width: auto; align-self: flex-start; }
+
+    .date-range {
+      display: flex; gap: var(--space-sm);
+    }
 
     .date-field {
-      display: flex; flex-direction: column; gap: 4px;
+      display: flex; flex-direction: column; gap: 4px; flex: 1;
     }
 
     .date-label {
@@ -233,6 +247,8 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       letter-spacing: 0.4px;
     }
 
+    .date-wrapper { position: relative; }
+
     .date-input {
       padding: 6px 10px;
       border: 1px solid var(--border-color);
@@ -242,11 +258,26 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       font-size: var(--font-size-sm);
       font-family: inherit;
       cursor: pointer;
+      position: relative; z-index: 1;
+      width: 100%; box-sizing: border-box;
     }
 
     .date-input:focus {
       outline: none;
       border-color: var(--color-primary);
+    }
+
+    .date-placeholder {
+      position: absolute; inset: 0;
+      padding: 6px 10px;
+      color: var(--text-muted);
+      font-size: var(--font-size-sm);
+      pointer-events: none;
+      display: flex; align-items: center;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      z-index: 0;
     }
 
     .state-message {
@@ -456,11 +487,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     }
 
     @media (max-width: 768px) {
-      .export-row { flex-wrap: wrap; align-items: flex-start; }
-      .date-field { flex: 1; min-width: 120px; }
-      .date-input { width: 100%; box-sizing: border-box; }
-      .export-row ::ng-deep .jiro-btn { width: 100%; flex-basis: 100%; }
-
       .session-card-header {
         flex-direction: column;
         align-items: flex-start;
@@ -489,6 +515,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
   `]
 })
 export class SessionHistoryComponent implements OnInit {
+  embedded = input(false);
   sessions = signal<SessionSummary[]>([]);
   loading = signal(true);
   selectedId = signal<string | null>(null);

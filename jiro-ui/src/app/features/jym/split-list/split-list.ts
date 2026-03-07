@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -6,20 +6,20 @@ import { JymService, Split, CreateSeriesRequest } from '../../../core/services/j
 import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-card';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
-import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
-
 @Component({
   selector: 'app-split-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, JiroCardComponent, JiroButtonComponent, JiroModalComponent, JymQuickNavComponent],
+  imports: [CommonModule, FormsModule, JiroCardComponent, JiroButtonComponent, JiroModalComponent],
   template: `
     <div class="split-list">
       <!-- Header -->
       <div class="page-header">
+        @if (!embedded()) {
         <div>
           <h1>Splits</h1>
           <p class="text-secondary">Manage your training splits</p>
         </div>
+        }
         <div class="header-actions">
           <button class="discover-btn" (click)="router.navigate(['/jym/discover'])">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -32,9 +32,6 @@ import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
           </jiro-button>
         </div>
       </div>
-
-      <!-- Quick nav -->
-      <jym-quick-nav></jym-quick-nav>
 
       <!-- Loading -->
       <div *ngIf="loading()" class="state-message">
@@ -416,6 +413,7 @@ import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
   `]
 })
 export class SplitListComponent implements OnInit {
+  embedded = input(false);
   splits = signal<Split[]>([]);
   loading = signal(true);
   saving = signal(false);
