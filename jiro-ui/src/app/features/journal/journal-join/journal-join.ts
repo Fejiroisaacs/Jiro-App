@@ -16,7 +16,11 @@ type State = 'loading' | 'joining' | 'success' | 'error' | 'no-token' | 'not-log
       <div class="join-card">
 
         <!-- Logo / branding -->
-        <div class="join-logo" aria-hidden="true">📔</div>
+        <div class="join-logo" aria-hidden="true">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+          </svg>
+        </div>
         <h1 class="join-title">Journaly</h1>
 
         <!-- Loading / joining -->
@@ -27,7 +31,11 @@ type State = 'loading' | 'joining' | 'success' | 'error' | 'no-token' | 'not-log
 
         <!-- Success -->
         <div *ngIf="state() === 'success'" class="join-state">
-          <div class="join-icon success-icon" aria-hidden="true">✅</div>
+          <div class="join-icon success-icon" aria-hidden="true">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+          </div>
           <h2>You're in!</h2>
           <p class="text-secondary">You've joined <strong>{{ groupName() }}</strong>. Start reading and writing together.</p>
           <jiro-button variant="primary" type="button" (click)="router.navigate(['/journal/groups', groupId()])">
@@ -38,7 +46,11 @@ type State = 'loading' | 'joining' | 'success' | 'error' | 'no-token' | 'not-log
 
         <!-- Error -->
         <div *ngIf="state() === 'error'" class="join-state">
-          <div class="join-icon error-icon" aria-hidden="true">⚠️</div>
+          <div class="join-icon error-icon" aria-hidden="true">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+          </div>
           <h2>Invite problem</h2>
           <p class="text-secondary">{{ errorMessage() }}</p>
           <jiro-button variant="primary" type="button" (click)="router.navigate(['/journal'])">
@@ -48,7 +60,11 @@ type State = 'loading' | 'joining' | 'success' | 'error' | 'no-token' | 'not-log
 
         <!-- No token in URL -->
         <div *ngIf="state() === 'no-token'" class="join-state">
-          <div class="join-icon" aria-hidden="true">🔗</div>
+          <div class="join-icon" aria-hidden="true">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+            </svg>
+          </div>
           <h2>Invalid link</h2>
           <p class="text-secondary">This invite link appears to be incomplete. Ask the group owner to resend the invite.</p>
           <jiro-button variant="primary" type="button" (click)="router.navigate(['/journal'])">
@@ -58,7 +74,11 @@ type State = 'loading' | 'joining' | 'success' | 'error' | 'no-token' | 'not-log
 
         <!-- Not logged in -->
         <div *ngIf="state() === 'not-logged-in'" class="join-state">
-          <div class="join-icon" aria-hidden="true">🔐</div>
+          <div class="join-icon" aria-hidden="true">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+          </div>
           <h2>Sign in to join</h2>
           <p class="text-secondary">You need a Jiro account to accept this group invite.</p>
           <jiro-button variant="primary" type="button" (click)="goToLogin()">
@@ -97,7 +117,7 @@ type State = 'loading' | 'joining' | 'success' | 'error' | 'no-token' | 'not-log
       gap: var(--space-sm);
     }
 
-    .join-logo { font-size: 2.5rem; line-height: 1; margin-bottom: var(--space-xs); }
+    .join-logo { margin-bottom: var(--space-xs); color: var(--color-primary); }
     .join-title { font-size: var(--font-size-xl); font-weight: 700; margin: 0 0 var(--space-md); letter-spacing: -0.5px; }
 
     .join-state {
@@ -109,7 +129,9 @@ type State = 'loading' | 'joining' | 'success' | 'error' | 'no-token' | 'not-log
       padding-top: var(--space-sm);
     }
 
-    .join-icon { font-size: 2rem; line-height: 1; }
+    .join-icon { color: var(--text-secondary); }
+    .join-icon.success-icon { color: #4caf50; }
+    .join-icon.error-icon { color: #e67e22; }
     .join-state h2 { margin: 0; font-size: var(--font-size-lg); }
     .join-state p { margin: 0; font-size: var(--font-size-sm); }
 
@@ -142,7 +164,7 @@ export class JournalJoinComponent implements OnInit {
     public router: Router,
     private svc: JournalService,
     private auth: AuthService,
-  ) {}
+  ) { }
 
   ngOnInit() {
     this.token = this.route.snapshot.queryParamMap.get('token') ?? '';

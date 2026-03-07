@@ -483,7 +483,8 @@ func (s *JournalService) GetGroup(ctx context.Context, userID, groupID uuid.UUID
 
 func (s *JournalService) ListGroups(ctx context.Context, userID uuid.UUID) ([]models.JournalGroup, error) {
 	rows, err := s.db.Query(ctx, `
-		SELECT g.id, g.owner_id, g.name, g.created_at, g.updated_at
+		SELECT g.id, g.owner_id, g.name, g.created_at, g.updated_at,
+		       (SELECT COUNT(*) FROM journal_group_members m2 WHERE m2.group_id = g.id AND m2.status = 'active') AS member_count
 		FROM journal_groups g
 		JOIN journal_group_members m ON m.group_id = g.id AND m.user_id = $1 AND m.status = 'active'
 		ORDER BY g.updated_at DESC
@@ -496,7 +497,7 @@ func (s *JournalService) ListGroups(ctx context.Context, userID uuid.UUID) ([]mo
 	var groups []models.JournalGroup
 	for rows.Next() {
 		var g models.JournalGroup
-		if err := rows.Scan(&g.ID, &g.OwnerID, &g.Name, &g.CreatedAt, &g.UpdatedAt); err != nil {
+		if err := rows.Scan(&g.ID, &g.OwnerID, &g.Name, &g.CreatedAt, &g.UpdatedAt, &g.MemberCount); err != nil {
 			return nil, err
 		}
 		g.Members = []models.JournalGroupMember{}

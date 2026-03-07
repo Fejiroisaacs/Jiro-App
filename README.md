@@ -11,8 +11,8 @@ Just like FeJiro, get it? :)
 | **Culinara** | Done | Recipe management, cook mode, trial logging, meal planner, collections, cook streak, grocery list, public discover, recipe sharing |
 | **Jym** | Done | Gym tracking — splits, routines, sessions, sets, PRs, 1RM, body weight, templates, series, session export, public splits |
 | **Journaly** | Done | Private journaling, group journals, collections, calendar view, image attachments |
+| **Ledger** | In Progress | Finance tracking — income, expenses, budgets, net worth |
 | **Echo** | Planned | Reminders and recurring tasks |
-| **Ledger** | Planned | Finance tracking — income, expenses, budgets, net worth |
 
 ## Stack
 

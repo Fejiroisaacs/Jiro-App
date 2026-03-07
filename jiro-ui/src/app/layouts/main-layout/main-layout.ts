@@ -1,7 +1,9 @@
-import { Component, signal, effect } from '@angular/core';
+import { Component, signal, effect, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
+import { RouterOutlet, RouterLink, RouterLinkActive, Router, NavigationEnd } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { filter, map, startWith } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { FeedbackService } from '../../core/services/feedback.service';
@@ -28,13 +30,13 @@ import { FeedbackService } from '../../core/services/feedback.service';
 
         <nav class="sidebar-nav">
           <a routerLink="/dashboard" routerLinkActive="active" class="nav-item">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="3" width="7" height="7"/>
-              <rect x="14" y="3" width="7" height="7"/>
-              <rect x="3" y="14" width="7" height="7"/>
-              <rect x="14" y="14" width="7" height="7"/>
-            </svg>
+            <img src="/icons/dashboard-icon.svg" width="24" height="24" alt="Dashboard" />
             <span *ngIf="!collapsed()" class="nav-label">Dashboard</span>
+          </a>
+
+          <a routerLink="/guide" routerLinkActive="active" class="nav-item">
+            <img src="/icons/guide-icon.svg" width="24" height="24" alt="Guide" />
+            <span *ngIf="!collapsed()" class="nav-label">Guide</span>
           </a>
 
           <div class="nav-section" *ngIf="!collapsed()">
@@ -45,7 +47,21 @@ import { FeedbackService } from '../../core/services/feedback.service';
             <img src="/icons/jym-icon.svg" width="28" height="28" alt="Jym" />
             <span *ngIf="!collapsed()" class="nav-label">Jym</span>
           </a>
-          
+          @if (navContext() === 'jym') {
+            <a routerLink="/jym/exercises" routerLinkActive="active" class="nav-item nav-sub-item">
+              <img src="/icons/nav-exercises.svg" width="20" height="20" alt="Exercises" />
+              <span *ngIf="!collapsed()" class="nav-label">Exercises</span>
+            </a>
+            <a routerLink="/jym/plan" routerLinkActive="active" class="nav-item nav-sub-item">
+              <img src="/icons/nav-plan.svg" width="20" height="20" alt="Plan" />
+              <span *ngIf="!collapsed()" class="nav-label">Plan</span>
+            </a>
+            <a routerLink="/jym/track" routerLinkActive="active" class="nav-item nav-sub-item">
+              <img src="/icons/nav-track.svg" width="20" height="20" alt="Track" />
+              <span *ngIf="!collapsed()" class="nav-label">Track</span>
+            </a>
+          }
+
           <a routerLink="/culinara" routerLinkActive="active" class="nav-item">
             <img src="/icons/culinara-icon.svg" width="28" height="28" alt="Culinara" />
             <span *ngIf="!collapsed()" class="nav-label">Culinara</span>
@@ -171,36 +187,83 @@ import { FeedbackService } from '../../core/services/feedback.service';
 
       <!-- Mobile bottom navigation -->
       <nav class="mobile-nav">
-        <a routerLink="/dashboard" routerLinkActive="active" class="mobile-nav-item">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-            <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
-          </svg>
-          <span>Home</span>
-        </a>
-        <a routerLink="/culinara" routerLinkActive="active" class="mobile-nav-item">
-          <img src="/icons/culinara-icon.svg" width="28" height="28" alt="Culinara" />
-          <span>Culinara</span>
-        </a>
-        <a routerLink="/jym" routerLinkActive="active" class="mobile-nav-item">
-          <img src="/icons/jym-icon.svg" width="28" height="28" alt="Jym" />
-          <span>Jym</span>
-        </a>
-        <a routerLink="/journal" routerLinkActive="active" class="mobile-nav-item">
-          <img src="/icons/journaly-icon.svg" width="28" height="28" alt="Journaly" />
-          <span>Journaly</span>
-        </a>
-        <a routerLink="/ledger" routerLinkActive="active" class="mobile-nav-item">
-          <img src="/icons/ledger-icon.svg" width="28" height="28" alt="Ledger" />
-          <span>Ledger</span>
-        </a>
-        <a routerLink="/settings" routerLinkActive="active" class="mobile-nav-item">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
-          </svg>
-          <span>Settings</span>
-        </a>
+        @switch (navContext()) {
+          @case ('jym') {
+            <!-- Jiro (back to hub) -->
+            <a routerLink="/dashboard" class="mobile-nav-item" [class.active]="false">
+              <img src="/icons/favicon.svg" width="24" height="24" alt="Jiro" />
+              <span>Jiro</span>
+            </a>
+            <!-- Jym dashboard -->
+            <a routerLink="/jym" routerLinkActive="active" [routerLinkActiveOptions]="{exact:true}" class="mobile-nav-item">
+              <img src="/icons/jym-icon.svg" width="24" height="24" alt="Jym" />
+              <span>Jym</span>
+            </a>
+            <!-- Exercises -->
+            <a routerLink="/jym/exercises" routerLinkActive="active" class="mobile-nav-item">
+              <img src="/icons/nav-exercises.svg" width="24" height="24" alt="Exercises" />
+              <span>Exercises</span>
+            </a>
+            <!-- Plan -->
+            <a routerLink="/jym/plan" routerLinkActive="active" class="mobile-nav-item">
+              <img src="/icons/nav-plan.svg" width="24" height="24" alt="Plan" />
+              <span>Plan</span>
+            </a>
+            <!-- Track -->
+            <a routerLink="/jym/track" routerLinkActive="active" class="mobile-nav-item">
+              <img src="/icons/nav-track.svg" width="24" height="24" alt="Track" />
+              <span>Track</span>
+            </a>
+          }
+          @case ('culinara') {
+            <a routerLink="/dashboard" class="mobile-nav-item">
+              <img src="/icons/favicon.svg" width="24" height="24" alt="Jiro" />
+              <span>Jiro</span>
+            </a>
+            <a routerLink="/culinara" routerLinkActive="active" class="mobile-nav-item">
+              <img src="/icons/culinara-icon.svg" width="24" height="24" alt="Culinara" />
+              <span>Culinara</span>
+            </a>
+          }
+          @case ('journal') {
+            <a routerLink="/dashboard" class="mobile-nav-item">
+              <img src="/icons/favicon.svg" width="24" height="24" alt="Jiro" />
+              <span>Jiro</span>
+            </a>
+            <a routerLink="/journal" routerLinkActive="active" class="mobile-nav-item">
+              <img src="/icons/journaly-icon.svg" width="24" height="24" alt="Journaly" />
+              <span>Journaly</span>
+            </a>
+          }
+          @case ('ledger') {
+            <a routerLink="/dashboard" class="mobile-nav-item">
+              <img src="/icons/favicon.svg" width="24" height="24" alt="Jiro" />
+              <span>Jiro</span>
+            </a>
+            <a routerLink="/ledger" routerLinkActive="active" class="mobile-nav-item">
+              <img src="/icons/ledger-icon.svg" width="24" height="24" alt="Ledger" />
+              <span>Ledger</span>
+            </a>
+          }
+          @default {
+            <!-- Hub nav -->
+            <a routerLink="/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{exact:true}" class="mobile-nav-item">
+              <img src="/icons/favicon.svg" width="24" height="24" alt="Jiro" />
+              <span>Home</span>
+            </a>
+            <a routerLink="/guide" routerLinkActive="active" class="mobile-nav-item">
+              <img src="/icons/guide-icon.svg" width="24" height="24" alt="Guide" />
+              <span>Guide</span>
+            </a>
+            <a routerLink="/settings" routerLinkActive="active" class="mobile-nav-item">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+              </svg>
+              <span>Settings</span>
+            </a>
+          }
+        }
       </nav>
     </div>
   `,
@@ -303,6 +366,11 @@ import { FeedbackService } from '../../core/services/feedback.service';
     .nav-item.disabled {
       opacity: 0.35;
       cursor: not-allowed;
+    }
+
+    .nav-sub-item {
+      padding-left: 24px;
+      font-size: var(--font-size-xs);
     }
 
     .nav-section {
@@ -504,7 +572,7 @@ import { FeedbackService } from '../../core/services/feedback.service';
       color: var(--text-on-dark);
       opacity: 0.55;
       text-decoration: none;
-      font-size: 0.6rem;
+      font-size: 0.72rem;
       font-weight: 500;
       letter-spacing: 0.3px;
       transition: opacity 0.15s;
@@ -634,6 +702,26 @@ import { FeedbackService } from '../../core/services/feedback.service';
 export class MainLayoutComponent {
   collapsed = signal(false);
   showMenu = signal(false);
+
+  private router = inject(Router);
+
+  private currentUrl = toSignal(
+    this.router.events.pipe(
+      filter(e => e instanceof NavigationEnd),
+      map(() => this.router.url),
+      startWith(this.router.url),
+    ),
+    { initialValue: this.router.url }
+  );
+
+  navContext = computed(() => {
+    const url = this.currentUrl() ?? '';
+    if (url.startsWith('/jym')) return 'jym';
+    if (url.startsWith('/culinara')) return 'culinara';
+    if (url.startsWith('/journal')) return 'journal';
+    if (url.startsWith('/ledger')) return 'ledger';
+    return 'hub';
+  });
 
   // Feedback FAB
   feedbackOpen = signal(false);

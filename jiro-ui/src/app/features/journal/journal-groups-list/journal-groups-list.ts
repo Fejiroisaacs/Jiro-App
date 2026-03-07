@@ -46,7 +46,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
           <div class="group-avatar">{{ g.name[0].toUpperCase() }}</div>
           <div class="group-info">
             <span class="group-name">{{ g.name }}</span>
-            <span class="group-members text-secondary">{{ g.members.length }} member{{ g.members.length !== 1 ? 's' : '' }}</span>
+            <span class="group-members text-secondary">{{ g.member_count }} member{{ g.member_count !== 1 ? 's' : '' }}</span>
           </div>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="group-arrow">
             <polyline points="9,18 15,12 9,6"/>
@@ -116,7 +116,7 @@ export class JournalGroupsListComponent implements OnInit {
   newName = '';
   creating = signal(false);
 
-  constructor(private svc: JournalService, public router: Router) {}
+  constructor(private svc: JournalService, public router: Router) { }
 
   ngOnInit() {
     this.svc.listGroups().subscribe({

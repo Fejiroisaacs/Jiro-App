@@ -136,7 +136,7 @@ export class DashboardComponent {
       name: 'Journaly',
       description: 'Personal knowledge base. Organize and share your thoughts.',
       icon: '/icons/journaly-icon.svg',
-      route: '/journaly',
+      route: '/journal',
       color: 'rgba(122, 103, 65, 0.15)',
       available: true,
     },

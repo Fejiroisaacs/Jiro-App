@@ -1,7 +1,6 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
-import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
 import { FormsModule } from '@angular/forms';
 import { JymService, Exercise } from '../../../core/services/jym.service';
 import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-card';
@@ -13,22 +12,21 @@ const MUSCLE_GROUPS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs'
 @Component({
   selector: 'app-exercise-library',
   standalone: true,
-  imports: [CommonModule, FormsModule, JiroCardComponent, JiroButtonComponent, JiroModalComponent, JymQuickNavComponent],
+  imports: [CommonModule, FormsModule, JiroCardComponent, JiroButtonComponent, JiroModalComponent],
   template: `
     <div class="exercise-library">
       <!-- Header -->
       <div class="page-header">
-        <div>
-          <h1>Exercise Library</h1>
-          <p class="text-secondary">Your personal movement catalogue</p>
-        </div>
+        @if (!embedded()) {
+          <div>
+            <h1>Exercise Library</h1>
+            <p class="text-secondary">Your personal movement catalogue</p>
+          </div>
+        }
         <div class="header-actions">
           <jiro-button variant="primary" type="button" (click)="showCreate.set(true)">+ New Exercise</jiro-button>
         </div>
       </div>
-
-      <!-- Quick nav -->
-      <jym-quick-nav></jym-quick-nav>
 
       <!-- Filters -->
       <div class="filters">
@@ -331,8 +329,6 @@ const MUSCLE_GROUPS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs'
 
     .delete-confirm { display: flex; flex-direction: column; align-items: center; gap: var(--space-md); text-align: center; }
 
-    .delete-icon { }
-
     .delete-msg { font-size: var(--font-size-md); line-height: 1.6; color: var(--text-secondary); }
 
     .delete-msg strong { color: var(--text-primary); }
@@ -377,6 +373,7 @@ const MUSCLE_GROUPS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs'
   `]
 })
 export class ExerciseLibraryComponent implements OnInit {
+  embedded = input(false);
   exercises = signal<Exercise[]>([]);
   loading = signal(true);
   saving = signal(false);

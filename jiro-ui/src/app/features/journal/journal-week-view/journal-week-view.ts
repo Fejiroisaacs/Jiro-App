@@ -283,7 +283,7 @@ export function currentWeekBounds(): { from: string; to: string } {
   `],
 })
 export class JournalWeekViewComponent implements OnChanges, AfterViewInit {
-  constructor(private elRef: ElementRef) {}
+  constructor(private elRef: ElementRef) { }
   @Input() entries: JournalEntry[] = [];
   @Input() showAuthor = false;
   @Input() memberMap: Record<string, string> = {};
@@ -379,8 +379,8 @@ export class JournalWeekViewComponent implements OnChanges, AfterViewInit {
     return map[mood] ?? 'var(--border-color)';
   }
 
-  moodEmoji(mood: string): string {
-    return MOODS.find(m => m.value === mood)?.emoji ?? '';
+  moodIcon(mood: string): string {
+    return MOODS.find(m => m.value === mood)?.icon ?? '';
   }
 
   moodLabel(mood: string): string {

@@ -1,7 +1,6 @@
-import { Component, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef, signal, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import { JymService, BodyWeight } from '../../../core/services/jym.service';
 import { SettingsService } from '../../../core/services/settings.service';
@@ -12,18 +11,17 @@ Chart.register(...registerables);
 @Component({
   selector: 'app-body-weight',
   standalone: true,
-  imports: [CommonModule, FormsModule, JiroButtonComponent, JymQuickNavComponent],
+  imports: [CommonModule, FormsModule, JiroButtonComponent],
   template: `
     <div class="body-weight">
+      @if (!embedded()) {
       <div class="page-header">
         <div>
           <h1>Body Weight</h1>
           <p class="text-secondary">Track your weight and see how it correlates with strength</p>
         </div>
       </div>
-
-      <!-- Quick nav -->
-      <jym-quick-nav></jym-quick-nav>
+      }
 
       <!-- Log weight form -->
       <div class="log-card">
@@ -224,6 +222,8 @@ Chart.register(...registerables);
 })
 export class BodyWeightComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('chartCanvas') canvasRef!: ElementRef<HTMLCanvasElement>;
+
+  embedded = input(false);
 
   weights = signal<BodyWeight[]>([]);
   loading = signal(true);

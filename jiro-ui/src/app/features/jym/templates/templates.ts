@@ -1,25 +1,23 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, input, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { JymService, Routine } from '../../../core/services/jym.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
-import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
-
 @Component({
   selector: 'app-jym-templates',
   standalone: true,
-  imports: [CommonModule, JiroButtonComponent, JiroModalComponent, JymQuickNavComponent],
+  imports: [CommonModule, JiroButtonComponent, JiroModalComponent],
   template: `
     <div class="templates-page">
+      @if (!embedded()) {
       <div class="page-header">
         <div>
           <h1>Templates</h1>
           <p class="text-secondary">Reusable workout layouts saved from your sessions</p>
         </div>
       </div>
-
-      <jym-quick-nav></jym-quick-nav>
+      }
 
       <div *ngIf="loading()" class="state-msg">
         <div class="spinner-lg"></div>
@@ -36,7 +34,7 @@ import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
         </div>
         <p class="empty-title">No templates yet</p>
         <p class="text-secondary empty-hint">
-          Finish a session and tap <strong>Save as Template</strong> to save its exercise layout for future workouts.
+          During a session, tap <strong>Save Icon</strong> to save its exercise layout for future workouts.
         </p>
       </div>
 
@@ -151,6 +149,7 @@ import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
   `]
 })
 export class JymTemplatesComponent implements OnInit {
+  embedded = input(false);
   templates = signal<Routine[]>([]);
   loading = signal(true);
   deleting = signal<Routine | null>(null);

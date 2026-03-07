@@ -307,6 +307,6 @@ export class JournalHomeComponent implements OnInit {
     return body.length > 180 ? body.slice(0, 180) + '...' : body;
   }
 
-  moodEmoji(value: string): string { return MOODS.find(m => m.value === value)?.emoji ?? ''; }
+  moodIcon(value: string): string { return MOODS.find(m => m.value === value)?.icon ?? ''; }
   moodLabel(value: string): string { return MOODS.find(m => m.value === value)?.label ?? value; }
 }
