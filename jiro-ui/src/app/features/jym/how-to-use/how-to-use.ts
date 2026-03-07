@@ -1,15 +1,11 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { JymQuickNavComponent } from '../jym-quick-nav/jym-quick-nav';
-
 @Component({
   selector: 'jym-how-to-use',
   standalone: true,
-  imports: [CommonModule, JymQuickNavComponent],
+  imports: [CommonModule],
   template: `
     <div class="page-container">
-      <jym-quick-nav></jym-quick-nav>
-
       <div class="content-wrapper">
         <header class="page-header">
           <h1>How to Use: Jym App</h1>
