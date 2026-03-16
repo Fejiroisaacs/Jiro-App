@@ -30,12 +30,20 @@ import { FeedbackService } from '../../core/services/feedback.service';
 
         <nav class="sidebar-nav">
           <a routerLink="/dashboard" routerLinkActive="active" class="nav-item">
-            <img src="/icons/dashboard-icon.svg" width="24" height="24" alt="Dashboard" />
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+              <rect x="3" y="3" width="8" height="8" rx="1.5" />
+              <rect x="3" y="13" width="8" height="8" rx="1.5" />
+              <rect x="13" y="3" width="8" height="18" rx="1.5" />
+            </svg>
             <span *ngIf="!collapsed()" class="nav-label">Dashboard</span>
           </a>
 
           <a routerLink="/guide" routerLinkActive="active" class="nav-item">
-            <img src="/icons/guide-icon.svg" width="24" height="24" alt="Guide" />
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+              <rect x="10" y="2" width="4" height="20" rx="1" />
+              <rect x="4" y="6" width="10" height="5" rx="1" />
+              <rect x="10" y="13" width="10" height="5" rx="1" />
+            </svg>
             <span *ngIf="!collapsed()" class="nav-label">Guide</span>
           </a>
 
@@ -252,7 +260,11 @@ import { FeedbackService } from '../../core/services/feedback.service';
               <span>Home</span>
             </a>
             <a routerLink="/guide" routerLinkActive="active" class="mobile-nav-item">
-              <img src="/icons/guide-icon.svg" width="24" height="24" alt="Guide" />
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+              <rect x="10" y="2" width="4" height="20" rx="1" />
+              <rect x="4" y="6" width="10" height="5" rx="1" />
+              <rect x="10" y="13" width="10" height="5" rx="1" />
+            </svg>
               <span>Guide</span>
             </a>
             <a routerLink="/settings" routerLinkActive="active" class="mobile-nav-item">
