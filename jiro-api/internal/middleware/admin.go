@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"crypto/subtle"
 	"net/http"
 
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/models"
@@ -15,7 +16,8 @@ func AdminRequired(secret string) gin.HandlerFunc {
 			c.Next()
 			return
 		}
-		if c.GetHeader("X-Admin-Secret") != secret {
+		provided := c.GetHeader("X-Admin-Secret")
+		if subtle.ConstantTimeCompare([]byte(provided), []byte(secret)) != 1 {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, models.ErrorResponse{
 				Error: models.ErrorDetail{Code: "UNAUTHORIZED", Message: "Invalid admin secret"},
 			})

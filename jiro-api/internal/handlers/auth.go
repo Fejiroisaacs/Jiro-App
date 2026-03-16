@@ -8,6 +8,7 @@ import (
 
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/analytics"
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/config"
+	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/middleware"
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/models"
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/services"
 	"github.com/gin-gonic/gin"
@@ -21,17 +22,19 @@ type AuthHandler struct {
 	userService   *services.UserService
 	emailService  *services.EmailService
 	ledgerService *services.LedgerService
+	failTracker   *middleware.LoginFailTracker
 	cfg           *config.Config
 	appBaseURL    string
 	db            *pgxpool.Pool
 }
 
-func NewAuthHandler(authService *services.AuthService, userService *services.UserService, emailService *services.EmailService, ledgerService *services.LedgerService, cfg *config.Config, db *pgxpool.Pool) *AuthHandler {
+func NewAuthHandler(authService *services.AuthService, userService *services.UserService, emailService *services.EmailService, ledgerService *services.LedgerService, failTracker *middleware.LoginFailTracker, cfg *config.Config, db *pgxpool.Pool) *AuthHandler {
 	return &AuthHandler{
 		authService:   authService,
 		userService:   userService,
 		emailService:  emailService,
 		ledgerService: ledgerService,
+		failTracker:   failTracker,
 		cfg:           cfg,
 		appBaseURL:    cfg.AppBaseURL,
 		db:            db,
@@ -130,6 +133,14 @@ func (h *AuthHandler) Register(c *gin.Context) {
 }
 
 func (h *AuthHandler) Login(c *gin.Context) {
+	ip := c.ClientIP()
+	if h.failTracker.IsBlocked(ip) {
+		c.JSON(http.StatusTooManyRequests, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "RATE_LIMITED", Message: "Too many failed attempts. Try again in 15 minutes."},
+		})
+		return
+	}
+
 	var req models.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
@@ -140,6 +151,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	user, err := h.userService.GetByEmail(c.Request.Context(), req.Email)
 	if err != nil {
+		h.failTracker.RecordFail(ip)
 		c.JSON(http.StatusUnauthorized, models.ErrorResponse{
 			Error: models.ErrorDetail{Code: "INVALID_CREDENTIALS", Message: "Invalid email or password"},
 		})
@@ -147,11 +159,14 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	if !h.authService.VerifyPassword(user.PasswordHash, req.Password) {
+		h.failTracker.RecordFail(ip)
 		c.JSON(http.StatusUnauthorized, models.ErrorResponse{
 			Error: models.ErrorDetail{Code: "INVALID_CREDENTIALS", Message: "Invalid email or password"},
 		})
 		return
 	}
+
+	h.failTracker.RecordSuccess(ip)
 
 	accessToken, err := h.authService.GenerateAccessToken(user.ID)
 	if err != nil {

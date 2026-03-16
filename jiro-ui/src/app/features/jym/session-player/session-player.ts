@@ -1164,7 +1164,9 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
         if (existingBlocks.length === 0 && routerTargets.length > 0) {
           // Fresh split session — save targets so we can restore on return
           localStorage.setItem(targetsKey, JSON.stringify(routerTargets));
-          this.blocks.set(buildRoutineBlocks(routerTargets));
+          const newBlocks = buildRoutineBlocks(routerTargets);
+          this.blocks.set(newBlocks);
+          this.loadSuggestionsForBlocks(newBlocks);
         } else {
           // Returning: merge logged sets with any un-logged routine exercises
           const savedStr = localStorage.getItem(targetsKey);
@@ -1173,8 +1175,11 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
             const existingIds = new Set(existingBlocks.map(b => b.exerciseId));
             const missing = buildRoutineBlocks(savedTargets.filter(t => !existingIds.has(t.exercise_id)));
             this.blocks.set([...existingBlocks, ...missing]);
+            this.loadSuggestionsForBlocks(missing);
           } else if (savedTargets.length > 0 && existingBlocks.length === 0) {
-            this.blocks.set(buildRoutineBlocks(savedTargets));
+            const newBlocks = buildRoutineBlocks(savedTargets);
+            this.blocks.set(newBlocks);
+            this.loadSuggestionsForBlocks(newBlocks);
           } else {
             this.blocks.set(existingBlocks);
           }
@@ -1743,6 +1748,26 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
         this.formCheckUploading.update(m => { const n = new Map(m); n.set(exId, false); return n; });
       },
     });
+  }
+
+  private loadSuggestionsForBlocks(blocks: ExerciseBlock[]) {
+    for (const block of blocks) {
+      this.jymService.getExercise(block.exerciseId).subscribe({
+        next: ex => {
+          const { suggestion, ghostWeight, ghostReps } = this.computeSuggestion(ex.history);
+          if (!suggestion) return;
+          this.blocks.update(bs => bs.map(b => b.exerciseId === block.exerciseId ? {
+            ...b,
+            suggestion,
+            sets: b.sets.map(s => !s.saved ? {
+              ...s,
+              ghostWeight: ghostWeight ?? s.ghostWeight,
+              ghostReps: ghostReps ?? s.ghostReps,
+            } : s),
+          } : b));
+        },
+      });
+    }
   }
 
   private computeSuggestion(history: SetHistory[]): { suggestion: string | null; ghostWeight: string | null; ghostReps: string | null } {

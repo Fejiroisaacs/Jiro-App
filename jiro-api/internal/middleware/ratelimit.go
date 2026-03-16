@@ -9,6 +9,77 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// LoginFailTracker blocks IPs after too many failed login attempts.
+const (
+	maxLoginFails      = 10
+	loginBlockDuration = 15 * time.Minute
+)
+
+type failEntry struct {
+	count        int
+	blockedUntil time.Time
+}
+
+type LoginFailTracker struct {
+	mu      sync.Mutex
+	entries map[string]*failEntry
+}
+
+func NewLoginFailTracker() *LoginFailTracker {
+	lft := &LoginFailTracker{entries: make(map[string]*failEntry)}
+	go func() {
+		for {
+			time.Sleep(10 * time.Minute)
+			lft.mu.Lock()
+			now := time.Now()
+			for ip, e := range lft.entries {
+				if now.After(e.blockedUntil) && e.count < maxLoginFails {
+					delete(lft.entries, ip)
+				}
+			}
+			lft.mu.Unlock()
+		}
+	}()
+	return lft
+}
+
+func (lft *LoginFailTracker) RecordFail(ip string) {
+	lft.mu.Lock()
+	defer lft.mu.Unlock()
+	e, ok := lft.entries[ip]
+	if !ok {
+		e = &failEntry{}
+		lft.entries[ip] = e
+	}
+	e.count++
+	if e.count >= maxLoginFails {
+		e.blockedUntil = time.Now().Add(loginBlockDuration)
+	}
+}
+
+func (lft *LoginFailTracker) RecordSuccess(ip string) {
+	lft.mu.Lock()
+	defer lft.mu.Unlock()
+	delete(lft.entries, ip)
+}
+
+func (lft *LoginFailTracker) IsBlocked(ip string) bool {
+	lft.mu.Lock()
+	defer lft.mu.Unlock()
+	e, ok := lft.entries[ip]
+	if !ok {
+		return false
+	}
+	if e.blockedUntil.IsZero() {
+		return false
+	}
+	if time.Now().After(e.blockedUntil) {
+		delete(lft.entries, ip)
+		return false
+	}
+	return true
+}
+
 type bucket struct {
 	tokens     float64
 	lastFill   time.Time

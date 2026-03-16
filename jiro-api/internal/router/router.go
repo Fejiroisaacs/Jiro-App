@@ -15,9 +15,12 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	}
 
 	r := gin.New()
+	// Trust only private/loopback ranges — prevents X-Forwarded-For IP spoofing
+	r.SetTrustedProxies([]string{"127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"})
 	r.Use(gin.Recovery())
 	r.Use(middleware.CORS(cfg.CORSOrigins))
 	r.Use(middleware.SecurityHeaders(cfg.Environment))
+	r.Use(middleware.MaxBodySize(1 << 20)) // 1 MB cap on all request bodies
 
 	// Services
 	authService := services.NewAuthService(db, cfg)
@@ -32,8 +35,12 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	storageService := services.NewStorageService(cfg.StorageEndpoint, cfg.StorageBucket, cfg.StorageAccessKey, cfg.StorageSecretKey, cfg.StoragePublicURL)
 	ledgerService := services.NewLedgerService(db)
 
+	// Rate limiter + login fail tracker
+	rl := middleware.NewRateLimiter()
+	loginFailTracker := middleware.NewLoginFailTracker()
+
 	// Handlers
-	authHandler := handlers.NewAuthHandler(authService, userService, emailService, ledgerService, cfg, db)
+	authHandler := handlers.NewAuthHandler(authService, userService, emailService, ledgerService, loginFailTracker, cfg, db)
 	ledgerHandler := handlers.NewLedgerHandler(ledgerService)
 	userHandler := handlers.NewUserHandler(userService)
 	healthHandler := handlers.NewHealthHandler(db)
@@ -44,9 +51,6 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	mealPlanHandler := handlers.NewMealPlanHandler(mealPlanService)
 	uploadHandler := handlers.NewUploadHandler(storageService, userService, recipeService, jymService)
 	journalHandler := handlers.NewJournalHandler(journalService, emailService, storageService, cfg.AppBaseURL)
-
-	// Rate limiter
-	rl := middleware.NewRateLimiter()
 
 	// Routes
 	v1 := r.Group("/api/v1")
@@ -67,9 +71,9 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			public.GET("/jym/public-splits/:id", jymHandler.GetPublicSplit)
 		}
 
-		// Auth routes (rate limited by IP: 10/min)
+		// Auth routes (rate limited by IP: 5/min)
 		auth := v1.Group("/auth")
-		auth.Use(middleware.RateLimitByIP(rl, 10))
+		auth.Use(middleware.RateLimitByIP(rl, 5))
 		{
 			auth.POST("/register", authHandler.Register)
 			auth.POST("/login", authHandler.Login)

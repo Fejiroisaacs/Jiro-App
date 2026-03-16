@@ -56,8 +56,9 @@ export class AuthService {
   }
 
   /** Called by APP_INITIALIZER. Silently rotates the token if a session exists.
-   *  Failure is non-fatal — localStorage state is kept so sessions persist across
-   *  browser close. The interceptor handles any subsequent 401s lazily. */
+   *  A 401 means the refresh token has expired — clear auth so the guard redirects
+   *  to login. Non-401 errors (e.g. offline) keep cached state so the interceptor
+   *  can retry lazily once connectivity is restored. */
   async init(): Promise<void> {
     if (!this.accessToken()) {
       this.initialized.set(true);
@@ -66,7 +67,10 @@ export class AuthService {
     await firstValueFrom(
       this.http.post<AuthResponse>(`${API_URL}/auth/refresh`, {}, { withCredentials: true }).pipe(
         tap(res => this.handleAuth(res)),
-        catchError(() => of(null)),
+        catchError((err) => {
+          if (err?.status === 401) this.clearAuth();
+          return of(null);
+        }),
       )
     ).catch(() => {});
     this.initialized.set(true);
