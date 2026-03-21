@@ -30,7 +30,7 @@
     "@angular/core": "^21.2.4",
     "@angular/forms": "^21.2.4",
     "@angular/platform-browser": "^21.2.4",
-    "@angular/router": "^21.2.4",
+    "@angular/router": "^21.2.5",
     "chart.js": "^4.5.1",
     "html-to-image": "^1.11.13",
     "rxjs": "~7.8.0",
