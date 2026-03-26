@@ -55,12 +55,19 @@ export class AuthService {
     return this.accessToken();
   }
 
-  /** Called by APP_INITIALIZER. Silently rotates the token if a session exists.
-   *  A 401 means the refresh token has expired — clear auth so the guard redirects
-   *  to login. Non-401 errors (e.g. offline) keep cached state so the interceptor
-   *  can retry lazily once connectivity is restored. */
+  /** Called by APP_INITIALIZER. Only refreshes if the stored access token is
+   *  already expired. Skipping unnecessary refreshes prevents sign-out on
+   *  close/reopen when the token is still valid.
+   *  A 401 on refresh means the session is truly dead — clear auth so the
+   *  guard redirects to login. Non-401 errors (e.g. offline) keep cached
+   *  state so the interceptor can retry lazily once connectivity is restored. */
   async init(): Promise<void> {
-    if (!this.accessToken()) {
+    const token = this.accessToken();
+    if (!token) {
+      this.initialized.set(true);
+      return;
+    }
+    if (!this.isTokenExpired(token)) {
       this.initialized.set(true);
       return;
     }
@@ -74,6 +81,15 @@ export class AuthService {
       )
     ).catch(() => {});
     this.initialized.set(true);
+  }
+
+  private isTokenExpired(token: string): boolean {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.exp * 1000 < Date.now();
+    } catch {
+      return true;
+    }
   }
 
   register(email: string, password: string, displayName: string, username?: string) {
