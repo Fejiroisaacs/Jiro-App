@@ -50,7 +50,7 @@ const bentoAnimation = trigger('bentoEntrance', [
             No ads. No clutter. Just your life, beautifully organised.
           </p>
           <div class="l-hero-actions">
-            <a routerLink="/register" class="l-btn l-btn--primary">Start for free</a>
+            <a routerLink="/register" class="l-btn l-btn--primary">Sign up</a>
             <a class="l-btn l-btn--ghost" (click)="scrollToModules()">Explore modules</a>
           </div>
         </div>
@@ -316,7 +316,6 @@ const bentoAnimation = trigger('bentoEntrance', [
       <section class="l-final">
         <div class="l-final-inner">
           <h2>Ready to organise your chaos?</h2>
-          <p>Join free. No credit card required.</p>
           <a routerLink="/register" class="l-btn l-btn--primary l-btn--lg">Create your account</a>
         </div>
         <div class="l-orb l-orb--3"></div>
@@ -1029,7 +1028,6 @@ const bentoAnimation = trigger('bentoEntrance', [
       .l-card--echo { grid-column: 1; grid-row: auto; flex-direction: column; }
       .l-card--culinara .l-mockup-culinara,
       .l-card--jym .l-mockup-jym { width: 100%; }
-      .l-nav-login { display: none; }
     }
   `]
 })
