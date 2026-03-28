@@ -1773,8 +1773,8 @@ func (s *JymService) copySplit(ctx context.Context, importerID, splitID uuid.UUI
 		rd := rMap[rID]
 		var newRoutineID uuid.UUID
 		err = tx.QueryRow(ctx,
-			`INSERT INTO routines (split_id, name, day_order) VALUES ($1, $2, $3) RETURNING id`,
-			newSplitID, rd.name, rd.dayOrder,
+			`INSERT INTO routines (user_id, split_id, name, day_order) VALUES ($1, $2, $3, $4) RETURNING id`,
+			importerID, newSplitID, rd.name, rd.dayOrder,
 		).Scan(&newRoutineID)
 		if err != nil {
 			return uuid.Nil, err
