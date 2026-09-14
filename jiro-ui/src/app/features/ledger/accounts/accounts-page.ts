@@ -11,7 +11,7 @@ import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-car
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 import { LedgerQuickNavComponent } from '../ledger-quick-nav/ledger-quick-nav';
-import { formatCurrency, formatDate, hexWithAlpha } from '../shared/ledger-utils';
+import { formatCurrency, formatSignedCurrency, formatDate, hexWithAlpha } from '../shared/ledger-utils';
 
 type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
 
@@ -183,7 +183,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
                     <span class="detail-txn-amount"
                       [class.amount-pos]="t.type === 'income'"
                       [class.amount-neg]="t.type === 'expense'">
-                      {{ t.type === 'expense' ? '-' : '+' }}{{ formatCurrency(t.amount, account.currency) }}
+                      {{ formatSignedCurrency(t.amount, account.currency, t.type === 'transfer' ? 'never' : 'exceptZero') }}
                     </span>
                     <span class="detail-txn-date text-muted">{{ formatDate(t.date) }}</span>
                   </div>
@@ -766,6 +766,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
 })
 export class AccountsPageComponent implements OnInit {
   readonly formatCurrency = formatCurrency;
+  readonly formatSignedCurrency = formatSignedCurrency;
   readonly formatDate = formatDate;
   readonly hexWithAlpha = hexWithAlpha;
 

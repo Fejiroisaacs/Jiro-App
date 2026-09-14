@@ -5,7 +5,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 import { LedgerQuickNavComponent } from '../ledger-quick-nav/ledger-quick-nav';
 import { LedgerTransactionFormComponent, TransactionPayload } from '../shared/transaction-form/ledger-transaction-form';
-import { intervalLabel } from '../shared/ledger-utils';
+import { intervalLabel, parseDateOnly, formatSignedCurrency } from '../shared/ledger-utils';
 import {
   LedgerService,
   LedgerTransaction,
@@ -1145,10 +1145,11 @@ export class TransactionLogComponent implements OnInit {
   // ── Display helpers ───────────────────────────────────────────────────────
 
   formatAmount(amount: number, type: string): string {
-    const abs = Math.abs(amount).toFixed(2);
-    if (type === 'income') return `+$${abs}`;
-    if (type === 'expense') return `-$${abs}`;
-    return `$${abs}`;
+    if (type === 'transfer') return formatSignedCurrency(amount, 'USD', 'never');
+    // Stored sign is authoritative (expenses are negative); normalise by type
+    // in case an older row was stored unsigned.
+    const signed = type === 'expense' ? -Math.abs(amount) : Math.abs(amount);
+    return formatSignedCurrency(signed);
   }
 
   getAmountColor(type: string): string {
@@ -1169,7 +1170,7 @@ export class TransactionLogComponent implements OnInit {
   }
 
   formatDateSeparator(dateStr: string): string {
-    const d = new Date(dateStr + 'T00:00:00');
+    const d = parseDateOnly(dateStr);
     const today = new Date();
     const yesterday = new Date();
     yesterday.setDate(today.getDate() - 1);
@@ -1183,8 +1184,7 @@ export class TransactionLogComponent implements OnInit {
   }
 
   formatDateShort(dateStr: string): string {
-    const d = new Date(dateStr + 'T00:00:00');
-    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    return parseDateOnly(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   }
 
   getGroupTotal(group: TransactionGroup): string {
@@ -1193,10 +1193,7 @@ export class TransactionLogComponent implements OnInit {
       if (tx.type === 'expense') return sum - Math.abs(tx.amount);
       return sum;
     }, 0);
-    const abs = Math.abs(net).toFixed(2);
-    if (net > 0) return `+$${abs}`;
-    if (net < 0) return `-$${abs}`;
-    return `$${abs}`;
+    return formatSignedCurrency(net);
   }
 
   getGroupTotalColor(group: TransactionGroup): string {

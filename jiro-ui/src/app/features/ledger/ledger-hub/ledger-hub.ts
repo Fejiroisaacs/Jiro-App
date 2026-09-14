@@ -12,7 +12,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 import { LedgerQuickNavComponent } from '../ledger-quick-nav/ledger-quick-nav';
 import { LedgerTransactionFormComponent, TransactionPayload } from '../shared/transaction-form/ledger-transaction-form';
-import { formatCurrency, formatDate, formatPct, clamp, hexWithAlpha } from '../shared/ledger-utils';
+import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hexWithAlpha } from '../shared/ledger-utils';
 
 @Component({
   selector: 'app-ledger-hub',
@@ -162,7 +162,7 @@ import { formatCurrency, formatDate, formatPct, clamp, hexWithAlpha } from '../s
                 </div>
                 <div class="txn-right">
                   <span class="txn-amount" [class.amount-pos]="t.type === 'income'" [class.amount-neg]="t.type === 'expense'">
-                    {{ t.type === 'expense' ? '-' : '+' }}{{ formatCurrency(t.amount) }}
+                    {{ formatSignedCurrency(t.amount, 'USD', t.type === 'transfer' ? 'never' : 'exceptZero') }}
                   </span>
                   <span class="txn-date text-muted">{{ formatDate(t.date) }}</span>
                 </div>
@@ -571,6 +571,7 @@ export class LedgerHubComponent implements OnInit {
   readonly currentMonthLabel = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
 
   readonly formatCurrency = formatCurrency;
+  readonly formatSignedCurrency = formatSignedCurrency;
   readonly formatDate = formatDate;
   readonly formatPct = formatPct;
   readonly clamp = clamp;

@@ -12,6 +12,7 @@ import {
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Chart, registerables } from 'chart.js';
+import { parseDateOnly } from '../shared/ledger-utils';
 import {
   LedgerService,
   NetWorthSnapshot,
@@ -620,7 +621,7 @@ export class NetWorthPageComponent implements OnInit, AfterViewInit, OnDestroy {
     }).subscribe({
       next: snap => {
         this.snapshots.update(list => [...list, snap].sort(
-          (a, b) => new Date(a.snapshot_date).getTime() - new Date(b.snapshot_date).getTime()
+          (a, b) => parseDateOnly(a.snapshot_date).getTime() - parseDateOnly(b.snapshot_date).getTime()
         ));
         this.savingSnapshot.set(false);
         this.closeSnapshotModal();
@@ -631,7 +632,7 @@ export class NetWorthPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-GB', {
+    return parseDateOnly(iso).toLocaleDateString('en-GB', {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
@@ -652,7 +653,7 @@ export class NetWorthPageComponent implements OnInit, AfterViewInit, OnDestroy {
     if (snaps.length === 0) return;
 
     const sorted = [...snaps].sort(
-      (a, b) => new Date(a.snapshot_date).getTime() - new Date(b.snapshot_date).getTime()
+      (a, b) => parseDateOnly(a.snapshot_date).getTime() - parseDateOnly(b.snapshot_date).getTime()
     );
     const labels = sorted.map(s => this.formatDate(s.snapshot_date));
     const values = sorted.map(s => s.net_worth);
