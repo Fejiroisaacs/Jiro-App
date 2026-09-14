@@ -1,54 +1,42 @@
-# Jiro UI redesign: Phase 0 + Phase 1
+# Jiro UI redesign
 
 Plan: `~/.claude/plans/jaunty-rolling-dream.md`. Audit: `docs/UI-AUDIT-2026-09.md`.
 
-## Phase 0: bugs
+## Phase 0 + Phase 1 (done, commits 71a2ae9..38fa179, pushed 2026-09-14)
 
-- [x] 0.1 Ledger dates: `parseDateOnly` in ledger-utils; transaction-log, networth-page use it
-- [x] 0.2 Ledger amounts: `formatSignedCurrency`; hub, accounts, transaction-log use it
-- [x] 0.3 Ten undefined CSS variables defined; `scripts/check-css-vars.mjs` + `npm run check:css`
-- [x] 0.4 Copy: "foucus", "Light weight baby", login subtitle
-- [x] 0.5 404 page (`features/not-found`) wired to `**`
-- [x] 0.6 Delete `app.html`, `desktop.ini` x2
+- [x] 0.1-0.6 bugs: ledger dates and amounts, undefined CSS vars + `check:css`, copy, 404 page, dead files
+- [x] 1.1-1.8 foundation: tokens and hardened palette, three themes with brand dark modes, focus + reduced motion, `jiro-icon` + `jiro-mark` + icon pipeline, `jiro-button` without `::ng-deep`, toast + confirm, page-header + empty-state, housekeeping
 
-## Phase 1: design system foundation
+## Phase 2: the shell (done)
 
-- [x] 1.1 Tokens + hardened palette (radius, type, z-index, semantic, rgb triplets, mark tokens; styles.scss literals)
-- [x] 1.2 Three themes with brand-derived dark; THEMES narrowing; effect moved to App; pre-boot dark script; theme-color meta; white-on-primary literals
-- [x] 1.3 Global focus-visible (+ sidebar and field exceptions); removed 51 `outline: none`; reduced-motion block; landing gates
-- [x] 1.4 `@phosphor-icons/core`, `scripts/build-icons.mjs`, `jiro-icon`, `jiro-mark`; tiles in main-layout/dashboard/guide; modal close + star-rating
-- [x] 1.5 `jiro-button`: `--jiro-btn-width`, `block`, `size`; removed all 65 `::ng-deep` rules; `block` on auth, journal-join, journal-group, split-list
-- [x] 1.6 Toast service + `jiro-toaster`; confirm service + `jiro-confirm`; migrated 3 toasts + 4 native confirms
-- [x] 1.7 `jiro-page-header`, `jiro-empty-state`, global `.spinner`; guide + settings use the header
-- [x] 1.8 check-css-vars hex report; deleted 3 unreferenced icon SVGs
+- [x] 2.1 Navigation model: `core/navigation.ts`, `jiro-module-nav` (desktop row + mobile overflow chips), generated mobile bar, `jiro-tab-strip` with `?tab=` URL sync, three quick-navs deleted, Culinara header links and back-links removed, Journaly pages on `jiro-page-header` with New entry
+- [x] 2.2 Shell chrome: chrome-height tokens, no desktop topbar, `jiro-user-menu` (sidebar footer + mobile top bar), dismissible verify banner with toasts, `jiro-feedback-form` in a modal, shell icons via `jiro-icon`, `.main` overflow clip, session bar offset under the mobile top bar
+- [x] 2.3 Dashboard v2: `dashboard.service.ts` (forkJoin, per-source catchError), Today row, This-month row, 14-day activity strip, shortcuts, `jiro-skeleton`
+- [x] 2.4 Route titles + `JiroTitleStrategy` (shared instance via `useExisting`; `current` signal feeds the mobile bar)
+- [x] 2.5 Housekeeping: main-layout shrunk, styles.scss tab-strip removed, todo review
 
-## Verification
+## Verification (Phase 2)
 
-- [x] `npm run check:css`: 76 referenced variables, 0 undefined
-- [x] `npx ng build --configuration production`: 406.6 kB initial, under the 500 kB budget
-- [x] Playwright desktop: ledger hub "Sep 12 / -$86.42 / +$3,150.00"; transactions 0 x "Invalid Date"; 404 renders; focus ring visible (cream on sidebar); dark toggle sets html.dark and theme-color #1A1310; forest and slate light+dark; toast "Settings saved"; confirm dialog focuses Cancel and closes on Escape; /admin themed; /login dark with dark on; reduced-motion disables tilt and normal motion keeps it
-- [x] Playwright mobile: dashboard, jym, ledger, culinara light; dashboard, session player, transactions dark
-- [x] Contrast script: every body-text pair >= 4.5:1 in all six palettes after the three fixes
-- [x] `git diff --stat`: routes unchanged except `**`, no nav label or field-name changes
+- [x] `npm run check:css` 0 undefined (80 vars), `npm run icons` (50 icons), production build 408 kB initial
+- [x] Desktop: no topbar; menu opens on Enter with focus on the first item, ArrowDown/End move, Escape closes and refocuses; Dark mode item toggles `html.dark`; feedback modal shows the form and the toast after Send
+- [x] Desktop: active tab Jym / Exercises (on the exercise detail) / Net Worth; zero `.lnav .jnav .secondary-links`; `/jym/plan?tab=series` opens Series and switching writes `?tab=templates`; session player has no module row and sticks at top 0
+- [x] Dashboard seeded (Resume card, "Written today", month net +$3,022.39, budget bar, activity strip with both journal days) and empty (four empty states, "Good evening, Ada"); light and dark
+- [x] Verify banner dismiss persists across reload in the session
+- [x] Document titles "Dashboard · Jiro", "Net worth · Jiro", "Transactions · Jiro"
+- [x] Mobile: bars 3 / 5 / 5 / 4 / 5 (hub, Jym, Culinara, Journaly, Ledger); top bar shows module or route title ("Exercise" on the drill-down); menu opens downward; Ledger overflow chips (2); no FAB; session bar sits at 48px under the 48px top bar; dashboard stacks in one column
 
-## Review
+## Review (Phase 2)
 
-**Delivered.** 5 Phase 0 commits + 1 Phase 1 commit on `New-Features`, not pushed.
-
-**Numbers moved.** `::ng-deep` 65 -> 0. `outline: none` 51 -> 0. Undefined CSS variables 10 -> 0. Themes 11 -> 3. Raw hex in components 204 -> 196 (Phase 3 target: 0). `window.confirm` 4 -> 0. Hand-rolled toasts 3 -> 0.
+**Delivered.** One navigation model in `core/navigation.ts` rendered by the shell (desktop tab row, mobile bar, overflow chips); three quick-nav components and four hand-written nav patterns gone. Desktop topbar removed; the account menu lives in the sidebar footer and the mobile top bar and is fully keyboard-operable. Feedback is a menu item in a modal; the FAB is gone. The verify banner is dismissible per session and its resend action now reports back. Dashboard shows today (workout, journal, kitchen), this month (ledger net, income, expenses, savings rate, top budgets), a 14-day activity strip and module shortcuts, with per-card degradation when a module fails. Every route has a title.
 
 **Deviations from the plan.**
-- Phase 1 landed as one commit, not one per sub-area: the outline sweep and the button sweep touched the same 30 files as the token and toast work, so per-area staging would have needed hunk-level splitting.
-- `jiro-skeleton` deferred to Phase 3 with its first consumer (plan review correction).
-- NotFound keeps its own centred layout rather than `jiro-page-header`; `guide.ts` took the header instead.
-- The three mobile-only "shrink the button" overrides were deleted rather than converted; buttons keep their 40px minimum on mobile, which matches the audit's touch-target finding.
-- Contrast pass moved three light tokens after measurement: muted #7C6F67 -> #756861, danger #C1582A -> #BD5629, warning #A97A45 -> #956B3D.
+- Settings "Feedback" card dropped (review correction); the menu item is the single entry point.
+- `jiro-skeleton` built now because the dashboard is its first consumer.
+- The activity strip counts UTC days (like the API's streaks and calendars) rather than local days; late-evening users may see the last column labelled with tomorrow's weekday initial.
+- Unused CSS left behind for Phase 3 cleanup: `.page-header` rules in the three Journaly section pages, `.back-link` rules in three Culinara pages.
 
-**Known, left for Phase 2/3.**
-- Shell stroke icons (hamburger, sun/moon, gear, feedback) are still inline SVGs; only module marks moved.
-- Session player bar paints the primary button on a primary background (pre-existing; Phase 3 session bar).
-- Ledger summary strip, category chips and page-level `.state-message`/`.spinner-lg` copies still use their own colours and CSS.
-- 14 hand-rolled confirm modals still exist alongside the new service.
-- Feedback FAB, verify banner, dashboard launcher, four secondary-nav patterns: Phase 2.
+**Found during verification, not fixed here.**
+- Backend: `GET /culinara/cook-streak` returns 500 when a trial has no `date_cooked` (my seed created one that way; the UI's trial modal always sets it). The dashboard shows "Culinara is not available right now" in that case.
+- Session player bar still paints the primary button on a primary background (Phase 3).
 
-**Next.** Phase 2 (shell): unified module sub-nav on desktop and in the mobile bar, topbar rework, dashboard v2 from `MASTER-DASHBOARD-REDESIGN.md` in house style, feedback into the user menu, dismissible verify banner, `jiro-icon` for the shell's stroke icons.
+**Next: Phase 3 (pages).** Session player and exercise library, Ledger hub and transactions, Journaly home, Culinara list and detail; migrate control flow, hand-rolled confirms and toasts, `.state-message`/`.spinner-lg` copies, raw hex colours (196 left) as each page is touched. Then Phase 4, the landing page with real screenshots.

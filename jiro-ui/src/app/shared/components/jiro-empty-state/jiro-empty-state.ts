@@ -1,4 +1,4 @@
-import { Component, input } from '@angular/core';
+import { Component, booleanAttribute, input } from '@angular/core';
 import { JiroIconComponent } from '../jiro-icon/jiro-icon';
 import { IconName } from '../../icons/icons.generated';
 
@@ -64,5 +64,5 @@ export class JiroEmptyStateComponent {
   heading = input.required<string>();
   message = input<string>('');
   icon = input<IconName | null>(null);
-  compact = input(false);
+  compact = input(false, { transform: booleanAttribute });
 }
