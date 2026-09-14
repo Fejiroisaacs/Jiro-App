@@ -3,7 +3,6 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
-import { LedgerQuickNavComponent } from '../ledger-quick-nav/ledger-quick-nav';
 import { LedgerTransactionFormComponent, TransactionPayload } from '../shared/transaction-form/ledger-transaction-form';
 import { intervalLabel, parseDateOnly, formatSignedCurrency } from '../shared/ledger-utils';
 import {
@@ -39,7 +38,6 @@ interface EditForm {
     FormsModule,
     JiroButtonComponent,
     JiroModalComponent,
-    LedgerQuickNavComponent,
     LedgerTransactionFormComponent,
   ],
   template: `
@@ -60,8 +58,6 @@ interface EditForm {
           </jiro-button>
         </div>
       </div>
-
-      <ledger-quick-nav />
 
       <!-- ── Desktop Filter Bar ──────────────────────────────────────────────── -->
       <div class="filter-bar desktop-filters">

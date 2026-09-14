@@ -10,7 +10,6 @@ import {
 import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-card';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
-import { LedgerQuickNavComponent } from '../ledger-quick-nav/ledger-quick-nav';
 import { formatCurrency, formatSignedCurrency, formatDate, hexWithAlpha } from '../shared/ledger-utils';
 
 type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
@@ -24,7 +23,6 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
     JiroCardComponent,
     JiroButtonComponent,
     JiroModalComponent,
-    LedgerQuickNavComponent,
   ],
   template: `
     <div class="accounts-page">
@@ -44,8 +42,6 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
           </jiro-button>
         </div>
       </div>
-
-      <ledger-quick-nav />
 
       <!-- ── Loading ── -->
       <div *ngIf="loading()" class="state-message">

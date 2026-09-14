@@ -1,7 +1,6 @@
 import { Component, OnInit, computed, signal, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 import { MealPlanService, MealPlan, MealPlanEntry, MealSlot } from '../../../core/services/meal-plan.service';
 import { RecipeService, Recipe } from '../../../core/services/recipe.service';
 import { ShoppingListComponent } from '../shopping-list/shopping-list';
@@ -36,13 +35,12 @@ function addWeeks(d: Date, n: number): Date {
 @Component({
   selector: 'app-meal-planner',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule],
   template: `
     <div class="planner-page">
       <!-- Header -->
       <div class="page-header">
         <div>
-          <a routerLink="/culinara" class="back-link">← Culinara</a>
           <h1>Meal Planner</h1>
           <p class="text-secondary">{{ weekLabel() }}</p>
         </div>

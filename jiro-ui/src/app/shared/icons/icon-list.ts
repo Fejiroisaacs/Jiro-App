@@ -45,6 +45,12 @@ export const ICON_LIST = [
   'notebook',
   'coins',
   'wallet',
+  'users',
+  'folder',
+  'receipt',
+  'bank',
+  'chart-line-up',
+  'arrows-left-right',
   // status
   'warning',
   'warning-circle',

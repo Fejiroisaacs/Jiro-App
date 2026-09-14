@@ -22,7 +22,6 @@ const STORAGE_KEY = 'culinara_shopping_list';
     <div class="shopping-list">
       <div class="page-header">
         <div>
-          <a routerLink="/culinara" class="back-link">← Culinara</a>
           <h1>Grocery List</h1>
           <p class="text-secondary">{{ uncheckedCount() }} item{{ uncheckedCount() !== 1 ? 's' : '' }} remaining</p>
         </div>

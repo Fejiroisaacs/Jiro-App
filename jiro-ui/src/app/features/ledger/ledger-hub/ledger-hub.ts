@@ -10,7 +10,6 @@ import {
 } from '../../../core/services/ledger.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
-import { LedgerQuickNavComponent } from '../ledger-quick-nav/ledger-quick-nav';
 import { LedgerTransactionFormComponent, TransactionPayload } from '../shared/transaction-form/ledger-transaction-form';
 import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hexWithAlpha } from '../shared/ledger-utils';
 
@@ -22,7 +21,6 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
     RouterLink,
     JiroButtonComponent,
     JiroModalComponent,
-    LedgerQuickNavComponent,
     LedgerTransactionFormComponent,
   ],
   template: `
@@ -43,8 +41,6 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
           </jiro-button>
         </div>
       </div>
-
-      <ledger-quick-nav />
 
       <!-- ── Loading ── -->
       <div *ngIf="loading()" class="state-message">

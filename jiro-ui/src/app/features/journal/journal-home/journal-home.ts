@@ -8,7 +8,7 @@ import {
   JournalStreak,
   MOODS,
 } from '../../../core/services/journal.service';
-import { JournalQuickNavComponent } from '../journal-quick-nav/journal-quick-nav';
+import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JournalWeekViewComponent, toISO } from '../journal-week-view/journal-week-view';
 import { JournalDayModalComponent } from '../journal-day-modal/journal-day-modal';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
@@ -17,20 +17,13 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 @Component({
   selector: 'app-journal-home',
   standalone: true,
-  imports: [CommonModule, FormsModule, JournalQuickNavComponent, JournalWeekViewComponent, JournalDayModalComponent, JiroButtonComponent, JiroModalComponent],
+  imports: [CommonModule, FormsModule, JiroPageHeaderComponent, JournalWeekViewComponent, JournalDayModalComponent, JiroButtonComponent, JiroModalComponent],
   template: `
     <div class="journal-home">
 
-      <!-- Header -->
-      <div class="page-header">
-        <div>
-          <h1>Journaly</h1>
-          <p class="text-secondary">Your reflection space</p>
-        </div>
-      </div>
-
-      <!-- Quick nav -->
-      <journal-quick-nav></journal-quick-nav>
+      <jiro-page-header heading="Journaly" subtitle="Your reflection space">
+        <jiro-button actions variant="primary" type="button" (click)="router.navigate(['/journal/new'])">New entry</jiro-button>
+      </jiro-page-header>
 
       <!-- Streak banner -->
       <div class="streak-banner" *ngIf="streak()">

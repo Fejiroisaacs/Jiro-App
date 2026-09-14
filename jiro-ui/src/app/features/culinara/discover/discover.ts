@@ -13,7 +13,6 @@ import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-car
     <div class="discover-page">
       <div class="page-header">
         <div>
-          <a routerLink="/culinara" class="back-link">← Culinara</a>
           <h1>Discover</h1>
           <p class="text-secondary">Recipes shared publicly by the community</p>
         </div>

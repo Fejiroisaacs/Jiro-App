@@ -47,33 +47,6 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
             <jiro-button variant="primary" type="button" (click)="showCreate.set(true)">
               + New Recipe
             </jiro-button>
-            <!-- On desktop: display:contents lets these flow inline with the button.
-                 On mobile: becomes a flex row so all three sit in one compact line. -->
-            <div class="secondary-links">
-              <a routerLink="/culinara/discover" class="shopping-link">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="11" cy="11" r="8"/>
-                  <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                </svg>
-                Discover
-              </a>
-              <a routerLink="/culinara/meal-planner" class="shopping-link">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                  <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
-                  <line x1="3" y1="10" x2="21" y2="10"/>
-                </svg>
-                Meal Planner
-              </a>
-              <a routerLink="/culinara/shopping" class="shopping-link">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
-                  <line x1="3" y1="6" x2="21" y2="6"/>
-                  <path d="M16 10a4 4 0 0 1-8 0"/>
-                </svg>
-                Grocery List
-              </a>
-            </div>
           </div>
         </div>
       </div>
@@ -249,31 +222,6 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
     }
 
     /* On desktop the wrapper is invisible — children flow inline with the button */
-    .secondary-links {
-      display: contents;
-    }
-
-    .shopping-link {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 8px 14px;
-      border: 1px solid var(--border-color);
-      border-radius: var(--border-radius);
-      color: var(--text-secondary);
-      font-size: var(--font-size-sm);
-      font-weight: 500;
-      text-decoration: none;
-      background: var(--bg-surface);
-      transition: color 0.15s, border-color 0.15s;
-      white-space: nowrap;
-    }
-
-    .shopping-link:hover {
-      color: var(--text-primary);
-      border-color: var(--text-secondary);
-    }
-
     .controls-row {
       display: flex;
       align-items: center;
@@ -665,18 +613,6 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
 
       .header-actions { --jiro-btn-width: 100%; }
 
-      /* Restore secondary-links as a visible flex row */
-      .secondary-links {
-        display: flex;
-        gap: var(--space-xs);
-      }
-
-      .secondary-links .shopping-link {
-        flex: 1;
-        justify-content: center;
-        padding: 7px 6px;
-        font-size: var(--font-size-xs);
-      }
     }
   `]
 })

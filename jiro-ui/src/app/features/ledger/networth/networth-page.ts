@@ -21,14 +21,13 @@ import {
 import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-card';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
-import { LedgerQuickNavComponent } from '../ledger-quick-nav/ledger-quick-nav';
 
 Chart.register(...registerables);
 
 @Component({
   selector: 'app-networth-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, JiroCardComponent, JiroButtonComponent, JiroModalComponent, LedgerQuickNavComponent],
+  imports: [CommonModule, FormsModule, JiroCardComponent, JiroButtonComponent, JiroModalComponent],
   template: `
     <div class="networth-page">
 
@@ -47,8 +46,6 @@ Chart.register(...registerables);
           Take Snapshot
         </jiro-button>
       </div>
-
-      <ledger-quick-nav />
 
       <!-- Loading -->
       <div *ngIf="loading()" class="state-message">

@@ -1,27 +1,22 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { JournalService, JournalGroup } from '../../../core/services/journal.service';
-import { JournalQuickNavComponent } from '../journal-quick-nav/journal-quick-nav';
+import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 
 @Component({
   selector: 'app-journal-groups-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, JournalQuickNavComponent, JiroButtonComponent, JiroModalComponent],
+  imports: [CommonModule, FormsModule, RouterLink, JiroPageHeaderComponent, JiroButtonComponent, JiroModalComponent],
   template: `
     <div class="groups-page">
 
-      <div class="page-header">
-        <div>
-          <h1>Journaly</h1>
-          <p class="text-secondary">Your reflection space</p>
-        </div>
-      </div>
-
-      <journal-quick-nav></journal-quick-nav>
+      <jiro-page-header heading="Journaly" subtitle="Your reflection space">
+        <jiro-button actions variant="primary" type="button" routerLink="/journal/new">New entry</jiro-button>
+      </jiro-page-header>
 
       <div class="section-row">
         <h2 class="section-title">My Groups</h2>

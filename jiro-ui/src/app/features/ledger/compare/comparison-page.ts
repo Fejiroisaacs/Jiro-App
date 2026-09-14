@@ -10,7 +10,6 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { LedgerQuickNavComponent } from '../ledger-quick-nav/ledger-quick-nav';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import { LedgerService, ComparisonResponse } from '../../../core/services/ledger.service';
 import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-card';
@@ -69,7 +68,7 @@ function computePresetRanges(preset: Preset): DateRange | null {
 @Component({
   selector: 'app-comparison-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, JiroCardComponent, JiroButtonComponent, LedgerQuickNavComponent],
+  imports: [CommonModule, FormsModule, JiroCardComponent, JiroButtonComponent],
   template: `
     <div class="comparison-page">
 
@@ -80,8 +79,6 @@ function computePresetRanges(preset: Preset): DateRange | null {
           <p class="text-secondary">Analyse how your finances changed between two periods</p>
         </div>
       </div>
-
-      <ledger-quick-nav />
 
       <!-- ── Period Selector ── -->
       <jiro-card>
