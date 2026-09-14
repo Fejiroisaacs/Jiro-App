@@ -126,7 +126,7 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
             } @else if (t.icon) {
               <jiro-icon [name]="t.icon" [size]="22" />
             }
-            <span>{{ t.label }}</span>
+            <span class="mobile-nav-label">{{ t.mobileLabel ?? t.label }}</span>
           </a>
         }
       </nav>
@@ -374,20 +374,30 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
     }
 
     .mobile-nav-item {
-      flex: 1;
+      flex: 1 1 0;
+      min-width: 0;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       gap: 3px;
+      padding: 0 2px;
       color: var(--text-on-dark);
       opacity: 0.75;
       text-decoration: none;
-      font-size: 0.72rem;
+      font-size: 0.7rem;
       font-weight: 500;
-      letter-spacing: 0.3px;
+      letter-spacing: 0.2px;
       transition: opacity 0.15s;
       min-height: 44px;
+    }
+
+    /* Five slots at 360px are about 72px each: one line, never clipped mid-bar. */
+    .mobile-nav-label {
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .mobile-nav-item.active { opacity: 1; }

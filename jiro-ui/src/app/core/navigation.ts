@@ -8,6 +8,8 @@ import { MarkName } from '../shared/components/jiro-mark/jiro-mark';
  */
 export interface NavTab {
   label: string;
+  /** Shorter label for the five-slot mobile bar (about 72px per slot); defaults to `label`. */
+  mobileLabel?: string;
   route: string;
   /** Match the route exactly (module homes). Others match by prefix. */
   exact?: boolean;
@@ -48,8 +50,8 @@ export const MODULES: ModuleNav[] = [
     tabs: [
       { label: 'Culinara', route: '/culinara', exact: true, mark: 'culinara' },
       { label: 'Discover', route: '/culinara/discover', icon: 'magnifying-glass' },
-      { label: 'Meal Planner', route: '/culinara/meal-planner', icon: 'calendar-blank' },
-      { label: 'Grocery List', route: '/culinara/shopping', icon: 'basket' },
+      { label: 'Meal Planner', mobileLabel: 'Planner', route: '/culinara/meal-planner', icon: 'calendar-blank' },
+      { label: 'Grocery List', mobileLabel: 'Grocery', route: '/culinara/shopping', icon: 'basket' },
     ],
   },
   {
@@ -70,7 +72,7 @@ export const MODULES: ModuleNav[] = [
     home: '/ledger',
     tabs: [
       { label: 'Overview', route: '/ledger', exact: true, mark: 'ledger' },
-      { label: 'Transactions', route: '/ledger/transactions', icon: 'receipt' },
+      { label: 'Transactions', mobileLabel: 'Activity', route: '/ledger/transactions', icon: 'receipt' },
       { label: 'Accounts', route: '/ledger/accounts', icon: 'bank' },
       { label: 'Budgets', route: '/ledger/budgets', icon: 'wallet' },
       { label: 'Net Worth', route: '/ledger/networth', icon: 'chart-line-up', mobile: false },
