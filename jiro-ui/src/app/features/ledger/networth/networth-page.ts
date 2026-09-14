@@ -48,13 +48,16 @@ Chart.register(...registerables);
       </div>
 
       <!-- Loading -->
-      <div *ngIf="loading()" class="state-message">
+      @if (loading()) {
+<div class="state-message">
         <div class="spinner-lg"></div>
         <p>Loading snapshots...</p>
       </div>
+}
 
       <!-- Empty state (no snapshots at all) -->
-      <div *ngIf="!loading() && snapshots().length === 0" class="empty-state">
+      @if (!loading() && snapshots().length === 0) {
+<div class="empty-state">
         <div class="empty-icon">
           <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/>
@@ -66,9 +69,11 @@ Chart.register(...registerables);
           Take your first snapshot
         </jiro-button>
       </div>
+}
 
       <!-- Content (has snapshots) -->
-      <ng-container *ngIf="!loading() && snapshots().length > 0">
+      @if (!loading() && snapshots().length > 0) {
+
 
         <!-- Current snapshot summary -->
         <jiro-card class="summary-card">
@@ -118,7 +123,8 @@ Chart.register(...registerables);
         <div class="snapshot-list-section">
           <h2 class="section-heading">Snapshot History</h2>
           <div class="snapshot-list">
-            <div *ngFor="let snap of displayedSnapshots()" class="snapshot-row">
+            @for (snap of displayedSnapshots(); track snap) {
+<div class="snapshot-row">
               <div class="snap-date">{{ formatDate(snap.snapshot_date) }}</div>
               <div class="snap-values">
                 <div class="snap-stat">
@@ -140,20 +146,26 @@ Chart.register(...registerables);
                 </div>
               </div>
             </div>
+}
           </div>
         </div>
 
-      </ng-container>
+      
+}
 
       <!-- Take Snapshot Modal -->
-      <jiro-modal *ngIf="showSnapshotModal()" title="Take Snapshot" maxWidth="480px" (close)="closeSnapshotModal()">
+      @if (showSnapshotModal()) {
+<jiro-modal title="Take Snapshot" maxWidth="480px" (close)="closeSnapshotModal()">
 
-        <div *ngIf="loadingAccounts()" class="accounts-loading">
+        @if (loadingAccounts()) {
+<div class="accounts-loading">
           <div class="spinner-sm"></div>
           <span>Loading accounts...</span>
         </div>
+}
 
-        <form *ngIf="!loadingAccounts()" class="modal-form" (ngSubmit)="submitSnapshot()">
+        @if (!loadingAccounts()) {
+<form class="modal-form" (ngSubmit)="submitSnapshot()">
 
           <div class="form-group">
             <label class="form-label">Snapshot Date</label>
@@ -207,7 +219,9 @@ Chart.register(...registerables);
           </div>
 
         </form>
+}
       </jiro-modal>
+}
 
     </div>
   `,

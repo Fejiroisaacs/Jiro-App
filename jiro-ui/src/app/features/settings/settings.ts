@@ -1,5 +1,5 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { AuthService, UserSettings } from '../../core/services/auth.service';
 import { SettingsService, Theme } from '../../core/services/settings.service';
@@ -12,7 +12,7 @@ import { ToastService } from '../../core/services/toast.service';
 @Component({
   selector: 'app-settings',
   standalone: true,
-  imports: [CommonModule, FormsModule, JiroCardComponent, JiroButtonComponent, JiroInputComponent, JiroPageHeaderComponent],
+  imports: [FormsModule, JiroCardComponent, JiroButtonComponent, JiroInputComponent, JiroPageHeaderComponent],
   template: `
     <div class="settings">
       <jiro-page-header heading="Settings" subtitle="Account, profile, preferences and theme" />
@@ -20,22 +20,28 @@ import { ToastService } from '../../core/services/toast.service';
       <!-- Account -->
       <jiro-card class="settings-section">
         <h2>Account</h2>
-        <div class="setting-row" *ngIf="authService.user() as user">
+        @if (authService.user(); as user) {
+<div class="setting-row">
           <div>
             <label class="setting-label">Email</label>
             <p class="text-secondary">{{ user.email }}</p>
           </div>
-          <div class="verified-badge" *ngIf="user.email_verified">
+          @if (user.email_verified) {
+<div class="verified-badge">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
               <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
               <polyline points="22 4 12 14.01 9 11.01"/>
             </svg>
             Verified
           </div>
-          <div class="unverified-badge" *ngIf="!user.email_verified">
+}
+          @if (!user.email_verified) {
+<div class="unverified-badge">
             Not verified
           </div>
+}
         </div>
+}
       </jiro-card>
 
       <!-- Profile -->
@@ -45,19 +51,27 @@ import { ToastService } from '../../core/services/toast.service';
         <!-- Avatar -->
         <div class="avatar-row">
           <div class="avatar-preview">
-            <img *ngIf="authService.user()?.avatar_url" [src]="authService.user()!.avatar_url" alt="Avatar" class="avatar-img">
-            <div *ngIf="!authService.user()?.avatar_url" class="avatar-placeholder">
+            @if (authService.user()?.avatar_url) {
+<img [src]="authService.user()!.avatar_url" alt="Avatar" class="avatar-img">
+}
+            @if (!authService.user()?.avatar_url) {
+<div class="avatar-placeholder">
               {{ (authService.user()?.display_name || authService.user()?.email || '?')[0].toUpperCase() }}
             </div>
+}
           </div>
           <div class="avatar-actions">
             <label class="avatar-upload-btn">
               <input type="file" accept="image/jpeg,image/png,image/webp" (change)="onAvatarFileChange($event)" style="display:none">
               {{ avatarUploading() ? (avatarProgress() + '%') : 'Upload photo' }}
             </label>
-            <button *ngIf="authService.user()?.avatar_url" class="avatar-remove-btn" (click)="removeAvatar()">Remove</button>
+            @if (authService.user()?.avatar_url) {
+<button class="avatar-remove-btn" (click)="removeAvatar()">Remove</button>
+}
           </div>
-          <span *ngIf="avatarError()" class="profile-error">{{ avatarError() }}</span>
+          @if (avatarError()) {
+<span class="profile-error">{{ avatarError() }}</span>
+}
         </div>
 
         <div class="profile-form">
@@ -95,7 +109,9 @@ import { ToastService } from '../../core/services/toast.service';
             <jiro-button variant="primary" (click)="saveProfile()" [disabled]="profileSaving()">
               {{ profileSaving() ? 'Saving...' : 'Save Profile' }}
             </jiro-button>
-            <span class="profile-error" *ngIf="profileError()">{{ profileError() }}</span>
+            @if (profileError()) {
+<span class="profile-error">{{ profileError() }}</span>
+}
           </div>
         </div>
       </jiro-card>
@@ -121,7 +137,9 @@ import { ToastService } from '../../core/services/toast.service';
             <p class="text-secondary setting-desc">Used for reminder scheduling</p>
           </div>
           <select [(ngModel)]="timezone" (change)="save()" class="jiro-select">
-            <option *ngFor="let tz of commonTimezones" [value]="tz">{{ tz }}</option>
+            @for (tz of commonTimezones; track tz) {
+<option [value]="tz">{{ tz }}</option>
+}
           </select>
         </div>
       </jiro-card>
@@ -146,14 +164,16 @@ import { ToastService } from '../../core/services/toast.service';
 
         <p class="text-secondary" style="margin-top: var(--space-md);">Color theme</p>
         <div class="theme-grid">
-          <button
-            *ngFor="let t of themes"
+          @for (t of themes; track t) {
+<button
+           
             class="theme-option"
             [class.selected]="settings().theme === t.value"
             (click)="selectTheme(t.value)">
             <div class="theme-swatch" [style.background]="t.color"></div>
             <span>{{ t.label }}</span>
           </button>
+}
         </div>
       </jiro-card>
 

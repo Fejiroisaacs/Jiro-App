@@ -1,9 +1,9 @@
 import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 @Component({
   selector: 'jym-how-to-use',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   template: `
     <div class="page-container">
       <div class="content-wrapper">

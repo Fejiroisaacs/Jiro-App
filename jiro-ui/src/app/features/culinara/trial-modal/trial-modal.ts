@@ -1,5 +1,5 @@
 import { Component, EventEmitter, Input, OnInit, Output, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import {
   RecipeService,
@@ -14,7 +14,7 @@ import { StarRatingComponent } from '../../../shared/components/star-rating/star
 @Component({
   selector: 'app-trial-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule, JiroButtonComponent, StarRatingComponent],
+  imports: [FormsModule, JiroButtonComponent, StarRatingComponent],
   template: `
     <form (ngSubmit)="onSubmit()" class="trial-form">
       <!-- Date cooked -->
@@ -32,7 +32,8 @@ import { StarRatingComponent } from '../../../shared/components/star-rating/star
         <label class="field-label">Modifications</label>
         <p class="field-hint">What did you change from the base recipe?</p>
         <div class="mod-list">
-          <div *ngFor="let mod of modifications; let i = index" class="mod-row">
+          @for (mod of modifications; track mod; let i = $index) {
+<div class="mod-row">
             <input
               class="field-input mod-item"
               type="text"
@@ -47,6 +48,7 @@ import { StarRatingComponent } from '../../../shared/components/star-rating/star
               placeholder="Change (e.g. +50g, toasted)" />
             <button type="button" class="remove-btn" (click)="removeMod(i)">&times;</button>
           </div>
+}
           <button type="button" class="add-link" (click)="addMod()">+ Add modification</button>
         </div>
       </div>
@@ -69,7 +71,9 @@ import { StarRatingComponent } from '../../../shared/components/star-rating/star
       </div>
 
       <!-- Error -->
-      <p *ngIf="error()" class="form-error">{{ error() }}</p>
+      @if (error()) {
+<p class="form-error">{{ error() }}</p>
+}
 
       <!-- Actions -->
       <div class="form-actions">

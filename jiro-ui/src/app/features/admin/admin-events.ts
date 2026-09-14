@@ -22,16 +22,23 @@ const EVENT_TYPES = [
 
       <form class="filter-bar" (ngSubmit)="search()">
         <select class="filter-input" [(ngModel)]="eventFilter" name="event">
-          <option *ngFor="let e of eventTypes" [value]="e">{{ e || 'All events' }}</option>
+          @for (e of eventTypes; track e) {
+<option [value]="e">{{ e || 'All events' }}</option>
+}
         </select>
         <input class="filter-input uid-input" type="text" [(ngModel)]="userIdFilter" name="uid" placeholder="Filter by user ID..." />
         <button class="search-btn" type="submit">Filter</button>
       </form>
 
-      <div *ngIf="loading()" class="state-msg">Loading...</div>
-      <div *ngIf="error()" class="error-msg">{{ error() }}</div>
+      @if (loading()) {
+<div class="state-msg">Loading...</div>
+}
+      @if (error()) {
+<div class="error-msg">{{ error() }}</div>
+}
 
-      <div class="table-wrap" *ngIf="!loading() && events().length > 0">
+      @if (!loading() && events().length > 0) {
+<div class="table-wrap">
         <table class="events-table">
           <thead>
             <tr>
@@ -42,30 +49,41 @@ const EVENT_TYPES = [
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let e of events()">
+            @for (e of events(); track e) {
+<tr>
               <td class="time-cell">{{ formatTime(e.occurred_at) }}</td>
               <td><span class="event-chip">{{ e.event }}</span></td>
               <td class="user-cell">
-                <ng-container *ngIf="e.user_id; else noUser">
+                @if (e.user_id) {
+
                   <span class="user-name" (click)="goToUser(e.user_id)" title="{{ e.user_id }}">
                     {{ e.username ? '@' + e.username : e.user_email ?? e.user_id }}
                   </span>
-                </ng-container>
-                <ng-template #noUser><span class="dim">—</span></ng-template>
+                
+} @else {
+<span class="dim">—</span>
+}
+                
               </td>
               <td class="props-cell hide-sm">{{ e.properties ? (e.properties | json) : '—' }}</td>
             </tr>
+}
           </tbody>
         </table>
       </div>
+}
 
-      <div *ngIf="!loading() && events().length === 0" class="state-msg">No events found.</div>
+      @if (!loading() && events().length === 0) {
+<div class="state-msg">No events found.</div>
+}
 
-      <div *ngIf="events().length > 0" class="pagination">
+      @if (events().length > 0) {
+<div class="pagination">
         <button class="page-btn" [disabled]="page() <= 1" (click)="changePage(-1)">Prev</button>
         <span class="page-label">Page {{ page() }}</span>
         <button class="page-btn" [disabled]="events().length < pageSize" (click)="changePage(1)">Next</button>
       </div>
+}
     </div>
   `,
   styles: [`

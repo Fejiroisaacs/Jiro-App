@@ -1,5 +1,5 @@
 import { Component, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
@@ -10,9 +10,10 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 @Component({
   selector: 'app-split-detail',
   standalone: true,
-  imports: [CommonModule, FormsModule, DragDropModule, JiroButtonComponent, JiroModalComponent],
+  imports: [FormsModule, DragDropModule, JiroButtonComponent, JiroModalComponent],
   template: `
-    <div class="split-detail" *ngIf="split()">
+    @if (split()) {
+<div class="split-detail">
       <!-- Header -->
       <div class="page-header">
         <div class="header-left">
@@ -23,8 +24,12 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
             All Splits
           </button>
           <div class="split-title-row">
-            <h1 *ngIf="!editingName()">{{ split()!.name }}</h1>
-            <input *ngIf="editingName()" class="title-input" [(ngModel)]="editName" (blur)="saveName()" (keydown.enter)="saveName()" autofocus />
+            @if (!editingName()) {
+<h1>{{ split()!.name }}</h1>
+}
+            @if (editingName()) {
+<input class="title-input" [(ngModel)]="editName" (blur)="saveName()" (keydown.enter)="saveName()" autofocus />
+}
             <button class="edit-btn" (click)="startEditName()">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -52,8 +57,11 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
               </button>
             </div>
             <div class="tags-row">
-              <div *ngIf="!editingTags()" class="tags-display">
-                <span *ngFor="let tag of split()!.tags" class="tag-chip">{{ tag }}</span>
+              @if (!editingTags()) {
+<div class="tags-display">
+                @for (tag of split()!.tags; track tag) {
+<span class="tag-chip">{{ tag }}</span>
+}
                 <button class="tag-edit-btn" (click)="startEditTags()">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
@@ -61,11 +69,14 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
                   {{ split()!.tags.length ? '' : 'Add tags' }}
                 </button>
               </div>
-              <div *ngIf="editingTags()" class="tags-edit">
+}
+              @if (editingTags()) {
+<div class="tags-edit">
                 <input class="tag-input" type="text" [(ngModel)]="editTagsRaw" placeholder="PPL, Hypertrophy, Beginner" (keydown.enter)="saveTags()" (keydown.escape)="editingTags.set(false)" autofocus />
                 <button class="tag-save-btn" (click)="saveTags()">Save</button>
                 <button class="tag-cancel-btn" (click)="editingTags.set(false)">Cancel</button>
               </div>
+}
             </div>
           </div>
         </div>
@@ -90,31 +101,41 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       </div>
 
       <!-- Share panel -->
-      <div *ngIf="shareUrl()" class="share-panel">
+      @if (shareUrl()) {
+<div class="share-panel">
         <div class="share-url-row">
           <input class="share-url-input" [value]="shareUrl()" readonly />
           <button class="share-copy-btn" (click)="copyLink()" [class.copied]="copied()">
-            <svg *ngIf="!copied()" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            @if (!copied()) {
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
             </svg>
-            <svg *ngIf="copied()" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+}
+            @if (copied()) {
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="20 6 9 17 4 12"/>
             </svg>
+}
             {{ copied() ? 'Copied!' : 'Copy' }}
           </button>
         </div>
         <button class="share-revoke-btn" (click)="revokeShare()">Revoke link</button>
       </div>
+}
 
       <!-- Loading -->
-      <div *ngIf="loading()" class="state-message">
+      @if (loading()) {
+<div class="state-message">
         <div class="spinner-lg"></div>
       </div>
+}
 
       <!-- Routines (drag-drop columns) -->
-      <div *ngIf="!loading()" class="routines-board">
-        <div
-          *ngFor="let routine of routines(); let ri = index"
+      @if (!loading()) {
+<div class="routines-board">
+        @for (routine of routines(); track routine; let ri = $index) {
+<div
+         
           class="routine-column">
           <div class="routine-header">
             <div class="routine-title">
@@ -137,8 +158,9 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
             [cdkDropListConnectedTo]="getConnectedLists()"
             class="exercise-list"
             (cdkDropListDropped)="onDrop($event, ri)">
-            <div
-              *ngFor="let item of routine.items; let ii = index"
+            @for (item of routine.items; track item; let ii = $index) {
+<div
+             
               cdkDrag
               class="exercise-item">
               <div class="drag-handle" cdkDragHandle>
@@ -149,7 +171,9 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
               </div>
               <div class="item-info">
                 <span class="item-name">{{ item.exercise_name }}</span>
-                <span class="item-muscle" *ngIf="item.muscle_group">{{ item.muscle_group }}</span>
+                @if (item.muscle_group) {
+<span class="item-muscle">{{ item.muscle_group }}</span>
+}
               </div>
               <div class="item-targets">
                 <span class="target-text">{{ item.target_sets }}×{{ item.target_reps }}</span>
@@ -160,26 +184,35 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
                 </svg>
               </button>
             </div>
+}
 
-            <div *ngIf="routine.items.length === 0" class="empty-list">
+            @if (routine.items.length === 0) {
+<div class="empty-list">
               Drag exercises here or click + Add
             </div>
+}
           </div>
 
           <button class="add-ex-btn" (click)="openExercisePicker(ri)">
             + Add Exercise
           </button>
         </div>
+}
 
-        <div *ngIf="routines().length === 0" class="board-empty">
+        @if (routines().length === 0) {
+<div class="board-empty">
           <p class="text-secondary">No training days yet. Add your first day to start building.</p>
           <jiro-button variant="primary" type="button" (click)="showAddRoutine.set(true)">+ Add Day</jiro-button>
         </div>
+}
       </div>
+}
     </div>
+}
 
     <!-- Add Routine Modal -->
-    <jiro-modal *ngIf="showAddRoutine()" title="Add Training Day" maxWidth="400px" (close)="showAddRoutine.set(false)">
+    @if (showAddRoutine()) {
+<jiro-modal title="Add Training Day" maxWidth="400px" (close)="showAddRoutine.set(false)">
       <form class="simple-form" (ngSubmit)="addRoutine()">
         <div class="form-group">
           <label class="form-label">Day Name</label>
@@ -197,30 +230,45 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
         </div>
       </form>
     </jiro-modal>
+}
 
     <!-- Exercise Picker Modal -->
-    <jiro-modal *ngIf="showExPicker()" title="Add Exercise" maxWidth="480px" (close)="showExPicker.set(false)">
+    @if (showExPicker()) {
+<jiro-modal title="Add Exercise" maxWidth="480px" (close)="showExPicker.set(false)">
       <div class="ex-picker">
-        <input *ngIf="!creatingExercise()" class="form-input" type="text" [(ngModel)]="exSearch" (input)="filterExercises()" placeholder="Search exercises..." />
-        <div *ngIf="!creatingExercise()" class="ex-picker-list">
-          <button
-            *ngFor="let ex of filteredExercises()"
+        @if (!creatingExercise()) {
+<input class="form-input" type="text" [(ngModel)]="exSearch" (input)="filterExercises()" placeholder="Search exercises..." />
+}
+        @if (!creatingExercise()) {
+<div class="ex-picker-list">
+          @for (ex of filteredExercises(); track ex) {
+<button
+           
             class="ex-pick-btn"
             (click)="addExerciseToRoutine(ex)">
             <span class="ex-pick-name">{{ ex.name }}</span>
-            <span class="ex-pick-muscle" *ngIf="ex.muscle_group">{{ ex.muscle_group }}</span>
+            @if (ex.muscle_group) {
+<span class="ex-pick-muscle">{{ ex.muscle_group }}</span>
+}
           </button>
-          <div *ngIf="filteredExercises().length === 0" class="no-results">
+}
+          @if (filteredExercises().length === 0) {
+<div class="no-results">
             <p class="text-secondary">No exercises match "{{ exSearch }}".</p>
           </div>
+}
         </div>
+}
 
         <!-- Create new exercise inline -->
-        <button *ngIf="!creatingExercise() && !pickerSelectedEx()" class="create-ex-inline-btn" (click)="startCreateExercise()">
+        @if (!creatingExercise() && !pickerSelectedEx()) {
+<button class="create-ex-inline-btn" (click)="startCreateExercise()">
           + Create New Exercise{{ exSearch.trim() ? ' "' + exSearch.trim() + '"' : '' }}
         </button>
+}
 
-        <div *ngIf="creatingExercise()" class="inline-create-form">
+        @if (creatingExercise()) {
+<div class="inline-create-form">
           <div class="form-group">
             <label class="form-label">Exercise Name *</label>
             <input class="form-input" type="text" [(ngModel)]="newExName" placeholder="e.g. Bulgarian Split Squat" />
@@ -229,10 +277,14 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
             <label class="form-label">Muscle Group</label>
             <select class="form-input" [(ngModel)]="newExMuscleGroup">
               <option value="">None</option>
-              <option *ngFor="let mg of muscleGroups" [value]="mg">{{ mg }}</option>
+              @for (mg of muscleGroups; track mg) {
+<option [value]="mg">{{ mg }}</option>
+}
             </select>
           </div>
-          <p *ngIf="newExError()" class="create-ex-error">{{ newExError() }}</p>
+          @if (newExError()) {
+<p class="create-ex-error">{{ newExError() }}</p>
+}
           <div class="form-actions">
             <jiro-button variant="secondary" type="button" (click)="creatingExercise.set(false)">Cancel</jiro-button>
             <jiro-button variant="primary" type="button" [disabled]="newExSaving() || !newExName.trim()" (click)="createAndPickExercise()">
@@ -240,9 +292,11 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
             </jiro-button>
           </div>
         </div>
+}
 
         <!-- Target sets/reps -->
-        <div *ngIf="pickerSelectedEx()" class="target-inputs">
+        @if (pickerSelectedEx()) {
+<div class="target-inputs">
           <div class="target-row">
             <div class="form-group">
               <label class="form-label">Sets</label>
@@ -257,11 +311,14 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
             Add {{ pickerSelectedEx()!.name }}
           </jiro-button>
         </div>
+}
       </div>
     </jiro-modal>
+}
 
     <!-- Start Series Modal -->
-    <jiro-modal *ngIf="showSeriesModal()" title="Start Series" maxWidth="440px" (close)="showSeriesModal.set(false)">
+    @if (showSeriesModal()) {
+<jiro-modal title="Start Series" maxWidth="440px" (close)="showSeriesModal.set(false)">
       <form class="simple-form" (ngSubmit)="createSeries()">
         <div class="form-group">
           <label class="form-label">Series Name</label>
@@ -275,14 +332,18 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
             <button type="button" class="dur-btn" [class.active]="seriesDuration === 'sessions'" (click)="seriesDuration = 'sessions'">Sessions</button>
           </div>
         </div>
-        <div class="form-group" *ngIf="seriesDuration === 'weeks'">
+        @if (seriesDuration === 'weeks') {
+<div class="form-group">
           <label class="form-label">Target Weeks</label>
           <input class="form-input" type="number" [(ngModel)]="seriesTargetWeeks" name="targetWeeks" min="1" max="52" />
         </div>
-        <div class="form-group" *ngIf="seriesDuration === 'sessions'">
+}
+        @if (seriesDuration === 'sessions') {
+<div class="form-group">
           <label class="form-label">Target Sessions</label>
           <input class="form-input" type="number" [(ngModel)]="seriesTargetSessions" name="targetSessions" min="1" max="200" />
         </div>
+}
         <div class="form-actions">
           <jiro-button variant="secondary" type="button" (click)="showSeriesModal.set(false)">Cancel</jiro-button>
           <jiro-button variant="primary" type="submit" [disabled]="creatingSeries() || !seriesName.trim()">
@@ -291,6 +352,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
         </div>
       </form>
     </jiro-modal>
+}
   `,
   styles: [`
     :host { display: block; }

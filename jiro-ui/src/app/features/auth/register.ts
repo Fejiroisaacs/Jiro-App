@@ -1,5 +1,5 @@
 import { Component, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
@@ -12,7 +12,7 @@ const USERNAME_PATTERN = /^[a-z0-9_]{3,30}$/;
 @Component({
   selector: 'app-register',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, JiroCardComponent, JiroButtonComponent, JiroInputComponent],
+  imports: [FormsModule, RouterLink, JiroCardComponent, JiroButtonComponent, JiroInputComponent],
   template: `
     <div class="auth-page">
       <div class="auth-container">

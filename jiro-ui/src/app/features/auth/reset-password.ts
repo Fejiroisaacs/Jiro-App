@@ -1,5 +1,5 @@
 import { Component, signal, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
@@ -9,20 +9,21 @@ import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-inpu
 @Component({
   selector: 'app-reset-password',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, JiroButtonComponent, JiroInputComponent],
+  imports: [FormsModule, RouterLink, JiroButtonComponent, JiroInputComponent],
   template: `
     <div class="auth-page">
       <div class="auth-card">
         <h1>Reset password</h1>
 
-        <div *ngIf="invalidLink(); else form">
+        @if (invalidLink()) {
+<div>
           <div class="error-box">
             <p>{{ errorMessage() }}</p>
           </div>
           <a routerLink="/forgot-password" class="back-link">Request a new reset link</a>
         </div>
+} @else {
 
-        <ng-template #form>
           <p class="subtitle">Enter your new password below.</p>
 
           <div class="form-fields">
@@ -43,7 +44,9 @@ import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-inpu
             </jiro-input>
           </div>
 
-          <div class="form-error" *ngIf="error()">{{ error() }}</div>
+          @if (error()) {
+<div class="form-error">{{ error() }}</div>
+}
 
           <jiro-button
             block
@@ -53,7 +56,10 @@ import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-inpu
             style="width: 100%">
             {{ loading() ? 'Updating...' : 'Set new password' }}
           </jiro-button>
-        </ng-template>
+        
+}
+
+        
       </div>
     </div>
   `,

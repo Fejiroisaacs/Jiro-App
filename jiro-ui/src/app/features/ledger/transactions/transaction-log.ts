@@ -73,26 +73,32 @@ interface EditForm {
           <label class="filter-label">Account</label>
           <select class="filter-select" [(ngModel)]="filterAccountId" (change)="applyFilters()">
             <option value="">All accounts</option>
-            <option *ngFor="let a of accounts()" [value]="a.id">{{ a.name }}</option>
+            @for (a of accounts(); track a) {
+<option [value]="a.id">{{ a.name }}</option>
+}
           </select>
         </div>
         <div class="filter-group">
           <label class="filter-label">Category</label>
           <select class="filter-select" [(ngModel)]="filterCategoryId" (change)="applyFilters()">
             <option value="">All categories</option>
-            <option *ngFor="let c of flatCategories()" [value]="c.id">{{ c.name }}</option>
+            @for (c of flatCategories(); track c) {
+<option [value]="c.id">{{ c.name }}</option>
+}
           </select>
         </div>
         <div class="filter-group type-toggle-group">
           <label class="filter-label">Type</label>
           <div class="type-toggle">
-            <button
-              *ngFor="let t of typeOptions"
+            @for (t of typeOptions; track t) {
+<button
+             
               class="type-btn"
               [class.active]="filterType === t.value"
               (click)="setType(t.value)">
               {{ t.label }}
             </button>
+}
           </div>
         </div>
         <div class="filter-group search-group">
@@ -128,16 +134,20 @@ interface EditForm {
             <line x1="10" y1="18" x2="14" y2="18"/>
           </svg>
           Filters
-          <span *ngIf="activeFilterCount() > 0" class="filter-badge">{{ activeFilterCount() }}</span>
+          @if (activeFilterCount() > 0) {
+<span class="filter-badge">{{ activeFilterCount() }}</span>
+}
         </button>
         <div class="type-toggle mobile-type-toggle">
-          <button
-            *ngFor="let t of typeOptions"
+          @for (t of typeOptions; track t) {
+<button
+           
             class="type-btn"
             [class.active]="filterType === t.value"
             (click)="setType(t.value)">
             {{ t.label }}
           </button>
+}
         </div>
       </div>
 
@@ -156,14 +166,18 @@ interface EditForm {
             <label class="filter-label">Account</label>
             <select class="filter-select" [(ngModel)]="filterAccountId" (change)="applyFilters()">
               <option value="">All accounts</option>
-              <option *ngFor="let a of accounts()" [value]="a.id">{{ a.name }}</option>
+              @for (a of accounts(); track a) {
+<option [value]="a.id">{{ a.name }}</option>
+}
             </select>
           </div>
           <div class="filter-group">
             <label class="filter-label">Category</label>
             <select class="filter-select" [(ngModel)]="filterCategoryId" (change)="applyFilters()">
               <option value="">All categories</option>
-              <option *ngFor="let c of flatCategories()" [value]="c.id">{{ c.name }}</option>
+              @for (c of flatCategories(); track c) {
+<option [value]="c.id">{{ c.name }}</option>
+}
             </select>
           </div>
           <div class="filter-group full-width">
@@ -191,13 +205,16 @@ interface EditForm {
       </div>
 
       <!-- ── Loading ─────────────────────────────────────────────────────────── -->
-      <div *ngIf="loading()" class="state-message">
+      @if (loading()) {
+<div class="state-message">
         <div class="spinner-lg"></div>
         <p>Loading transactions...</p>
       </div>
+}
 
       <!-- ── Empty state (no transactions at all) ────────────────────────────── -->
-      <div *ngIf="!loading() && allTransactions().length === 0" class="state-message">
+      @if (!loading() && allTransactions().length === 0) {
+<div class="state-message">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5">
           <rect x="2" y="5" width="20" height="14" rx="2"/>
           <line x1="2" y1="10" x2="22" y2="10"/>
@@ -208,9 +225,11 @@ interface EditForm {
           Log Your First Transaction
         </jiro-button>
       </div>
+}
 
       <!-- ── No-results state (filters return nothing) ───────────────────────── -->
-      <div *ngIf="!loading() && allTransactions().length > 0 && visibleTransactions().length === 0" class="state-message">
+      @if (!loading() && allTransactions().length > 0 && visibleTransactions().length === 0) {
+<div class="state-message">
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
           <line x1="8" y1="11" x2="14" y2="11"/>
@@ -219,10 +238,13 @@ interface EditForm {
         <p class="text-secondary">No transactions match your current filters.</p>
         <button class="clear-btn-inline" (click)="clearFilters()">Clear filters</button>
       </div>
+}
 
       <!-- ── Transaction list grouped by date ───────────────────────────────── -->
-      <div *ngIf="!loading() && visibleTransactions().length > 0" class="transaction-list">
-        <ng-container *ngFor="let group of groupedTransactions()">
+      @if (!loading() && visibleTransactions().length > 0) {
+<div class="transaction-list">
+        @for (group of groupedTransactions(); track group) {
+
           <!-- Date separator -->
           <div class="date-separator">
             <span class="date-label">{{ group.label }}</span>
@@ -233,8 +255,9 @@ interface EditForm {
           </div>
 
           <!-- Transaction rows -->
-          <div
-            *ngFor="let tx of group.transactions"
+          @for (tx of group.transactions; track tx) {
+<div
+           
             class="tx-row"
             (click)="openEditModal(tx)">
 
@@ -248,7 +271,8 @@ interface EditForm {
                 <div class="tx-description">
                   {{ tx.description }}
                   <!-- Recurring badge -->
-                  <span *ngIf="tx.is_recurring" class="recurring-badge">
+                  @if (tx.is_recurring) {
+<span class="recurring-badge">
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                       <path d="M17 1l4 4-4 4"/>
                       <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
@@ -257,24 +281,29 @@ interface EditForm {
                     </svg>
                     {{ intervalLabel(tx.recurrence_interval) }}
                   </span>
+}
                 </div>
                 <div class="tx-meta">
-                  <span
-                    *ngIf="tx.category_name"
+                  @if (tx.category_name) {
+<span
+                   
                     class="category-chip"
                     [style.background]="(tx.category_color || '#9B8F88') + '22'"
                     [style.color]="tx.category_color || 'var(--text-muted)'"
                     [style.border-color]="(tx.category_color || '#9B8F88') + '55'">
                     {{ tx.category_name }}
                   </span>
+}
                   <span class="account-name">{{ getAccountName(tx.account_id) }}</span>
-                  <span *ngIf="tx.type === 'transfer' && tx.transfer_to_account_id" class="transfer-indicator">
+                  @if (tx.type === 'transfer' && tx.transfer_to_account_id) {
+<span class="transfer-indicator">
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                       <line x1="5" y1="12" x2="19" y2="12"/>
                       <polyline points="12,5 19,12 12,19"/>
                     </svg>
                     {{ getAccountName(tx.transfer_to_account_id) }}
                   </span>
+}
                 </div>
               </div>
             </div>
@@ -292,24 +321,31 @@ interface EditForm {
               </svg>
             </div>
           </div>
-        </ng-container>
+}
+        
+}
 
         <!-- Load more -->
-        <div class="load-more-row" *ngIf="hasMore()">
+        @if (hasMore()) {
+<div class="load-more-row">
           <jiro-button variant="secondary" type="button" [disabled]="loadingMore()" (click)="loadMore()">
             {{ loadingMore() ? 'Loading...' : 'Load More' }}
           </jiro-button>
         </div>
+}
       </div>
+}
     </div>
 
     <!-- ── Edit Transaction Modal ──────────────────────────────────────────── -->
-    <jiro-modal
-      *ngIf="editingTx()"
+    @if (editingTx()) {
+<jiro-modal
+     
       title="Edit Transaction"
       maxWidth="520px"
       (close)="closeEditModal()">
-      <form class="tx-form" (ngSubmit)="saveEdit()" *ngIf="editForm">
+      @if (editForm) {
+<form class="tx-form" (ngSubmit)="saveEdit()">
 
         <div class="tx-type-indicator" [style.background]="getTypeColor(editingTx()!.type) + '18'">
           <span class="tx-type-pill" [style.background]="getTypeColor(editingTx()!.type)" [style.color]="'#fff'">
@@ -331,17 +367,23 @@ interface EditForm {
             placeholder="0.00"
             [disabled]="editingTx()!.type === 'transfer'"
             [class.field-disabled]="editingTx()!.type === 'transfer'" />
-          <p *ngIf="editingTx()!.type === 'transfer'" class="field-hint">Amount cannot be changed on transfers.</p>
+          @if (editingTx()!.type === 'transfer') {
+<p class="field-hint">Amount cannot be changed on transfers.</p>
+}
         </div>
 
         <!-- Category — hidden for transfers -->
-        <div class="form-group" *ngIf="editingTx()!.type !== 'transfer'">
+        @if (editingTx()!.type !== 'transfer') {
+<div class="form-group">
           <label class="form-label">Category</label>
           <select class="form-input" [(ngModel)]="editForm.category_id" name="category_id">
             <option value="">No category</option>
-            <option *ngFor="let c of flatCategoriesByType(editingTx()!.type)" [value]="c.id">{{ c.name }}</option>
+            @for (c of flatCategoriesByType(editingTx()!.type); track c) {
+<option [value]="c.id">{{ c.name }}</option>
+}
           </select>
         </div>
+}
 
         <div class="form-group">
           <label class="form-label">Description</label>
@@ -386,7 +428,8 @@ interface EditForm {
           </div>
         </div>
 
-        <div class="form-group" *ngIf="editForm.is_recurring">
+        @if (editForm.is_recurring) {
+<div class="form-group">
           <label class="form-label">Recurrence</label>
           <select class="form-input" [(ngModel)]="editForm.recurrence_interval" name="recurrence_interval">
             <option value="weekly">Weekly</option>
@@ -395,6 +438,7 @@ interface EditForm {
             <option value="yearly">Yearly</option>
           </select>
         </div>
+}
 
         <div class="form-actions">
           <jiro-button variant="danger" type="button" [disabled]="saving() || deleting()" (click)="confirmDeleteTx()">
@@ -408,11 +452,14 @@ interface EditForm {
           </div>
         </div>
       </form>
+}
     </jiro-modal>
+}
 
     <!-- Delete confirmation nested within edit context -->
-    <jiro-modal
-      *ngIf="confirmingDelete()"
+    @if (confirmingDelete()) {
+<jiro-modal
+     
       title="Delete Transaction?"
       maxWidth="400px"
       (close)="confirmingDelete.set(false)">
@@ -429,10 +476,12 @@ interface EditForm {
         </div>
       </div>
     </jiro-modal>
+}
 
     <!-- ── Add Transaction Modal ───────────────────────────────────────────── -->
-    <jiro-modal
-      *ngIf="showAddModal()"
+    @if (showAddModal()) {
+<jiro-modal
+     
       title="Add Transaction"
       maxWidth="520px"
       (close)="closeAddModal()">
@@ -444,6 +493,7 @@ interface EditForm {
         (formCancel)="closeAddModal()">
       </ledger-transaction-form>
     </jiro-modal>
+}
   `,
   styles: [`
     :host { display: block; }

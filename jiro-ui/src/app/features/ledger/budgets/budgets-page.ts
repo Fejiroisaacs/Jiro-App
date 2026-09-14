@@ -34,13 +34,16 @@ import { periodLabel, clamp } from '../shared/ledger-utils';
       </div>
 
       <!-- Loading -->
-      <div *ngIf="loading()" class="state-message">
+      @if (loading()) {
+<div class="state-message">
         <div class="spinner-lg"></div>
         <p>Loading budgets...</p>
       </div>
+}
 
       <!-- Summary bar -->
-      <div *ngIf="!loading() && budgets().length > 0" class="summary-bar">
+      @if (!loading() && budgets().length > 0) {
+<div class="summary-bar">
         <div class="summary-item">
           <span class="summary-label">Total Budgeted</span>
           <span class="summary-value">\${{ totalBudgeted() | number:'1.2-2' }}</span>
@@ -58,9 +61,11 @@ import { periodLabel, clamp } from '../shared/ledger-utils';
           </span>
         </div>
       </div>
+}
 
       <!-- Empty state -->
-      <div *ngIf="!loading() && budgets().length === 0" class="empty-state">
+      @if (!loading() && budgets().length === 0) {
+<div class="empty-state">
         <div class="empty-icon">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <rect x="2" y="7" width="20" height="14" rx="2"/>
@@ -75,10 +80,13 @@ import { periodLabel, clamp } from '../shared/ledger-utils';
           Set your first budget
         </jiro-button>
       </div>
+}
 
       <!-- Budget grid -->
-      <div *ngIf="!loading() && budgets().length > 0" class="budgets-grid">
-        <jiro-card *ngFor="let budget of budgets()" class="budget-card">
+      @if (!loading() && budgets().length > 0) {
+<div class="budgets-grid">
+        @for (budget of budgets(); track budget) {
+<jiro-card class="budget-card">
 
           <!-- Card header -->
           <div class="budget-header">
@@ -112,15 +120,19 @@ import { periodLabel, clamp } from '../shared/ledger-utils';
 
           <!-- Remaining -->
           <div class="remaining-row">
-            <span *ngIf="budget.remaining >= 0" class="remaining-ok">
+            @if (budget.remaining >= 0) {
+<span class="remaining-ok">
               \${{ budget.remaining | number:'1.2-2' }} remaining
             </span>
-            <span *ngIf="budget.remaining < 0" class="remaining-over">
+}
+            @if (budget.remaining < 0) {
+<span class="remaining-over">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
               </svg>
               Over budget by \${{ (-budget.remaining) | number:'1.2-2' }}
             </span>
+}
             <button class="delete-btn" (click)="confirmDelete(budget)" title="Delete budget">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="3,6 5,6 21,6"/>
@@ -131,10 +143,13 @@ import { periodLabel, clamp } from '../shared/ledger-utils';
           </div>
 
         </jiro-card>
+}
       </div>
+}
 
       <!-- Add Budget Modal -->
-      <jiro-modal *ngIf="showAddModal()" title="Add Budget" maxWidth="480px" (close)="closeAddModal()">
+      @if (showAddModal()) {
+<jiro-modal title="Add Budget" maxWidth="480px" (close)="closeAddModal()">
         <form class="modal-form" (ngSubmit)="submitBudget()">
 
           <div class="form-group">
@@ -144,12 +159,16 @@ import { periodLabel, clamp } from '../shared/ledger-utils';
             </div>
             <select class="form-input" [(ngModel)]="newCategoryId" name="category" required>
               <option value="" disabled>Select a category...</option>
-              <ng-container *ngFor="let cat of expenseCategories()">
+              @for (cat of expenseCategories(); track cat) {
+
                 <option [value]="cat.id">{{ cat.name }}</option>
-                <option *ngFor="let child of cat.children" [value]="child.id">
+                @for (child of cat.children; track child) {
+<option [value]="child.id">
                   &nbsp;&nbsp;{{ child.name }}
                 </option>
-              </ng-container>
+}
+              
+}
             </select>
           </div>
 
@@ -194,9 +213,11 @@ import { periodLabel, clamp } from '../shared/ledger-utils';
 
         </form>
       </jiro-modal>
+}
 
       <!-- New Category Modal -->
-      <jiro-modal *ngIf="showCatModal()" title="New Category" maxWidth="400px" (close)="closeCatModal()">
+      @if (showCatModal()) {
+<jiro-modal title="New Category" maxWidth="400px" (close)="closeCatModal()">
         <form class="modal-form" (ngSubmit)="submitCategory()">
           <div class="form-group">
             <label class="form-label">Name</label>
@@ -209,7 +230,9 @@ import { periodLabel, clamp } from '../shared/ledger-utils';
               <button type="button" class="seg-btn" [class.active]="catForm.type === 'income'" (click)="catForm.type = 'income'">Income</button>
             </div>
           </div>
-          <p *ngIf="catError()" class="form-error">{{ catError() }}</p>
+          @if (catError()) {
+<p class="form-error">{{ catError() }}</p>
+}
           <div class="form-actions">
             <jiro-button variant="secondary" type="button" (click)="closeCatModal()">Cancel</jiro-button>
             <jiro-button variant="primary" type="submit" [disabled]="catSaving() || !catForm.name.trim()">
@@ -218,9 +241,11 @@ import { periodLabel, clamp } from '../shared/ledger-utils';
           </div>
         </form>
       </jiro-modal>
+}
 
       <!-- Delete Confirmation Modal -->
-      <jiro-modal *ngIf="deletingBudget()" title="Delete Budget?" maxWidth="420px" (close)="deletingBudget.set(null)">
+      @if (deletingBudget()) {
+<jiro-modal title="Delete Budget?" maxWidth="420px" (close)="deletingBudget.set(null)">
         <div class="delete-confirm">
           <p>Delete the budget for <strong>{{ deletingBudget()!.category_name }}</strong>?</p>
           <p class="text-secondary" style="font-size: var(--font-size-sm); margin-top: var(--space-xs);">
@@ -234,6 +259,7 @@ import { periodLabel, clamp } from '../shared/ledger-utils';
           </div>
         </div>
       </jiro-modal>
+}
 
     </div>
   `,

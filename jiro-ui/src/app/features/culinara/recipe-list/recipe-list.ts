@@ -1,5 +1,5 @@
 import { Component, OnInit, computed, signal, effect } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { RecipeService, Recipe, CookStreak, Collection } from '../../../core/services/recipe.service';
@@ -14,14 +14,13 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
   selector: 'app-recipe-list',
   standalone: true,
   imports: [
-    CommonModule,
     RouterLink,
     FormsModule,
     JiroCardComponent,
     JiroButtonComponent,
     JiroModalComponent,
-    RecipeFormComponent,
-  ],
+    RecipeFormComponent
+],
   template: `
     <div class="recipe-list">
       <!-- Header -->
@@ -31,7 +30,8 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
           <p class="text-secondary">Your recipe notebook</p>
         </div>
         <div class="header-right">
-          <div class="streak-badge" *ngIf="cookStreak()?.current_streak">
+          @if (cookStreak()?.current_streak) {
+<div class="streak-badge">
             <span class="streak-flame">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
             </span>
@@ -39,10 +39,13 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
               <span class="streak-num">{{ cookStreak()!.current_streak }}</span>
               <span class="streak-label">day streak</span>
             </div>
-            <div class="streak-stat" *ngIf="cookStreak()!.total_cook_days">
+            @if (cookStreak()!.total_cook_days) {
+<div class="streak-stat">
               <span class="streak-total">{{ cookStreak()!.total_cook_days }}</span> days cooked
             </div>
+}
           </div>
+}
           <div class="header-actions">
             <jiro-button variant="primary" type="button" (click)="showCreate.set(true)">
               + New Recipe
@@ -60,53 +63,67 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
           [(ngModel)]="searchQuery"
           (input)="onSearch()" />
         <div class="sort-pills">
-          <button
-            *ngFor="let s of sortOptions"
+          @for (s of sortOptions; track s) {
+<button
+           
             class="sort-pill"
             [class.sort-pill--active]="sortKey() === s.key"
             (click)="sortKey.set(s.key)">
             {{ s.label }}
           </button>
+}
         </div>
       </div>
 
       <!-- Tag filter chips -->
-      <div class="tag-filter" *ngIf="availableTags().length > 0">
+      @if (availableTags().length > 0) {
+<div class="tag-filter">
         <button
           class="tag-chip"
           [class.tag-chip--active]="activeTag() === null"
           (click)="activeTag.set(null)">
           All
         </button>
-        <button
-          *ngFor="let tag of availableTags()"
+        @for (tag of availableTags(); track tag) {
+<button
+         
           class="tag-chip"
           [class.tag-chip--active]="activeTag() === tag"
           (click)="activeTag.set(activeTag() === tag ? null : tag)">
           {{ tag }}
         </button>
+}
       </div>
+}
 
       <!-- Collection filter -->
-      <div class="collection-filter" *ngIf="collections().length > 0">
+      @if (collections().length > 0) {
+<div class="collection-filter">
         <button
           class="collection-chip"
           [class.collection-chip--active]="activeCollection() === null"
           (click)="activeCollection.set(null)">
           All
         </button>
-        <button
-          *ngFor="let col of collections()"
+        @for (col of collections(); track col) {
+<button
+         
           class="collection-chip"
           [class.collection-chip--active]="activeCollection() === col.id"
           (click)="activeCollection.set(activeCollection() === col.id ? null : col.id)">
           <svg class="folder-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> {{ col.name }}
-          <span class="col-count" *ngIf="col.recipe_count">{{ col.recipe_count }}</span>
+          @if (col.recipe_count) {
+<span class="col-count">{{ col.recipe_count }}</span>
+}
         </button>
-        <button class="collection-chip collection-chip--add" (click)="showNewCollectionInput = true" *ngIf="!showNewCollectionInput">
+}
+        @if (!showNewCollectionInput) {
+<button class="collection-chip collection-chip--add" (click)="showNewCollectionInput = true">
           +
         </button>
-        <div class="new-collection-inline" *ngIf="showNewCollectionInput">
+}
+        @if (showNewCollectionInput) {
+<div class="new-collection-inline">
           <input
             class="new-collection-input"
             [(ngModel)]="newCollectionName"
@@ -115,77 +132,110 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
             (keydown.escape)="showNewCollectionInput = false; newCollectionName = ''" />
           <button class="new-collection-save" (click)="createCollection()">✓</button>
         </div>
+}
       </div>
+}
 
       <!-- Loading -->
-      <div *ngIf="loading()" class="state-message">
+      @if (loading()) {
+<div class="state-message">
         <div class="spinner-lg"></div>
         <p>Loading recipes...</p>
       </div>
+}
 
       <!-- Empty state -->
-      <div *ngIf="!loading() && allRecipes().length === 0" class="state-message">
+      @if (!loading() && allRecipes().length === 0) {
+<div class="state-message">
         <h3>No recipes yet</h3>
         <p class="text-secondary">Start your culinary lab by adding your first recipe.</p>
         <jiro-button variant="primary" type="button" (click)="showCreate.set(true)">
           Add First Recipe
         </jiro-button>
       </div>
+}
 
       <!-- No results for current filter -->
-      <div *ngIf="!loading() && allRecipes().length > 0 && displayedRecipes().length === 0" class="state-message">
+      @if (!loading() && allRecipes().length > 0 && displayedRecipes().length === 0) {
+<div class="state-message">
         <p class="text-secondary">No recipes match your filters.</p>
       </div>
+}
 
       <!-- Recipe grid -->
-      <div *ngIf="!loading() && displayedRecipes().length > 0" class="recipe-grid">
-        <jiro-card
-          *ngFor="let recipe of displayedRecipes()"
+      @if (!loading() && displayedRecipes().length > 0) {
+<div class="recipe-grid">
+        @for (recipe of displayedRecipes(); track recipe) {
+<jiro-card
+         
           [clickable]="true"
           [routerLink]="['/culinara', recipe.id]"
           class="recipe-card">
           <div class="recipe-card-inner">
-            <div class="recipe-cover" *ngIf="recipe.cover_image_url">
+            @if (recipe.cover_image_url) {
+<div class="recipe-cover">
               <img [src]="recipe.cover_image_url" [alt]="recipe.title" class="cover-thumb">
             </div>
+}
             <div class="recipe-meta">
-              <span class="trial-count" *ngIf="recipe.trial_count != null">
+              @if (recipe.trial_count != null) {
+<span class="trial-count">
                 {{ recipe.trial_count }} {{ recipe.trial_count === 1 ? 'trial' : 'trials' }}
               </span>
-              <div class="rating" *ngIf="recipe.latest_rating != null">
+}
+              @if (recipe.latest_rating != null) {
+<div class="rating">
                 <span class="star">★</span>
                 <span>{{ recipe.latest_rating }}</span>
               </div>
+}
             </div>
             <h3 class="recipe-title">{{ recipe.title }}</h3>
-            <p class="recipe-desc text-secondary" *ngIf="recipe.description">
+            @if (recipe.description) {
+<p class="recipe-desc text-secondary">
               {{ recipe.description }}
             </p>
-            <div class="tag-chips-row" *ngIf="recipe.tags && recipe.tags.length">
-              <span *ngFor="let tag of recipe.tags" class="recipe-tag">{{ tag }}</span>
+}
+            @if (recipe.tags && recipe.tags.length) {
+<div class="tag-chips-row">
+              @for (tag of recipe.tags; track tag) {
+<span class="recipe-tag">{{ tag }}</span>
+}
             </div>
+}
             <div class="card-footer">
-              <div class="ingredient-chips" *ngIf="recipe.base_ingredients && recipe.base_ingredients.length">
-                <span
-                  *ngFor="let ing of recipe.base_ingredients.slice(0, 3)"
+              @if (recipe.base_ingredients && recipe.base_ingredients.length) {
+<div class="ingredient-chips">
+                @for (ing of recipe.base_ingredients.slice(0, 3); track ing) {
+<span
+                 
                   class="chip">
                   {{ ing.item }}
                 </span>
-                <span *ngIf="recipe.base_ingredients.length > 3" class="chip chip-more">
+}
+                @if (recipe.base_ingredients.length > 3) {
+<span class="chip chip-more">
                   +{{ recipe.base_ingredients.length - 3 }}
                 </span>
+}
               </div>
-              <span class="last-cooked" *ngIf="recipe.last_cooked">
+}
+              @if (recipe.last_cooked) {
+<span class="last-cooked">
                 Last made {{ formatRelative(recipe.last_cooked) }}
               </span>
+}
             </div>
           </div>
         </jiro-card>
+}
       </div>
+}
 
       <!-- Create recipe modal -->
-      <jiro-modal
-        *ngIf="showCreate()"
+      @if (showCreate()) {
+<jiro-modal
+       
         title="New Recipe"
         maxWidth="600px"
         (close)="showCreate.set(false)">
@@ -194,6 +244,7 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
           (cancelled)="showCreate.set(false)">
         </app-recipe-form>
       </jiro-modal>
+}
     </div>
   `,
   styles: [`

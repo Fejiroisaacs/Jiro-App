@@ -1,5 +1,5 @@
 import { Component, OnInit, signal, input } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { JymService, Split, CreateSeriesRequest } from '../../../core/services/jym.service';
@@ -9,7 +9,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 @Component({
   selector: 'app-split-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, JiroCardComponent, JiroButtonComponent, JiroModalComponent],
+  imports: [FormsModule, JiroCardComponent, JiroButtonComponent, JiroModalComponent],
   template: `
     <div class="split-list">
       <!-- Header -->
@@ -34,30 +34,42 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       </div>
 
       <!-- Loading -->
-      <div *ngIf="loading()" class="state-message">
+      @if (loading()) {
+<div class="state-message">
         <div class="spinner-lg"></div>
         <p>Loading splits...</p>
       </div>
+}
 
       <!-- Empty state -->
-      <div *ngIf="!loading() && splits().length === 0" class="state-message">
+      @if (!loading() && splits().length === 0) {
+<div class="state-message">
         <h3>No training splits yet</h3>
         <p class="text-secondary">Create your first split to organise your training week.</p>
         <jiro-button variant="primary" type="button" (click)="showCreate.set(true)">
           Create First Split
         </jiro-button>
       </div>
+}
 
       <!-- Splits grid -->
-      <div *ngIf="!loading() && splits().length > 0" class="splits-grid">
-        <jiro-card *ngFor="let split of splits()" class="split-card">
+      @if (!loading() && splits().length > 0) {
+<div class="splits-grid">
+        @for (split of splits(); track split) {
+<jiro-card class="split-card">
           <div class="split-header">
             <div class="split-info">
               <h3 class="split-name">{{ split.name }}</h3>
-              <p class="split-desc text-secondary" *ngIf="split.description">{{ split.description }}</p>
-              <div *ngIf="split.tags.length" class="split-tags">
-                <span *ngFor="let tag of split.tags" class="tag-chip">{{ tag }}</span>
+              @if (split.description) {
+<p class="split-desc text-secondary">{{ split.description }}</p>
+}
+              @if (split.tags.length) {
+<div class="split-tags">
+                @for (tag of split.tags; track tag) {
+<span class="tag-chip">{{ tag }}</span>
+}
               </div>
+}
             </div>
             <span class="routine-badge">{{ split.routine_count || 0 }} {{ (split.routine_count || 0) === 1 ? 'day' : 'days' }}</span>
           </div>
@@ -93,10 +105,13 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
             </button>
           </div>
         </jiro-card>
+}
       </div>
+}
 
       <!-- Create Split Modal -->
-      <jiro-modal *ngIf="showCreate()" title="New Training Split" maxWidth="480px" (close)="showCreate.set(false)">
+      @if (showCreate()) {
+<jiro-modal title="New Training Split" maxWidth="480px" (close)="showCreate.set(false)">
         <form class="create-form" (ngSubmit)="createSplit()">
           <div class="form-group">
             <label class="form-label">Split Name</label>
@@ -134,9 +149,11 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
           </div>
         </form>
       </jiro-modal>
+}
 
       <!-- New Series Modal -->
-      <jiro-modal *ngIf="showNewSeries()" title="Start New Series" maxWidth="480px" (close)="showNewSeries.set(false)">
+      @if (showNewSeries()) {
+<jiro-modal title="Start New Series" maxWidth="480px" (close)="showNewSeries.set(false)">
         <form class="create-form" (ngSubmit)="createSeries()">
           <div class="form-group">
             <label class="form-label">Series Name</label>
@@ -150,14 +167,18 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
               <button type="button" class="dtype-btn" [class.active]="seriesDurationType === 'open'" (click)="seriesDurationType = 'open'">Open-ended</button>
             </div>
           </div>
-          <div class="form-group" *ngIf="seriesDurationType === 'weeks'">
+          @if (seriesDurationType === 'weeks') {
+<div class="form-group">
             <label class="form-label">Target Weeks</label>
             <input class="form-input" type="number" min="1" [(ngModel)]="seriesTargetWeeks" name="tweeks" placeholder="e.g. 8" />
           </div>
-          <div class="form-group" *ngIf="seriesDurationType === 'sessions'">
+}
+          @if (seriesDurationType === 'sessions') {
+<div class="form-group">
             <label class="form-label">Target Sessions</label>
             <input class="form-input" type="number" min="1" [(ngModel)]="seriesTargetSessions" name="tsessions" placeholder="e.g. 24" />
           </div>
+}
           <div class="form-actions">
             <jiro-button variant="secondary" type="button" (click)="showNewSeries.set(false)">Cancel</jiro-button>
             <jiro-button variant="primary" type="submit" [disabled]="savingSeries() || !seriesName.trim()">
@@ -166,9 +187,11 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
           </div>
         </form>
       </jiro-modal>
+}
 
       <!-- Delete Split Confirmation Modal -->
-      <jiro-modal *ngIf="deletingSplit()" title="Delete Split?" maxWidth="420px" (close)="deletingSplit.set(null)">
+      @if (deletingSplit()) {
+<jiro-modal title="Delete Split?" maxWidth="420px" (close)="deletingSplit.set(null)">
         <div class="delete-confirm">
           <p>Delete <strong>{{ deletingSplit()!.name }}</strong>?</p>
           <p class="text-secondary" style="font-size: var(--font-size-sm); margin-top: var(--space-xs);">
@@ -182,25 +205,34 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
           </div>
         </div>
       </jiro-modal>
+}
 
       <!-- Start Session: choose routine modal -->
-      <jiro-modal *ngIf="showRoutinePicker()" title="Choose Routine" maxWidth="420px" (close)="showRoutinePicker.set(false)">
-        <div *ngIf="loadingRoutines()" class="picker-loading">
+      @if (showRoutinePicker()) {
+<jiro-modal title="Choose Routine" maxWidth="420px" (close)="showRoutinePicker.set(false)">
+        @if (loadingRoutines()) {
+<div class="picker-loading">
           <div class="spinner-lg"></div>
         </div>
-        <div *ngIf="!loadingRoutines()" class="routine-list">
-          <button
-            *ngFor="let r of pickerRoutines()"
+}
+        @if (!loadingRoutines()) {
+<div class="routine-list">
+          @for (r of pickerRoutines(); track r) {
+<button
+           
             class="routine-pick-btn"
             (click)="startWithRoutine(r.id)">
             <span class="routine-pick-name">{{ r.name }}</span>
             <span class="routine-pick-day">Day {{ r.day_order }}</span>
           </button>
+}
           <button class="routine-pick-btn freestyle" (click)="startFreeWithSplit()">
             Freestyle (no routine)
           </button>
         </div>
+}
       </jiro-modal>
+}
     </div>
   `,
   styles: [`

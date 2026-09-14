@@ -43,13 +43,16 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
       </div>
 
       <!-- ── Loading ── -->
-      <div *ngIf="loading()" class="state-message">
+      @if (loading()) {
+<div class="state-message">
         <div class="spinner-lg"></div>
         <p class="text-secondary">Loading your finances...</p>
       </div>
+}
 
       <!-- ── No Accounts Empty State ── -->
-      <div *ngIf="!loading() && accounts().length === 0" class="empty-state">
+      @if (!loading() && accounts().length === 0) {
+<div class="empty-state">
         <div class="empty-icon">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <rect x="2" y="5" width="20" height="14" rx="2"/>
@@ -64,9 +67,11 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
           </jiro-button>
         </div>
       </div>
+}
 
       <!-- ── Main content (accounts exist) ── -->
-      <ng-container *ngIf="!loading() && accounts().length > 0">
+      @if (!loading() && accounts().length > 0) {
+
 
         <!-- Monthly Summary Bar -->
         <div class="summary-bar">
@@ -104,14 +109,18 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
             </div>
 
             <!-- Budgets empty -->
-            <div *ngIf="budgets().length === 0" class="mini-empty">
+            @if (budgets().length === 0) {
+<div class="mini-empty">
               <p class="text-secondary">No budgets set up yet.</p>
               <a routerLink="/ledger/budgets" class="section-link">Create budget →</a>
             </div>
+}
 
             <!-- Budgets grid (desktop) / horizontal scroll (mobile) -->
-            <div *ngIf="budgets().length > 0" class="budgets-grid">
-              <div *ngFor="let b of budgets()" class="budget-card">
+            @if (budgets().length > 0) {
+<div class="budgets-grid">
+              @for (b of budgets(); track b) {
+<div class="budget-card">
                 <div class="budget-card-top">
                   <span class="budget-cat-dot" [style.background]="b.category_color || '#9B8F88'"></span>
                   <span class="budget-cat-name">{{ b.category_name }}</span>
@@ -132,7 +141,9 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
                   <span class="text-muted">of {{ formatCurrency(b.amount) }}</span>
                 </div>
               </div>
+}
             </div>
+}
           </div>
 
           <!-- Right: Recent Transactions -->
@@ -143,18 +154,24 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
             </div>
 
             <!-- Transactions empty -->
-            <div *ngIf="transactions().length === 0" class="mini-empty">
+            @if (transactions().length === 0) {
+<div class="mini-empty">
               <p class="text-secondary">No transactions this month.</p>
             </div>
+}
 
             <!-- Transactions list -->
-            <div *ngIf="transactions().length > 0" class="txn-list">
-              <div *ngFor="let t of transactions()" class="txn-row">
+            @if (transactions().length > 0) {
+<div class="txn-list">
+              @for (t of transactions(); track t) {
+<div class="txn-row">
                 <div class="txn-left">
                   <span class="txn-desc">{{ t.description || 'Untitled' }}</span>
-                  <span *ngIf="t.category_name" class="cat-chip" [style.background]="hexWithAlpha(t.category_color, 0.12)" [style.color]="t.category_color || 'var(--text-muted)'">
+                  @if (t.category_name) {
+<span class="cat-chip" [style.background]="hexWithAlpha(t.category_color, 0.12)" [style.color]="t.category_color || 'var(--text-muted)'">
                     {{ t.category_name }}
                   </span>
+}
                 </div>
                 <div class="txn-right">
                   <span class="txn-amount" [class.amount-pos]="t.type === 'income'" [class.amount-neg]="t.type === 'expense'">
@@ -163,11 +180,14 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
                   <span class="txn-date text-muted">{{ formatDate(t.date) }}</span>
                 </div>
               </div>
+}
             </div>
+}
           </div>
 
         </div>
-      </ng-container>
+      
+}
 
       <!-- ── FAB (mobile only) ── -->
       <button class="fab" (click)="openAddTransaction()" aria-label="Log transaction">
@@ -177,7 +197,8 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
       </button>
 
       <!-- ── Add Transaction Modal ── -->
-      <jiro-modal *ngIf="showTxnModal()" title="Log Transaction" maxWidth="520px" (close)="closeAddTransaction()">
+      @if (showTxnModal()) {
+<jiro-modal title="Log Transaction" maxWidth="520px" (close)="closeAddTransaction()">
         <ledger-transaction-form
           [accounts]="accounts()"
           [saving]="txnSaving()"
@@ -187,6 +208,7 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
           (formCancel)="closeAddTransaction()">
         </ledger-transaction-form>
       </jiro-modal>
+}
 
     </div>
   `,

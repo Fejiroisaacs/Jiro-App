@@ -1,5 +1,5 @@
 import { Component, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { ActivatedRoute, Router } from '@angular/router';
 import { JymService, PublicSplitDetail } from '../../../core/services/jym.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
@@ -7,26 +7,31 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
 @Component({
   selector: 'app-discover-detail',
   standalone: true,
-  imports: [CommonModule, JiroButtonComponent],
+  imports: [JiroButtonComponent],
   template: `
     <div class="discover-detail">
       <!-- Loading -->
-      <div *ngIf="loading()" class="state-message">
+      @if (loading()) {
+<div class="state-message">
         <div class="spinner-lg"></div>
         <p>Loading split...</p>
       </div>
+}
 
       <!-- Error -->
-      <div *ngIf="!loading() && error()" class="state-message">
+      @if (!loading() && error()) {
+<div class="state-message">
         <h3>Split not found</h3>
         <p class="text-secondary">This split may be private or no longer exists.</p>
         <jiro-button variant="secondary" type="button" (click)="router.navigate(['/jym/discover'])">
           Back to Discover
         </jiro-button>
       </div>
+}
 
       <!-- Content -->
-      <div *ngIf="!loading() && split()">
+      @if (!loading() && split()) {
+<div>
         <!-- Header -->
         <div class="page-header">
           <div class="header-left">
@@ -37,61 +42,82 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
               Discover
             </button>
             <h1>{{ split()!.split_name }}</h1>
-            <div *ngIf="split()!.tags.length" class="tag-row">
-              <span *ngFor="let tag of split()!.tags" class="tag-chip">{{ tag }}</span>
+            @if (split()!.tags.length) {
+<div class="tag-row">
+              @for (tag of split()!.tags; track tag) {
+<span class="tag-chip">{{ tag }}</span>
+}
             </div>
+}
           </div>
           <div class="header-actions">
             <jiro-button variant="primary" type="button" [disabled]="importing()" (click)="importSplit()">
-              <svg *ngIf="!importing() && !imported()" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              @if (!importing() && !imported()) {
+<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                 <polyline points="7,10 12,15 17,10"/>
                 <line x1="12" y1="15" x2="12" y2="3"/>
               </svg>
-              <svg *ngIf="imported()" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+}
+              @if (imported()) {
+<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="20,6 9,17 4,12"/>
               </svg>
+}
               {{ importing() ? 'Importing...' : imported() ? 'Added!' : 'Add to My Splits' }}
             </jiro-button>
           </div>
         </div>
 
         <!-- Success banner -->
-        <div *ngIf="imported()" class="import-banner">
+        @if (imported()) {
+<div class="import-banner">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="20,6 9,17 4,12"/>
           </svg>
           Split added to your account.
           <button class="goto-btn" (click)="router.navigate(['/jym/splits'])">Go to My Splits</button>
         </div>
+}
 
         <!-- Routines -->
         <div class="routines-grid">
-          <div *ngFor="let routine of split()!.routines" class="routine-card">
+          @for (routine of split()!.routines; track routine) {
+<div class="routine-card">
             <div class="routine-header">
               <span class="day-chip">Day {{ routine.day_order }}</span>
               <span class="routine-name">{{ routine.name }}</span>
             </div>
             <div class="exercise-list">
-              <div *ngFor="let ex of routine.exercises" class="exercise-row">
+              @for (ex of routine.exercises; track ex) {
+<div class="exercise-row">
                 <div class="ex-info">
                   <span class="ex-name">{{ ex.name }}</span>
-                  <span class="ex-muscle text-secondary" *ngIf="ex.muscle_group">{{ ex.muscle_group }}</span>
+                  @if (ex.muscle_group) {
+<span class="ex-muscle text-secondary">{{ ex.muscle_group }}</span>
+}
                 </div>
                 <span class="ex-sets">{{ ex.target_sets }}×{{ ex.target_reps }}</span>
               </div>
-              <div *ngIf="routine.exercises.length === 0" class="no-exercises text-secondary">
+}
+              @if (routine.exercises.length === 0) {
+<div class="no-exercises text-secondary">
                 No exercises listed
               </div>
+}
             </div>
           </div>
+}
         </div>
 
         <!-- Empty routines -->
-        <div *ngIf="split()!.routines.length === 0" class="state-message">
+        @if (split()!.routines.length === 0) {
+<div class="state-message">
           <p class="text-secondary">This split has no routines yet.</p>
         </div>
+}
       </div>
+}
     </div>
   `,
   styles: [`

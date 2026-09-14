@@ -1,5 +1,5 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { Router, RouterLink } from '@angular/router';
 import { JymService, Split, SplitSeriesSummary, SessionSummary, Routine } from '../../../core/services/jym.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
@@ -7,7 +7,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 @Component({
   selector: 'app-jym-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterLink, JiroButtonComponent, JiroModalComponent],
+  imports: [RouterLink, JiroButtonComponent, JiroModalComponent],
   template: `
     <div class="jym-dash">
       <!-- Header -->
@@ -24,7 +24,8 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       </div>
 
       <!-- Activity Stats -->
-      <div *ngIf="hasCompletedSessions()" class="stats-section">
+      @if (hasCompletedSessions()) {
+<div class="stats-section">
         <div class="stats-panels">
           <!-- Heatmap -->
           <div class="stats-panel heatmap-panel">
@@ -34,8 +35,9 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
             </div>
             <div class="heatmap-wrap">
               <div class="heatmap-grid">
-                <div
-                  *ngFor="let day of heatmapDays()"
+                @for (day of heatmapDays(); track day) {
+<div
+                 
                   class="heat-cell"
                   [class.heat-none]="day.count === 0 && !day.future"
                   [class.heat-future]="day.future"
@@ -43,6 +45,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
                   [class.heat-high]="day.count >= 2"
                   [title]="day.label + (day.count > 0 ? ' · ' + day.count + (day.count === 1 ? ' session' : ' sessions') : '')">
                 </div>
+}
               </div>
               <div class="heatmap-legend">
                 <span class="legend-label text-secondary">Less</span>
@@ -55,13 +58,15 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
           </div>
 
           <!-- Muscle Group Tracker -->
-          <div class="stats-panel mg-panel" *ngIf="muscleGroupStats().length > 0">
+          @if (muscleGroupStats().length > 0) {
+<div class="stats-panel mg-panel">
             <div class="stats-header">
               <span class="stats-title">Muscle Groups</span>
               <span class="stats-sub text-secondary">Last 4 weeks</span>
             </div>
             <div class="mg-list">
-              <div *ngFor="let mg of muscleGroupStats()" class="mg-row">
+              @for (mg of muscleGroupStats(); track mg) {
+<div class="mg-row">
                 <span class="mg-name">{{ mg.name }}</span>
                 <div class="mg-bar">
                   <div class="mg-fill"
@@ -77,19 +82,26 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
                   {{ mg.daysSinceLast === 0 ? 'Today' : mg.daysSinceLast + 'd ago' }}
                 </span>
               </div>
+}
             </div>
           </div>
+}
         </div>
       </div>
+}
 
       <!-- In Progress Sessions -->
-      <div *ngIf="inProgressSessions().length > 0" class="in-progress-section">
+      @if (inProgressSessions().length > 0) {
+<div class="in-progress-section">
         <h2 class="section-title">In Progress</h2>
-        <div *ngFor="let s of inProgressSessions()" class="ipc" (click)="router.navigate(['/jym/session', s.id])">
+        @for (s of inProgressSessions(); track s) {
+<div class="ipc" (click)="router.navigate(['/jym/session', s.id])">
           <div class="ipc-info">
             <div class="ipc-name">{{ s.routine_name || 'Freestyle Session' }}</div>
             <div class="ipc-meta">Started {{ formatSessionTime(s.started_at) }}
-              <span *ngIf="s.set_count > 0"> · {{ s.set_count }} sets logged</span>
+              @if (s.set_count > 0) {
+<span> · {{ s.set_count }} sets logged</span>
+}
             </div>
           </div>
           <div class="ipc-actions">
@@ -104,10 +116,13 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
             </button>
           </div>
         </div>
+}
       </div>
+}
 
       <!-- Discard Session Confirmation Modal -->
-      <jiro-modal *ngIf="discardingSession()" title="Discard Session?" maxWidth="420px" (close)="discardingSession.set(null)">
+      @if (discardingSession()) {
+<jiro-modal title="Discard Session?" maxWidth="420px" (close)="discardingSession.set(null)">
         <div class="delete-confirm">
           <p>Discard <strong>{{ discardingSession()!.routine_name || 'Freestyle Session' }}</strong>?</p>
           <p class="text-secondary" style="font-size: var(--font-size-sm); margin-top: var(--space-xs);">
@@ -121,23 +136,32 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
           </div>
         </div>
       </jiro-modal>
+}
 
       <!-- Active Series -->
-      <div *ngIf="activeSeries().length > 0" class="active-series-section">
+      @if (activeSeries().length > 0) {
+<div class="active-series-section">
         <h2 class="section-title">Active Series</h2>
         <div class="active-series-list">
-          <div *ngFor="let sr of activeSeries()" class="asc">
+          @for (sr of activeSeries(); track sr) {
+<div class="asc">
             <div class="asc-info">
               <div class="asc-split-label">{{ sr.split_name }}</div>
               <div class="asc-name">{{ sr.name }}</div>
               <div class="asc-pills">
-                <span class="asc-pill" *ngIf="!(sr.duration_type === 'sessions' && sr.target_sessions)">{{ sr.session_count }} sessions</span>
-                <span *ngIf="sr.duration_type === 'weeks' && sr.target_weeks" class="asc-pill">
+                @if (!(sr.duration_type === 'sessions' && sr.target_sessions)) {
+<span class="asc-pill">{{ sr.session_count }} sessions</span>
+}
+                @if (sr.duration_type === 'weeks' && sr.target_weeks) {
+<span class="asc-pill">
                   {{ progressWeeks(sr) }} / {{ sr.target_weeks }} wks
                 </span>
-                <span *ngIf="sr.duration_type === 'sessions' && sr.target_sessions" class="asc-pill">
+}
+                @if (sr.duration_type === 'sessions' && sr.target_sessions) {
+<span class="asc-pill">
                   {{ sr.session_count }} / {{ sr.target_sessions }} sessions
                 </span>
+}
               </div>
             </div>
             <div class="asc-actions">
@@ -150,8 +174,10 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
               </jiro-button>
             </div>
           </div>
+}
         </div>
       </div>
+}
 
       <!-- Your Splits summary -->
       <div class="splits-summary">
@@ -161,15 +187,21 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
             Manage Splits →
           </a>
         </div>
-        <div *ngIf="loading()" class="state-message">
+        @if (loading()) {
+<div class="state-message">
           <div class="spinner-lg"></div>
         </div>
-        <div *ngIf="!loading() && splits().length === 0" class="empty-splits">
+}
+        @if (!loading() && splits().length === 0) {
+<div class="empty-splits">
           <p class="text-secondary">No splits yet.</p>
           <a routerLink="/jym/splits" class="manage-link">Create your first split →</a>
         </div>
-        <div *ngIf="!loading() && splits().length > 0" class="splits-row">
-          <div *ngFor="let split of splits().slice(0, 4)" class="split-chip">
+}
+        @if (!loading() && splits().length > 0) {
+<div class="splits-row">
+          @for (split of splits().slice(0, 4); track split) {
+<div class="split-chip">
             <div class="split-chip-info" (click)="router.navigate(['/jym/splits', split.id])">
               <span class="split-chip-name">{{ split.name }}</span>
               <span class="split-chip-days">{{ split.routine_count || 0 }} {{ (split.routine_count || 0) === 1 ? 'day' : 'days' }}</span>
@@ -180,10 +212,14 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
               </svg>
             </button>
           </div>
-          <a *ngIf="splits().length > 4" routerLink="/jym/splits" class="split-chip more-chip">
+}
+          @if (splits().length > 4) {
+<a routerLink="/jym/splits" class="split-chip more-chip">
             +{{ splits().length - 4 }} more
           </a>
+}
         </div>
+}
       </div>
 
       <!-- Templates -->
@@ -192,44 +228,62 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
           <h2 class="section-title">Templates</h2>
           <a routerLink="/jym/templates" class="manage-link">Manage →</a>
         </div>
-        <div *ngIf="loading()" class="state-message">
+        @if (loading()) {
+<div class="state-message">
           <div class="spinner-lg"></div>
         </div>
-        <div *ngIf="!loading() && templates().length === 0" class="empty-splits">
+}
+        @if (!loading() && templates().length === 0) {
+<div class="empty-splits">
           <p class="text-secondary">No templates yet.</p>
           <p class="text-secondary" style="font-size:var(--font-size-sm)">
             During a session, tap the save icon to store its layout as a reusable template.
           </p>
         </div>
-        <div *ngIf="!loading() && templates().length > 0" class="splits-row">
-          <div *ngFor="let t of templates().slice(0, 4)" class="split-chip" (click)="startFromTemplate(t)">
+}
+        @if (!loading() && templates().length > 0) {
+<div class="splits-row">
+          @for (t of templates().slice(0, 4); track t) {
+<div class="split-chip" (click)="startFromTemplate(t)">
             <span class="split-chip-name">{{ t.name }}</span>
             <span class="split-chip-days">{{ t.items.length }} {{ t.items.length === 1 ? 'exercise' : 'exercises' }}</span>
           </div>
-          <a *ngIf="templates().length > 4" routerLink="/jym/templates" class="split-chip more-chip">
+}
+          @if (templates().length > 4) {
+<a routerLink="/jym/templates" class="split-chip more-chip">
             +{{ templates().length - 4 }} more
           </a>
+}
         </div>
+}
       </div>
 
       <!-- Start Session: choose routine modal -->
-      <jiro-modal *ngIf="showRoutinePicker()" title="Choose Routine" maxWidth="420px" (close)="showRoutinePicker.set(false)">
-        <div *ngIf="loadingRoutines()" class="picker-loading">
+      @if (showRoutinePicker()) {
+<jiro-modal title="Choose Routine" maxWidth="420px" (close)="showRoutinePicker.set(false)">
+        @if (loadingRoutines()) {
+<div class="picker-loading">
           <div class="spinner-lg"></div>
         </div>
-        <div *ngIf="!loadingRoutines()" class="routine-list">
-          <button
-            *ngFor="let r of pickerRoutines()"
+}
+        @if (!loadingRoutines()) {
+<div class="routine-list">
+          @for (r of pickerRoutines(); track r) {
+<button
+           
             class="routine-pick-btn"
             (click)="startWithRoutine(r.id)">
             <span class="routine-pick-name">{{ r.name }}</span>
             <span class="routine-pick-day">Day {{ r.day_order }}</span>
           </button>
+}
           <button class="routine-pick-btn freestyle" (click)="startFreeWithSplit()">
             Freestyle (no routine)
           </button>
         </div>
+}
       </jiro-modal>
+}
     </div>
   `,
   styles: [`

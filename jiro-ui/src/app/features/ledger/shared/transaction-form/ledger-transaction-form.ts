@@ -1,5 +1,5 @@
 import { Component, Input, Output, EventEmitter, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { LedgerService, LedgerAccount, CategoryTree } from '../../../../core/services/ledger.service';
 import { JiroButtonComponent } from '../../../../shared/components/jiro-button/jiro-button';
@@ -21,7 +21,7 @@ export interface TransactionPayload {
 @Component({
   selector: 'ledger-transaction-form',
   standalone: true,
-  imports: [CommonModule, FormsModule, JiroButtonComponent, JiroModalComponent],
+  imports: [FormsModule, JiroButtonComponent, JiroModalComponent],
   template: `
     <form class="tx-form" (ngSubmit)="submit()">
 
@@ -40,30 +40,40 @@ export interface TransactionPayload {
         <label class="form-label">{{ form.type === 'transfer' ? 'From Account' : 'Account' }}</label>
         <select class="form-input" [(ngModel)]="form.account_id" name="account_id" required>
           <option value="">Select account</option>
-          <option *ngFor="let a of accounts" [value]="a.id">{{ a.name }} ({{ a.currency }})</option>
+          @for (a of accounts; track a) {
+<option [value]="a.id">{{ a.name }} ({{ a.currency }})</option>
+}
         </select>
       </div>
 
       <!-- To Account (transfers only) -->
-      <div class="form-group" *ngIf="form.type === 'transfer'">
+      @if (form.type === 'transfer') {
+<div class="form-group">
         <label class="form-label">To Account</label>
         <select class="form-input" [(ngModel)]="form.transfer_to_account_id" name="transfer_to_account_id">
           <option value="">Select destination</option>
-          <option *ngFor="let a of accounts" [value]="a.id" [disabled]="a.id === form.account_id">{{ a.name }} ({{ a.currency }})</option>
+          @for (a of accounts; track a) {
+<option [value]="a.id" [disabled]="a.id === form.account_id">{{ a.name }} ({{ a.currency }})</option>
+}
         </select>
       </div>
+}
 
       <!-- Category (income/expense only) -->
-      <div class="form-group" *ngIf="form.type !== 'transfer'">
+      @if (form.type !== 'transfer') {
+<div class="form-group">
         <div class="label-row">
           <label class="form-label">Category <span class="optional-label">(optional)</span></label>
           <button type="button" class="new-cat-btn" (click)="openCatModal()">+ New</button>
         </div>
         <select class="form-input" [(ngModel)]="form.category_id" name="category_id">
           <option value="">No category</option>
-          <option *ngFor="let c of categoriesByType()" [value]="c.id">{{ c.name }}</option>
+          @for (c of categoriesByType(); track c) {
+<option [value]="c.id">{{ c.name }}</option>
+}
         </select>
       </div>
+}
 
       <!-- Amount -->
       <div class="form-group">
@@ -103,7 +113,8 @@ export interface TransactionPayload {
         </div>
       </div>
 
-      <div class="form-group" *ngIf="form.is_recurring">
+      @if (form.is_recurring) {
+<div class="form-group">
         <label class="form-label">Repeat every</label>
         <select class="form-input" [(ngModel)]="form.recurrence_interval" name="recurrence_interval">
           <option value="weekly">Week</option>
@@ -112,8 +123,11 @@ export interface TransactionPayload {
           <option value="yearly">Year</option>
         </select>
       </div>
+}
 
-      <p *ngIf="error" class="form-error">{{ error }}</p>
+      @if (error) {
+<p class="form-error">{{ error }}</p>
+}
 
       <div class="form-actions">
         <jiro-button variant="secondary" type="button" (click)="cancel()">Cancel</jiro-button>
@@ -125,7 +139,8 @@ export interface TransactionPayload {
     </form>
 
     <!-- New Category Modal -->
-    <jiro-modal *ngIf="showCatModal()" title="New Category" maxWidth="400px" (close)="closeCatModal()">
+    @if (showCatModal()) {
+<jiro-modal title="New Category" maxWidth="400px" (close)="closeCatModal()">
       <form class="tx-form" (ngSubmit)="submitCategory()">
         <div class="form-group">
           <label class="form-label">Name</label>
@@ -139,7 +154,9 @@ export interface TransactionPayload {
             <button type="button" class="type-btn" [class.active]="catForm.type === 'income'" (click)="catForm.type = 'income'">Income</button>
           </div>
         </div>
-        <p *ngIf="catError()" class="form-error">{{ catError() }}</p>
+        @if (catError()) {
+<p class="form-error">{{ catError() }}</p>
+}
         <div class="form-actions">
           <jiro-button variant="secondary" type="button" (click)="closeCatModal()">Cancel</jiro-button>
           <jiro-button variant="primary" type="submit" [disabled]="catSaving() || !catForm.name.trim()">
@@ -148,6 +165,7 @@ export interface TransactionPayload {
         </div>
       </form>
     </jiro-modal>
+}
   `,
   styles: [`
     :host { display: block; }

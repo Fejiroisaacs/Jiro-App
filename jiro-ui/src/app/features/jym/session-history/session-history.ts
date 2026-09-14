@@ -55,22 +55,28 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       </div>
 
       <!-- Loading -->
-      <div *ngIf="loading()" class="state-message">
+      @if (loading()) {
+<div class="state-message">
         <div class="spinner-lg"></div>
         <p>Loading sessions...</p>
       </div>
+}
 
       <!-- Empty -->
-      <div *ngIf="!loading() && sessions().length === 0" class="state-message">
+      @if (!loading() && sessions().length === 0) {
+<div class="state-message">
         <h3>No sessions yet</h3>
         <p class="text-secondary">Start your first workout session to see history here.</p>
         <jiro-button variant="primary" type="button" (click)="startNew()">Start Workout</jiro-button>
       </div>
+}
 
       <!-- Session list -->
-      <div *ngIf="!loading() && sessions().length > 0" class="sessions-list">
-        <div
-          *ngFor="let s of sessions()"
+      @if (!loading() && sessions().length > 0) {
+<div class="sessions-list">
+        @for (s of sessions(); track s) {
+<div
+         
           class="session-card"
           [class.selected]="selectedId() === s.id"
           (click)="loadDetail(s)">
@@ -78,16 +84,28 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
           <div class="session-card-header">
             <div class="session-meta">
               <span class="session-date">{{ formatDate(s.started_at) }}</span>
-              <span class="session-routine" *ngIf="s.routine_name">{{ s.routine_name }}</span>
-              <span class="session-routine freestyle" *ngIf="!s.routine_name">Freestyle</span>
-              <span *ngIf="s.session_type === 'deload'" class="type-badge deload">Deload</span>
-              <span *ngIf="s.session_type === 'test'" class="type-badge test">Test</span>
+              @if (s.routine_name) {
+<span class="session-routine">{{ s.routine_name }}</span>
+}
+              @if (!s.routine_name) {
+<span class="session-routine freestyle">Freestyle</span>
+}
+              @if (s.session_type === 'deload') {
+<span class="type-badge deload">Deload</span>
+}
+              @if (s.session_type === 'test') {
+<span class="type-badge test">Test</span>
+}
             </div>
             <div class="session-right">
               <div class="session-stats">
                 <span class="stat-pill">{{ s.set_count }} sets</span>
-                <span *ngIf="s.ended_at" class="stat-pill">{{ formatDuration(s.started_at, s.ended_at) }}</span>
-                <span *ngIf="s.total_volume > 0" class="stat-pill vol-pill">{{ settingsService.toDisplay(s.total_volume) | number:'1.0-0' }} {{ settingsService.unitLabel() }}</span>
+                @if (s.ended_at) {
+<span class="stat-pill">{{ formatDuration(s.started_at, s.ended_at) }}</span>
+}
+                @if (s.total_volume > 0) {
+<span class="stat-pill vol-pill">{{ settingsService.toDisplay(s.total_volume) | number:'1.0-0' }} {{ settingsService.unitLabel() }}</span>
+}
               </div>
               <button class="delete-session-btn" (click)="deleteSession($event, s)" title="Delete session">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -100,75 +118,106 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
           </div>
 
           <!-- Expanded detail -->
-          <div *ngIf="selectedId() === s.id" class="session-detail">
-            <div *ngIf="detailLoading()" class="detail-loading">
+          @if (selectedId() === s.id) {
+<div class="session-detail">
+            @if (detailLoading()) {
+<div class="detail-loading">
               <div class="spinner-sm"></div>
             </div>
+}
 
-            <div *ngIf="!detailLoading() && detail()" class="detail-sets">
-              <div *ngFor="let group of groupedSets(detail()!.sets)" class="detail-ex">
+            @if (!detailLoading() && detail()) {
+<div class="detail-sets">
+              @for (group of groupedSets(detail()!.sets); track group) {
+<div class="detail-ex">
                 <div class="detail-ex-name">{{ group.exerciseName }}</div>
                 <div class="detail-set-rows">
-                  <div *ngFor="let set of group.sets" class="detail-set-row">
+                  @for (set of group.sets; track set) {
+<div class="detail-set-row">
                     <span class="ds-num">Set {{ set.set_number }}</span>
                     <span class="ds-weight">{{ settingsService.toDisplay(set.weight) | number:'1.1-1' }} {{ settingsService.unitLabel() }}</span>
                     <span class="ds-x">×</span>
                     <span class="ds-reps">{{ set.reps_performed }} reps</span>
-                    <img *ngIf="set.is_pr" src="/icons/badge-icon.svg" class="pr-badge" alt="PR" />
+                    @if (set.is_pr) {
+<img src="/icons/badge-icon.svg" class="pr-badge" alt="PR" />
+}
                   </div>
+}
                 </div>
               </div>
+}
 
               <div class="detail-notes">
                 <span class="detail-notes-label">Notes</span>
-                <p class="detail-notes-text" *ngIf="detail()!.notes">{{ detail()!.notes }}</p>
-                <p class="detail-notes-text text-muted" *ngIf="!detail()!.notes" style="font-style: italic;">No notes for this session.</p>
+                @if (detail()!.notes) {
+<p class="detail-notes-text">{{ detail()!.notes }}</p>
+}
+                @if (!detail()!.notes) {
+<p class="detail-notes-text text-muted" style="font-style: italic;">No notes for this session.</p>
+}
               </div>
 
               <!-- Attachments panel -->
-              <div *ngIf="detail()!.attachments.length > 0" class="attachments-panel" (click)="$event.stopPropagation()">
+              @if (detail()!.attachments.length > 0) {
+<div class="attachments-panel" (click)="$event.stopPropagation()">
                 <div class="attachments-header">
                   <span class="section-label">Form Check / Photos</span>
                 </div>
 
                 <div class="attachments-grid">
-                  <div *ngFor="let a of detail()!.attachments" class="attachment-item">
-                    <video
-                      *ngIf="a.file_type === 'video/mp4' || a.file_type === 'video/webm'"
+                  @for (a of detail()!.attachments; track a) {
+<div class="attachment-item">
+                    @if (a.file_type === 'video/mp4' || a.file_type === 'video/webm') {
+<video
+                     
                       [src]="a.file_url"
                       class="attachment-media"
                       controls
                       preload="none"
                       (click)="$event.stopPropagation()">
                     </video>
-                    <img
-                      *ngIf="a.file_type === 'image/jpeg' || a.file_type === 'image/png'"
+}
+                    @if (a.file_type === 'image/jpeg' || a.file_type === 'image/png') {
+<img
+                     
                       [src]="a.file_url"
                       [alt]="a.label || 'Attachment'"
                       class="attachment-media attachment-img" />
+}
                     <div class="attachment-footer">
                       <span class="attachment-label">{{ a.label || (a.file_type.startsWith('video') ? 'Video' : 'Photo') }}</span>
                       <button class="attachment-delete-btn"
                         [disabled]="deletingAttachment().has(a.id)"
                         (click)="$event.stopPropagation(); confirmingAttachmentId.set(a.id)"
                         title="Delete">
-                        <svg *ngIf="!deletingAttachment().has(a.id)" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        @if (!deletingAttachment().has(a.id)) {
+<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                           <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                         </svg>
-                        <div *ngIf="deletingAttachment().has(a.id)" class="spinner-xs"></div>
+}
+                        @if (deletingAttachment().has(a.id)) {
+<div class="spinner-xs"></div>
+}
                       </button>
                     </div>
                   </div>
+}
                 </div>
               </div>
+}
             </div>
+}
           </div>
+}
         </div>
+}
       </div>
+}
     </div>
 
     <!-- Delete attachment confirmation -->
-    <jiro-modal *ngIf="confirmingAttachmentId()" title="Delete Clip?" maxWidth="400px" (close)="confirmingAttachmentId.set(null)">
+    @if (confirmingAttachmentId()) {
+<jiro-modal title="Delete Clip?" maxWidth="400px" (close)="confirmingAttachmentId.set(null)">
       <div class="delete-confirm">
         <p class="text-secondary" style="font-size: var(--font-size-sm);">
           This will permanently remove the clip. This cannot be undone.
@@ -183,9 +232,11 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
         </div>
       </div>
     </jiro-modal>
+}
 
     <!-- Delete session confirmation -->
-    <jiro-modal *ngIf="deletingSession()" title="Delete Session?" maxWidth="420px" (close)="deletingSession.set(null)">
+    @if (deletingSession()) {
+<jiro-modal title="Delete Session?" maxWidth="420px" (close)="deletingSession.set(null)">
       <div class="delete-confirm">
         <p>Delete this session from <strong>{{ formatDate(deletingSession()!.started_at) }}</strong>?</p>
         <p class="text-secondary" style="font-size: var(--font-size-sm); margin-top: var(--space-xs);">
@@ -199,6 +250,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
         </div>
       </div>
     </jiro-modal>
+}
   `,
   styles: [`
     :host { display: block; }

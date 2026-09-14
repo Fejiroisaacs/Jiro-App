@@ -1,5 +1,5 @@
 import { Component, OnInit, signal, HostListener } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
@@ -15,7 +15,7 @@ import { UploadService } from '../../../core/services/upload.service';
 @Component({
   selector: 'app-journal-editor',
   standalone: true,
-  imports: [CommonModule, FormsModule, JiroButtonComponent],
+  imports: [FormsModule, JiroButtonComponent],
   template: `
     <div class="editor-page" [class.immersive]="immersive()">
 
@@ -25,12 +25,20 @@ import { UploadService } from '../../../core/services/upload.service';
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="15,18 9,12 15,6"/>
           </svg>
-          <span *ngIf="!immersive()">Back</span>
+          @if (!immersive()) {
+<span>Back</span>
+}
         </button>
         <div class="editor-topbar-title">
-          <span *ngIf="!editId">New Entry</span>
-          <span *ngIf="editId">Edit Entry</span>
-          <span class="for-date-badge" *ngIf="forDate && !editId">for {{ formatForDate() }}</span>
+          @if (!editId) {
+<span>New Entry</span>
+}
+          @if (editId) {
+<span>Edit Entry</span>
+}
+          @if (forDate && !editId) {
+<span class="for-date-badge">for {{ formatForDate() }}</span>
+}
         </div>
         <div class="editor-topbar-actions">
           <jiro-button
@@ -44,11 +52,14 @@ import { UploadService } from '../../../core/services/upload.service';
       </div>
 
       <!-- Loading skeleton -->
-      <div *ngIf="loading()" class="state-center">
+      @if (loading()) {
+<div class="state-center">
         <div class="spinner-lg"></div>
       </div>
+}
 
-      <div *ngIf="!loading()" class="editor-body">
+      @if (!loading()) {
+<div class="editor-body">
 
         <!-- Title -->
         <input
@@ -76,8 +87,9 @@ import { UploadService } from '../../../core/services/upload.service';
           <div class="toolbar-section">
             <span class="toolbar-label">Mood</span>
             <div class="mood-row">
-              <button
-                *ngFor="let m of moods"
+              @for (m of moods; track m) {
+<button
+               
                 class="mood-chip"
                 [class.selected]="mood === m.value"
                 (click)="mood = (mood === m.value ? '' : m.value)"
@@ -86,6 +98,7 @@ import { UploadService } from '../../../core/services/upload.service';
                 type="button">
                 {{ m.label }}
               </button>
+}
             </div>
           </div>
 
@@ -94,10 +107,12 @@ import { UploadService } from '../../../core/services/upload.service';
             <span class="toolbar-label">Tags</span>
             <div class="tag-editor">
               <div class="tag-chips">
-                <span class="tag-chip" *ngFor="let t of tags">
+                @for (t of tags; track t) {
+<span class="tag-chip">
                   {{ t }}
                   <button class="tag-remove" (click)="removeTag(t)" [attr.aria-label]="'Remove tag ' + t" type="button">×</button>
                 </span>
+}
               </div>
               <input
                 type="text"
@@ -114,16 +129,20 @@ import { UploadService } from '../../../core/services/upload.service';
           <div class="toolbar-section">
             <div class="img-header">
               <span class="toolbar-label">Images ({{ images().length }}/3)</span>
-              <label class="img-add-btn" *ngIf="images().length < 3">
+              @if (images().length < 3) {
+<label class="img-add-btn">
                 <input type="file" accept="image/jpeg,image/png,image/webp" (change)="onFileSelected($event)" hidden [disabled]="uploading()" />
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
                 {{ uploading() ? 'Uploading...' : 'Add' }}
               </label>
+}
             </div>
-            <div class="img-previews" *ngIf="images().length > 0">
-              <div *ngFor="let img of images()" class="img-thumb">
+            @if (images().length > 0) {
+<div class="img-previews">
+              @for (img of images(); track img) {
+<div class="img-thumb">
                 <img [src]="img.file_url" [alt]="'Attached image'" (click)="lightboxUrl.set(img.file_url)" />
                 <button class="img-remove" (click)="deleteImage(img)" [disabled]="deletingImgId() === img.id" type="button" aria-label="Remove image">
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
@@ -131,16 +150,23 @@ import { UploadService } from '../../../core/services/upload.service';
                   </svg>
                 </button>
               </div>
+}
             </div>
-            <p class="img-hint text-secondary" *ngIf="uploadError()">{{ uploadError() }}</p>
+}
+            @if (uploadError()) {
+<p class="img-hint text-secondary">{{ uploadError() }}</p>
+}
           </div>
 
           <!-- Collections -->
-          <div class="toolbar-section" *ngIf="!editId || entry()">
+          @if (!editId || entry()) {
+<div class="toolbar-section">
             <span class="toolbar-label">Collections</span>
-            <div class="coll-selector" *ngIf="collections().length > 0">
-              <label
-                *ngFor="let c of collections()"
+            @if (collections().length > 0) {
+<div class="coll-selector">
+              @for (c of collections(); track c) {
+<label
+               
                 class="coll-option"
                 [class.selected]="selectedCollections.has(c.id)">
                 <input
@@ -153,15 +179,22 @@ import { UploadService } from '../../../core/services/upload.service';
                 </svg>
                 {{ c.name }}
               </label>
+}
             </div>
-            <p class="text-secondary" style="font-size:var(--font-size-xs)" *ngIf="collections().length === 0">
+}
+            @if (collections().length === 0) {
+<p class="text-secondary" style="font-size:var(--font-size-xs)">
               No collections yet.
             </p>
+}
           </div>
+}
 
         </div>
 
-        <p class="save-error" *ngIf="saveError()">{{ saveError() }}</p>
+        @if (saveError()) {
+<p class="save-error">{{ saveError() }}</p>
+}
 
         <!-- Bottom save -->
         <div class="bottom-save">
@@ -175,13 +208,16 @@ import { UploadService } from '../../../core/services/upload.service';
         </div>
 
       </div>
+}
 
     </div>
 
     <!-- Lightbox -->
-    <div class="lightbox" *ngIf="lightboxUrl()" (click)="lightboxUrl.set(null)">
+    @if (lightboxUrl()) {
+<div class="lightbox" (click)="lightboxUrl.set(null)">
       <img [src]="lightboxUrl()!" alt="Full size image" />
     </div>
+}
   `,
   styles: [`
     :host { display: block; }

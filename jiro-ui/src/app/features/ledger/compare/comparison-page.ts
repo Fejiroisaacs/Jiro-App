@@ -102,7 +102,8 @@ function computePresetRanges(preset: Preset): DateRange | null {
           </div>
 
           <!-- Custom date pickers -->
-          <div *ngIf="selectedPreset() === 'custom'" class="custom-ranges">
+          @if (selectedPreset() === 'custom') {
+<div class="custom-ranges">
             <div class="range-group">
               <div class="range-label">
                 <span class="period-dot dot-a"></span>
@@ -153,9 +154,11 @@ function computePresetRanges(preset: Preset): DateRange | null {
               </jiro-button>
             </div>
           </div>
+}
 
           <!-- Active range summary (shown for presets) -->
-          <div *ngIf="selectedPreset() !== 'custom' && activeRange()" class="range-summary">
+          @if (selectedPreset() !== 'custom' && activeRange()) {
+<div class="range-summary">
             <span class="range-chip">
               <span class="period-dot dot-a"></span>
               A: {{ activeRange()!.aFrom | date:'mediumDate' }} — {{ activeRange()!.aTo | date:'mediumDate' }}
@@ -166,35 +169,43 @@ function computePresetRanges(preset: Preset): DateRange | null {
               B: {{ activeRange()!.bFrom | date:'mediumDate' }} — {{ activeRange()!.bTo | date:'mediumDate' }}
             </span>
           </div>
+}
         </div>
       </jiro-card>
 
       <!-- ── Loading ── -->
-      <div *ngIf="loading()" class="state-center">
+      @if (loading()) {
+<div class="state-center">
         <div class="spinner-lg"></div>
         <span class="state-label">Loading comparison...</span>
       </div>
+}
 
       <!-- ── Empty / No data state ── -->
-      <div *ngIf="!loading() && !result() && !loadError()" class="state-center state-empty">
+      @if (!loading() && !result() && !loadError()) {
+<div class="state-center state-empty">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="empty-icon">
           <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
         </svg>
         <p class="state-label">Select a period to compare</p>
         <p class="state-sub">Choose a preset above or enter custom date ranges</p>
       </div>
+}
 
       <!-- ── Error state ── -->
-      <div *ngIf="!loading() && loadError()" class="state-center state-error">
+      @if (!loading() && loadError()) {
+<div class="state-center state-error">
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
         </svg>
         <p class="state-label">Failed to load comparison</p>
         <p class="state-sub">{{ loadError() }}</p>
       </div>
+}
 
       <!-- ── Results ── -->
-      <div *ngIf="!loading() && result()" class="results-body">
+      @if (!loading() && result()) {
+<div class="results-body">
 
         <!-- Summary cards -->
         <div class="summary-grid">
@@ -357,7 +368,8 @@ function computePresetRanges(preset: Preset): DateRange | null {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr *ngFor="let cat of sortedCategories()">
+                  @for (cat of sortedCategories(); track cat) {
+<tr>
                     <td class="cat-name-cell">
                       <span class="cat-color-dot" [style.background]="cat.color || '#9B8F88'"></span>
                       {{ cat.name }}
@@ -375,8 +387,10 @@ function computePresetRanges(preset: Preset): DateRange | null {
                       </span>
                     </td>
                   </tr>
+}
                   <!-- Total row -->
-                  <tr class="total-row" *ngIf="result()!.categories.length > 0">
+                  @if (result()!.categories.length > 0) {
+<tr class="total-row">
                     <td class="total-label">Total</td>
                     <td class="num-cell total-val">{{ totalA() | currency }}</td>
                     <td class="num-cell total-val">{{ totalB() | currency }}</td>
@@ -391,13 +405,15 @@ function computePresetRanges(preset: Preset): DateRange | null {
                       </span>
                     </td>
                   </tr>
+}
                 </tbody>
               </table>
             </div>
 
             <!-- Mobile card list -->
             <div class="mobile-cat-list">
-              <div class="mobile-cat-card" *ngFor="let cat of sortedCategories()">
+              @for (cat of sortedCategories(); track cat) {
+<div class="mobile-cat-card">
                 <div class="mcc-header">
                   <span class="cat-color-dot" [style.background]="cat.color || '#9B8F88'"></span>
                   <span class="mcc-name">{{ cat.name }}</span>
@@ -423,9 +439,11 @@ function computePresetRanges(preset: Preset): DateRange | null {
                   </span>
                 </div>
               </div>
+}
 
               <!-- Mobile total -->
-              <div class="mobile-cat-card total-card" *ngIf="result()!.categories.length > 0">
+              @if (result()!.categories.length > 0) {
+<div class="mobile-cat-card total-card">
                 <div class="mcc-header">
                   <span class="mcc-name total-label">Total</span>
                 </div>
@@ -449,16 +467,20 @@ function computePresetRanges(preset: Preset): DateRange | null {
                   </span>
                 </div>
               </div>
+}
             </div>
 
             <!-- Empty categories -->
-            <div *ngIf="result()!.categories.length === 0" class="no-categories">
+            @if (result()!.categories.length === 0) {
+<div class="no-categories">
               <p class="text-secondary">No category data found for the selected periods.</p>
             </div>
+}
           </div>
         </jiro-card>
 
-      </div><!-- /results-body -->
+      </div>
+}<!-- /results-body -->
     </div>
   `,
   styles: [`

@@ -2,7 +2,7 @@ import {
   Component, Input, Output, EventEmitter,
   signal, computed, OnChanges, SimpleChanges, AfterViewInit, ElementRef,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { JournalEntry, MOODS } from '../../../core/services/journal.service';
 
 // ─── Exported helpers used by parent components ──────────────────────────────
@@ -34,7 +34,7 @@ export function currentWeekBounds(): { from: string; to: string } {
 @Component({
   selector: 'journal-week-view',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   template: `
     <div class="wv">
 
@@ -60,8 +60,9 @@ export function currentWeekBounds(): { from: string; to: string } {
 
       <!-- Day columns -->
       <div class="wv-grid" [class.wv-loading]="loading">
-        <div
-          *ngFor="let day of weekDays()"
+        @for (day of weekDays(); track day) {
+<div
+         
           class="wv-day"
           [class.wv-day--today]="isToday(day)">
 
@@ -84,19 +85,28 @@ export function currentWeekBounds(): { from: string; to: string } {
 
           <!-- Sticky notes -->
           <div class="wv-day-body">
-            <div
-              *ngFor="let e of entriesByDay()[iso(day)]"
+            @for (e of entriesByDay()[iso(day)]; track e) {
+<div
+             
               class="wv-note"
               [style.border-left-color]="moodColor(e.mood)"
               (click)="entryClick.emit(e)">
-              <div class="wv-note-author" *ngIf="showAuthor">{{ authorName(e) }}</div>
-              <div class="wv-note-title" *ngIf="e.title">{{ e.title }}</div>
+              @if (showAuthor) {
+<div class="wv-note-author">{{ authorName(e) }}</div>
+}
+              @if (e.title) {
+<div class="wv-note-title">{{ e.title }}</div>
+}
               <div class="wv-note-body">{{ noteExcerpt(e.body) }}</div>
-              <span class="wv-note-mood" *ngIf="e.mood">{{ moodLabel(e.mood) }}</span>
+              @if (e.mood) {
+<span class="wv-note-mood">{{ moodLabel(e.mood) }}</span>
+}
             </div>
+}
           </div>
 
         </div>
+}
       </div>
 
     </div>

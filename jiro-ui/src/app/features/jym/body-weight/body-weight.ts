@@ -45,11 +45,14 @@ Chart.register(...registerables);
       </div>
 
       <!-- Loading -->
-      <div *ngIf="loading()" class="state-message">
+      @if (loading()) {
+<div class="state-message">
         <div class="spinner-lg"></div>
       </div>
+}
 
-      <div *ngIf="!loading()">
+      @if (!loading()) {
+<div>
         <!-- Chart -->
         <div class="chart-section" [hidden]="weights().length < 2">
           <h2 class="section-title">Weight Over Time</h2>
@@ -59,13 +62,16 @@ Chart.register(...registerables);
         </div>
 
         <!-- Empty state -->
-        <div *ngIf="weights().length === 0" class="state-message">
+        @if (weights().length === 0) {
+<div class="state-message">
           <h3>No weight logged yet</h3>
           <p class="text-secondary">Log your first weight above to start tracking.</p>
         </div>
+}
 
         <!-- Recent weights table -->
-        <div *ngIf="weights().length > 0" class="table-section">
+        @if (weights().length > 0) {
+<div class="table-section">
           <h2 class="section-title">Recent Entries</h2>
           <table class="weight-table">
             <thead>
@@ -77,14 +83,19 @@ Chart.register(...registerables);
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let w of weights(); let i = index">
+              @for (w of weights(); track w; let i = $index) {
+<tr>
                 <td class="date-cell">{{ formatDate(w.recorded_at) }}</td>
                 <td class="weight-cell">{{ settingsService.toDisplay(w.weight_kg) | number:'1.1-1' }} {{ settingsService.unitLabel() }}</td>
                 <td class="change-cell">
-                  <span *ngIf="i < weights().length - 1" [class.positive]="delta(i) > 0" [class.negative]="delta(i) < 0">
+                  @if (i < weights().length - 1) {
+<span [class.positive]="delta(i) > 0" [class.negative]="delta(i) < 0">
                     {{ delta(i) > 0 ? '+' : '' }}{{ settingsService.toDisplay(delta(i)) | number:'1.1-1' }} {{ settingsService.unitLabel() }}
                   </span>
-                  <span *ngIf="i === weights().length - 1" class="text-muted">—</span>
+}
+                  @if (i === weights().length - 1) {
+<span class="text-muted">—</span>
+}
                 </td>
                 <td class="del-cell">
                   <button class="del-btn" (click)="deleteWeight(w)" title="Delete">
@@ -95,10 +106,13 @@ Chart.register(...registerables);
                   </button>
                 </td>
               </tr>
+}
             </tbody>
           </table>
         </div>
+}
       </div>
+}
     </div>
   `,
   styles: [`

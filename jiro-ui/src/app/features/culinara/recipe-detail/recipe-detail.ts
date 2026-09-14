@@ -1,6 +1,6 @@
 import { Component, OnInit, computed, inject, signal, HostListener, ElementRef } from '@angular/core';
 import { ConfirmService } from '../../../core/services/confirm.service';
-import { CommonModule } from '@angular/common';
+
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ShoppingListComponent } from '../shopping-list/shopping-list';
 import {
@@ -34,29 +34,33 @@ interface CookIngredient {
   selector: 'app-recipe-detail',
   standalone: true,
   imports: [
-    CommonModule,
     RouterLink,
     JiroButtonComponent,
     JiroModalComponent,
     RecipeFormComponent,
     TrialModalComponent,
-    PromoteDialogComponent,
-  ],
+    PromoteDialogComponent
+],
   template: `
     <div class="detail-wrapper">
       <!-- Loading -->
-      <div *ngIf="loading()" class="state-center">
+      @if (loading()) {
+<div class="state-center">
         <div class="spinner-lg"></div>
       </div>
+}
 
       <!-- Error -->
-      <div *ngIf="!loading() && !recipe()" class="state-center">
+      @if (!loading() && !recipe()) {
+<div class="state-center">
         <p class="text-secondary">Recipe not found.</p>
         <a routerLink="/culinara" class="back-link">← Back to Culinara</a>
       </div>
+}
 
       <!-- Content -->
-      <div *ngIf="recipe() as r" class="detail-root">
+      @if (recipe(); as r) {
+<div class="detail-root">
         <!-- Mobile tab bar -->
         <div class="mobile-tabs">
           <button
@@ -70,7 +74,9 @@ interface CookIngredient {
             [class.mobile-tab--active]="mobileTab() === 'trials'"
             (click)="mobileTab.set('trials')">
             Trial Log
-            <span class="tab-count" *ngIf="r.trials && r.trials.length">{{ r.trials.length }}</span>
+            @if (r.trials && r.trials.length) {
+<span class="tab-count">{{ r.trials.length }}</span>
+}
           </button>
         </div>
 
@@ -81,7 +87,8 @@ interface CookIngredient {
             <a routerLink="/culinara" class="back-link">← Culinara</a>
 
             <!-- Cover photo -->
-            <div class="cover-hero" *ngIf="r.cover_image_url">
+            @if (r.cover_image_url) {
+<div class="cover-hero">
               <img [src]="r.cover_image_url" [alt]="r.title" class="cover-hero-img">
               <div class="cover-hero-actions">
                 <label class="cover-action-btn" title="Change cover photo">
@@ -93,25 +100,32 @@ interface CookIngredient {
                 </button>
               </div>
             </div>
+}
 
             <!-- Add cover photo (no cover yet) -->
-            <div class="cover-empty" *ngIf="!r.cover_image_url && !coverUploading()">
+            @if (!r.cover_image_url && !coverUploading()) {
+<div class="cover-empty">
               <label class="cover-add-btn">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
                 Add cover photo
                 <input type="file" accept="image/jpeg,image/png,image/webp" (change)="onCoverFileChange($event)" style="display:none">
               </label>
             </div>
+}
 
             <!-- Cover upload progress -->
-            <div class="cover-uploading" *ngIf="coverUploading()">
+            @if (coverUploading()) {
+<div class="cover-uploading">
               <div class="cover-progress-bar">
                 <div class="cover-progress-fill" [style.width.%]="coverProgress()"></div>
               </div>
               <span class="cover-progress-label">Uploading {{ coverProgress() }}%</span>
             </div>
+}
 
-            <p class="cover-error text-secondary" *ngIf="coverError()">{{ coverError() }}</p>
+            @if (coverError()) {
+<p class="cover-error text-secondary">{{ coverError() }}</p>
+}
 
             <!-- Header -->
             <div class="panel-header">
@@ -124,11 +138,15 @@ interface CookIngredient {
                   </svg>
                 </button>
                 <button class="icon-btn" title="Share recipe" (click)="shareRecipe()">
-                  <svg *ngIf="!shareLoading()" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  @if (!shareLoading()) {
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
                     <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
                   </svg>
-                  <span *ngIf="shareLoading()" class="btn-spinner"></span>
+}
+                  @if (shareLoading()) {
+<span class="btn-spinner"></span>
+}
                 </button>
                 <button class="icon-btn" title="Edit recipe" (click)="showEdit.set(true)">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -148,7 +166,8 @@ interface CookIngredient {
             </div>
 
             <!-- Share link banner -->
-            <div class="share-banner" *ngIf="shareUrl()">
+            @if (shareUrl()) {
+<div class="share-banner">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
                 <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
                 <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
@@ -159,6 +178,7 @@ interface CookIngredient {
               </div>
               <button class="share-close-btn" (click)="shareUrl.set('')">✕</button>
             </div>
+}
 
             <!-- Public toggle -->
             <div class="public-toggle-row">
@@ -176,81 +196,122 @@ interface CookIngredient {
               </button>
             </div>
 
-            <p *ngIf="r.description" class="recipe-desc">{{ r.description }}</p>
+            @if (r.description) {
+<p class="recipe-desc">{{ r.description }}</p>
+}
 
             <!-- Tags -->
-            <div class="tag-row" *ngIf="r.tags && r.tags.length">
-              <span *ngFor="let tag of r.tags" class="recipe-tag">{{ tag }}</span>
+            @if (r.tags && r.tags.length) {
+<div class="tag-row">
+              @for (tag of r.tags; track tag) {
+<span class="recipe-tag">{{ tag }}</span>
+}
             </div>
+}
 
             <!-- Dietary flags -->
-            <div class="dietary-row" *ngIf="r.dietary_flags">
-              <span class="dietary-pill" *ngIf="r.dietary_flags.vegan">
+            @if (r.dietary_flags) {
+<div class="dietary-row">
+              @if (r.dietary_flags.vegan) {
+<span class="dietary-pill">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.9C15.5 4.9 17 3.5 19 1c1 2 2 4.5 2 8 0 5.5-4.5 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>
                 Vegan
               </span>
-              <span class="dietary-pill" *ngIf="r.dietary_flags.vegetarian">
+}
+              @if (r.dietary_flags.vegetarian) {
+<span class="dietary-pill">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 20h10"/><path d="M10 20c5.5-2.5 8-6.5 8-12"/><path d="M6 20c-2-5-2.5-10 0-15 3 2 6 3 10 3"/></svg>
                 Vegetarian
               </span>
-              <span class="dietary-pill" *ngIf="r.dietary_flags.gluten_free">
+}
+              @if (r.dietary_flags.gluten_free) {
+<span class="dietary-pill">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 22 16 8"/><path d="M3.47 12.53 5 11l1.53 1.53a3.5 3.5 0 0 1 0 4.94L5 19l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z"/><path d="M7.47 8.53 9 7l1.53 1.53a3.5 3.5 0 0 1 0 4.94L9 15l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z"/><path d="M11.47 4.53 13 3l1.53 1.53a3.5 3.5 0 0 1 0 4.94L13 11l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z"/><line x1="20" y1="2" x2="22" y2="4"/><path d="M17.47 8.53 19 7l1.53 1.53a3.5 3.5 0 0 1 0 4.94L19 15l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z"/></svg>
                 Gluten-Free
               </span>
-              <span class="dietary-pill" *ngIf="r.dietary_flags.dairy_free">
+}
+              @if (r.dietary_flags.dairy_free) {
+<span class="dietary-pill">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 2 1.88 1.88"/><path d="M14.12 3.88 16 2"/><path d="M9 7.13v-1a3.003 3.003 0 1 1 6 0v1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 .67-2.22 2.75 2.75 0 0 1 4.78 0A4 4 0 0 1 12 11"/><path d="M12 20c3.3 0 6-2.7 6-6v-3a4 4 0 0 0-.67-2.22 2.75 2.75 0 0 0-4.78 0A4 4 0 0 0 12 11"/><path d="M2 2 22 22"/></svg>
                 Dairy-Free
               </span>
-              <span class="dietary-pill" *ngIf="r.dietary_flags.nut_free">
+}
+              @if (r.dietary_flags.nut_free) {
+<span class="dietary-pill">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
                 Nut-Free
               </span>
+}
             </div>
+}
 
             <!-- Nutrition -->
-            <div class="macro-bar" *ngIf="r.nutrition && (r.nutrition.calories || r.nutrition.protein || r.nutrition.carbs || r.nutrition.fat)">
-              <div class="macro-chip" *ngIf="r.nutrition.calories"><span class="macro-val">{{ r.nutrition.calories }}</span> cal</div>
-              <div class="macro-chip" *ngIf="r.nutrition.protein"><span class="macro-val">{{ r.nutrition.protein }}g</span> protein</div>
-              <div class="macro-chip" *ngIf="r.nutrition.carbs"><span class="macro-val">{{ r.nutrition.carbs }}g</span> carbs</div>
-              <div class="macro-chip" *ngIf="r.nutrition.fat"><span class="macro-val">{{ r.nutrition.fat }}g</span> fat</div>
+            @if (r.nutrition && (r.nutrition.calories || r.nutrition.protein || r.nutrition.carbs || r.nutrition.fat)) {
+<div class="macro-bar">
+              @if (r.nutrition.calories) {
+<div class="macro-chip"><span class="macro-val">{{ r.nutrition.calories }}</span> cal</div>
+}
+              @if (r.nutrition.protein) {
+<div class="macro-chip"><span class="macro-val">{{ r.nutrition.protein }}g</span> protein</div>
+}
+              @if (r.nutrition.carbs) {
+<div class="macro-chip"><span class="macro-val">{{ r.nutrition.carbs }}g</span> carbs</div>
+}
+              @if (r.nutrition.fat) {
+<div class="macro-chip"><span class="macro-val">{{ r.nutrition.fat }}g</span> fat</div>
+}
             </div>
+}
 
             <!-- Add to Collection -->
-            <div class="collection-picker" *ngIf="collections().length > 0">
+            @if (collections().length > 0) {
+<div class="collection-picker">
               <button class="collection-toggle" (click)="showCollectionPicker.set(!showCollectionPicker()); $event.stopPropagation()">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                 {{ recipeCollectionIds().size > 0 ? recipeCollectionIds().size + ' collection' + (recipeCollectionIds().size > 1 ? 's' : '') : 'Add to collection' }}
               </button>
-              <div class="collection-dropdown" *ngIf="showCollectionPicker()" (click)="$event.stopPropagation()">
-                <button
-                  *ngFor="let col of collections()"
+              @if (showCollectionPicker()) {
+<div class="collection-dropdown" (click)="$event.stopPropagation()">
+                @for (col of collections(); track col) {
+<button
+                 
                   class="collection-option"
                   [class.collection-option--active]="recipeCollectionIds().has(col.id)"
                   (click)="toggleCollection(col)">
                   <span class="col-check">{{ recipeCollectionIds().has(col.id) ? '✓' : '' }}</span>
                   {{ col.name }}
                 </button>
+}
               </div>
+}
             </div>
+}
 
             <!-- Stats row -->
             <div class="stats-row">
-              <div class="stat" *ngIf="r.trials && r.trials.length > 0">
+              @if (r.trials && r.trials.length > 0) {
+<div class="stat">
                 <span class="stat-value">{{ r.trials.length }}</span>
                 <span class="stat-label">{{ r.trials.length === 1 ? 'Trial' : 'Trials' }}</span>
               </div>
-              <div class="stat" *ngIf="latestRating() != null">
+}
+              @if (latestRating() != null) {
+<div class="stat">
                 <span class="stat-value star-val">★ {{ latestRating() }}</span>
                 <span class="stat-label">Latest</span>
               </div>
-              <div class="stat" *ngIf="avgRating() != null">
+}
+              @if (avgRating() != null) {
+<div class="stat">
                 <span class="stat-value star-val">★ {{ avgRating() }}</span>
                 <span class="stat-label">Average</span>
               </div>
+}
             </div>
 
             <!-- Ingredients -->
-            <div class="section" *ngIf="r.base_ingredients && r.base_ingredients.length">
+            @if (r.base_ingredients && r.base_ingredients.length) {
+<div class="section">
               <div class="section-header">
                 <h3 class="section-title">Base Ingredients</h3>
                 <button class="add-grocery-btn" (click)="addToGrocery()" title="Add to grocery list">
@@ -263,19 +324,26 @@ interface CookIngredient {
                 </button>
               </div>
               <div class="ingredient-table">
-                <div *ngFor="let ing of r.base_ingredients" class="ingredient-row">
+                @for (ing of r.base_ingredients; track ing) {
+<div class="ingredient-row">
                   <span class="ing-item">{{ ing.item }}</span>
                   <span class="ing-amount">{{ ing.amount }}</span>
                 </div>
+}
               </div>
-              <p *ngIf="groceryAdded()" class="grocery-confirm">✓ Added to grocery list</p>
+              @if (groceryAdded()) {
+<p class="grocery-confirm">✓ Added to grocery list</p>
+}
             </div>
+}
 
             <!-- Instructions -->
-            <div class="section" *ngIf="r.instructions">
+            @if (r.instructions) {
+<div class="section">
               <h3 class="section-title">Instructions</h3>
               <div class="instructions-text">{{ r.instructions }}</div>
             </div>
+}
           </div>
 
           <!-- Right: Trials -->
@@ -288,21 +356,27 @@ interface CookIngredient {
             </div>
 
             <!-- Empty trials -->
-            <div *ngIf="!r.trials || r.trials.length === 0" class="trials-empty">
+            @if (!r.trials || r.trials.length === 0) {
+<div class="trials-empty">
               <p>No trials yet</p>
               <p class="text-secondary">Cook the recipe and log your first experiment.</p>
             </div>
+}
 
             <!-- Trial cards -->
-            <div *ngIf="r.trials && r.trials.length" class="trials-list">
-              <div *ngFor="let trial of r.trials" class="trial-card">
+            @if (r.trials && r.trials.length) {
+<div class="trials-list">
+              @for (trial of r.trials; track trial) {
+<div class="trial-card">
                 <!-- Trial header -->
                 <div class="trial-header">
                   <div class="trial-meta">
                     <span class="trial-date">{{ formatDate(trial.date_cooked) }}</span>
-                    <div class="trial-rating" *ngIf="trial.rating">
+                    @if (trial.rating) {
+<div class="trial-rating">
                       <span class="star">★</span> {{ trial.rating }}/5
                     </div>
+}
                   </div>
                   <div class="trial-actions">
                     <button
@@ -327,26 +401,36 @@ interface CookIngredient {
                 </div>
 
                 <!-- Modifications -->
-                <div class="trial-mods" *ngIf="trial.modifications && trial.modifications.length">
+                @if (trial.modifications && trial.modifications.length) {
+<div class="trial-mods">
                   <p class="mods-label">Modifications</p>
-                  <div *ngFor="let mod of trial.modifications" class="mod-row">
+                  @for (mod of trial.modifications; track mod) {
+<div class="mod-row">
                     <span class="mod-item">{{ mod.item }}</span>
                     <span class="mod-sep">→</span>
                     <span class="mod-change">{{ mod.change }}</span>
                   </div>
+}
                 </div>
+}
 
                 <!-- Notes -->
-                <p *ngIf="trial.notes" class="trial-notes">{{ trial.notes }}</p>
+                @if (trial.notes) {
+<p class="trial-notes">{{ trial.notes }}</p>
+}
               </div>
+}
             </div>
+}
           </div>
         </div>
       </div>
+}
 
       <!-- Edit recipe modal -->
-      <jiro-modal
-        *ngIf="showEdit() && recipe()"
+      @if (showEdit() && recipe()) {
+<jiro-modal
+       
         title="Edit Recipe"
         maxWidth="600px"
         (close)="showEdit.set(false)">
@@ -356,10 +440,12 @@ interface CookIngredient {
           (cancelled)="showEdit.set(false)">
         </app-recipe-form>
       </jiro-modal>
+}
 
       <!-- Log trial modal -->
-      <jiro-modal
-        *ngIf="showTrial() && recipe()"
+      @if (showTrial() && recipe()) {
+<jiro-modal
+       
         title="Log Trial"
         maxWidth="560px"
         (close)="showTrial.set(false)">
@@ -369,10 +455,12 @@ interface CookIngredient {
           (cancelled)="showTrial.set(false)">
         </app-trial-modal>
       </jiro-modal>
+}
 
       <!-- Edit trial modal -->
-      <jiro-modal
-        *ngIf="editingTrial()"
+      @if (editingTrial()) {
+<jiro-modal
+       
         title="Edit Trial"
         maxWidth="560px"
         (close)="editingTrial.set(null)">
@@ -382,10 +470,12 @@ interface CookIngredient {
           (cancelled)="editingTrial.set(null)">
         </app-trial-modal>
       </jiro-modal>
+}
 
       <!-- Promote modal -->
-      <jiro-modal
-        *ngIf="promotingTrial() && recipe()"
+      @if (promotingTrial() && recipe()) {
+<jiro-modal
+       
         title="Promote Trial to Base"
         maxWidth="480px"
         (close)="promotingTrial.set(null)">
@@ -395,9 +485,11 @@ interface CookIngredient {
           (cancelled)="promotingTrial.set(null)">
         </app-promote-dialog>
       </jiro-modal>
+}
 
       <!-- Cook mode overlay -->
-      <div *ngIf="cookMode()" class="cook-overlay">
+      @if (cookMode()) {
+<div class="cook-overlay">
         <div class="cook-header">
           <h2 class="cook-title">{{ recipe()?.title }}</h2>
           <button class="cook-close" (click)="exitCookMode()" title="Exit without logging">
@@ -407,11 +499,13 @@ interface CookIngredient {
 
         <div class="cook-body">
           <!-- Ingredients checklist -->
-          <div class="cook-section" *ngIf="cookIngredients().length">
+          @if (cookIngredients().length) {
+<div class="cook-section">
             <h3 class="cook-section-title">Ingredients</h3>
             <div class="cook-ingredients">
-              <label
-                *ngFor="let ing of cookIngredients(); let i = index"
+              @for (ing of cookIngredients(); track ing; let i = $index) {
+<label
+               
                 class="cook-ingredient"
                 [class.cook-ingredient--checked]="ing.checked"
                 (click)="toggleCookIngredient(i)">
@@ -419,32 +513,42 @@ interface CookIngredient {
                 <span class="ing-item">{{ ing.item }}</span>
                 <span class="ing-amount">{{ ing.amount }}</span>
               </label>
+}
             </div>
           </div>
+}
 
           <!-- Steps -->
-          <div class="cook-section" *ngIf="cookSteps().length">
+          @if (cookSteps().length) {
+<div class="cook-section">
             <h3 class="cook-section-title">Steps</h3>
             <div class="cook-steps">
-              <div
-                *ngFor="let step of cookSteps(); let i = index"
+              @for (step of cookSteps(); track step; let i = $index) {
+<div
+               
                 class="cook-step"
                 [class.cook-step--done]="step.done"
                 (click)="toggleStep(i)">
                 <div class="step-num">{{ i + 1 }}</div>
                 <p class="step-text">{{ step.text }}</p>
                 <div class="step-check">
-                  <svg *ngIf="step.done" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  @if (step.done) {
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                     <polyline points="20 6 9 17 4 12"/>
                   </svg>
+}
                 </div>
               </div>
+}
             </div>
           </div>
+}
 
-          <div class="cook-empty" *ngIf="cookIngredients().length === 0 && cookSteps().length === 0">
+          @if (cookIngredients().length === 0 && cookSteps().length === 0) {
+<div class="cook-empty">
             <p class="text-secondary">No ingredients or instructions added to this recipe yet.</p>
           </div>
+}
         </div>
 
         <!-- Sticky finish footer -->
@@ -453,14 +557,16 @@ interface CookIngredient {
             <div class="cook-footer-left">
               <span class="cook-footer-label">Rate this cook</span>
               <div class="cook-stars">
-                <button
-                  *ngFor="let s of [1,2,3,4,5]"
+                @for (s of [1,2,3,4,5]; track s) {
+<button
+                 
                   type="button"
                   class="cook-star"
                   [class.cook-star--filled]="s <= cookRating()"
                   (click)="cookRating.set(s === cookRating() ? 0 : s)">
                   ★
                 </button>
+}
               </div>
               <textarea
                 class="cook-notes"
@@ -471,14 +577,19 @@ interface CookIngredient {
             </div>
             <div class="cook-footer-actions">
               <button class="cook-log-btn" (click)="finishCooking()" [disabled]="cookSaving()">
-                <span *ngIf="!cookSaving()">Log Trial</span>
-                <span *ngIf="cookSaving()">Saving...</span>
+                @if (!cookSaving()) {
+<span>Log Trial</span>
+}
+                @if (cookSaving()) {
+<span>Saving...</span>
+}
               </button>
               <button class="cook-skip-btn" (click)="exitCookMode()">Skip</button>
             </div>
           </div>
         </div>
       </div>
+}
     </div>
   `,
   styles: [`

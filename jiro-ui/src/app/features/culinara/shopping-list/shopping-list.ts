@@ -1,6 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ConfirmService } from '../../../core/services/confirm.service';
-import { CommonModule } from '@angular/common';
+
 import { RouterLink } from '@angular/router';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 
@@ -17,7 +17,7 @@ const STORAGE_KEY = 'culinara_shopping_list';
 @Component({
   selector: 'app-shopping-list',
   standalone: true,
-  imports: [CommonModule, RouterLink, JiroButtonComponent],
+  imports: [RouterLink, JiroButtonComponent],
   template: `
     <div class="shopping-list">
       <div class="page-header">
@@ -26,17 +26,22 @@ const STORAGE_KEY = 'culinara_shopping_list';
           <p class="text-secondary">{{ uncheckedCount() }} item{{ uncheckedCount() !== 1 ? 's' : '' }} remaining</p>
         </div>
         <div class="header-actions">
-          <button class="action-btn" (click)="clearChecked()" *ngIf="checkedCount() > 0">
+          @if (checkedCount() > 0) {
+<button class="action-btn" (click)="clearChecked()">
             Clear checked ({{ checkedCount() }})
           </button>
-          <button class="action-btn action-btn--danger" (click)="clearAll()" *ngIf="items().length > 0">
+}
+          @if (items().length > 0) {
+<button class="action-btn action-btn--danger" (click)="clearAll()">
             Clear all
           </button>
+}
         </div>
       </div>
 
       <!-- Empty state -->
-      <div *ngIf="items().length === 0" class="empty-state">
+      @if (items().length === 0) {
+<div class="empty-state">
         <div class="empty-icon">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
@@ -50,16 +55,19 @@ const STORAGE_KEY = 'culinara_shopping_list';
           <jiro-button variant="primary" type="button">Browse Recipes</jiro-button>
         </a>
       </div>
+}
 
       <!-- Grouped by recipe -->
-      <div *ngFor="let group of groupedItems()" class="recipe-group">
+      @for (group of groupedItems(); track group) {
+<div class="recipe-group">
         <div class="group-header">
           <span class="group-title">{{ group.recipeTitle }}</span>
           <button class="add-all-btn" (click)="addGroupToCart(group.recipeTitle)">Check all</button>
         </div>
         <div class="group-items">
-          <label
-            *ngFor="let item of group.items"
+          @for (item of group.items; track item) {
+<label
+           
             class="shop-item"
             [class.shop-item--checked]="item.checked">
             <input
@@ -70,8 +78,10 @@ const STORAGE_KEY = 'culinara_shopping_list';
             <span class="item-amount">{{ item.amount }}</span>
             <button class="remove-item" (click)="removeItem(item.id)" title="Remove">×</button>
           </label>
+}
         </div>
       </div>
+}
     </div>
   `,
   styles: [`

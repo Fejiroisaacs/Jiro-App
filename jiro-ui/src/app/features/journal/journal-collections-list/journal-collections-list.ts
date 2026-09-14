@@ -1,5 +1,5 @@
 import { Component, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { JournalService, JournalCollection } from '../../../core/services/journal.service';
@@ -10,7 +10,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 @Component({
   selector: 'app-journal-collections-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, JiroPageHeaderComponent, JiroButtonComponent, JiroModalComponent],
+  imports: [FormsModule, RouterLink, JiroPageHeaderComponent, JiroButtonComponent, JiroModalComponent],
   template: `
     <div class="collections-page">
 
@@ -23,34 +23,47 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
         <jiro-button variant="secondary" type="button" (click)="showCreate.set(true)">+ New</jiro-button>
       </div>
 
-      <div *ngIf="loading()" class="state-box">
+      @if (loading()) {
+<div class="state-box">
         <div class="spinner-lg"></div>
       </div>
+}
 
-      <div *ngIf="!loading() && collections().length === 0" class="state-box">
+      @if (!loading() && collections().length === 0) {
+<div class="state-box">
         <h3>No collections yet</h3>
         <p class="text-secondary">Group related entries into collections — travel, family moments, and more.</p>
         <jiro-button variant="primary" type="button" (click)="showCreate.set(true)">Create Collection</jiro-button>
       </div>
+}
 
-      <div class="collections-grid" *ngIf="!loading() && collections().length > 0">
-        <div
-          *ngFor="let c of collections()"
+      @if (!loading() && collections().length > 0) {
+<div class="collections-grid">
+        @for (c of collections(); track c) {
+<div
+         
           class="collection-card"
           (click)="router.navigate(['/journal/collections', c.id])">
           <div class="collection-cover" [style.background-image]="c.cover_image_url ? 'url(' + c.cover_image_url + ')' : ''">
-            <img *ngIf="!c.cover_image_url" src="/icons/folder-icon.svg" width="48" height="48" alt="" />
+            @if (!c.cover_image_url) {
+<img src="/icons/folder-icon.svg" width="48" height="48" alt="" />
+}
           </div>
           <div class="collection-body">
             <span class="collection-name">{{ c.name }}</span>
             <span class="collection-count text-secondary">{{ c.entry_count }} {{ c.entry_count === 1 ? 'entry' : 'entries' }}</span>
-            <p class="collection-desc text-secondary" *ngIf="c.description">{{ c.description }}</p>
+            @if (c.description) {
+<p class="collection-desc text-secondary">{{ c.description }}</p>
+}
           </div>
         </div>
+}
       </div>
+}
     </div>
 
-    <jiro-modal *ngIf="showCreate()" title="New Collection" (close)="showCreate.set(false)">
+    @if (showCreate()) {
+<jiro-modal title="New Collection" (close)="showCreate.set(false)">
       <div class="modal-form">
         <label class="form-label">Name</label>
         <input type="text" class="form-control" [(ngModel)]="newName" placeholder="e.g. Europe Trip 2024" maxlength="100" />
@@ -64,6 +77,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
         </jiro-button>
       </div>
     </jiro-modal>
+}
   `,
   styles: [`
     .collections-page { max-width: 860px; }

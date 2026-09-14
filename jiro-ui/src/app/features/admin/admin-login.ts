@@ -1,5 +1,5 @@
 import { Component, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -9,7 +9,7 @@ import { environment } from '../../../environments/environment';
 @Component({
   selector: 'app-admin-login',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   template: `
     <div class="login-wrap">
       <div class="login-card">
@@ -23,7 +23,9 @@ import { environment } from '../../../environments/environment';
             name="secret"
             [placeholder]="isProduction ? 'Admin secret' : 'Admin secret (blank in local dev)'"
             autocomplete="current-password" />
-          <div *ngIf="error()" class="error-msg">{{ error() }}</div>
+          @if (error()) {
+<div class="error-msg">{{ error() }}</div>
+}
           <button class="login-btn" type="submit" [disabled]="loading()">
             {{ loading() ? 'Verifying...' : 'Enter' }}
           </button>

@@ -23,11 +23,14 @@ Chart.register(...registerables);
         My Series
       </button>
 
-      <div *ngIf="loading()" class="state-message">
+      @if (loading()) {
+<div class="state-message">
         <div class="spinner-lg"></div>
       </div>
+}
 
-      <div *ngIf="!loading() && series()" class="content">
+      @if (!loading() && series()) {
+<div class="content">
         <!-- Header -->
         <div class="detail-header">
           <div>
@@ -38,11 +41,14 @@ Chart.register(...registerables);
                 {{ series()!.ended_at ? 'Ended' : 'Active' }}
               </span>
               <span class="meta-text">Started {{ formatDate(series()!.started_at) }}</span>
-              <span *ngIf="series()!.ended_at" class="meta-text">· Ended {{ formatDate(series()!.ended_at!) }}</span>
+              @if (series()!.ended_at) {
+<span class="meta-text">· Ended {{ formatDate(series()!.ended_at!) }}</span>
+}
               <span class="meta-text">· {{ series()!.session_count }} sessions</span>
             </div>
           </div>
-          <div *ngIf="!series()!.ended_at" class="header-btns">
+          @if (!series()!.ended_at) {
+<div class="header-btns">
             <jiro-button variant="primary" type="button" (click)="openRoutinePicker()">
               Start Session
             </jiro-button>
@@ -50,10 +56,12 @@ Chart.register(...registerables);
               End Series
             </jiro-button>
           </div>
+}
         </div>
 
         <!-- Progress bar (for fixed-length series) -->
-        <div *ngIf="series()!.duration_type !== 'open'" class="progress-section">
+        @if (series()!.duration_type !== 'open') {
+<div class="progress-section">
           <div class="progress-label">
             <span>Progress</span>
             <span class="progress-value">{{ progressText() }}</span>
@@ -62,14 +70,18 @@ Chart.register(...registerables);
             <div class="progress-fill" [style.width.%]="progressPct()"></div>
           </div>
         </div>
+}
 
         <!-- No sessions yet -->
-        <div *ngIf="series()!.sessions.length === 0" class="state-message">
+        @if (series()!.sessions.length === 0) {
+<div class="state-message">
           <h3>No sessions logged yet</h3>
           <p class="text-secondary">Start a session linked to this series to see progression data.</p>
         </div>
+}
 
-        <div *ngIf="series()!.sessions.length > 0">
+        @if (series()!.sessions.length > 0) {
+<div>
           <!-- Tab bar -->
           <div class="tab-bar">
             <button class="tab-btn" [class.active]="activeTab() === 'volume'" (click)="activeTab.set('volume')">Volume</button>
@@ -78,58 +90,78 @@ Chart.register(...registerables);
           </div>
 
           <!-- Volume chart -->
-          <div *ngIf="activeTab() === 'volume'" class="chart-block">
+          @if (activeTab() === 'volume') {
+<div class="chart-block">
             <h2 class="section-title">Total Volume per Session</h2>
             <p class="section-sub">Sum of weight × reps across all sets. Excludes deload sessions.</p>
             <div class="chart-wrapper">
               <canvas #volumeCanvas></canvas>
             </div>
           </div>
+}
 
           <!-- 1RM chart -->
-          <div *ngIf="activeTab() === 'orm'" class="chart-block">
+          @if (activeTab() === 'orm') {
+<div class="chart-block">
             <div class="orm-header">
               <h2 class="section-title">Estimated 1RM Progression</h2>
               <select class="ex-select" [(ngModel)]="selectedExId" (ngModelChange)="drawOrmChart()">
-                <option *ngFor="let ex of series()!.exercise_progressions" [value]="ex.exercise_id">
+                @for (ex of series()!.exercise_progressions; track ex) {
+<option [value]="ex.exercise_id">
                   {{ ex.exercise_name }}
                 </option>
+}
               </select>
             </div>
             <div class="chart-wrapper">
               <canvas #ormCanvas></canvas>
             </div>
           </div>
+}
 
           <!-- Compare tab -->
-          <div *ngIf="activeTab() === 'compare'" class="compare-block">
+          @if (activeTab() === 'compare') {
+<div class="compare-block">
             <h2 class="section-title">Series Comparison</h2>
             <p class="section-sub">Compare performance with another series of the same split.</p>
-            <div *ngIf="otherSeries().length === 0" class="no-compare">
+            @if (otherSeries().length === 0) {
+<div class="no-compare">
               <p class="text-secondary">No other series for <strong>{{ series()!.split_name }}</strong> to compare with yet.</p>
             </div>
-            <div *ngIf="otherSeries().length > 0" class="compare-controls">
+}
+            @if (otherSeries().length > 0) {
+<div class="compare-controls">
               <div class="form-row">
                 <div class="form-group">
                   <label class="form-label">Compare with</label>
                   <select class="ex-select" [(ngModel)]="compareSeriesId" (ngModelChange)="loadCompare()">
                     <option value="">Select a series...</option>
-                    <option *ngFor="let s of otherSeries()" [value]="s.id">{{ s.name }}</option>
+                    @for (s of otherSeries(); track s) {
+<option [value]="s.id">{{ s.name }}</option>
+}
                   </select>
                 </div>
-                <div class="form-group" *ngIf="compareSeriesId">
+                @if (compareSeriesId) {
+<div class="form-group">
                   <label class="form-label">Exercise</label>
                   <select class="ex-select" [(ngModel)]="compareExId" (ngModelChange)="drawCompareChart()">
                     <option value="">Select exercise...</option>
-                    <option *ngFor="let ex of compareExercises()" [value]="ex.exercise_id">{{ ex.exercise_name }}</option>
+                    @for (ex of compareExercises(); track ex) {
+<option [value]="ex.exercise_id">{{ ex.exercise_name }}</option>
+}
                   </select>
                 </div>
+}
               </div>
-              <div *ngIf="compareSeriesId && compareExId" class="chart-wrapper">
+              @if (compareSeriesId && compareExId) {
+<div class="chart-wrapper">
                 <canvas #compareCanvas></canvas>
               </div>
+}
             </div>
+}
           </div>
+}
 
           <!-- Sessions table -->
           <div class="sessions-section">
@@ -145,42 +177,60 @@ Chart.register(...registerables);
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let s of series()!.sessions; let i = index" [class.deload-row]="s.session_type === 'deload'">
+                @for (s of series()!.sessions; track s; let i = $index) {
+<tr [class.deload-row]="s.session_type === 'deload'">
                   <td class="num-cell">{{ i + 1 }}</td>
                   <td>{{ formatDate(s.date) }}</td>
                   <td>
-                    <span *ngIf="s.session_type === 'normal'" class="type-dot normal"></span>
-                    <span *ngIf="s.session_type === 'deload'" class="type-chip deload">Deload</span>
-                    <span *ngIf="s.session_type === 'test'" class="type-chip test">Test</span>
+                    @if (s.session_type === 'normal') {
+<span class="type-dot normal"></span>
+}
+                    @if (s.session_type === 'deload') {
+<span class="type-chip deload">Deload</span>
+}
+                    @if (s.session_type === 'test') {
+<span class="type-chip test">Test</span>
+}
                   </td>
                   <td>{{ s.set_count }}</td>
                   <td>{{ s.total_volume | number:'1.0-0' }} kg</td>
                 </tr>
+}
               </tbody>
             </table>
           </div>
         </div>
+}
       </div>
+}
 
       <!-- Routine picker modal -->
-      <jiro-modal *ngIf="showRoutinePicker()" title="Start Session" maxWidth="440px" (close)="showRoutinePicker.set(false)">
+      @if (showRoutinePicker()) {
+<jiro-modal title="Start Session" maxWidth="440px" (close)="showRoutinePicker.set(false)">
         <div class="routine-picker">
           <p class="picker-sub">Pick a routine for this session, or go freestyle.</p>
-          <div *ngIf="loadingRoutines()" class="picker-loading">
+          @if (loadingRoutines()) {
+<div class="picker-loading">
             <div class="spinner-sm"></div>
           </div>
-          <div *ngIf="!loadingRoutines()" class="routine-list">
-            <button *ngFor="let r of splitRoutines()" class="routine-row" (click)="startWithRoutine(r.id)">
+}
+          @if (!loadingRoutines()) {
+<div class="routine-list">
+            @for (r of splitRoutines(); track r) {
+<button class="routine-row" (click)="startWithRoutine(r.id)">
               <div class="routine-row-name">{{ r.name }}</div>
               <span class="routine-row-count">{{ r.items.length }} exercises</span>
             </button>
+}
             <button class="routine-row freestyle-row" (click)="startFreestyle()">
               <div class="routine-row-name">Freestyle</div>
               <span class="routine-row-count">No template</span>
             </button>
           </div>
+}
         </div>
       </jiro-modal>
+}
     </div>
   `,
   styles: [`

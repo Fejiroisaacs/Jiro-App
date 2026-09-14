@@ -1,5 +1,5 @@
 import { Component, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { RecipeService, SharedRecipeResponse } from '../../../core/services/recipe.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -7,7 +7,7 @@ import { AuthService } from '../../../core/services/auth.service';
 @Component({
   selector: 'app-recipe-share',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [RouterLink],
   template: `
     <div class="share-page">
       <header class="share-header">
@@ -22,12 +22,15 @@ import { AuthService } from '../../../core/services/auth.service';
       </header>
 
       <main class="share-main">
-        <div *ngIf="loading()" class="state-box">
+        @if (loading()) {
+<div class="state-box">
           <div class="spinner"></div>
           <p>Loading shared recipe…</p>
         </div>
+}
 
-        <div *ngIf="!loading() && error()" class="state-box error-box">
+        @if (!loading() && error()) {
+<div class="state-box error-box">
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <circle cx="12" cy="12" r="10"/>
             <line x1="12" y1="8" x2="12" y2="12"/>
@@ -36,52 +39,87 @@ import { AuthService } from '../../../core/services/auth.service';
           <p class="error-msg">This link is invalid or has expired.</p>
           <a routerLink="/culinara" class="btn-primary">Browse your recipes</a>
         </div>
+}
 
-        <div *ngIf="!loading() && !error() && shared() as s" class="recipe-card">
+        @if (!loading() && !error() && shared(); as s) {
+<div class="recipe-card">
           <div class="recipe-meta">
             <p class="shared-by">Shared by <strong>{{ s.shared_by }}</strong></p>
           </div>
 
           <h1 class="recipe-title">{{ s.recipe.title }}</h1>
 
-          <p *ngIf="s.recipe.description" class="recipe-desc">{{ s.recipe.description }}</p>
+          @if (s.recipe.description) {
+<p class="recipe-desc">{{ s.recipe.description }}</p>
+}
 
-          <div class="tag-row" *ngIf="s.recipe.tags.length">
-            <span *ngFor="let tag of s.recipe.tags" class="tag">{{ tag }}</span>
+          @if (s.recipe.tags.length) {
+<div class="tag-row">
+            @for (tag of s.recipe.tags; track tag) {
+<span class="tag">{{ tag }}</span>
+}
           </div>
+}
 
-          <div class="info-chips" *ngIf="s.recipe.dietary_flags">
-            <span *ngIf="s.recipe.dietary_flags.vegan" class="chip">Vegan</span>
-            <span *ngIf="s.recipe.dietary_flags.vegetarian" class="chip">Vegetarian</span>
-            <span *ngIf="s.recipe.dietary_flags.gluten_free" class="chip">Gluten-free</span>
-            <span *ngIf="s.recipe.dietary_flags.dairy_free" class="chip">Dairy-free</span>
+          @if (s.recipe.dietary_flags) {
+<div class="info-chips">
+            @if (s.recipe.dietary_flags.vegan) {
+<span class="chip">Vegan</span>
+}
+            @if (s.recipe.dietary_flags.vegetarian) {
+<span class="chip">Vegetarian</span>
+}
+            @if (s.recipe.dietary_flags.gluten_free) {
+<span class="chip">Gluten-free</span>
+}
+            @if (s.recipe.dietary_flags.dairy_free) {
+<span class="chip">Dairy-free</span>
+}
           </div>
+}
 
-          <div *ngIf="s.recipe.base_ingredients.length" class="section">
+          @if (s.recipe.base_ingredients.length) {
+<div class="section">
             <h2 class="section-title">Ingredients</h2>
             <ul class="ingredient-list">
-              <li *ngFor="let ing of s.recipe.base_ingredients" class="ingredient-item">
-                <span class="ing-amount" *ngIf="ing.amount">{{ ing.amount }}</span>
+              @for (ing of s.recipe.base_ingredients; track ing) {
+<li class="ingredient-item">
+                @if (ing.amount) {
+<span class="ing-amount">{{ ing.amount }}</span>
+}
                 <span class="ing-item">{{ ing.item }}</span>
               </li>
+}
             </ul>
           </div>
+}
 
-          <div *ngIf="s.recipe.instructions" class="section">
+          @if (s.recipe.instructions) {
+<div class="section">
             <h2 class="section-title">Instructions</h2>
             <div class="instructions">{{ s.recipe.instructions }}</div>
           </div>
+}
 
           <div class="import-bar">
             <p class="import-hint">Want to save this recipe to your collection?</p>
             <button class="btn-primary" (click)="importRecipe()" [disabled]="importing()">
-              <span *ngIf="!importing()">Import Recipe</span>
-              <span *ngIf="importing()" class="btn-spinner"></span>
+              @if (!importing()) {
+<span>Import Recipe</span>
+}
+              @if (importing()) {
+<span class="btn-spinner"></span>
+}
             </button>
-            <p *ngIf="importSuccess()" class="import-success">Imported! <a routerLink="/culinara">View your recipes →</a></p>
-            <p *ngIf="importError()" class="import-error">{{ importError() }}</p>
+            @if (importSuccess()) {
+<p class="import-success">Imported! <a routerLink="/culinara">View your recipes →</a></p>
+}
+            @if (importError()) {
+<p class="import-error">{{ importError() }}</p>
+}
           </div>
         </div>
+}
       </main>
     </div>
   `,

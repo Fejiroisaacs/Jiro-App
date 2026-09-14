@@ -1,5 +1,5 @@
 import { Component, EventEmitter, HostListener, Input, Output } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { JiroIconComponent } from '../jiro-icon/jiro-icon';
 
 let modalSeq = 0;
@@ -7,7 +7,7 @@ let modalSeq = 0;
 @Component({
   selector: 'jiro-modal',
   standalone: true,
-  imports: [CommonModule, JiroIconComponent],
+  imports: [JiroIconComponent],
   template: `
     <div class="modal-backdrop" (click)="onBackdropClick($event)">
       <div
@@ -16,12 +16,14 @@ let modalSeq = 0;
         aria-modal="true"
         [attr.aria-labelledby]="title ? titleId : null"
         [style.max-width]="maxWidth">
-        <div class="modal-header" *ngIf="title">
+        @if (title) {
+<div class="modal-header">
           <h2 [id]="titleId">{{ title }}</h2>
           <button type="button" class="modal-close" (click)="close.emit()" aria-label="Close">
             <jiro-icon name="x" [size]="18" />
           </button>
         </div>
+}
         <div class="modal-body">
           <ng-content></ng-content>
         </div>

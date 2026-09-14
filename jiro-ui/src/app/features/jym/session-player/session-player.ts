@@ -1,5 +1,5 @@
 import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import {
@@ -43,7 +43,7 @@ interface ExerciseBlock {
 @Component({
   selector: 'app-session-player',
   standalone: true,
-  imports: [CommonModule, FormsModule, JiroButtonComponent, JiroModalComponent],
+  imports: [FormsModule, JiroButtonComponent, JiroModalComponent],
   template: `
     <!-- Sticky header bar -->
     <div class="session-bar">
@@ -74,16 +74,21 @@ interface ExerciseBlock {
             {{ finishing() ? 'Finishing...' : 'Finish' }}
           </jiro-button>
         </div>
-        <p *ngIf="emptySessionError()" class="empty-session-error">{{ emptySessionError() }}</p>
+        @if (emptySessionError()) {
+<p class="empty-session-error">{{ emptySessionError() }}</p>
+}
       </div>
       <!-- Rest timer row — expands the bar after logging a set -->
-      <div *ngIf="restTimerActive()" class="rest-row" [class.rest-done]="restTimerDone()">
+      @if (restTimerActive()) {
+<div class="rest-row" [class.rest-done]="restTimerDone()">
         <span class="rest-label">Rest</span>
         <span class="rest-countdown">{{ restTimerDisplay() }}</span>
         <div class="rest-presets">
-          <button *ngFor="let d of restPresets" class="rest-chip"
+          @for (d of restPresets; track d) {
+<button class="rest-chip"
             [class.active]="restTimerDuration() === d"
             (click)="setRestDuration(d)">{{ restPresetLabel(d) }}</button>
+}
           <button class="rest-chip rest-add-btn" (click)="addRestTime(30)" title="Add 30 seconds">+30s</button>
         </div>
         <button class="rest-skip-btn" (click)="skipRestTimer()">✕</button>
@@ -92,25 +97,33 @@ interface ExerciseBlock {
             [style.width.%]="(restTimerRemaining() / restTimerDuration()) * 100"></div>
         </div>
       </div>
+}
     </div>
 
     <!-- Deload / Test notice -->
-    <div *ngIf="sessionType() === 'deload'" class="type-notice deload-notice">
+    @if (sessionType() === 'deload') {
+<div class="type-notice deload-notice">
       Deload session: take it easy and focus on recovery.
     </div>
-    <div *ngIf="sessionType() === 'test'" class="type-notice test-notice">
+}
+    @if (sessionType() === 'test') {
+<div class="type-notice test-notice">
       Test session: work up to a top set and see where your 1RM stands.
     </div>
+}
 
     <!-- Loading -->
     <div class="player-body">
-      <div *ngIf="loading()" class="state-message">
+      @if (loading()) {
+<div class="state-message">
         <div class="spinner-lg"></div>
         <p>Loading session...</p>
       </div>
+}
 
       <!-- Session notes -->
-      <div *ngIf="!loading()" class="notes-panel">
+      @if (!loading()) {
+<div class="notes-panel">
         <textarea
           class="notes-input"
           [(ngModel)]="sessionNotes"
@@ -119,11 +132,14 @@ interface ExerciseBlock {
           (blur)="saveNotes()">
         </textarea>
       </div>
+}
 
       <!-- Body weight panel -->
-      <div *ngIf="!loading()" class="bw-panel">
+      @if (!loading()) {
+<div class="bw-panel">
         <span class="bw-label">Body weight</span>
-        <div *ngIf="!bwLogged()" class="bw-row">
+        @if (!bwLogged()) {
+<div class="bw-row">
           <input
             class="bw-input"
             type="number"
@@ -138,38 +154,53 @@ interface ExerciseBlock {
             {{ bwSaving() ? '...' : 'Log' }}
           </button>
         </div>
-        <span *ngIf="bwLogged()" class="bw-logged">✓ {{ bwValue }} {{ settingsService.unitLabel() }} logged</span>
+}
+        @if (bwLogged()) {
+<span class="bw-logged">✓ {{ bwValue }} {{ settingsService.unitLabel() }} logged</span>
+}
       </div>
+}
 
       <!-- Session body -->
-      <div *ngIf="!loading()" class="exercises">
+      @if (!loading()) {
+<div class="exercises">
         <!-- Empty state -->
-        <div *ngIf="blocks().length === 0" class="no-exercises">
+        @if (blocks().length === 0) {
+<div class="no-exercises">
           <h3>No exercises yet</h3>
           <p class="text-secondary">Tap "+ Add Exercise" below to add your first lift.</p>
         </div>
+}
 
         <!-- Exercise blocks -->
-        <div *ngFor="let block of blocks(); let bi = index" class="ex-block">
+        @for (block of blocks(); track block; let bi = $index) {
+<div class="ex-block">
           <div class="block-header" [class.block-open]="!isCollapsed(bi)" (click)="toggleBlock(bi)">
             <div class="block-title">
               <h3>{{ block.exerciseName }}</h3>
-              <span *ngIf="block.muscleGroup" class="mg-tag">{{ block.muscleGroup }}</span>
-              <span *ngIf="isCollapsed(bi) && savedCount(bi) > 0" class="sets-done-tag">{{ savedCount(bi) }} sets</span>
+              @if (block.muscleGroup) {
+<span class="mg-tag">{{ block.muscleGroup }}</span>
+}
+              @if (isCollapsed(bi) && savedCount(bi) > 0) {
+<span class="sets-done-tag">{{ savedCount(bi) }} sets</span>
+}
             </div>
             <svg class="chevron" [class.open]="!isCollapsed(bi)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="6,9 12,15 18,9"/>
             </svg>
           </div>
 
-          <ng-container *ngIf="!isCollapsed(bi)">
+          @if (!isCollapsed(bi)) {
+
             <!-- Progressive overload suggestion -->
-            <div *ngIf="block.suggestion && !allSaved(bi)" class="overload-hint">
+            @if (block.suggestion && !allSaved(bi)) {
+<div class="overload-hint">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="23,6 13.5,15.5 8.5,10.5 1,18"/><polyline points="17,6 23,6 23,12"/>
               </svg>
               {{ block.suggestion }}
             </div>
+}
 
             <!-- Exercise note -->
             <div class="ex-note-wrap">
@@ -192,7 +223,8 @@ interface ExerciseBlock {
             </div>
 
             <!-- Set rows -->
-            <ng-container *ngFor="let row of block.sets; let si = index">
+            @for (row of block.sets; track row; let si = $index) {
+
               <div class="set-row" [class.set-done]="row.saved" [class.set-warmup]="row.isWarmup">
                 <span class="set-num-cell">{{ row.setNumber }}</span>
 
@@ -206,7 +238,9 @@ interface ExerciseBlock {
                     [placeholder]="row.ghostWeight || '0'"
                     [class.has-ghost]="row.ghostWeight && !row.weight"
                     [disabled]="row.saved" />
-                  <span *ngIf="row.ghostWeight && !row.weight" class="ghost-hint">{{ row.ghostWeight }}</span>
+                  @if (row.ghostWeight && !row.weight) {
+<span class="ghost-hint">{{ row.ghostWeight }}</span>
+}
                 </div>
 
                 <div class="input-wrap">
@@ -218,7 +252,9 @@ interface ExerciseBlock {
                     [placeholder]="row.ghostReps || '0'"
                     [class.has-ghost]="row.ghostReps && !row.reps"
                     [disabled]="row.saved" />
-                  <span *ngIf="row.ghostReps && !row.reps" class="ghost-hint">{{ row.ghostReps }}</span>
+                  @if (row.ghostReps && !row.reps) {
+<span class="ghost-hint">{{ row.ghostReps }}</span>
+}
                 </div>
 
                 <input
@@ -238,26 +274,39 @@ interface ExerciseBlock {
                   (click)="toggleWarmup(bi, si)">W</button>
 
                 <div class="action-cell">
-                  <img *ngIf="row.saved && row.isPR" src="/icons/badge-icon.svg" class="pr-badge" title="Personal Record" alt="PR" />
-                  <button
-                    *ngIf="!row.saved"
+                  @if (row.saved && row.isPR) {
+<img src="/icons/badge-icon.svg" class="pr-badge" title="Personal Record" alt="PR" />
+}
+                  @if (!row.saved) {
+<button
+                   
                     class="log-btn"
                     [disabled]="row.saving || !row.weight || !row.reps || (!!row.rpe && rpeInvalid(row.rpe))"
                     (click)="logSet(bi, si)">
-                    <span *ngIf="!row.saving">✓</span>
-                    <span *ngIf="row.saving" class="spinner-sm"></span>
+                    @if (!row.saving) {
+<span>✓</span>
+}
+                    @if (row.saving) {
+<span class="spinner-sm"></span>
+}
                   </button>
-                  <button *ngIf="row.saved" class="del-btn" (click)="deleteSet(bi, si)">
+}
+                  @if (row.saved) {
+<button class="del-btn" (click)="deleteSet(bi, si)">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                       <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                     </svg>
                   </button>
+}
                 </div>
               </div>
-              <div *ngIf="!row.saved && !!row.rpe && rpeInvalid(row.rpe)" class="rpe-err-msg">
+              @if (!row.saved && !!row.rpe && rpeInvalid(row.rpe)) {
+<div class="rpe-err-msg">
                 RPE must be between 1 and 10
               </div>
-            </ng-container>
+}
+            
+}
 
             <!-- Add set -->
             <button class="add-set-btn" (click)="addSet(bi)">+ Add Set</button>
@@ -279,30 +328,42 @@ interface ExerciseBlock {
                 accept="video/mp4,video/webm,image/jpeg,image/png"
                 style="display:none"
                 (change)="onFormCheckFileChange($event, bi)">
-              <div *ngIf="isFormCheckUploading(block.exerciseId)" class="fc-progress-bar">
+              @if (isFormCheckUploading(block.exerciseId)) {
+<div class="fc-progress-bar">
                 <div class="fc-progress-fill" [style.width.%]="getFormCheckProgress(block.exerciseId)"></div>
               </div>
-              <ng-container *ngIf="getFirstAttachment(block.exerciseId) as clip">
+}
+              @if (getFirstAttachment(block.exerciseId); as clip) {
+
                 <a [href]="clip.file_url" target="_blank" class="fc-clip-link">
-                  <img *ngIf="clip.file_type.startsWith('image/')" [src]="clip.file_url" class="fc-thumb" alt="form check">
-                  <span *ngIf="!clip.file_type.startsWith('image/')" class="fc-thumb-video">
+                  @if (clip.file_type.startsWith('image/')) {
+<img [src]="clip.file_url" class="fc-thumb" alt="form check">
+}
+                  @if (!clip.file_type.startsWith('image/')) {
+<span class="fc-thumb-video">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
                     </svg>
                   </span>
+}
                 </a>
-              </ng-container>
+              
+}
             </div>
-          </ng-container>
+          
+}
         </div>
+}
 
         <!-- Add exercise -->
         <button class="add-exercise-btn" (click)="addExercise()">+ Add Exercise</button>
       </div>
+}
     </div>
 
     <!-- Exit confirmation modal -->
-    <jiro-modal *ngIf="showExitConfirm()" title="Exit Workout?" maxWidth="400px" (close)="showExitConfirm.set(false)">
+    @if (showExitConfirm()) {
+<jiro-modal title="Exit Workout?" maxWidth="400px" (close)="showExitConfirm.set(false)">
       <p style="font-size:var(--font-size-sm);color:var(--text-secondary);line-height:1.6;margin-bottom:var(--space-lg)">
         Your sets are saved. You can resume this session any time from the Jym home page.
       </p>
@@ -318,9 +379,11 @@ interface ExerciseBlock {
         </div>
       </div>
     </jiro-modal>
+}
 
     <!-- Save as Template modal -->
-    <jiro-modal *ngIf="showTemplateSave()" title="Save as Template" maxWidth="420px" (close)="showTemplateSave.set(false)">
+    @if (showTemplateSave()) {
+<jiro-modal title="Save as Template" maxWidth="420px" (close)="showTemplateSave.set(false)">
       <p style="font-size:var(--font-size-sm);color:var(--text-secondary);margin-bottom:var(--space-md);">
         Give this workout layout a name to reuse it in future sessions.
       </p>
@@ -332,7 +395,9 @@ interface ExerciseBlock {
         (keydown.enter)="saveAsTemplate()"
         maxlength="80"
       />
-      <div *ngIf="templateSaveError()" class="template-save-error">{{ templateSaveError() }}</div>
+      @if (templateSaveError()) {
+<div class="template-save-error">{{ templateSaveError() }}</div>
+}
       <div style="display:flex;justify-content:flex-end;gap:var(--space-sm);margin-top:var(--space-md)">
         <jiro-button variant="secondary" type="button" (click)="showTemplateSave.set(false)">Cancel</jiro-button>
         <jiro-button variant="primary" type="button" [disabled]="!templateName.trim() || templateSaving()" (click)="saveAsTemplate()">
@@ -340,37 +405,50 @@ interface ExerciseBlock {
         </jiro-button>
       </div>
     </jiro-modal>
+}
 
 
     <!-- Exercise picker overlay -->
-    <div *ngIf="showExPicker()" class="overlay">
+    @if (showExPicker()) {
+<div class="overlay">
       <div class="picker-panel">
 
         <!-- Default: search + list -->
-        <ng-container *ngIf="!creatingExercise()">
+        @if (!creatingExercise()) {
+
           <div class="picker-header">
             <h3>Add Exercise</h3>
             <button class="close-btn" (click)="showExPicker.set(false)">✕</button>
           </div>
           <input class="picker-search" type="text" [(ngModel)]="exSearch" (input)="filterExercises()" placeholder="Search exercises..." autofocus />
           <div class="picker-list">
-            <button *ngFor="let ex of filteredExercises()" class="picker-item" (click)="pickExercise(ex)">
+            @for (ex of filteredExercises(); track ex) {
+<button class="picker-item" (click)="pickExercise(ex)">
               <span class="pi-name">{{ ex.name }}</span>
-              <span *ngIf="ex.muscle_group" class="pi-mg">{{ ex.muscle_group }}</span>
+              @if (ex.muscle_group) {
+<span class="pi-mg">{{ ex.muscle_group }}</span>
+}
             </button>
+}
             <!-- Create shortcut: always visible at bottom, name pre-filled from search -->
             <button class="picker-create-btn" (click)="startCreateExercise()">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
               </svg>
-              <span *ngIf="exSearch.trim()">Create "{{ exSearch.trim() }}"</span>
-              <span *ngIf="!exSearch.trim()">New Exercise</span>
+              @if (exSearch.trim()) {
+<span>Create "{{ exSearch.trim() }}"</span>
+}
+              @if (!exSearch.trim()) {
+<span>New Exercise</span>
+}
             </button>
           </div>
-        </ng-container>
+        
+}
 
         <!-- Create mode: inline mini-form -->
-        <ng-container *ngIf="creatingExercise()">
+        @if (creatingExercise()) {
+
           <div class="picker-header">
             <button class="back-btn" (click)="creatingExercise.set(false)">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -393,9 +471,13 @@ interface ExerciseBlock {
             <label class="create-label" style="margin-top:var(--space-sm)">Muscle Group <span style="opacity:0.5">(optional)</span></label>
             <select class="create-select" [(ngModel)]="newExMuscleGroup">
               <option value="">— None —</option>
-              <option *ngFor="let mg of muscleGroups" [value]="mg">{{ mg }}</option>
+              @for (mg of muscleGroups; track mg) {
+<option [value]="mg">{{ mg }}</option>
+}
             </select>
-            <div *ngIf="newExError()" class="template-save-error" style="margin-top:var(--space-xs)">{{ newExError() }}</div>
+            @if (newExError()) {
+<div class="template-save-error" style="margin-top:var(--space-xs)">{{ newExError() }}</div>
+}
             <jiro-button
               variant="primary"
               type="button"
@@ -405,10 +487,12 @@ interface ExerciseBlock {
               {{ newExSaving() ? 'Creating...' : 'Create & Add to Session' }}
             </jiro-button>
           </div>
-        </ng-container>
+        
+}
 
       </div>
     </div>
+}
   `,
   styles: [`
     :host { display: block; }

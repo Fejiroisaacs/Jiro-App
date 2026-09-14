@@ -1,5 +1,5 @@
 import { Component, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { JymService, PublicSplitSummary } from '../../../core/services/jym.service';
@@ -8,7 +8,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
 @Component({
   selector: 'app-discover',
   standalone: true,
-  imports: [CommonModule, FormsModule, JiroButtonComponent],
+  imports: [FormsModule, JiroButtonComponent],
   template: `
     <div class="discover">
       <div class="page-header">
@@ -47,47 +47,64 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
       </form>
 
       <!-- Loading -->
-      <div *ngIf="loading()" class="state-message">
+      @if (loading()) {
+<div class="state-message">
         <div class="spinner-lg"></div>
         <p>Searching...</p>
       </div>
+}
 
       <!-- Empty -->
-      <div *ngIf="!loading() && splits().length === 0 && searched()" class="state-message">
+      @if (!loading() && splits().length === 0 && searched()) {
+<div class="state-message">
         <h3>No splits found</h3>
         <p class="text-secondary">Try a different search term or tag.</p>
       </div>
+}
 
       <!-- Prompt to search -->
-      <div *ngIf="!loading() && !searched()" class="state-message prompt">
+      @if (!loading() && !searched()) {
+<div class="state-message prompt">
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="prompt-icon">
           <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
         <p class="text-secondary">Search for splits or browse by tag above.</p>
       </div>
+}
 
       <!-- Results grid -->
-      <div *ngIf="!loading() && splits().length > 0" class="splits-grid">
-        <div
-          *ngFor="let split of splits()"
+      @if (!loading() && splits().length > 0) {
+<div class="splits-grid">
+        @for (split of splits(); track split) {
+<div
+         
           class="split-card"
           (click)="router.navigate(['/jym/discover', split.id])">
           <div class="card-header">
             <h3 class="split-name">{{ split.name }}</h3>
             <span class="routine-badge">{{ split.routine_count }} {{ split.routine_count === 1 ? 'day' : 'days' }}</span>
           </div>
-          <p class="split-desc text-secondary" *ngIf="split.description">{{ split.description }}</p>
-          <div *ngIf="split.tags.length" class="tag-row">
-            <span *ngFor="let tag of split.tags" class="tag-chip">{{ tag }}</span>
+          @if (split.description) {
+<p class="split-desc text-secondary">{{ split.description }}</p>
+}
+          @if (split.tags.length) {
+<div class="tag-row">
+            @for (tag of split.tags; track tag) {
+<span class="tag-chip">{{ tag }}</span>
+}
           </div>
+}
           <div class="card-footer text-secondary">
             Added {{ formatDate(split.created_at) }}
           </div>
         </div>
+}
       </div>
+}
 
       <!-- Pagination -->
-      <div *ngIf="!loading() && splits().length > 0" class="pagination">
+      @if (!loading() && splits().length > 0) {
+<div class="pagination">
         <button class="page-btn" [disabled]="page() <= 1" (click)="changePage(-1)">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="15,18 9,12 15,6"/>
@@ -102,6 +119,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
           </svg>
         </button>
       </div>
+}
     </div>
   `,
   styles: [`

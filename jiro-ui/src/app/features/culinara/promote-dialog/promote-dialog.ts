@@ -1,12 +1,12 @@
 import { Component, EventEmitter, Input, Output, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { RecipeService, RecipeTrial, Recipe, Modification } from '../../../core/services/recipe.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 
 @Component({
   selector: 'app-promote-dialog',
   standalone: true,
-  imports: [CommonModule, JiroButtonComponent],
+  imports: [JiroButtonComponent],
   template: `
     <div class="promote-dialog">
       <p class="promote-desc">
@@ -15,23 +15,31 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
       </p>
 
       <!-- Modifications preview -->
-      <div class="mods-preview" *ngIf="modifications().length > 0">
+      @if (modifications().length > 0) {
+<div class="mods-preview">
         <h4 class="mods-title">Changes to be applied</h4>
         <div class="mod-list">
-          <div *ngFor="let mod of modifications()" class="mod-row">
+          @for (mod of modifications(); track mod) {
+<div class="mod-row">
             <span class="mod-item">{{ mod.item }}</span>
             <span class="mod-arrow">→</span>
             <span class="mod-change">{{ mod.change }}</span>
           </div>
+}
         </div>
       </div>
+}
 
-      <p *ngIf="modifications().length === 0" class="no-mods">
+      @if (modifications().length === 0) {
+<p class="no-mods">
         This trial has no modifications recorded. Promoting it won't change the base ingredients.
       </p>
+}
 
       <!-- Error -->
-      <p *ngIf="error()" class="form-error">{{ error() }}</p>
+      @if (error()) {
+<p class="form-error">{{ error() }}</p>
+}
 
       <!-- Actions -->
       <div class="dialog-actions">

@@ -1,5 +1,5 @@
 import { Component, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
@@ -15,7 +15,7 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
 @Component({
   selector: 'app-journal-collection',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, JiroButtonComponent, JiroModalComponent, SafeHtmlPipe],
+  imports: [FormsModule, RouterLink, JiroButtonComponent, JiroModalComponent, SafeHtmlPipe],
   template: `
     <div class="collection-page">
 
@@ -28,18 +28,25 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
             </svg>
             Journaly
           </a>
-          <div class="coll-header-info" *ngIf="collection()">
+          @if (collection()) {
+<div class="coll-header-info">
             <div class="coll-cover" [style.background-image]="collection()!.cover_image_url ? 'url(' + collection()!.cover_image_url + ')' : ''">
-              <img *ngIf="!collection()!.cover_image_url" src="/icons/folder-icon.svg" width="48" height="48" alt="" class="coll-cover-icon" />
+              @if (!collection()!.cover_image_url) {
+<img src="/icons/folder-icon.svg" width="48" height="48" alt="" class="coll-cover-icon" />
+}
             </div>
             <div>
               <h1>{{ collection()!.name }}</h1>
-              <p class="text-secondary" *ngIf="collection()!.description">{{ collection()!.description }}</p>
+              @if (collection()!.description) {
+<p class="text-secondary">{{ collection()!.description }}</p>
+}
               <p class="text-secondary">{{ entries().length }} {{ entries().length === 1 ? 'entry' : 'entries' }}</p>
             </div>
           </div>
+}
         </div>
-        <div class="header-actions" *ngIf="collection()">
+        @if (collection()) {
+<div class="header-actions">
           <jiro-button variant="secondary" type="button" (click)="openEdit()">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -48,40 +55,52 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
             Edit
           </jiro-button>
         </div>
+}
       </div>
 
       <!-- Loading -->
-      <div *ngIf="loading()" class="state-center">
+      @if (loading()) {
+<div class="state-center">
         <div class="spinner-lg"></div>
       </div>
+}
 
       <!-- Not found -->
-      <div *ngIf="!loading() && !collection()" class="state-center">
+      @if (!loading() && !collection()) {
+<div class="state-center">
         <h3>Collection not found</h3>
         <p class="text-secondary">This collection may have been deleted.</p>
         <jiro-button variant="primary" type="button" (click)="router.navigate(['/journal'])">Back to Journaly</jiro-button>
       </div>
+}
 
       <!-- Content -->
-      <div *ngIf="!loading() && collection()">
+      @if (!loading() && collection()) {
+<div>
 
         <!-- Empty -->
-        <div *ngIf="entries().length === 0" class="state-center">
+        @if (entries().length === 0) {
+<div class="state-center">
           <h3>No entries yet</h3>
           <p class="text-secondary">Add entries to this collection from the editor or entry cards.</p>
           <jiro-button variant="primary" type="button" (click)="router.navigate(['/journal/new'])">Write Entry</jiro-button>
         </div>
+}
 
         <!-- Entries -->
-        <div class="entries-list" *ngIf="entries().length > 0">
-          <div
-            *ngFor="let e of entries()"
+        @if (entries().length > 0) {
+<div class="entries-list">
+          @for (e of entries(); track e) {
+<div
+           
             class="entry-card"
             (click)="router.navigate(['/journal', e.id, 'edit'])">
             <div class="entry-card-top">
               <div class="entry-meta">
                 <span class="entry-date">{{ formatDate(e.created_at) }}</span>
-                <span class="mood-chip" *ngIf="e.mood"><span [innerHTML]="moodIcon(e.mood) | safeHtml"></span> {{ moodLabel(e.mood) }}</span>
+                @if (e.mood) {
+<span class="mood-chip"><span [innerHTML]="moodIcon(e.mood) | safeHtml"></span> {{ moodLabel(e.mood) }}</span>
+}
               </div>
               <div class="entry-card-actions" (click)="$event.stopPropagation()">
                 <button
@@ -95,27 +114,37 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
                 </button>
               </div>
             </div>
-            <h3 class="entry-title" *ngIf="e.title">{{ e.title }}</h3>
+            @if (e.title) {
+<h3 class="entry-title">{{ e.title }}</h3>
+}
             <p class="entry-excerpt">{{ excerpt(e.body) }}</p>
             <div class="entry-footer">
               <div class="tag-list">
-                <span class="tag-chip" *ngFor="let t of (e.tags || [])">{{ t }}</span>
+                @for (t of (e.tags || []); track t) {
+<span class="tag-chip">{{ t }}</span>
+}
               </div>
-              <span class="img-badge" *ngIf="e.images?.length">
+              @if (e.images?.length) {
+<span class="img-badge">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
                   <polyline points="21,15 16,10 5,21"/>
                 </svg>
                 {{ e.images?.length }}
               </span>
+}
             </div>
           </div>
+}
         </div>
+}
       </div>
+}
     </div>
 
     <!-- Edit modal -->
-    <jiro-modal *ngIf="showEdit()" title="Edit Collection" (close)="showEdit.set(false)">
+    @if (showEdit()) {
+<jiro-modal title="Edit Collection" (close)="showEdit.set(false)">
       <div class="modal-form">
         <label class="form-label">Name</label>
         <input type="text" class="form-control" [(ngModel)]="editName" maxlength="100" />
@@ -131,18 +160,22 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
         </jiro-button>
       </div>
     </jiro-modal>
+}
 
     <!-- Remove entry from collection confirm -->
-    <jiro-modal *ngIf="removeTarget()" title="Remove from Collection" (close)="removeTarget.set(null)">
+    @if (removeTarget()) {
+<jiro-modal title="Remove from Collection" (close)="removeTarget.set(null)">
       <p>Remove <strong>{{ removeTarget()?.title || 'this entry' }}</strong> from the collection? The entry itself won't be deleted.</p>
       <div class="modal-actions">
         <jiro-button variant="secondary" type="button" (click)="removeTarget.set(null)">Cancel</jiro-button>
         <jiro-button variant="danger" type="button" [disabled]="!!removingId()" (click)="removeEntry()">Remove</jiro-button>
       </div>
     </jiro-modal>
+}
 
     <!-- Delete collection confirm -->
-    <jiro-modal *ngIf="confirmDeleteColl()" title="Delete Collection" (close)="confirmDeleteColl.set(false)">
+    @if (confirmDeleteColl()) {
+<jiro-modal title="Delete Collection" (close)="confirmDeleteColl.set(false)">
       <p>Delete <strong>{{ collection()?.name }}</strong>? The entries inside won't be deleted, just the collection.</p>
       <div class="modal-actions">
         <jiro-button variant="secondary" type="button" (click)="confirmDeleteColl.set(false)">Cancel</jiro-button>
@@ -151,6 +184,7 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
         </jiro-button>
       </div>
     </jiro-modal>
+}
   `,
   styles: [`
     .collection-page { max-width: 860px; }

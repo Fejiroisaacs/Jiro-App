@@ -1,5 +1,5 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import {
@@ -17,7 +17,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 @Component({
   selector: 'app-journal-home',
   standalone: true,
-  imports: [CommonModule, FormsModule, JiroPageHeaderComponent, JournalWeekViewComponent, JournalDayModalComponent, JiroButtonComponent, JiroModalComponent],
+  imports: [FormsModule, JiroPageHeaderComponent, JournalWeekViewComponent, JournalDayModalComponent, JiroButtonComponent, JiroModalComponent],
   template: `
     <div class="journal-home">
 
@@ -26,7 +26,8 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       </jiro-page-header>
 
       <!-- Streak banner -->
-      <div class="streak-banner" *ngIf="streak()">
+      @if (streak()) {
+<div class="streak-banner">
         <div class="streak-info">
           <span class="streak-count">{{ streak()!.current_streak }}</span>
           <span class="streak-label">day streak</span>
@@ -41,6 +42,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
           <span class="stat-name">entries</span>
         </div>
       </div>
+}
 
       <!-- Week view calendar -->
       <journal-week-view
@@ -60,7 +62,9 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
           (ngModelChange)="onFilterChange()" />
         <select class="filter-select" [(ngModel)]="filterMood" (ngModelChange)="onFilterChange()">
           <option value="">All moods</option>
-          <option *ngFor="let m of moods" [value]="m.value">{{ m.label }}</option>
+          @for (m of moods; track m) {
+<option [value]="m.value">{{ m.label }}</option>
+}
         </select>
         <input
           type="text"
@@ -71,19 +75,25 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       </div>
 
       <!-- Empty -->
-      <div *ngIf="!loadingEntries() && entries().length === 0" class="state-box">
+      @if (!loadingEntries() && entries().length === 0) {
+<div class="state-box">
         <h3>Start your first entry</h3>
         <p class="text-secondary">A sentence is enough. Just begin.</p>
         <jiro-button variant="primary" type="button" (click)="router.navigate(['/journal/new'])">Write now</jiro-button>
       </div>
+}
 
       <!-- Entry list -->
-      <div class="entries-list" *ngIf="!loadingEntries() && entries().length > 0">
-        <div *ngFor="let e of entries()" class="entry-card" (click)="router.navigate(['/journal', e.id, 'edit'])">
+      @if (!loadingEntries() && entries().length > 0) {
+<div class="entries-list">
+        @for (e of entries(); track e) {
+<div class="entry-card" (click)="router.navigate(['/journal', e.id, 'edit'])">
           <div class="entry-card-top">
             <div class="entry-meta">
               <span class="entry-date">{{ formatDate(e.created_at) }}</span>
-              <span class="mood-chip" *ngIf="e.mood">{{ moodLabel(e.mood) }}</span>
+              @if (e.mood) {
+<span class="mood-chip">{{ moodLabel(e.mood) }}</span>
+}
             </div>
             <div class="entry-card-actions" (click)="$event.stopPropagation()">
               <button class="icon-btn danger" (click)="confirmDelete(e)" aria-label="Delete entry">
@@ -94,28 +104,37 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
               </button>
             </div>
           </div>
-          <h3 class="entry-title" *ngIf="e.title">{{ e.title }}</h3>
+          @if (e.title) {
+<h3 class="entry-title">{{ e.title }}</h3>
+}
           <p class="entry-excerpt">{{ excerpt(e.body) }}</p>
           <div class="entry-footer">
             <div class="tag-list">
-              <span class="tag-chip" *ngFor="let t of (e.tags || [])">{{ t }}</span>
+              @for (t of (e.tags || []); track t) {
+<span class="tag-chip">{{ t }}</span>
+}
             </div>
-            <span class="img-badge" *ngIf="e.images?.length">
+            @if (e.images?.length) {
+<span class="img-badge">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
                 <polyline points="21,15 16,10 5,21"/>
               </svg>
               {{ e.images?.length }}
             </span>
+}
           </div>
         </div>
+}
       </div>
+}
 
     </div>
 
     <!-- Day modal -->
-    <journal-day-modal
-      *ngIf="dayModalDate()"
+    @if (dayModalDate()) {
+<journal-day-modal
+     
       [date]="dayModalDate()!"
       [entries]="dayModalEntries()"
       [initialEntry]="dayModalInitEntry()"
@@ -124,9 +143,11 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       (editEntry)="onDayModalEdit($event)"
       (deleteEntry)="onDayModalDelete($event)">
     </journal-day-modal>
+}
 
     <!-- Delete confirm -->
-    <jiro-modal *ngIf="deleteTarget()" title="Delete Entry" (close)="deleteTarget.set(null)">
+    @if (deleteTarget()) {
+<jiro-modal title="Delete Entry" (close)="deleteTarget.set(null)">
       <p>Are you sure you want to delete this entry? This cannot be undone.</p>
       <div class="modal-actions">
         <jiro-button variant="secondary" type="button" (click)="deleteTarget.set(null)">Cancel</jiro-button>
@@ -135,6 +156,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
         </jiro-button>
       </div>
     </jiro-modal>
+}
   `,
   styles: [`
     .journal-home { max-width: 860px; }

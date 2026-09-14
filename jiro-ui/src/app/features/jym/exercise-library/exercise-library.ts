@@ -1,5 +1,5 @@
 import { Component, OnInit, signal, input } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { JymService, Exercise } from '../../../core/services/jym.service';
@@ -12,7 +12,7 @@ const MUSCLE_GROUPS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs'
 @Component({
   selector: 'app-exercise-library',
   standalone: true,
-  imports: [CommonModule, FormsModule, JiroCardComponent, JiroButtonComponent, JiroModalComponent],
+  imports: [FormsModule, JiroCardComponent, JiroButtonComponent, JiroModalComponent],
   template: `
     <div class="exercise-library">
       <!-- Header -->
@@ -43,42 +43,54 @@ const MUSCLE_GROUPS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs'
             (click)="setMG('')">
             All
           </button>
-          <button
-            *ngFor="let mg of muscleGroups"
+          @for (mg of muscleGroups; track mg) {
+<button
+           
             class="mg-chip"
             [class.active]="activeMG() === mg"
             (click)="setMG(mg)">
             {{ mg }}
           </button>
+}
         </div>
       </div>
 
       <!-- Loading -->
-      <div *ngIf="loading()" class="state-message">
+      @if (loading()) {
+<div class="state-message">
         <div class="spinner-lg"></div>
         <p>Loading exercises...</p>
       </div>
+}
 
       <!-- Empty -->
-      <div *ngIf="!loading() && exercises().length === 0" class="state-message">
+      @if (!loading() && exercises().length === 0) {
+<div class="state-message">
         <h3>No exercises yet</h3>
         <p class="text-secondary">Build your exercise library to track performance over time.</p>
         <jiro-button variant="primary" type="button" (click)="showCreate.set(true)">Add First Exercise</jiro-button>
       </div>
+}
 
       <!-- Exercise grid -->
-      <div *ngIf="!loading() && exercises().length > 0" class="ex-grid">
-        <jiro-card
-          *ngFor="let ex of exercises()"
+      @if (!loading() && exercises().length > 0) {
+<div class="ex-grid">
+        @for (ex of exercises(); track ex) {
+<jiro-card
+         
           [clickable]="true"
           class="ex-card"
           (click)="goToDetail(ex.id)">
           <div class="ex-card-inner">
             <div class="ex-header">
               <h3 class="ex-name">{{ ex.name }}</h3>
-              <span *ngIf="ex.muscle_group" class="mg-badge">{{ ex.muscle_group }}</span>
+              @if (ex.muscle_group) {
+<span class="mg-badge">{{ ex.muscle_group }}</span>
+}
             </div>
-            <p *ngIf="ex.notes" class="ex-notes text-secondary">{{ ex.notes }}</p>
+            @if (ex.notes) {
+<p class="ex-notes text-secondary">{{ ex.notes }}</p>
+}
             <div class="card-actions" (click)="$event.stopPropagation()">
               <button class="icon-btn edit-btn" title="Edit exercise" (click)="openEdit(ex)">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -98,10 +110,13 @@ const MUSCLE_GROUPS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs'
             </div>
           </div>
         </jiro-card>
+}
       </div>
+}
 
       <!-- Create Modal -->
-      <jiro-modal *ngIf="showCreate()" title="New Exercise" maxWidth="480px" (close)="showCreate.set(false)">
+      @if (showCreate()) {
+<jiro-modal title="New Exercise" maxWidth="480px" (close)="showCreate.set(false)">
         <form class="create-form" (ngSubmit)="createExercise()">
           <div class="form-group">
             <label class="form-label">Name *</label>
@@ -111,7 +126,9 @@ const MUSCLE_GROUPS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs'
             <label class="form-label">Muscle Group</label>
             <select class="form-input" [(ngModel)]="newMG" name="mg">
               <option value="">None</option>
-              <option *ngFor="let mg of muscleGroups" [value]="mg">{{ mg }}</option>
+              @for (mg of muscleGroups; track mg) {
+<option [value]="mg">{{ mg }}</option>
+}
             </select>
           </div>
           <div class="form-group">
@@ -126,9 +143,11 @@ const MUSCLE_GROUPS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs'
           </div>
         </form>
       </jiro-modal>
+}
 
       <!-- Edit Modal -->
-      <jiro-modal *ngIf="editingExercise()" [title]="'Edit Exercise'" maxWidth="480px" (close)="editingExercise.set(null)">
+      @if (editingExercise()) {
+<jiro-modal [title]="'Edit Exercise'" maxWidth="480px" (close)="editingExercise.set(null)">
         <form class="create-form" (ngSubmit)="saveEdit()">
           <div class="form-group">
             <label class="form-label">Name *</label>
@@ -138,7 +157,9 @@ const MUSCLE_GROUPS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs'
             <label class="form-label">Muscle Group</label>
             <select class="form-input" [(ngModel)]="editMg" name="emg">
               <option value="">None</option>
-              <option *ngFor="let mg of muscleGroups" [value]="mg">{{ mg }}</option>
+              @for (mg of muscleGroups; track mg) {
+<option [value]="mg">{{ mg }}</option>
+}
             </select>
           </div>
           <div class="form-group">
@@ -156,9 +177,11 @@ const MUSCLE_GROUPS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs'
           </div>
         </form>
       </jiro-modal>
+}
 
       <!-- Delete Confirm Modal -->
-      <jiro-modal *ngIf="deletingExercise()" title="Delete Exercise" maxWidth="440px" (close)="deletingExercise.set(null)">
+      @if (deletingExercise()) {
+<jiro-modal title="Delete Exercise" maxWidth="440px" (close)="deletingExercise.set(null)">
         <div class="delete-confirm">
           <div class="delete-icon">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--color-danger)" stroke-width="1.5">
@@ -179,6 +202,7 @@ const MUSCLE_GROUPS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs'
           </div>
         </div>
       </jiro-modal>
+}
     </div>
   `,
   styles: [`

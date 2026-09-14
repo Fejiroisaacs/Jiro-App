@@ -1,11 +1,11 @@
 import { Component, Input, forwardRef } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { ControlValueAccessor, NG_VALUE_ACCESSOR, FormsModule } from '@angular/forms';
 
 @Component({
   selector: 'jiro-input',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   providers: [
     {
       provide: NG_VALUE_ACCESSOR,
@@ -15,7 +15,9 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR, FormsModule } from '@angular/f
   ],
   template: `
     <div class="jiro-input-wrapper" [class.has-error]="error">
-      <label *ngIf="label" class="jiro-label">{{ label }}</label>
+      @if (label) {
+<label class="jiro-label">{{ label }}</label>
+}
       <input
         class="jiro-input"
         [type]="type"
@@ -23,7 +25,9 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR, FormsModule } from '@angular/f
         [value]="value"
         (input)="onInput($event)"
         (blur)="onTouched()" />
-      <span *ngIf="error" class="jiro-error">{{ error }}</span>
+      @if (error) {
+<span class="jiro-error">{{ error }}</span>
+}
     </div>
   `,
   styles: [`

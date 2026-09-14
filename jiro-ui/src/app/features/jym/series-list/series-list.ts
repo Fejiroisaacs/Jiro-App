@@ -1,5 +1,5 @@
 import { Component, OnInit, signal, input, output } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { Router } from '@angular/router';
 import { JymService, SplitSeriesSummary } from '../../../core/services/jym.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
@@ -8,7 +8,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 @Component({
   selector: 'app-series-list',
   standalone: true,
-  imports: [CommonModule, JiroButtonComponent, JiroModalComponent],
+  imports: [JiroButtonComponent, JiroModalComponent],
   template: `
     <div class="series-list">
       @if (!embedded()) {
@@ -20,16 +20,20 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       </div>
       }
 
-      <div *ngIf="loading()" class="state-message">
+      @if (loading()) {
+<div class="state-message">
         <div class="spinner-lg"></div>
         <p>Loading...</p>
       </div>
+}
 
       <!-- Active Series -->
-      <div *ngIf="!loading() && activeSeries().length > 0" class="section">
+      @if (!loading() && activeSeries().length > 0) {
+<div class="section">
         <h2 class="section-title">Active Series</h2>
         <div class="series-grid">
-          <div *ngFor="let sr of activeSeries()" class="series-card">
+          @for (sr of activeSeries(); track sr) {
+<div class="series-card">
             <div class="card-top">
               <div>
                 <div class="split-name">{{ sr.split_name }}</div>
@@ -48,14 +52,22 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
             </div>
 
             <div class="card-footer">
-              <span class="sessions-pill" *ngIf="!(sr.duration_type === 'sessions' && sr.target_sessions)">{{ sr.session_count }} sessions</span>
-              <span class="duration-pill" *ngIf="sr.duration_type === 'weeks' && sr.target_weeks">
+              @if (!(sr.duration_type === 'sessions' && sr.target_sessions)) {
+<span class="sessions-pill">{{ sr.session_count }} sessions</span>
+}
+              @if (sr.duration_type === 'weeks' && sr.target_weeks) {
+<span class="duration-pill">
                 {{ progressWeeks(sr) }} / {{ sr.target_weeks }} wks
               </span>
-              <span class="duration-pill" *ngIf="sr.duration_type === 'sessions' && sr.target_sessions">
+}
+              @if (sr.duration_type === 'sessions' && sr.target_sessions) {
+<span class="duration-pill">
                 {{ sr.session_count }} / {{ sr.target_sessions }} sessions
               </span>
-              <span class="duration-pill open" *ngIf="sr.duration_type === 'open'">Open-ended</span>
+}
+              @if (sr.duration_type === 'open') {
+<span class="duration-pill open">Open-ended</span>
+}
 
               <div class="card-footer-actions">
                 <jiro-button variant="primary" type="button" (click)="$event.stopPropagation(); startFromSeriesSplit(sr.split_id, sr.id)">
@@ -74,14 +86,18 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
               </div>
             </div>
           </div>
+}
         </div>
       </div>
+}
 
       <!-- Ended Series -->
-      <div *ngIf="!loading() && endedSeries().length > 0" class="section">
+      @if (!loading() && endedSeries().length > 0) {
+<div class="section">
         <h2 class="section-title">Ended Series</h2>
         <div class="series-grid">
-          <div *ngFor="let sr of endedSeries()" class="series-card" (click)="view(sr.id)">
+          @for (sr of endedSeries(); track sr) {
+<div class="series-card" (click)="view(sr.id)">
             <div class="card-top">
               <div>
                 <div class="split-name">{{ sr.split_name }}</div>
@@ -109,18 +125,23 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
               </button>
             </div>
           </div>
+}
         </div>
       </div>
+}
 
       <!-- Empty State -->
-      <div *ngIf="!loading() && series().length === 0" class="state-message">
+      @if (!loading() && series().length === 0) {
+<div class="state-message">
         <h3>No series yet</h3>
         <p class="text-secondary">Start a series from any of your splits to track structured progression.</p>
         <a (click)="goToSplits.emit()" class="start-link">Go to Splits →</a>
       </div>
+}
 
       <!-- Start a new series CTA (shown when series exist) -->
-      <div *ngIf="!loading() && series().length > 0" class="start-cta">
+      @if (!loading() && series().length > 0) {
+<div class="start-cta">
         <a (click)="goToSplits.emit()" class="start-link">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -128,25 +149,34 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
           Start a new series from your Splits
         </a>
       </div>
+}
 
       <!-- Routine Picker Modal -->
-      <jiro-modal *ngIf="showRoutinePicker()" title="Choose Routine" maxWidth="420px" (close)="showRoutinePicker.set(false)">
-        <div *ngIf="loadingRoutines()" class="picker-loading">
+      @if (showRoutinePicker()) {
+<jiro-modal title="Choose Routine" maxWidth="420px" (close)="showRoutinePicker.set(false)">
+        @if (loadingRoutines()) {
+<div class="picker-loading">
           <div class="spinner-lg"></div>
         </div>
-        <div *ngIf="!loadingRoutines()" class="routine-list">
-          <button
-            *ngFor="let r of pickerRoutines()"
+}
+        @if (!loadingRoutines()) {
+<div class="routine-list">
+          @for (r of pickerRoutines(); track r) {
+<button
+           
             class="routine-pick-btn"
             (click)="startWithRoutine(r.id)">
             <span class="routine-pick-name">{{ r.name }}</span>
             <span class="routine-pick-day">Day {{ r.day_order }}</span>
           </button>
+}
           <button class="routine-pick-btn freestyle" (click)="startFreeWithSplit()">
             Freestyle (no routine)
           </button>
         </div>
+}
       </jiro-modal>
+}
     </div>
   `,
   styles: [`

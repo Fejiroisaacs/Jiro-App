@@ -29,18 +29,24 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
       </button>
 
       <!-- Loading -->
-      <div *ngIf="loading()" class="state-message">
+      @if (loading()) {
+<div class="state-message">
         <div class="spinner-lg"></div>
       </div>
+}
 
-      <div *ngIf="!loading() && exercise()" class="detail-body">
+      @if (!loading() && exercise()) {
+<div class="detail-body">
         <!-- Header -->
         <div class="detail-header">
           <div class="detail-title">
             <h1>{{ exercise()!.name }}</h1>
-            <span *ngIf="exercise()!.muscle_group" class="mg-badge">{{ exercise()!.muscle_group }}</span>
+            @if (exercise()!.muscle_group) {
+<span class="mg-badge">{{ exercise()!.muscle_group }}</span>
+}
           </div>
-          <div class="pr-stats" *ngIf="exercise()!.history.length > 0">
+          @if (exercise()!.history.length > 0) {
+<div class="pr-stats">
             <div class="stat">
               <span class="stat-label">Best Weight</span>
               <span class="stat-value">{{ settingsService.toDisplay(exercise()!.best_weight) | number:'1.1-1' }} {{ settingsService.unitLabel() }}</span>
@@ -50,12 +56,16 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
               <span class="stat-value primary">{{ settingsService.toDisplay(exercise()!.est_1rm) | number:'1.1-1' }} {{ settingsService.unitLabel() }}</span>
             </div>
           </div>
+}
         </div>
 
-        <p *ngIf="exercise()!.notes" class="exercise-notes text-secondary">{{ exercise()!.notes }}</p>
+        @if (exercise()!.notes) {
+<p class="exercise-notes text-secondary">{{ exercise()!.notes }}</p>
+}
 
         <!-- Plateau / Decline banner -->
-        <div *ngIf="plateauStatus() === 'plateau'" class="plateau-banner plateau">
+        @if (plateauStatus() === 'plateau') {
+<div class="plateau-banner plateau">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
           </svg>
@@ -64,7 +74,9 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
             Consider a small weight increase, extra reps, or a deload week to break through.
           </div>
         </div>
-        <div *ngIf="plateauStatus() === 'decline'" class="plateau-banner decline">
+}
+        @if (plateauStatus() === 'decline') {
+<div class="plateau-banner decline">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="23,18 13.5,8.5 8.5,13.5 1,6"/><polyline points="17,18 23,18 23,12"/>
           </svg>
@@ -73,9 +85,11 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
             Consider a deload, technique check, or extra recovery before pushing again.
           </div>
         </div>
+}
 
         <!-- Chart section — shown whenever there is any history -->
-        <div class="chart-section" *ngIf="exercise()!.history.length > 0">
+        @if (exercise()!.history.length > 0) {
+<div class="chart-section">
 
           <!-- Tab chips -->
           <div class="chart-tabs">
@@ -86,23 +100,30 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
           </div>
 
           <!-- Weight selector (Reps @ Weight only) -->
-          <div class="weight-selector-row" *ngIf="selectedChart() === 'repsatweight' && uniqueWeights().length > 0">
+          @if (selectedChart() === 'repsatweight' && uniqueWeights().length > 0) {
+<div class="weight-selector-row">
             <label class="ws-label">Weight</label>
             <select class="weight-select" (change)="onWeightChange($event)">
-              <option *ngFor="let w of uniqueWeights()" [value]="w" [selected]="w === selectedWeight()">
+              @for (w of uniqueWeights(); track w) {
+<option [value]="w" [selected]="w === selectedWeight()">
                 {{ settingsService.toDisplay(w) | number:'1.1-1' }} {{ settingsService.unitLabel() }}
               </option>
+}
             </select>
           </div>
+}
 
           <!-- Chart wrapper -->
           <div class="chart-wrapper">
-            <div *ngIf="chartEmpty()" class="chart-empty">
+            @if (chartEmpty()) {
+<div class="chart-empty">
               <p class="text-secondary">Not enough data to display this chart.</p>
             </div>
+}
             <canvas #chartCanvas [hidden]="chartEmpty()"></canvas>
           </div>
         </div>
+}
 
         <!-- Section tabs + content -->
         <div class="section-panel">
@@ -113,21 +134,29 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
           </button>
           <button class="section-tab" [class.active]="activeSection() === 'form'" (click)="setSection('form')">
             Form Progression
-            <span *ngIf="formChecks().length > 0" class="tab-count">{{ formChecks().length }}</span>
+            @if (formChecks().length > 0) {
+<span class="tab-count">{{ formChecks().length }}</span>
+}
           </button>
           <button class="section-tab" [class.active]="activeSection() === 'notes'" (click)="setSection('notes')">
             Notes
-            <span *ngIf="sessionNotes().length > 0" class="tab-count">{{ sessionNotes().length }}</span>
+            @if (sessionNotes().length > 0) {
+<span class="tab-count">{{ sessionNotes().length }}</span>
+}
           </button>
         </div>
 
         <!-- ── History tab ─────────────────────────────────────────── -->
-        <div *ngIf="activeSection() === 'history'" class="tab-panel">
-          <div *ngIf="exercise()!.history.length === 0" class="no-history">
+        @if (activeSection() === 'history') {
+<div class="tab-panel">
+          @if (exercise()!.history.length === 0) {
+<div class="no-history">
             <p class="text-secondary">No sets logged yet. Start a session and log this exercise.</p>
           </div>
+}
 
-          <table *ngIf="exercise()!.history.length > 0" class="history-table">
+          @if (exercise()!.history.length > 0) {
+<table class="history-table">
             <thead>
               <tr>
                 <th class="th-sort" (click)="sortBy('date')">
@@ -150,19 +179,25 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let entry of pagedHistory()" [class.is-pr]="entry.is_pr">
+              @for (entry of pagedHistory(); track entry) {
+<tr [class.is-pr]="entry.is_pr">
                 <td class="date-cell">{{ formatDate(entry.date) }}</td>
                 <td class="weight-cell">{{ settingsService.toDisplay(entry.weight) | number:'1.1-1' }} {{ settingsService.unitLabel() }}</td>
                 <td>{{ entry.reps }} reps</td>
                 <td class="orm-cell">{{ settingsService.toDisplay(entry.est_1rm) | number:'1.1-1' }} {{ settingsService.unitLabel() }}</td>
                 <td class="pr-cell">
-                  <img *ngIf="entry.is_pr" src="/icons/badge-icon.svg" class="pr-badge" title="Personal Record" alt="PR" />
+                  @if (entry.is_pr) {
+<img src="/icons/badge-icon.svg" class="pr-badge" title="Personal Record" alt="PR" />
+}
                 </td>
               </tr>
+}
             </tbody>
           </table>
+}
 
-          <div *ngIf="historyTotalPages() > 1" class="pagination">
+          @if (historyTotalPages() > 1) {
+<div class="pagination">
             <button class="page-btn" [disabled]="historyPage() === 0" (click)="historyPage.set(historyPage() - 1)">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="15,18 9,12 15,6"/>
@@ -175,47 +210,71 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
               </svg>
             </button>
           </div>
+}
         </div>
+}
 
         <!-- ── Form tab ────────────────────────────────────────────── -->
-        <div *ngIf="activeSection() === 'form'" class="tab-panel">
-          <div *ngIf="formChecksLoading()" class="fc-loading">
+        @if (activeSection() === 'form') {
+<div class="tab-panel">
+          @if (formChecksLoading()) {
+<div class="fc-loading">
             <div class="spinner-sm"></div>
             <span>Loading clips...</span>
           </div>
+}
 
-          <div *ngIf="!formChecksLoading() && groupedFormChecks().length === 0" class="no-history">
+          @if (!formChecksLoading() && groupedFormChecks().length === 0) {
+<div class="no-history">
             <p class="text-secondary">No form check clips yet. Tap "+ Form Check" during a session to add one.</p>
           </div>
+}
 
-          <div *ngIf="!formChecksLoading() && groupedFormChecks().length > 0" class="fc-groups">
-            <div *ngFor="let group of pagedFormGroups()" class="fc-group">
+          @if (!formChecksLoading() && groupedFormChecks().length > 0) {
+<div class="fc-groups">
+            @for (group of pagedFormGroups(); track group) {
+<div class="fc-group">
               <div class="fc-group-date">{{ group.date }}</div>
               <div class="fc-grid">
-                <div *ngFor="let item of group.items" class="fc-item">
+                @for (item of group.items; track item) {
+<div class="fc-item">
                   <div class="fc-media-wrap">
-                    <video *ngIf="item.file_type.startsWith('video')"
+                    @if (item.file_type.startsWith('video')) {
+<video
                       [src]="item.file_url" controls playsinline class="fc-media">
                     </video>
-                    <img *ngIf="item.file_type.startsWith('image')"
+}
+                    @if (item.file_type.startsWith('image')) {
+<img
                       [src]="item.file_url" [alt]="item.label || 'Form check'" class="fc-media" />
+}
                     <button class="fc-delete-btn"
                       [disabled]="deletingFormCheck().has(item.id)"
                       (click)="confirmingDeleteId.set(item.id)"
                       title="Delete clip">
-                      <svg *ngIf="!deletingFormCheck().has(item.id)" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      @if (!deletingFormCheck().has(item.id)) {
+<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                         <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                       </svg>
-                      <div *ngIf="deletingFormCheck().has(item.id)" class="spinner-xs"></div>
+}
+                      @if (deletingFormCheck().has(item.id)) {
+<div class="spinner-xs"></div>
+}
                     </button>
                   </div>
-                  <p *ngIf="item.label" class="fc-label">{{ item.label }}</p>
+                  @if (item.label) {
+<p class="fc-label">{{ item.label }}</p>
+}
                 </div>
+}
               </div>
             </div>
+}
           </div>
+}
 
-          <div *ngIf="formTotalPages() > 1" class="pagination">
+          @if (formTotalPages() > 1) {
+<div class="pagination">
             <button class="page-btn" [disabled]="formPage() === 0" (click)="formPage.set(formPage() - 1)">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="15,18 9,12 15,6"/>
@@ -228,27 +287,39 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
               </svg>
             </button>
           </div>
+}
         </div>
+}
 
         <!-- ── Notes tab ────────────────────────────────────────── -->
-        <div *ngIf="activeSection() === 'notes'" class="tab-panel">
-          <div *ngIf="sessionNotes().length === 0" class="no-history">
+        @if (activeSection() === 'notes') {
+<div class="tab-panel">
+          @if (sessionNotes().length === 0) {
+<div class="no-history">
             <p class="text-secondary">No notes yet. Add a note for this exercise during a session.</p>
           </div>
-          <div *ngIf="sessionNotes().length > 0" class="notes-list">
-            <div *ngFor="let n of sessionNotes()" class="notes-item">
+}
+          @if (sessionNotes().length > 0) {
+<div class="notes-list">
+            @for (n of sessionNotes(); track n) {
+<div class="notes-item">
               <span class="notes-item-date">{{ formatDate(n.date) }}</span>
               <p class="notes-item-text">{{ n.exercise_note }}</p>
             </div>
+}
           </div>
+}
         </div>
+}
 
         </div><!-- /section-panel -->
       </div>
+}
     </div>
 
     <!-- Delete form check confirmation -->
-    <jiro-modal *ngIf="confirmingDeleteId()" title="Delete Clip?" maxWidth="400px" (close)="confirmingDeleteId.set(null)">
+    @if (confirmingDeleteId()) {
+<jiro-modal title="Delete Clip?" maxWidth="400px" (close)="confirmingDeleteId.set(null)">
       <div class="delete-confirm">
         <p class="text-secondary" style="font-size: var(--font-size-sm);">
           This will permanently remove the clip. This cannot be undone.
@@ -263,6 +334,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
         </div>
       </div>
     </jiro-modal>
+}
   `,
   styles: [`
     :host { display: block; }

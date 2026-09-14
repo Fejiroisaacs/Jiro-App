@@ -1,5 +1,5 @@
 import { Component, OnInit, computed, signal, ElementRef } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { MealPlanService, MealPlan, MealPlanEntry, MealSlot } from '../../../core/services/meal-plan.service';
 import { RecipeService, Recipe } from '../../../core/services/recipe.service';
@@ -35,7 +35,7 @@ function addWeeks(d: Date, n: number): Date {
 @Component({
   selector: 'app-meal-planner',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   template: `
     <div class="planner-page">
       <!-- Header -->
@@ -60,36 +60,45 @@ function addWeeks(d: Date, n: number): Date {
       </div>
 
       <!-- Loading -->
-      <div *ngIf="loading()" class="loading-state">
+      @if (loading()) {
+<div class="loading-state">
         <div class="spinner"></div>
       </div>
+}
 
       <!-- Calendar grid -->
-      <div *ngIf="!loading()" class="calendar-wrap">
+      @if (!loading()) {
+<div class="calendar-wrap">
         <div class="calendar-grid">
           <!-- Column headers: day names + dates -->
           <div class="slot-label-header"></div>
-          <div *ngFor="let day of dayHeaders()" class="day-header" [class.today]="day.isToday">
+          @for (day of dayHeaders(); track day) {
+<div class="day-header" [class.today]="day.isToday">
             <span class="day-name">{{ day.name }}</span>
             <span class="day-date">{{ day.date }}</span>
           </div>
+}
 
           <!-- Rows: one per meal slot -->
-          <ng-container *ngFor="let slot of slots">
+          @for (slot of slots; track slot) {
+
             <div class="slot-label">{{ slot.label }}</div>
-            <div
-              *ngFor="let dow of [0,1,2,3,4,5,6]"
+            @for (dow of [0,1,2,3,4,5,6]; track dow) {
+<div
+             
               class="calendar-cell"
               (click)="openPicker(dow, slot.key)">
 
               <!-- Recipe chips -->
-              <div
-                *ngFor="let entry of entriesFor(dow, slot.key)"
+              @for (entry of entriesFor(dow, slot.key); track entry) {
+<div
+               
                 class="entry-chip"
                 (click)="$event.stopPropagation()">
                 <span class="chip-title">{{ entry.recipe_title || entry.custom_label || 'Unnamed' }}</span>
                 <button class="chip-remove" (click)="removeEntry(entry)" title="Remove">×</button>
               </div>
+}
 
               <!-- Add placeholder -->
               <div class="add-placeholder">
@@ -98,12 +107,16 @@ function addWeeks(d: Date, n: number): Date {
                 </svg>
               </div>
             </div>
-          </ng-container>
+}
+          
+}
         </div>
       </div>
+}
 
       <!-- Recipe picker modal -->
-      <div class="modal-backdrop" *ngIf="pickerOpen()" (click)="closePicker()">
+      @if (pickerOpen()) {
+<div class="modal-backdrop" (click)="closePicker()">
         <div class="picker-modal" (click)="$event.stopPropagation()">
           <div class="picker-header">
             <h3>Add to {{ slotLabel(pickerSlot()!) }} — {{ dayLabel(pickerDow()!) }}</h3>
@@ -120,19 +133,26 @@ function addWeeks(d: Date, n: number): Date {
           </div>
 
           <div class="picker-results">
-            <div *ngIf="filteredRecipes().length === 0" class="picker-empty">
+            @if (filteredRecipes().length === 0) {
+<div class="picker-empty">
               No recipes found
             </div>
-            <button
-              *ngFor="let r of filteredRecipes()"
+}
+            @for (r of filteredRecipes(); track r) {
+<button
+             
               class="picker-recipe-btn"
               (click)="pickRecipe(r)">
               <span class="pr-title">{{ r.title }}</span>
-              <span class="pr-tags" *ngIf="r.tags.length">{{ r.tags.slice(0,3).join(' · ') }}</span>
+              @if (r.tags.length) {
+<span class="pr-tags">{{ r.tags.slice(0,3).join(' · ') }}</span>
+}
             </button>
+}
           </div>
         </div>
       </div>
+}
     </div>
   `,
   styles: [`

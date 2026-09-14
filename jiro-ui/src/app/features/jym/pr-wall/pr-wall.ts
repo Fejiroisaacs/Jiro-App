@@ -20,22 +20,27 @@ import { SettingsService } from '../../../core/services/settings.service';
       }
 
       <!-- Loading -->
-      <div *ngIf="loading()" class="state-message">
+      @if (loading()) {
+<div class="state-message">
         <div class="spinner-lg"></div>
         <p>Loading personal records...</p>
       </div>
+}
 
       <!-- Empty state -->
-      <div *ngIf="!loading() && prs().length === 0" class="state-message">
+      @if (!loading() && prs().length === 0) {
+<div class="state-message">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--text-muted)">
           <circle cx="12" cy="8" r="6"/><path d="M8 14l-2 8 6-3 6 3-2-8"/>
         </svg>
         <h3>No personal records yet</h3>
         <p class="text-secondary">Log some sets and your PRs will appear here automatically.</p>
       </div>
+}
 
       <!-- PR groups by muscle group -->
-      <div *ngIf="!loading() && prs().length > 0">
+      @if (!loading() && prs().length > 0) {
+<div>
         <!-- Summary strip -->
         <div class="summary-strip">
           <div class="summary-item">
@@ -53,7 +58,8 @@ import { SettingsService } from '../../../core/services/settings.service';
         </div>
 
         <!-- Groups -->
-        <div *ngFor="let group of groupedPRs()" class="mg-group">
+        @for (group of groupedPRs(); track group) {
+<div class="mg-group">
           <div class="mg-header">
             <span class="mg-label">{{ group.mg }}</span>
             <span class="mg-count">{{ group.prs.length }}</span>
@@ -67,7 +73,8 @@ import { SettingsService } from '../../../core/services/settings.service';
               <span class="col-date">Date</span>
             </div>
 
-            <div *ngFor="let pr of group.prs" class="pr-row"
+            @for (pr of group.prs; track pr) {
+<div class="pr-row"
               (click)="router.navigate(['/jym/exercises', pr.exercise_id])">
               <span class="col-exercise ex-name">
                 <img src="/icons/badge-icon.svg" class="trophy" alt="PR" />
@@ -84,9 +91,12 @@ import { SettingsService } from '../../../core/services/settings.service';
               </span>
               <span class="col-date date-val">{{ formatDate(pr.date) }}</span>
             </div>
+}
           </div>
         </div>
+}
       </div>
+}
     </div>
   `,
   styles: [`

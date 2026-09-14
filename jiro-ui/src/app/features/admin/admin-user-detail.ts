@@ -1,6 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { ConfirmService } from '../../core/services/confirm.service';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AdminService, AdminUserDetail } from '../../core/services/admin.service';
@@ -8,17 +8,22 @@ import { AdminService, AdminUserDetail } from '../../core/services/admin.service
 @Component({
   selector: 'app-admin-user-detail',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   template: `
     <div class="user-detail">
       <button class="back-btn" (click)="router.navigate(['/admin/users'])">
         ← Users
       </button>
 
-      <div *ngIf="loading()" class="state-msg">Loading...</div>
-      <div *ngIf="error()" class="error-msg">{{ error() }}</div>
+      @if (loading()) {
+<div class="state-msg">Loading...</div>
+}
+      @if (error()) {
+<div class="error-msg">{{ error() }}</div>
+}
 
-      <ng-container *ngIf="user() as u">
+      @if (user(); as u) {
+
         <div class="header">
           <div>
             <h1 class="user-email">{{ u.email }}</h1>
@@ -79,8 +84,11 @@ import { AdminService, AdminUserDetail } from '../../core/services/admin.service
           </div>
         </div>
 
-        <div *ngIf="actionMsg()" class="action-feedback">{{ actionMsg() }}</div>
-      </ng-container>
+        @if (actionMsg()) {
+<div class="action-feedback">{{ actionMsg() }}</div>
+}
+      
+}
     </div>
   `,
   styles: [`

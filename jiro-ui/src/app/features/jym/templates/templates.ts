@@ -1,5 +1,5 @@
 import { Component, OnInit, input, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { Router } from '@angular/router';
 import { JymService, Routine } from '../../../core/services/jym.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
@@ -7,7 +7,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 @Component({
   selector: 'app-jym-templates',
   standalone: true,
-  imports: [CommonModule, JiroButtonComponent, JiroModalComponent],
+  imports: [JiroButtonComponent, JiroModalComponent],
   template: `
     <div class="templates-page">
       @if (!embedded()) {
@@ -19,11 +19,14 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       </div>
       }
 
-      <div *ngIf="loading()" class="state-msg">
+      @if (loading()) {
+<div class="state-msg">
         <div class="spinner-lg"></div>
       </div>
+}
 
-      <div *ngIf="!loading() && templates().length === 0" class="empty-state">
+      @if (!loading() && templates().length === 0) {
+<div class="empty-state">
         <div class="empty-icon">
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -37,18 +40,27 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
           During a session, tap <strong>Save Icon</strong> to save its exercise layout for future workouts.
         </p>
       </div>
+}
 
-      <div *ngIf="!loading() && templates().length > 0" class="template-list">
-        <div *ngFor="let t of templates()" class="template-card">
+      @if (!loading() && templates().length > 0) {
+<div class="template-list">
+        @for (t of templates(); track t) {
+<div class="template-card">
           <div class="template-info">
             <div class="template-name">{{ t.name }}</div>
             <div class="template-exercises">
-              <span *ngFor="let item of t.items; let last = last" class="ex-chip">
+              @for (item of t.items; track item; let last = $last) {
+<span class="ex-chip">
                 {{ item.exercise_name }}
                 <span class="ex-sets">{{ item.target_sets }}×{{ item.target_reps }}</span>
-                <span *ngIf="!last" class="ex-sep"> · </span>
+                @if (!last) {
+<span class="ex-sep"> · </span>
+}
               </span>
-              <span *ngIf="t.items.length === 0" class="text-secondary">No exercises</span>
+}
+              @if (t.items.length === 0) {
+<span class="text-secondary">No exercises</span>
+}
             </div>
           </div>
           <div class="template-actions">
@@ -66,10 +78,13 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
             </button>
           </div>
         </div>
+}
       </div>
+}
 
       <!-- Delete confirmation modal -->
-      <jiro-modal *ngIf="deleting()" title="Delete Template?" maxWidth="400px" (close)="deleting.set(null)">
+      @if (deleting()) {
+<jiro-modal title="Delete Template?" maxWidth="400px" (close)="deleting.set(null)">
         <div class="delete-confirm">
           <p>Delete <strong>{{ deleting()!.name }}</strong>?</p>
           <p class="text-secondary" style="font-size: var(--font-size-sm); margin-top: var(--space-xs);">
@@ -83,6 +98,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
           </div>
         </div>
       </jiro-modal>
+}
     </div>
   `,
   styles: [`

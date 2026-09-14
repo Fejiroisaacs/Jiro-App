@@ -1,5 +1,5 @@
 import { Component, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AdminService, AdminUser } from '../../core/services/admin.service';
@@ -7,7 +7,7 @@ import { AdminService, AdminUser } from '../../core/services/admin.service';
 @Component({
   selector: 'app-admin-users',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   template: `
     <div class="users-page">
       <h1 class="page-title">Users</h1>
@@ -17,10 +17,15 @@ import { AdminService, AdminUser } from '../../core/services/admin.service';
         <button class="search-btn" type="submit">Search</button>
       </form>
 
-      <div *ngIf="loading()" class="state-msg">Loading...</div>
-      <div *ngIf="error()" class="error-msg">{{ error() }}</div>
+      @if (loading()) {
+<div class="state-msg">Loading...</div>
+}
+      @if (error()) {
+<div class="error-msg">{{ error() }}</div>
+}
 
-      <div class="table-wrap" *ngIf="!loading() && users().length > 0">
+      @if (!loading() && users().length > 0) {
+<div class="table-wrap">
       <table class="users-table">
         <thead>
           <tr>
@@ -34,7 +39,8 @@ import { AdminService, AdminUser } from '../../core/services/admin.service';
           </tr>
         </thead>
         <tbody>
-          <tr *ngFor="let u of users()" class="user-row" (click)="router.navigate(['/admin/users', u.id])">
+          @for (u of users(); track u) {
+<tr class="user-row" (click)="router.navigate(['/admin/users', u.id])">
             <td>{{ u.email }}</td>
             <td>{{ u.username ?? '—' }}</td>
             <td>
@@ -47,17 +53,23 @@ import { AdminService, AdminUser } from '../../core/services/admin.service';
             <td>{{ u.split_count }}</td>
             <td>{{ formatDate(u.created_at) }}</td>
           </tr>
+}
         </tbody>
       </table>
       </div>
+}
 
-      <div *ngIf="!loading() && users().length === 0 && searched()" class="state-msg">No users found.</div>
+      @if (!loading() && users().length === 0 && searched()) {
+<div class="state-msg">No users found.</div>
+}
 
-      <div *ngIf="users().length > 0" class="pagination">
+      @if (users().length > 0) {
+<div class="pagination">
         <button class="page-btn" [disabled]="page() <= 1" (click)="changePage(-1)">Prev</button>
         <span class="page-label">Page {{ page() }}</span>
         <button class="page-btn" [disabled]="users().length < pageSize" (click)="changePage(1)">Next</button>
       </div>
+}
     </div>
   `,
   styles: [`
