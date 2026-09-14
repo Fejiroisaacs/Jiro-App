@@ -95,10 +95,10 @@ interface ExerciseBlock {
 
     <!-- Deload / Test notice -->
     <div *ngIf="sessionType() === 'deload'" class="type-notice deload-notice">
-      Deload session: take it easy and foucus on recovery.
+      Deload session: take it easy and focus on recovery.
     </div>
     <div *ngIf="sessionType() === 'test'" class="type-notice test-notice">
-      Light weight baby!!! Use this session to find new 1RMs and set new PRs.
+      Test session: work up to a top set and see where your 1RM stands.
     </div>
 
     <!-- Loading -->

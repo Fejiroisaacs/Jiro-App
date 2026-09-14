@@ -16,7 +16,7 @@ import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-inpu
       <div class="auth-container">
         <div class="auth-header">
           <h1 class="auth-logo">Jiro</h1>
-          <p class="auth-subtitle">Jiro, just like Fejiro. Get it? :)</p>
+          <p class="auth-subtitle">Your life, in one place.</p>
         </div>
 
         <jiro-card>
