@@ -415,8 +415,8 @@ interface ExerciseBlock {
 
     /* Sticky bar */
     .session-bar {
-      position: sticky; top: 0; z-index: 200;
-      background: var(--color-primary); color: white;
+      position: sticky; top: var(--topbar-height, 0px); z-index: var(--z-sticky);
+      background: var(--color-primary); color: var(--text-on-primary);
       box-shadow: 0 2px 12px rgba(0,0,0,0.2);
       margin: calc(-1 * var(--space-xl));
       margin-bottom: var(--space-xl);

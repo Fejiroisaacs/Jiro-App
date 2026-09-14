@@ -43,6 +43,7 @@ let modalSeq = 0;
 
     .modal-content {
       background: var(--bg-canvas);
+      color: var(--text-primary); /* own the text colour: a modal can be opened from the dark sidebar */
       border: 1px solid var(--border-color);
       border-radius: var(--border-radius-lg);
       box-shadow: var(--shadow-lg);
