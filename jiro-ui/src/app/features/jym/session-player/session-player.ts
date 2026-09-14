@@ -14,6 +14,10 @@ import { SettingsService } from '../../../core/services/settings.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
+import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
+import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
 import { ToastService } from '../../../core/services/toast.service';
 
 interface SetRow {
@@ -43,7 +47,7 @@ interface ExerciseBlock {
 @Component({
   selector: 'app-session-player',
   standalone: true,
-  imports: [FormsModule, JiroButtonComponent, JiroModalComponent],
+  imports: [FormsModule, JiroButtonComponent, JiroModalComponent, JiroIconComponent, JiroSkeletonComponent, JiroEmptyStateComponent, JymPrBadgeComponent],
   template: `
     <!-- Sticky header bar -->
     <div class="session-bar">
@@ -62,15 +66,11 @@ interface ExerciseBlock {
             <button class="type-btn" [class.active]="settingsService.weightUnit() === 'lbs'" (click)="toggleUnit('lbs')">lbs</button>
             <button class="type-btn" [class.active]="settingsService.weightUnit() === 'kg'" (click)="toggleUnit('kg')">kg</button>
           </div>
-          <button class="save-template-btn" title="Save as Template" (click)="showTemplateSave.set(true)">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-              <polyline points="17,21 17,13 7,13 7,21"/>
-              <polyline points="7,3 7,8 15,8"/>
-            </svg>
+          <button class="save-template-btn" type="button" title="Save as template" aria-label="Save as template" (click)="showTemplateSave.set(true)">
+            <jiro-icon name="floppy-disk" [size]="15" />
           </button>
-          <jiro-button size="sm" variant="secondary" type="button" (click)="showExitConfirm.set(true)">Exit</jiro-button>
-          <jiro-button size="sm" variant="primary" type="button" (click)="finishSession()" [disabled]="finishing()">
+          <jiro-button size="sm" variant="ghost" type="button" (click)="showExitConfirm.set(true)">Exit</jiro-button>
+          <jiro-button size="sm" variant="inverse" type="button" (click)="finishSession()" [disabled]="finishing()">
             {{ finishing() ? 'Finishing...' : 'Finish' }}
           </jiro-button>
         </div>
@@ -89,9 +89,9 @@ interface ExerciseBlock {
             [class.active]="restTimerDuration() === d"
             (click)="setRestDuration(d)">{{ restPresetLabel(d) }}</button>
 }
-          <button class="rest-chip rest-add-btn" (click)="addRestTime(30)" title="Add 30 seconds">+30s</button>
+          <button class="rest-chip rest-add-btn" type="button" (click)="addRestTime(30)" title="Add 30 seconds" aria-label="Add 30 seconds">+30s</button>
         </div>
-        <button class="rest-skip-btn" (click)="skipRestTimer()">✕</button>
+        <button class="rest-skip-btn" type="button" (click)="skipRestTimer()" aria-label="Skip rest" title="Skip rest"><jiro-icon name="x" [size]="12" /></button>
         <div class="rest-progress">
           <div class="rest-progress-fill"
             [style.width.%]="(restTimerRemaining() / restTimerDuration()) * 100"></div>
@@ -115,11 +115,12 @@ interface ExerciseBlock {
     <!-- Loading -->
     <div class="player-body">
       @if (loading()) {
-<div class="state-message">
-        <div class="spinner-lg"></div>
-        <p>Loading session...</p>
-      </div>
-}
+        <div class="loading-blocks" aria-busy="true" aria-label="Loading session">
+          <jiro-skeleton height="56px" />
+          <jiro-skeleton height="180px" />
+          <jiro-skeleton height="180px" />
+        </div>
+      }
 
       <!-- Session notes -->
       @if (!loading()) {
@@ -166,16 +167,15 @@ interface ExerciseBlock {
 <div class="exercises">
         <!-- Empty state -->
         @if (blocks().length === 0) {
-<div class="no-exercises">
-          <h3>No exercises yet</h3>
-          <p class="text-secondary">Tap "+ Add Exercise" below to add your first lift.</p>
-        </div>
-}
+          <jiro-empty-state compact icon="barbell" heading="No exercises yet" message="Add your first lift to start logging sets.">
+            <jiro-button size="sm" type="button" (click)="addExercise()">Add exercise</jiro-button>
+          </jiro-empty-state>
+        }
 
         <!-- Exercise blocks -->
         @for (block of blocks(); track block; let bi = $index) {
 <div class="ex-block">
-          <div class="block-header" [class.block-open]="!isCollapsed(bi)" (click)="toggleBlock(bi)">
+          <div class="block-header" role="button" tabindex="0" [class.block-open]="!isCollapsed(bi)" [attr.aria-expanded]="!isCollapsed(bi)" (click)="toggleBlock(bi)" (keydown.enter)="toggleBlock(bi)" (keydown.space)="$event.preventDefault(); toggleBlock(bi)">
             <div class="block-title">
               <h3>{{ block.exerciseName }}</h3>
               @if (block.muscleGroup) {
@@ -185,7 +185,7 @@ interface ExerciseBlock {
 <span class="sets-done-tag">{{ savedCount(bi) }} sets</span>
 }
             </div>
-            <svg class="chevron" [class.open]="!isCollapsed(bi)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg class="chevron" aria-hidden="true" [class.open]="!isCollapsed(bi)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="6,9 12,15 18,9"/>
             </svg>
           </div>
@@ -218,7 +218,7 @@ interface ExerciseBlock {
               <span class="sh weight">Weight ({{ settingsService.unitLabel() }})</span>
               <span class="sh reps">Reps</span>
               <span class="sh rpe">RPE</span>
-              <span class="sh warmup-col" title="Warm-up set">W</span>
+              <span class="sh warmup-col" title="Warm-up"><jiro-icon name="fire" [size]="14" label="Warm-up" /></span>
               <span class="sh action"></span>
             </div>
 
@@ -268,23 +268,24 @@ interface ExerciseBlock {
                   [disabled]="row.saved" />
 
                 <button
+                  type="button"
                   class="warmup-btn"
                   [class.warmup-active]="row.isWarmup"
+                  [attr.aria-pressed]="row.isWarmup"
+                  [attr.aria-label]="'Warm-up, set ' + row.setNumber"
                   title="{{ row.isWarmup ? 'Warm-up set' : 'Mark as warm-up' }}"
-                  (click)="toggleWarmup(bi, si)">W</button>
+                  (click)="toggleWarmup(bi, si)"><jiro-icon name="fire" [size]="16" /></button>
 
                 <div class="action-cell">
                   @if (row.saved && row.isPR) {
-<img src="/icons/badge-icon.svg" class="pr-badge" title="Personal Record" alt="PR" />
+<jym-pr-badge />
 }
                   @if (!row.saved) {
-<button
-                   
-                    class="log-btn"
+<button type="button" class="log-btn" [attr.aria-label]="'Log set ' + row.setNumber"
                     [disabled]="row.saving || !row.weight || !row.reps || (!!row.rpe && rpeInvalid(row.rpe))"
                     (click)="logSet(bi, si)">
                     @if (!row.saving) {
-<span>✓</span>
+<jiro-icon name="check" [size]="18" />
 }
                     @if (row.saving) {
 <span class="spinner-sm"></span>
@@ -292,10 +293,8 @@ interface ExerciseBlock {
                   </button>
 }
                   @if (row.saved) {
-<button class="del-btn" (click)="deleteSet(bi, si)">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
+<button type="button" class="del-btn" [attr.aria-label]="'Remove set ' + row.setNumber" title="Remove set" (click)="deleteSet(bi, si)">
+                    <jiro-icon name="x" [size]="14" />
                   </button>
 }
                 </div>
@@ -408,91 +407,70 @@ interface ExerciseBlock {
 }
 
 
-    <!-- Exercise picker overlay -->
+    <!-- Exercise picker -->
     @if (showExPicker()) {
-<div class="overlay">
-      <div class="picker-panel">
-
-        <!-- Default: search + list -->
+      <jiro-modal [title]="creatingExercise() ? 'New exercise' : 'Add exercise'" maxWidth="480px" (close)="showExPicker.set(false)">
         @if (!creatingExercise()) {
-
-          <div class="picker-header">
-            <h3>Add Exercise</h3>
-            <button class="close-btn" (click)="showExPicker.set(false)">✕</button>
-          </div>
-          <input class="picker-search" type="text" [(ngModel)]="exSearch" (input)="filterExercises()" placeholder="Search exercises..." autofocus />
+          <input class="picker-search" type="text" [(ngModel)]="exSearch" (input)="filterExercises()" placeholder="Search exercises..." aria-label="Search exercises" autofocus />
           <div class="picker-list">
-            @for (ex of filteredExercises(); track ex) {
-<button class="picker-item" (click)="pickExercise(ex)">
-              <span class="pi-name">{{ ex.name }}</span>
-              @if (ex.muscle_group) {
-<span class="pi-mg">{{ ex.muscle_group }}</span>
-}
-            </button>
-}
-            <!-- Create shortcut: always visible at bottom, name pre-filled from search -->
-            <button class="picker-create-btn" (click)="startCreateExercise()">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-              </svg>
+            @for (ex of filteredExercises(); track ex.id) {
+              <button type="button" class="picker-item" (click)="pickExercise(ex)">
+                <span class="pi-name">{{ ex.name }}</span>
+                @if (ex.muscle_group) {
+                  <span class="pi-mg">{{ ex.muscle_group }}</span>
+                }
+              </button>
+            }
+            @if (filteredExercises().length === 0 && exSearch.trim()) {
+              <p class="picker-none">Nothing matches "{{ exSearch.trim() }}".</p>
+            }
+            <!-- Create shortcut: always at the bottom, name pre-filled from the search -->
+            <button type="button" class="picker-create-btn" (click)="startCreateExercise()">
+              <jiro-icon name="plus" [size]="14" />
               @if (exSearch.trim()) {
-<span>Create "{{ exSearch.trim() }}"</span>
-}
-              @if (!exSearch.trim()) {
-<span>New Exercise</span>
-}
+                <span>Create "{{ exSearch.trim() }}"</span>
+              } @else {
+                <span>New exercise</span>
+              }
             </button>
           </div>
-        
-}
-
-        <!-- Create mode: inline mini-form -->
-        @if (creatingExercise()) {
-
-          <div class="picker-header">
-            <button class="back-btn" (click)="creatingExercise.set(false)">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="15,18 9,12 15,6"/>
-              </svg>
-            </button>
-            <h3>New Exercise</h3>
-            <button class="close-btn" (click)="showExPicker.set(false)">✕</button>
-          </div>
+        } @else {
+          <button type="button" class="back-btn" (click)="creatingExercise.set(false)">
+            <jiro-icon name="caret-left" [size]="14" /> Back to search
+          </button>
           <div class="create-form">
-            <label class="create-label">Name</label>
+            <label class="create-label" for="new-ex-name">Name</label>
             <input
+              id="new-ex-name"
               class="picker-search"
               type="text"
               [(ngModel)]="newExName"
               placeholder="e.g. Romanian Deadlift"
               (keydown.enter)="!newExSaving() && newExName.trim() && createAndPickExercise()"
-              style="margin:0"
             />
-            <label class="create-label" style="margin-top:var(--space-sm)">Muscle Group <span style="opacity:0.5">(optional)</span></label>
-            <select class="create-select" [(ngModel)]="newExMuscleGroup">
-              <option value="">— None —</option>
+            <label class="create-label" for="new-ex-mg" style="margin-top:var(--space-sm)">Muscle group <span class="optional">(optional)</span></label>
+            <select id="new-ex-mg" class="create-select" [(ngModel)]="newExMuscleGroup">
+              <option value="">None</option>
               @for (mg of muscleGroups; track mg) {
-<option [value]="mg">{{ mg }}</option>
-}
+                <option [value]="mg">{{ mg }}</option>
+              }
             </select>
             @if (newExError()) {
-<div class="template-save-error" style="margin-top:var(--space-xs)">{{ newExError() }}</div>
-}
+              <div class="template-save-error">{{ newExError() }}</div>
+            }
             <jiro-button
-              variant="primary"
+              block
               type="button"
-              style="margin-top:var(--space-md);width:100%"
-              [disabled]="!newExName.trim() || newExSaving()"
+              style="margin-top:var(--space-md)"
+              [disabled]="!newExName.trim()"
+              [loading]="newExSaving()"
               (click)="createAndPickExercise()">
-              {{ newExSaving() ? 'Creating...' : 'Create & Add to Session' }}
+              {{ newExSaving() ? 'Creating...' : 'Create and add to session' }}
             </jiro-button>
           </div>
-        
-}
-
-      </div>
-    </div>
-}
+        }
+      </jiro-modal>
+    }
   `,
   styles: [`
     :host { display: block; }
@@ -501,7 +479,7 @@ interface ExerciseBlock {
     .session-bar {
       position: sticky; top: var(--topbar-height, 0px); z-index: var(--z-sticky);
       background: var(--color-primary); color: var(--text-on-primary);
-      box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+      box-shadow: 0 2px 12px rgba(var(--shadow-rgb), 0.25);
       margin: calc(-1 * var(--space-xl));
       margin-bottom: var(--space-xl);
     }
@@ -523,13 +501,13 @@ interface ExerciseBlock {
     .rest-row {
       display: flex; align-items: center; gap: var(--space-sm);
       padding: var(--space-xs) var(--space-xl);
-      background: rgba(0,0,0,0.15);
-      border-top: 1px solid rgba(255,255,255,0.1);
+      background: rgba(var(--shadow-rgb), 0.18);
+      border-top: 1px solid color-mix(in srgb, currentColor 15%, transparent);
       position: relative; overflow: hidden;
       transition: background 0.4s;
     }
 
-    .rest-row.rest-done { background: rgba(74,103,65,0.45); }
+    .rest-row.rest-done { background: rgba(var(--color-accent-rgb), 0.45); }
 
     .rest-label {
       font-size: var(--font-size-xs); text-transform: uppercase;
@@ -544,17 +522,17 @@ interface ExerciseBlock {
     .rest-presets { display: flex; gap: 4px; margin-left: auto; }
 
     .rest-chip {
-      padding: 2px 8px; border-radius: 10px;
-      border: 1px solid rgba(255,255,255,0.3); background: none;
-      color: rgba(255,255,255,0.65); font-size: var(--font-size-xs);
+      min-height: 28px; padding: 2px 8px; border-radius: 10px;
+      border: 1px solid color-mix(in srgb, currentColor 35%, transparent); background: none;
+      color: color-mix(in srgb, currentColor 70%, transparent); font-size: var(--font-size-xs);
       cursor: pointer; transition: all 0.15s; font-family: inherit; white-space: nowrap;
     }
 
-    .rest-chip:hover { border-color: rgba(255,255,255,0.7); color: white; }
+    .rest-chip:hover { border-color: color-mix(in srgb, currentColor 70%, transparent); color: inherit; }
 
     .rest-chip.active {
-      background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.7);
-      color: white; font-weight: 600;
+      background: color-mix(in srgb, currentColor 18%, transparent); border-color: color-mix(in srgb, currentColor 70%, transparent);
+      color: inherit; font-weight: 600;
     }
 
     .rest-add-btn { border-style: dashed; }
@@ -562,11 +540,11 @@ interface ExerciseBlock {
     .save-template-btn {
       display: flex; align-items: center; justify-content: center;
       width: 32px; height: 32px; border-radius: var(--border-radius-sm);
-      border: 1px solid rgba(255,255,255,0.25); background: none;
-      color: rgba(255,255,255,0.7); cursor: pointer; transition: all 0.15s;
+      border: 1px solid color-mix(in srgb, currentColor 30%, transparent); background: none;
+      color: color-mix(in srgb, currentColor 75%, transparent); cursor: pointer; transition: all 0.15s;
       flex-shrink: 0;
     }
-    .save-template-btn:hover { border-color: rgba(255,255,255,0.7); color: white; }
+    .save-template-btn:hover { border-color: color-mix(in srgb, currentColor 70%, transparent); color: inherit; }
 
     .template-name-input {
       width: 100%; padding: 9px 12px; border: 1px solid var(--border-color);
@@ -577,44 +555,46 @@ interface ExerciseBlock {
     .template-name-input:focus { border-color: var(--color-primary); }
 
     .template-save-error {
-      font-size: var(--font-size-sm); color: #e05c5c; margin-top: var(--space-xs);
+      font-size: var(--font-size-sm); color: var(--color-negative); margin-top: var(--space-xs);
     }
 
     .rest-skip-btn {
-      padding: 3px 8px; border-radius: 10px;
-      border: 1px solid rgba(255,255,255,0.25); background: none;
-      color: rgba(255,255,255,0.55); cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center;
+      min-height: 28px; padding: 3px 8px; border-radius: 10px;
+      border: 1px solid color-mix(in srgb, currentColor 30%, transparent); background: none;
+      color: color-mix(in srgb, currentColor 60%, transparent); cursor: pointer;
       font-size: var(--font-size-xs); transition: all 0.15s; font-family: inherit;
     }
 
-    .rest-skip-btn:hover { border-color: rgba(255,255,255,0.7); color: white; }
+    .rest-skip-btn:hover { border-color: color-mix(in srgb, currentColor 70%, transparent); color: inherit; }
 
     .rest-progress {
       position: absolute; bottom: 0; left: 0; right: 0;
-      height: 3px; background: rgba(255,255,255,0.15);
+      height: 3px; background: color-mix(in srgb, currentColor 15%, transparent);
     }
 
     .rest-progress-fill {
-      height: 100%; background: rgba(255,255,255,0.75);
+      height: 100%; background: color-mix(in srgb, currentColor 75%, transparent);
       transition: width 1s linear;
     }
 
-    .rest-row.rest-done .rest-progress-fill { background: rgba(144,238,144,0.8); }
+    .rest-row.rest-done .rest-progress-fill { background: var(--color-positive); }
 
     .type-toggle {
       display: flex; border-radius: 6px; overflow: hidden;
-      border: 1px solid rgba(255,255,255,0.3);
+      border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
     }
 
     .type-btn {
-      padding: 5px 10px; background: transparent; border: none;
-      color: rgba(255,255,255,0.7); font-size: var(--font-size-xs);
+      min-height: 28px; padding: 5px 10px; background: transparent; border: none;
+      color: color-mix(in srgb, currentColor 75%, transparent); font-size: var(--font-size-xs);
+      font-family: inherit;
       cursor: pointer; transition: all 0.15s; white-space: nowrap;
     }
 
-    .type-btn + .type-btn { border-left: 1px solid rgba(255,255,255,0.3); }
+    .type-btn + .type-btn { border-left: 1px solid color-mix(in srgb, currentColor 35%, transparent); }
 
-    .type-btn.active { background: rgba(255,255,255,0.2); color: white; font-weight: 600; }
+    .type-btn.active { background: color-mix(in srgb, currentColor 18%, transparent); color: inherit; font-weight: 600; }
 
     .type-notice {
       text-align: center; font-size: var(--font-size-sm); font-weight: 500;
@@ -622,9 +602,9 @@ interface ExerciseBlock {
       border-radius: var(--border-radius);
     }
 
-    .deload-notice { background: rgba(196,74,74,0.1); color: var(--color-danger); border: 1px solid rgba(196,74,74,0.2); }
+    .deload-notice { background: rgba(var(--color-danger-rgb), 0.1); color: var(--color-danger); border: 1px solid rgba(var(--color-danger-rgb), 0.2); }
 
-    .test-notice { background: rgba(122,59,46,0.1); color: var(--color-primary); border: 1px solid rgba(122,59,46,0.2); }
+    .test-notice { background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary); border: 1px solid rgba(var(--color-primary-rgb), 0.2); }
 
 
 
@@ -679,7 +659,7 @@ interface ExerciseBlock {
     .bw-input:focus { border-color: var(--color-primary); }
 
     .bw-save-btn {
-      padding: 6px 14px; background: var(--color-primary); color: white;
+      padding: 6px 14px; background: var(--color-primary); color: var(--text-on-primary); font-family: inherit;
       border: none; border-radius: var(--border-radius);
       font-size: var(--font-size-sm); font-weight: 500; cursor: pointer;
       transition: opacity 0.15s;
@@ -693,21 +673,7 @@ interface ExerciseBlock {
       font-size: var(--font-size-sm); color: var(--color-accent); font-weight: 500;
     }
 
-    .state-message {
-      display: flex; flex-direction: column; align-items: center;
-      gap: var(--space-md); padding: var(--space-2xl); text-align: center;
-    }
-
-    .spinner-lg {
-      width: 40px; height: 40px; border: 3px solid var(--border-color);
-      border-top-color: var(--color-primary); border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-
-    .no-exercises {
-      text-align: center; padding: var(--space-2xl);
-      display: flex; flex-direction: column; align-items: center; gap: var(--space-md);
-    }
+    .loading-blocks { display: flex; flex-direction: column; gap: var(--space-xl); }
 
     .exercises { display: flex; flex-direction: column; gap: var(--space-xl); }
 
@@ -730,10 +696,11 @@ interface ExerciseBlock {
       display: flex; align-items: center; gap: 6px;
       padding: 6px var(--space-lg);
       font-size: var(--font-size-xs); color: var(--color-primary);
-      background: rgba(122,59,46,0.06); border-bottom: 1px solid var(--border-color);
+      background: rgba(var(--color-primary-rgb), 0.06); border-bottom: 1px solid var(--border-color);
     }
 
     .block-header:hover { background: var(--bg-surface); }
+    .block-header:focus-visible { outline-offset: -2px; }
 
     .block-title { display: flex; align-items: center; gap: var(--space-sm); flex: 1; min-width: 0; }
 
@@ -741,7 +708,7 @@ interface ExerciseBlock {
 
     .sets-done-tag {
       font-size: var(--font-size-xs); padding: 2px 8px; border-radius: 10px;
-      background: rgba(122,59,46,0.1); color: var(--color-primary); font-weight: 500;
+      background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary); font-weight: 500;
     }
 
     .chevron {
@@ -751,7 +718,7 @@ interface ExerciseBlock {
     .chevron.open { transform: rotate(0deg); }
 
     .mg-tag {
-      background: rgba(122,59,46,0.12); color: var(--color-primary);
+      background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary);
       font-size: var(--font-size-xs); padding: 2px 8px; border-radius: 10px;
     }
 
@@ -782,7 +749,7 @@ interface ExerciseBlock {
     /* Set table */
     .set-header-row {
       display: grid;
-      grid-template-columns: 40px 1fr 1fr 64px 34px 52px;
+      grid-template-columns: 40px 1fr 1fr 64px 44px minmax(52px, auto);
       gap: var(--space-sm);
       padding: var(--space-xs) var(--space-lg);
       border-bottom: 1px solid var(--border-color);
@@ -797,7 +764,7 @@ interface ExerciseBlock {
 
     .set-row {
       display: grid;
-      grid-template-columns: 40px 1fr 1fr 64px 34px 52px;
+      grid-template-columns: 40px 1fr 1fr 64px 44px minmax(52px, auto);
       gap: var(--space-sm);
       align-items: center;
       padding: var(--space-xs) var(--space-lg);
@@ -807,22 +774,21 @@ interface ExerciseBlock {
 
     .set-row:last-of-type { border-bottom: none; }
 
-    .set-row.set-done { background: rgba(122,59,46,0.04); }
+    .set-row.set-done { background: rgba(var(--color-primary-rgb), 0.04); }
 
-    .set-row.set-warmup { background: rgba(200,160,80,0.06); }
+    .set-row.set-warmup { background: rgba(var(--color-warning-rgb), 0.08); }
 
     .warmup-btn {
-      width: 28px; height: 28px; border-radius: 4px;
+      width: 40px; height: 40px; border-radius: var(--border-radius-sm);
       background: none; border: 1px solid var(--border-color);
-      color: var(--text-muted); font-size: var(--font-size-xs);
-      font-weight: 700; cursor: pointer; transition: all 0.15s;
-      font-family: inherit; display: flex; align-items: center; justify-content: center;
+      color: var(--text-muted); cursor: pointer; transition: all 0.15s;
+      display: flex; align-items: center; justify-content: center;
     }
 
-    .warmup-btn:hover { border-color: #c8a050; color: #c8a050; }
+    .warmup-btn:hover { border-color: var(--color-warning); color: var(--color-warning); }
 
     .warmup-btn.warmup-active {
-      background: rgba(200,160,80,0.15); border-color: #c8a050; color: #c8a050;
+      background: rgba(var(--color-warning-rgb), 0.15); border-color: var(--color-warning); color: var(--color-warning);
     }
 
     .set-num-cell { font-size: var(--font-size-sm); font-weight: 500; color: var(--text-muted); text-align: center; }
@@ -830,7 +796,7 @@ interface ExerciseBlock {
     .input-wrap { position: relative; }
 
     .set-input {
-      width: 100%; padding: 8px 10px;
+      width: 100%; min-height: 44px; padding: 8px 10px;
       border: 1px solid var(--border-color); border-radius: var(--border-radius);
       background: var(--bg-canvas); color: var(--text-primary);
       font-size: var(--font-size-md); box-sizing: border-box;
@@ -841,11 +807,11 @@ interface ExerciseBlock {
 
     .set-input:disabled { opacity: 0.7; background: transparent; border-color: transparent; }
 
-    .set-input.has-ghost::placeholder { color: rgba(122,59,46,0.5); font-style: italic; }
+    .set-input.has-ghost::placeholder { color: rgba(var(--color-primary-rgb), 0.55); font-style: italic; }
 
     .ghost-hint {
       position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
-      font-size: var(--font-size-xs); color: rgba(122,59,46,0.5);
+      font-size: var(--font-size-xs); color: rgba(var(--color-primary-rgb), 0.55);
       pointer-events: none;
     }
 
@@ -862,9 +828,9 @@ interface ExerciseBlock {
     .action-cell { display: flex; align-items: center; justify-content: center; gap: var(--space-xs); }
 
     .log-btn {
-      width: 34px; height: 34px; border-radius: 50%;
-      background: var(--color-primary); color: white; border: none;
-      cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center;
+      width: 40px; height: 40px; border-radius: 50%;
+      background: var(--color-primary); color: var(--text-on-primary); border: none;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
       transition: opacity 0.15s;
     }
 
@@ -873,7 +839,7 @@ interface ExerciseBlock {
     .log-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
     .del-btn {
-      width: 28px; height: 28px; border-radius: 4px;
+      width: 40px; height: 40px; border-radius: var(--border-radius-sm);
       background: none; color: var(--text-muted); border: 1px solid var(--border-color);
       cursor: pointer; display: flex; align-items: center; justify-content: center;
       transition: all 0.15s;
@@ -881,12 +847,10 @@ interface ExerciseBlock {
 
     .del-btn:hover { color: var(--color-danger); border-color: var(--color-danger); }
 
-    .pr-badge { width: 28px; height: 28px; display: block; }
-
     .spinner-sm {
       width: 14px; height: 14px;
-      border: 2px solid rgba(255,255,255,0.4);
-      border-top-color: white; border-radius: 50%;
+      border: 2px solid color-mix(in srgb, currentColor 40%, transparent);
+      border-top-color: currentColor; border-radius: 50%;
       animation: spin 0.6s linear infinite; display: inline-block;
     }
 
@@ -894,10 +858,11 @@ interface ExerciseBlock {
       width: 100%; padding: var(--space-sm);
       background: none; border: none; border-top: 1px solid var(--border-color);
       color: var(--text-muted); font-size: var(--font-size-sm); cursor: pointer;
+      font-family: inherit; min-height: 44px;
       transition: all 0.15s;
     }
 
-    .add-set-btn:hover { color: var(--color-primary); background: rgba(122,59,46,0.04); }
+    .add-set-btn:hover { color: var(--color-primary); background: rgba(var(--color-primary-rgb), 0.04); }
 
     .add-exercise-btn {
       width: 100%; padding: var(--space-md);
@@ -907,86 +872,57 @@ interface ExerciseBlock {
       transition: all 0.15s; font-family: inherit; margin-top: var(--space-sm);
     }
 
-    .add-exercise-btn:hover { color: var(--color-primary); border-color: var(--color-primary); background: rgba(122,59,46,0.04); }
+    .add-exercise-btn:hover { color: var(--color-primary); border-color: var(--color-primary); background: rgba(var(--color-primary-rgb), 0.04); }
 
-    /* Exercise picker overlay */
-    .overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.45);
-      display: flex; align-items: flex-end; justify-content: center;
-      z-index: 500; animation: fadeIn 0.15s ease;
-    }
-
-    .picker-panel {
-      width: 100%; max-width: 480px;
-      background: var(--bg-surface); border-radius: var(--border-radius) var(--border-radius) 0 0;
-      max-height: 60vh; display: flex; flex-direction: column;
-      box-shadow: 0 -4px 24px rgba(0,0,0,0.2);
-    }
-
-    .picker-header {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: var(--space-md) var(--space-lg);
-      border-bottom: 1px solid var(--border-color);
-    }
-
-    .picker-header h3 { font-size: var(--font-size-md); font-weight: 600; }
-
-    .close-btn {
-      background: none; border: none; color: var(--text-muted);
-      font-size: 18px; cursor: pointer; padding: var(--space-xs);
-    }
-
+    /* Exercise picker (inside jiro-modal) */
     .picker-search {
-      margin: var(--space-sm) var(--space-md);
+      width: 100%; box-sizing: border-box;
       padding: 10px 14px; border: 1px solid var(--border-color);
       border-radius: var(--border-radius); background: var(--bg-canvas);
       color: var(--text-primary); font-size: var(--font-size-md);
- font-family: inherit;
+      font-family: inherit;
     }
-
     .picker-search:focus { border-color: var(--color-primary); }
 
-    .picker-list { overflow-y: auto; flex: 1; padding: var(--space-xs) var(--space-md); }
+    .picker-list { max-height: 50dvh; overflow-y: auto; margin-top: var(--space-sm); }
 
     .picker-item {
-      display: flex; align-items: center; justify-content: space-between;
-      width: 100%; padding: var(--space-sm) var(--space-md);
+      display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm);
+      width: 100%; min-height: 44px; padding: var(--space-sm) var(--space-md);
       background: none; border: none; border-radius: var(--border-radius);
-      cursor: pointer; text-align: left; transition: background 0.15s;
+      cursor: pointer; text-align: left; font-family: inherit; transition: background 0.15s;
     }
-
-    .picker-item:hover { background: rgba(122,59,46,0.08); }
+    .picker-item:hover { background: var(--bg-surface-hover); }
 
     .pi-name { font-size: var(--font-size-md); color: var(--text-primary); font-weight: 500; }
+    .pi-mg { font-size: var(--font-size-xs); color: var(--text-muted); white-space: nowrap; }
 
-    .pi-mg { font-size: var(--font-size-xs); color: var(--text-muted); }
+    .picker-none { padding: var(--space-md); font-size: var(--font-size-sm); color: var(--text-muted); text-align: center; }
 
     .picker-create-btn {
       display: flex; align-items: center; gap: var(--space-xs);
-      width: 100%; padding: var(--space-sm) var(--space-md);
+      width: 100%; min-height: 44px; padding: var(--space-sm) var(--space-md);
       background: none; border: none; border-top: 1px solid var(--border-color);
       color: var(--color-primary); font-size: var(--font-size-sm);
       font-weight: 500; cursor: pointer; text-align: left;
       font-family: inherit; margin-top: var(--space-xs);
       transition: background 0.15s;
     }
-    .picker-create-btn:hover { background: rgba(122,59,46,0.06); }
+    .picker-create-btn:hover { background: rgba(var(--color-primary-rgb), 0.06); }
 
     .back-btn {
-      display: flex; align-items: center; justify-content: center;
-      background: none; border: none; color: var(--text-muted);
-      cursor: pointer; padding: var(--space-xs); margin-right: var(--space-xs);
+      display: inline-flex; align-items: center; gap: 4px;
+      background: none; border: none; padding: 0; margin-bottom: var(--space-md);
+      color: var(--text-secondary); font-size: var(--font-size-sm); font-family: inherit; cursor: pointer;
     }
     .back-btn:hover { color: var(--text-primary); }
 
-    .create-form {
-      display: flex; flex-direction: column;
-      padding: var(--space-md) var(--space-lg) var(--space-lg);
-    }
+    .create-form { display: flex; flex-direction: column; }
     .create-label {
       font-size: var(--font-size-sm); font-weight: 500;
       color: var(--text-secondary); margin-bottom: 6px; display: block;
     }
+    .create-label .optional { color: var(--text-muted); font-weight: 400; }
     .create-select {
       padding: 10px 14px; border: 1px solid var(--border-color);
       border-radius: var(--border-radius); background: var(--bg-canvas);
@@ -996,7 +932,6 @@ interface ExerciseBlock {
     .create-select:focus { border-color: var(--color-primary); }
 
     @keyframes spin { to { transform: rotate(360deg); } }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
     /* ── Mobile responsive ── */
     @media (max-width: 768px) {
@@ -1042,16 +977,16 @@ interface ExerciseBlock {
     @media (max-width: 480px) {
       .set-header-row,
       .set-row {
-        grid-template-columns: 28px 1fr 1fr 46px 28px 40px;
+        grid-template-columns: 24px 1fr 1fr 44px 36px minmax(40px, auto);
         padding: var(--space-xs) var(--space-md);
         gap: 4px;
       }
 
-      .set-input { padding: 6px 6px; font-size: var(--font-size-sm); }
+      .set-input { min-height: 40px; padding: 6px 6px; font-size: var(--font-size-sm); }
 
-      .log-btn { width: 30px; height: 30px; font-size: 14px; }
+      .log-btn { width: 36px; height: 36px; }
 
-      .warmup-btn { width: 24px; height: 24px; font-size: 0.6rem; }
+      .warmup-btn, .del-btn { width: 36px; height: 36px; }
 
       .ex-note-wrap { padding: var(--space-xs) var(--space-md); }
     }

@@ -39,6 +39,7 @@
   --color-positive: #3F6B37;
   --color-negative: #A84A22;
   --color-warning: #956B3D;
+  --color-warning-rgb: 149, 107, 61;
   --color-info: #475B70;
   --color-success: var(--color-positive);
 
@@ -203,6 +204,7 @@ html.dark {
   --color-positive: #8DB37E;
   --color-negative: #E08A66;
   --color-warning: #D2A468;
+  --color-warning-rgb: 210, 164, 104;
   --color-info: #8FAAC6;
 
   --shadow-sm: 2px 2px 0px rgba(0, 0, 0, 0.45);

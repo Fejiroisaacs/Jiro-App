@@ -8,6 +8,9 @@ import { Component, booleanAttribute, input } from '@angular/core';
  *   <jiro-button variant="primary" (click)="save()">Save</jiro-button>
  *   <jiro-button block type="submit" [loading]="saving()">Sign in</jiro-button>
  *   <jiro-button size="sm" variant="secondary">Edit</jiro-button>
+ *
+ * On a coloured surface (the session bar) use `inverse` for the one primary
+ * action and `ghost` for the rest; both take their colours from the surface.
  */
 @Component({
   selector: 'jiro-button',
@@ -19,6 +22,8 @@ import { Component, booleanAttribute, input } from '@angular/core';
       [class.jiro-btn--primary]="variant() === 'primary'"
       [class.jiro-btn--secondary]="variant() === 'secondary'"
       [class.jiro-btn--danger]="variant() === 'danger'"
+      [class.jiro-btn--inverse]="variant() === 'inverse'"
+      [class.jiro-btn--ghost]="variant() === 'ghost'"
       [class.jiro-btn--sm]="size() === 'sm'"
       [disabled]="disabled() || loading()"
       [attr.aria-busy]="loading() ? 'true' : null"
@@ -106,6 +111,30 @@ import { Component, booleanAttribute, input } from '@angular/core';
       transform: translate(-2px, -2px);
     }
 
+    /* Primary action on a primary-coloured surface */
+    .jiro-btn--inverse {
+      background: var(--text-on-primary);
+      color: var(--color-primary);
+      border-color: var(--text-on-primary);
+    }
+    .jiro-btn--inverse:hover:not(:disabled) {
+      box-shadow: 4px 4px 0px rgba(var(--shadow-rgb), 0.35);
+      transform: translate(-2px, -2px);
+    }
+
+    /* Secondary action on any coloured surface: inherits the surface's text colour */
+    .jiro-btn--ghost {
+      background: transparent;
+      color: inherit;
+      border-color: color-mix(in srgb, currentColor 45%, transparent);
+    }
+    .jiro-btn--ghost:hover:not(:disabled) {
+      background: color-mix(in srgb, currentColor 12%, transparent);
+      border-color: color-mix(in srgb, currentColor 75%, transparent);
+      box-shadow: 4px 4px 0px color-mix(in srgb, currentColor 25%, transparent);
+      transform: translate(-2px, -2px);
+    }
+
     .jiro-btn__spinner {
       border-color: transparent;
       border-top-color: currentColor;
@@ -113,7 +142,7 @@ import { Component, booleanAttribute, input } from '@angular/core';
   `]
 })
 export class JiroButtonComponent {
-  variant = input<'primary' | 'secondary' | 'danger'>('primary');
+  variant = input<'primary' | 'secondary' | 'danger' | 'inverse' | 'ghost'>('primary');
   size = input<'sm' | 'md'>('md');
   type = input<'button' | 'submit'>('button');
   disabled = input(false, { transform: booleanAttribute });
