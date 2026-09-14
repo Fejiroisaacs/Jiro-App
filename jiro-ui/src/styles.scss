@@ -65,6 +65,19 @@
   --sidebar-width: 240px;
   --sidebar-collapsed-width: 64px;
   --topbar-height: 56px;
+
+  // Previously referenced but never defined (audit A3). Values are finalised
+  // in the Phase 1 token pass; this block makes the references resolve.
+  --border-radius-sm: 4px;
+  --border-radius-md: var(--border-radius);
+  --font-size-base: var(--font-size-md);
+  --space-3xl: 64px;
+  --bg-main: var(--bg-page);
+  --surface-secondary: var(--bg-canvas);
+  --color-success: var(--jiro-green);
+  --color-warning: var(--jiro-clay);
+  --color-accent-rgb: 74, 103, 65;
+  --color-danger-rgb: 193, 88, 42;
 }
 
 // ========================================

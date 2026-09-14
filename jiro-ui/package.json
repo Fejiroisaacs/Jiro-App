@@ -6,7 +6,8 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "check:css": "node scripts/check-css-vars.mjs"
   },
   "prettier": {
     "printWidth": 100,
