@@ -127,7 +127,6 @@ Chart.register(...registerables);
       display: flex; align-items: flex-end; gap: var(--space-md); flex-wrap: wrap;
     }
 
-    .form-row ::ng-deep .jiro-btn { width: auto; flex-shrink: 0; margin-bottom: 0; }
 
     .form-group { display: flex; flex-direction: column; gap: var(--space-xs); flex: 1; min-width: 120px; }
 
@@ -147,7 +146,6 @@ Chart.register(...registerables);
       background: transparent;
       color: var(--text-primary); 
       font-size: var(--font-size-md);
-      outline: none; 
       transition: border-color 0.2s; 
       font-family: inherit; 
       width: 100%; 

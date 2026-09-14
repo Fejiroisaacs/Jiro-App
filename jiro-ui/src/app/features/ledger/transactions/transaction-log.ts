@@ -465,7 +465,6 @@ interface EditForm {
 
     .header-actions { display: flex; gap: var(--space-sm); flex-shrink: 0; align-items: center; }
 
-    .header-actions ::ng-deep .jiro-btn { width: auto; }
 
     /* ── Filter bar ─────────────────────────────────────────────────────────── */
 
@@ -503,7 +502,7 @@ interface EditForm {
     }
 
     .date-input:focus, .filter-select:focus {
-      outline: none; border-color: var(--color-primary);
+ border-color: var(--color-primary);
     }
 
     .filter-select { min-width: 140px; }
@@ -550,7 +549,7 @@ interface EditForm {
       width: 100%; min-height: 36px;
     }
 
-    .search-input:focus { outline: none; border-color: var(--color-primary); }
+    .search-input:focus { border-color: var(--color-primary); }
 
     .clear-btn {
       display: flex; align-items: center; gap: 5px;
@@ -622,7 +621,6 @@ interface EditForm {
 
     .state-message h3 { font-size: var(--font-size-lg); font-weight: 600; }
 
-    .state-message ::ng-deep .jiro-btn { width: auto; }
 
     .clear-btn-inline {
       background: none; border: none;
@@ -752,7 +750,6 @@ interface EditForm {
       padding: var(--space-lg) 0;
     }
 
-    .load-more-row ::ng-deep .jiro-btn { width: auto; }
 
     /* ── Modal form ─────────────────────────────────────────────────────────── */
 
@@ -792,7 +789,7 @@ interface EditForm {
       border: none; border-bottom: 2px dashed var(--border-color);
       border-radius: 0; background: transparent;
       color: var(--text-primary); font-size: var(--font-size-md);
-      outline: none; transition: border-color 0.2s;
+ transition: border-color 0.2s;
       font-family: inherit; width: 100%; box-sizing: border-box;
     }
 
@@ -851,9 +848,6 @@ interface EditForm {
 
     .form-actions-right { display: flex; gap: var(--space-sm); }
 
-    .form-actions ::ng-deep .jiro-btn,
-    .form-actions-right ::ng-deep .jiro-btn { width: auto; }
-
     .delete-confirm { display: flex; flex-direction: column; gap: var(--space-xs); }
 
     /* ── Responsive ─────────────────────────────────────────────────────────── */
@@ -865,7 +859,7 @@ interface EditForm {
 
       .page-header { flex-direction: column; }
       .header-actions { width: 100%; }
-      .header-actions ::ng-deep .jiro-btn { width: 100%; }
+      .header-actions { --jiro-btn-width: 100%; }
 
       .tx-row { padding: var(--space-sm); min-height: 52px; }
 

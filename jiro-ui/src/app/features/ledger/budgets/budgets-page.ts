@@ -256,11 +256,9 @@ import { periodLabel, clamp } from '../shared/ledger-utils';
 
     .page-header h1 { font-size: var(--font-size-2xl); font-weight: 700; }
 
-    .page-header ::ng-deep .jiro-btn { width: auto; }
 
     @media (max-width: 600px) {
       .page-header { flex-direction: column; }
-      .page-header ::ng-deep .jiro-btn { width: auto; }
     }
 
     /* ── Summary bar ── */
@@ -347,7 +345,7 @@ import { periodLabel, clamp } from '../shared/ledger-utils';
 
     .empty-state h3 { font-size: var(--font-size-xl); font-weight: 600; color: var(--text-primary); }
 
-    .empty-state ::ng-deep .jiro-btn { width: auto; margin-top: var(--space-xs); }
+    .empty-state jiro-button { margin-top: var(--space-xs); }
 
     /* ── Budgets grid ── */
     .budgets-grid {
@@ -520,7 +518,6 @@ import { periodLabel, clamp } from '../shared/ledger-utils';
       background: transparent;
       color: var(--text-primary);
       font-size: var(--font-size-md);
-      outline: none;
       transition: border-color 0.2s;
       font-family: inherit;
       width: 100%;
@@ -546,7 +543,6 @@ import { periodLabel, clamp } from '../shared/ledger-utils';
       margin-top: var(--space-xs);
     }
 
-    .form-actions ::ng-deep .jiro-btn { width: auto; }
 
     .form-error { font-size: var(--font-size-sm); color: var(--color-danger); margin: 0; }
 

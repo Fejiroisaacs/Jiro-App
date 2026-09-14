@@ -173,7 +173,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       border: 1px solid var(--border-color); border-radius: var(--border-radius-sm);
       background: var(--bg-surface); color: var(--text-primary); padding: 7px var(--space-sm); flex: 1; min-width: 140px;
     }
-    .filter-input:focus, .filter-select:focus { outline: none; border-color: var(--color-primary); }
+    .filter-input:focus, .filter-select:focus { border-color: var(--color-primary); }
     .filter-tag { min-width: 120px; }
 
     /* State */

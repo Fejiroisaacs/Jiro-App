@@ -1,4 +1,5 @@
-import { Component, OnInit, computed, signal, HostListener, ElementRef } from '@angular/core';
+import { Component, OnInit, computed, inject, signal, HostListener, ElementRef } from '@angular/core';
+import { ConfirmService } from '../../../core/services/confirm.service';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ShoppingListComponent } from '../shopping-list/shopping-list';
@@ -985,10 +986,6 @@ interface CookIngredient {
       font-weight: 600;
     }
 
-    .trials-header ::ng-deep .jiro-btn {
-      width: auto;
-    }
-
     .trials-empty {
       text-align: center;
       padding: var(--space-xl) 0;
@@ -1365,7 +1362,6 @@ interface CookIngredient {
       color: var(--text-primary);
       font-size: var(--font-size-sm);
       font-family: inherit;
-      outline: none;
       resize: none;
       transition: border-color 0.2s;
       box-sizing: border-box;
@@ -1723,8 +1719,15 @@ export class RecipeDetailComponent implements OnInit {
     this.recipe.update(r => r ? { ...r, ...updated } : r);
   }
 
-  deleteTrial(trial: RecipeTrial) {
-    if (!confirm('Delete this trial?')) return;
+  private readonly confirmService = inject(ConfirmService);
+
+  async deleteTrial(trial: RecipeTrial) {
+    const ok = await this.confirmService.confirm({
+      title: 'Delete this trial?',
+      message: 'The notes, rating and modifications for this cook will be removed.',
+      confirmLabel: 'Delete trial',
+    });
+    if (!ok) return;
     this.recipeService.deleteTrial(trial.id).subscribe({
       next: () => {
         this.recipe.update(r => {
@@ -1735,10 +1738,15 @@ export class RecipeDetailComponent implements OnInit {
     });
   }
 
-  confirmDelete() {
+  async confirmDelete() {
     const r = this.recipe();
     if (!r) return;
-    if (!confirm(`Delete "${r.title}"? This cannot be undone.`)) return;
+    const ok = await this.confirmService.confirm({
+      title: `Delete "${r.title}"?`,
+      message: 'The recipe and its trial log will be removed. This cannot be undone.',
+      confirmLabel: 'Delete recipe',
+    });
+    if (!ok) return;
     this.recipeService.deleteRecipe(r.id).subscribe({
       next: () => this.router.navigate(['/culinara'])
     });

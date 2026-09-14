@@ -206,7 +206,7 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
 
       <!-- Delete group (owner only) -->
       <div class="danger-zone" *ngIf="isOwner()">
-        <jiro-button variant="danger" type="button" (click)="confirmDeleteGroup.set(true)">Delete Group</jiro-button>
+        <jiro-button block variant="danger" type="button" (click)="confirmDeleteGroup.set(true)">Delete Group</jiro-button>
       </div>
     </jiro-modal>
 
@@ -326,7 +326,7 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
       border: 1px solid var(--border-color); border-radius: var(--border-radius-sm);
       background: var(--bg-canvas); color: var(--text-primary); padding: 8px var(--space-sm);
     }
-    .invite-input:focus { outline: none; border-color: var(--color-primary); }
+    .invite-input:focus { border-color: var(--color-primary); }
     .invite-error { font-size: var(--font-size-xs); color: var(--color-danger); margin-top: var(--space-xs); }
     .invite-success { font-size: var(--font-size-xs); color: var(--color-success, #16a34a); margin-top: var(--space-xs); }
 
@@ -339,7 +339,7 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
       border: 1px solid var(--border-color); border-radius: var(--border-radius-sm);
       background: var(--bg-canvas); color: var(--text-primary); padding: 8px var(--space-sm);
     }
-    .form-control:focus { outline: none; border-color: var(--color-primary); }
+    .form-control:focus { border-color: var(--color-primary); }
     .body-area { resize: vertical; min-height: 100px; font-family: Georgia, serif; line-height: 1.6; }
     .mood-row-modal { display: flex; gap: var(--space-xs); overflow-x: auto; scrollbar-width: none; }
     .mood-row-modal::-webkit-scrollbar { display: none; }

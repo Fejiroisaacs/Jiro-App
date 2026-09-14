@@ -211,7 +211,6 @@ Chart.register(...registerables);
     .detail-header {
       display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-lg);
     }
-    .detail-header ::ng-deep .jiro-btn { width: auto; flex-shrink: 0; }
 
     .header-btns { display: flex; gap: var(--space-sm); flex-shrink: 0; }
 
@@ -270,7 +269,7 @@ Chart.register(...registerables);
     .ex-select {
       padding: 8px 12px; border: 1px solid var(--border-color);
       border-radius: var(--border-radius); background: var(--bg-surface);
-      color: var(--text-primary); font-size: var(--font-size-sm); outline: none; cursor: pointer;
+      color: var(--text-primary); font-size: var(--font-size-sm); cursor: pointer;
     }
     .ex-select:focus { border-color: var(--color-primary); }
 

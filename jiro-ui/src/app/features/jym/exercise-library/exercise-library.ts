@@ -198,7 +198,6 @@ const MUSCLE_GROUPS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs'
       gap: var(--space-sm); flex-shrink: 0;
     }
 
-    .header-actions ::ng-deep .jiro-btn { width: auto; }
 
     .filters { display: flex; flex-direction: column; gap: var(--space-md); margin-bottom: var(--space-xl); }
 
@@ -206,7 +205,7 @@ const MUSCLE_GROUPS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs'
       width: 100%; max-width: 400px; padding: 10px 14px;
       border: 1px solid var(--border-color); border-radius: var(--border-radius);
       background: var(--bg-surface); color: var(--text-primary);
-      font-size: var(--font-size-md); outline: none; transition: border-color 0.2s;
+      font-size: var(--font-size-md); transition: border-color 0.2s;
     }
 
     .search-input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(122,59,46,0.15); }
@@ -251,7 +250,6 @@ const MUSCLE_GROUPS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs'
       justify-content: center; padding: var(--space-2xl); gap: var(--space-md); text-align: center;
     }
 
-    .state-message ::ng-deep .jiro-btn { width: auto; }
 
     .spinner-lg {
       width: 40px; height: 40px; border: 3px solid var(--border-color);
@@ -352,7 +350,6 @@ const MUSCLE_GROUPS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs'
       background: transparent;
       color: var(--text-primary); 
       font-size: var(--font-size-md);
-      outline: none; 
       transition: border-color 0.2s; 
       font-family: inherit; 
       width: 100%; 
@@ -367,7 +364,6 @@ const MUSCLE_GROUPS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs'
 
     .form-actions { display: flex; justify-content: flex-end; gap: var(--space-sm); margin-top: var(--space-xs); }
 
-    .form-actions ::ng-deep .jiro-btn { width: auto; }
 
     @keyframes spin { to { transform: rotate(360deg); } }
   `]

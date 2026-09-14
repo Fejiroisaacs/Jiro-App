@@ -223,7 +223,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       margin-left: auto;
     }
 
-    .card-footer-actions ::ng-deep .jiro-btn { width: auto; }
 
     .sessions-pill, .duration-pill {
       font-size: var(--font-size-xs); padding: 3px 10px; border-radius: 10px;

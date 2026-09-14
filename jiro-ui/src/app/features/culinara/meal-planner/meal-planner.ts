@@ -381,7 +381,7 @@ function addWeeks(d: Date, n: number): Date {
       color: var(--text-primary);
       box-sizing: border-box;
     }
-    .search-input:focus { outline: none; border-color: var(--color-primary); }
+    .search-input:focus { border-color: var(--color-primary); }
 
     .picker-results {
       overflow-y: auto;

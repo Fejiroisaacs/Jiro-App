@@ -1,11 +1,11 @@
 import { Component, Input, forwardRef } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
+import { JiroIconComponent } from '../jiro-icon/jiro-icon';
 
 @Component({
   selector: 'star-rating',
   standalone: true,
-  imports: [CommonModule],
+  imports: [JiroIconComponent],
   providers: [
     {
       provide: NG_VALUE_ACCESSOR,
@@ -14,19 +14,22 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
     },
   ],
   template: `
-    <div class="stars" [class.readonly]="readonly">
-      <button
-        *ngFor="let star of [1,2,3,4,5]"
-        type="button"
-        class="star"
-        [class.filled]="star <= value"
-        [class.hovered]="star <= hoverValue && !readonly"
-        (click)="!readonly && select(star)"
-        (mouseenter)="!readonly && (hoverValue = star)"
-        (mouseleave)="hoverValue = 0"
-        [disabled]="readonly">
-        &#9733;
-      </button>
+    <div class="stars" [class.readonly]="readonly" role="group" [attr.aria-label]="ariaLabel">
+      @for (star of stars; track star) {
+        <button
+          type="button"
+          class="star"
+          [class.filled]="star <= value"
+          [class.hovered]="star <= hoverValue && !readonly"
+          [attr.aria-label]="star + (star === 1 ? ' star' : ' stars')"
+          [attr.aria-pressed]="star === value"
+          (click)="!readonly && select(star)"
+          (mouseenter)="!readonly && (hoverValue = star)"
+          (mouseleave)="hoverValue = 0"
+          [disabled]="readonly">
+          <jiro-icon [name]="star <= value || (star <= hoverValue && !readonly) ? 'star:fill' : 'star'" [size]="size" />
+        </button>
+      }
     </div>
   `,
   styles: [`
@@ -36,21 +39,22 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
     }
 
     .star {
+      display: inline-flex;
       background: none;
       border: none;
-      font-size: 20px;
+      border-radius: var(--border-radius-sm);
       cursor: pointer;
-      color: var(--border-color);
-      transition: color 0.1s;
-      padding: 0 2px;
+      color: var(--text-muted);
+      padding: 2px;
+      transition: color 0.1s, transform 0.1s;
     }
 
     .star.filled {
-      color: var(--jiro-clay);
+      color: var(--color-warning);
     }
 
     .star.hovered {
-      color: var(--jiro-clay);
+      color: var(--color-warning);
       opacity: 0.7;
     }
 
@@ -65,7 +69,10 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 })
 export class StarRatingComponent implements ControlValueAccessor {
   @Input() readonly = false;
+  @Input() size = 20;
+  @Input() ariaLabel = 'Rating';
 
+  readonly stars = [1, 2, 3, 4, 5];
   value = 0;
   hoverValue = 0;
   onChange: (val: number) => void = () => {};

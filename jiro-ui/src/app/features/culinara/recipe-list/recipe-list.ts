@@ -248,10 +248,6 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
       gap: var(--space-sm);
     }
 
-    .header-actions ::ng-deep .jiro-btn {
-      width: auto;
-    }
-
     /* On desktop the wrapper is invisible — children flow inline with the button */
     .secondary-links {
       display: contents;
@@ -296,7 +292,6 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
       background: var(--bg-surface);
       color: var(--text-primary);
       font-size: var(--font-size-md);
-      outline: none;
       transition: border-color 0.2s;
     }
 
@@ -379,10 +374,6 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
       padding: var(--space-2xl);
       gap: var(--space-md);
       text-align: center;
-    }
-
-    .state-message ::ng-deep .jiro-btn {
-      width: auto;
     }
 
     .spinner-lg {
@@ -633,7 +624,6 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
       background: var(--bg-surface);
       color: var(--text-primary);
       font-size: var(--font-size-xs);
-      outline: none;
       width: 140px;
       font-family: inherit;
     }
@@ -673,9 +663,7 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
         gap: var(--space-sm);
       }
 
-      .header-actions ::ng-deep .jiro-btn {
-        width: 100%;
-      }
+      .header-actions { --jiro-btn-width: 100%; }
 
       /* Restore secondary-links as a visible flex row */
       .secondary-links {

@@ -244,7 +244,6 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
       background: var(--bg-surface);
       color: var(--text-primary);
       font-size: var(--font-size-md);
-      outline: none;
       transition: border-color 0.2s;
       font-family: inherit;
       box-sizing: border-box;
@@ -424,10 +423,6 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
       gap: var(--space-sm);
       align-items: center;
       margin-top: var(--space-sm);
-    }
-
-    .form-actions ::ng-deep .jiro-btn {
-      width: auto;
     }
 
     .btn-ghost {

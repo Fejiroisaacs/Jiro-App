@@ -208,7 +208,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     .delete-confirm { display: flex; flex-direction: column; gap: var(--space-xs); }
 
     .form-actions { display: flex; justify-content: flex-end; gap: var(--space-sm); }
-    .form-actions ::ng-deep .jiro-btn { width: auto; }
 
     .page-header {
       display: flex; align-items: flex-start; justify-content: space-between;
@@ -222,14 +221,12 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       gap: var(--space-sm); flex-shrink: 0;
     }
 
-    .header-actions ::ng-deep .jiro-btn { width: auto; }
 
     .export-row {
       display: flex; flex-direction: column; gap: var(--space-sm);
       margin-bottom: var(--space-lg);
     }
 
-    .export-row ::ng-deep .jiro-btn { width: auto; align-self: flex-start; }
 
     .date-range {
       display: flex; gap: var(--space-sm);
@@ -263,7 +260,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     }
 
     .date-input:focus {
-      outline: none;
       border-color: var(--color-primary);
     }
 
@@ -285,7 +281,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       justify-content: center; padding: var(--space-2xl); gap: var(--space-md); text-align: center;
     }
 
-    .state-message ::ng-deep .jiro-btn { width: auto; }
 
     .spinner-lg {
       width: 40px; height: 40px; border: 3px solid var(--border-color);

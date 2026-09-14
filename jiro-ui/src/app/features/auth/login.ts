@@ -40,7 +40,7 @@ import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-inpu
 
             <a routerLink="/forgot-password" class="forgot-link">Forgot password?</a>
 
-            <jiro-button type="submit" [loading]="loading()" [disabled]="!email || !password">
+            <jiro-button block type="submit" [loading]="loading()" [disabled]="!email || !password">
               Sign In
             </jiro-button>
           </form>

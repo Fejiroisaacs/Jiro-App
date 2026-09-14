@@ -220,7 +220,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
     .header-actions { display: flex; gap: var(--space-sm); flex-shrink: 0; align-items: center; }
 
-    .header-actions ::ng-deep .jiro-btn { width: auto; }
 
     .discover-btn {
       display: flex; align-items: center; gap: 6px;
@@ -250,7 +249,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     @media (max-width: 600px) {
       .page-header { flex-direction: column; }
       .header-actions { flex-shrink: 1; }
-      .header-actions ::ng-deep .jiro-btn { width: auto; }
     }
 
     /* ── State messages ── */
@@ -259,7 +257,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       justify-content: center; padding: var(--space-2xl); gap: var(--space-md); text-align: center;
     }
 
-    .state-message ::ng-deep .jiro-btn { width: auto; }
 
     .spinner-lg {
       width: 40px; height: 40px;
@@ -300,7 +297,8 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     .split-actions { display: flex; gap: var(--space-sm); margin-top: var(--space-lg); align-items: center; }
 
     .btn-slot { flex: 1; display: flex; flex-direction: column; }
-    .btn-slot ::ng-deep .jiro-btn { flex: 1; width: 100%; }
+    .btn-slot { --jiro-btn-width: 100%; }
+    .btn-slot jiro-button { display: flex; flex: 1; }
 
     .delete-split-btn {
       flex-shrink: 0;
@@ -344,7 +342,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       background: transparent;
       color: var(--text-primary); 
       font-size: var(--font-size-md);
-      outline: none; 
       transition: border-color 0.2s; 
       font-family: inherit; 
       width: 100%; 
@@ -359,7 +356,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
     .form-actions { display: flex; justify-content: flex-end; gap: var(--space-sm); margin-top: var(--space-xs); }
 
-    .form-actions ::ng-deep .jiro-btn { width: auto; }
 
     .picker-loading { display: flex; justify-content: center; padding: var(--space-xl); }
 
@@ -400,11 +396,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     @media (max-width: 600px) {
       .split-actions { gap: 0.3rem; }
 
-      .split-actions ::ng-deep .jiro-btn {
-        padding: 0.4rem 0.55rem;
-        font-size: 0.7rem;
-        gap: 0.2rem;
-      }
 
       .split-actions svg { width: 10px; height: 10px; }
 

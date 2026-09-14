@@ -92,7 +92,6 @@ import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-car
       background: var(--bg-surface);
       color: var(--text-primary);
       font-size: var(--font-size-md);
-      outline: none;
     }
     .search-input:focus { border-color: var(--color-primary); }
     .search-input::placeholder { color: var(--text-muted); }

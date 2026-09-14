@@ -249,12 +249,10 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
     .header-actions { display: flex; gap: var(--space-sm); flex-shrink: 0; align-items: center; }
 
-    .header-actions ::ng-deep .jiro-btn { width: auto; }
 
     @media (max-width: 600px) {
       .page-header { flex-direction: column; }
       .header-actions { flex-shrink: 1; }
-      .header-actions ::ng-deep .jiro-btn { width: auto; }
     }
 
     /* ── In Progress ── */
@@ -279,7 +277,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
     .ipc-actions { display: flex; align-items: center; gap: var(--space-xs); flex-shrink: 0; }
 
-    .ipc-actions ::ng-deep .jiro-btn { width: auto; }
 
     .ipc-discard-btn {
       background: none; border: 1px solid var(--border-color);
@@ -328,7 +325,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
     .asc-actions { display: flex; align-items: center; gap: var(--space-sm); flex-shrink: 0; }
 
-    .asc-actions ::ng-deep .jiro-btn { width: auto; }
 
     .asc-view-btn {
       background: none; border: 1px solid var(--border-color);
@@ -418,7 +414,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
     .form-actions { display: flex; justify-content: flex-end; gap: var(--space-sm); margin-top: var(--space-xs); }
 
-    .form-actions ::ng-deep .jiro-btn { width: auto; }
 
     /* ── Activity Stats ── */
     .stats-section { margin-bottom: var(--space-xl); }
@@ -526,7 +521,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
       .asc-view-btn { padding: 0.3rem 0.6rem; font-size: 0.7rem; }
 
-      .asc-actions ::ng-deep .jiro-btn { font-size: 0.7rem; padding: 0.3rem 0.6rem; }
     }
   `]
 })

@@ -65,7 +65,7 @@ import { AdminService, AdminUser } from '../../core/services/admin.service';
     .search-bar { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
     .search-input {
       flex: 1; padding: 9px 12px; border: 1px solid var(--border-color); border-radius: 6px;
-      background: var(--bg-surface); color: var(--text-primary); font-size: 14px; outline: none;
+      background: var(--bg-surface); color: var(--text-primary); font-size: 14px;
     }
     .search-input:focus { border-color: var(--color-primary); }
     .search-btn {

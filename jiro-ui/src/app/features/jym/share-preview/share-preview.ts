@@ -191,7 +191,6 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
       display: flex; flex-direction: column; gap: var(--space-md);
     }
 
-    .import-info ::ng-deep .jiro-btn { width: auto; align-self: flex-start; }
 
     .import-success {
       display: flex; align-items: center; gap: var(--space-sm);

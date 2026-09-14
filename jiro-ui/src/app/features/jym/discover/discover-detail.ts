@@ -104,7 +104,6 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
       justify-content: center; padding: var(--space-2xl); gap: var(--space-md); text-align: center;
     }
 
-    .state-message ::ng-deep .jiro-btn { width: auto; }
 
     .spinner-lg {
       width: 36px; height: 36px; border: 3px solid var(--border-color);
@@ -119,7 +118,6 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
 
     .header-left { display: flex; flex-direction: column; gap: var(--space-xs); }
 
-    .header-actions ::ng-deep .jiro-btn { width: auto; flex-shrink: 0; }
 
     .back-btn {
       display: flex; align-items: center; gap: 6px;

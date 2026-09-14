@@ -230,7 +230,6 @@ Chart.register(...registerables);
 
     .page-header h1 { font-size: var(--font-size-2xl); font-weight: 700; }
 
-    .page-header ::ng-deep .jiro-btn { width: auto; }
 
     @media (max-width: 600px) {
       .page-header { flex-direction: column; }
@@ -282,7 +281,7 @@ Chart.register(...registerables);
 
     .empty-state h3 { font-size: var(--font-size-xl); font-weight: 600; }
 
-    .empty-state ::ng-deep .jiro-btn { width: auto; margin-top: var(--space-xs); }
+    .empty-state jiro-button { margin-top: var(--space-xs); }
 
     /* ── Summary card ── */
     .summary-card { width: 100%; }
@@ -473,7 +472,6 @@ Chart.register(...registerables);
       background: transparent;
       color: var(--text-primary);
       font-size: var(--font-size-md);
-      outline: none;
       transition: border-color 0.2s;
       font-family: inherit;
       width: 100%;
@@ -518,7 +516,6 @@ Chart.register(...registerables);
       margin-top: var(--space-xs);
     }
 
-    .form-actions ::ng-deep .jiro-btn { width: auto; }
 
     @keyframes spin { to { transform: rotate(360deg); } }
   `]

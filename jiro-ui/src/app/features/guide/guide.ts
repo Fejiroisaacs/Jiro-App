@@ -1,32 +1,31 @@
 import { Component } from '@angular/core';
 import { RouterModule } from '@angular/router';
+import { JiroMarkComponent, MarkName } from '../../shared/components/jiro-mark/jiro-mark';
+import { JiroPageHeaderComponent } from '../../shared/components/jiro-page-header/jiro-page-header';
 
 interface ModuleCard {
   label: string;
-  icon: string;
+  mark: MarkName;
   route: string | null;
 }
 
 @Component({
   selector: 'app-guide',
   standalone: true,
-  imports: [RouterModule],
+  imports: [RouterModule, JiroMarkComponent, JiroPageHeaderComponent],
   template: `
     <div class="guide-page">
-      <div class="page-header">
-        <h1>Guide</h1>
-        <p class="subtitle">Learn how to get the most out of Jiro</p>
-      </div>
+      <jiro-page-header heading="Guide" subtitle="Learn how to get the most out of Jiro" />
       <div class="module-grid">
         @for (m of modules; track m.label) {
           @if (m.route) {
             <a [routerLink]="m.route" class="module-card">
-              <img [src]="m.icon" [alt]="m.label" width="48" height="48" />
+              <jiro-mark [name]="m.mark" [size]="48" />
               <span>{{ m.label }}</span>
             </a>
           } @else {
             <div class="module-card disabled">
-              <img [src]="m.icon" [alt]="m.label" width="48" height="48" />
+              <jiro-mark [name]="m.mark" [size]="48" />
               <span>{{ m.label }}</span>
               <span class="soon">Soon</span>
             </div>
@@ -37,24 +36,7 @@ interface ModuleCard {
   `,
   styles: [`
     .guide-page {
-      padding: 24px 16px;
-    }
-
-    .page-header {
-      margin-bottom: 32px;
-    }
-
-    .page-header h1 {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: var(--text-primary);
-      margin: 0 0 4px;
-    }
-
-    .subtitle {
-      color: var(--text-secondary);
-      font-size: 0.875rem;
-      margin: 0;
+      max-width: 860px;
     }
 
     .module-grid {
@@ -110,9 +92,9 @@ interface ModuleCard {
 })
 export class GuideComponent {
   modules: ModuleCard[] = [
-    { label: 'Jym',      icon: '/icons/jym-icon.svg',      route: '/guide/jym' },
-    { label: 'Culinara', icon: '/icons/culinara-icon.svg', route: null },
-    { label: 'Journaly', icon: '/icons/journaly-icon.svg', route: null },
-    { label: 'Ledger',   icon: '/icons/ledger-icon.svg',   route: null },
+    { label: 'Jym',      mark: 'jym',      route: '/guide/jym' },
+    { label: 'Culinara', mark: 'culinara', route: null },
+    { label: 'Journaly', mark: 'journaly', route: null },
+    { label: 'Ledger',   mark: 'ledger',   route: null },
   ];
 }

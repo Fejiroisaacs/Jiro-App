@@ -176,7 +176,6 @@ export interface TransactionPayload {
       background: var(--bg-surface);
       color: var(--text-primary);
       font-size: var(--font-size-md);
-      outline: none;
       transition: border-color 0.2s, box-shadow 0.2s;
       width: 100%;
       box-sizing: border-box;
@@ -197,7 +196,6 @@ export interface TransactionPayload {
       gap: var(--space-sm);
       margin-top: var(--space-xs);
     }
-    .form-actions ::ng-deep .jiro-btn { width: auto; }
 
     /* Type toggle */
     .type-toggle {

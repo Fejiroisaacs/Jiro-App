@@ -1,4 +1,5 @@
-import { Component, OnInit, computed, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ConfirmService } from '../../../core/services/confirm.service';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
@@ -153,10 +154,6 @@ const STORAGE_KEY = 'culinara_shopping_list';
     .empty-state h3 {
       font-size: var(--font-size-lg);
       font-weight: 600;
-    }
-
-    .empty-state ::ng-deep .jiro-btn {
-      width: auto;
     }
 
     .recipe-group {
@@ -322,8 +319,15 @@ export class ShoppingListComponent implements OnInit {
     this.save();
   }
 
-  clearAll() {
-    if (!confirm('Clear the entire grocery list?')) return;
+  private readonly confirmService = inject(ConfirmService);
+
+  async clearAll() {
+    const ok = await this.confirmService.confirm({
+      title: 'Clear the grocery list?',
+      message: 'Every item will be removed, including ones you have not bought yet.',
+      confirmLabel: 'Clear list',
+    });
+    if (!ok) return;
     this.items.set([]);
     this.save();
   }

@@ -47,7 +47,6 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR, FormsModule } from '@angular/f
       color: var(--text-primary);
       font-size: var(--font-size-md);
       transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-      outline: none;
     }
 
     .jiro-input:focus {

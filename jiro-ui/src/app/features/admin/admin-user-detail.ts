@@ -1,4 +1,5 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
+import { ConfirmService } from '../../core/services/confirm.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -159,8 +160,15 @@ export class AdminUserDetailComponent implements OnInit {
     });
   }
 
-  deleteUser() {
-    if (!confirm(`Delete ${this.user()!.email}? This cannot be undone.`)) return;
+  private readonly confirmService = inject(ConfirmService);
+
+  async deleteUser() {
+    const ok = await this.confirmService.confirm({
+      title: 'Delete user?',
+      message: `${this.user()!.email} and all of their data will be removed. This cannot be undone.`,
+      confirmLabel: 'Delete user',
+    });
+    if (!ok) return;
     const id = this.user()!.id;
     this.actionLoading.set(true);
     this.adminService.deleteUser(id).subscribe({

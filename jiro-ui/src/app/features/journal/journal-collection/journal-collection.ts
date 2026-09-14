@@ -209,7 +209,7 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
     .modal-form { display: flex; flex-direction: column; gap: var(--space-xs); margin-bottom: var(--space-lg); }
     .form-label { font-size: var(--font-size-sm); font-weight: 500; color: var(--text-secondary); }
     .form-control { font-family: inherit; font-size: var(--font-size-sm); border: 1px solid var(--border-color); border-radius: var(--border-radius-sm); background: var(--bg-canvas); color: var(--text-primary); padding: 8px var(--space-sm); }
-    .form-control:focus { outline: none; border-color: var(--color-primary); }
+    .form-control:focus { border-color: var(--color-primary); }
     .modal-actions { display: flex; gap: var(--space-sm); align-items: center; }
 
     @media (max-width: 600px) {

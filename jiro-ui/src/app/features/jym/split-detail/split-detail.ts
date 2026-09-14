@@ -302,7 +302,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       margin-bottom: var(--space-xl); gap: var(--space-md);
     }
 
-    .page-header ::ng-deep .jiro-btn { width: auto; flex-shrink: 0; }
 
     .header-left { display: flex; flex-direction: column; gap: var(--space-sm); }
 
@@ -325,7 +324,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       font-size: var(--font-size-2xl); font-weight: 700;
       border: none; border-bottom: 2px dashed var(--color-primary);
       background: transparent; color: var(--text-primary);
-      outline: none; padding: 0 var(--space-xs);
+ padding: 0 var(--space-xs);
     }
 
     .edit-btn {
@@ -383,7 +382,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       padding: 4px 10px; border: 1px solid var(--color-primary);
       border-radius: var(--border-radius); background: var(--bg-surface);
       color: var(--text-primary); font-size: var(--font-size-sm);
-      outline: none; font-family: inherit; width: 240px;
+ font-family: inherit; width: 240px;
     }
 
     .tag-save-btn, .tag-cancel-btn {
@@ -417,7 +416,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       gap: var(--space-md); padding: var(--space-2xl); text-align: center; width: 100%;
     }
 
-    .board-empty ::ng-deep .jiro-btn { width: auto; }
 
     .routine-column {
       min-width: 260px; max-width: 280px; flex-shrink: 0;
@@ -536,7 +534,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       background: transparent;
       color: var(--text-primary); 
       font-size: var(--font-size-md);
-      outline: none; 
       transition: border-color 0.2s; 
       font-family: inherit; 
       width: 100%; 
@@ -547,7 +544,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
     .form-actions { display: flex; justify-content: flex-end; gap: var(--space-sm); margin-top: var(--space-xs); }
 
-    .form-actions ::ng-deep .jiro-btn { width: auto; }
 
     /* Exercise picker */
     .ex-picker { display: flex; flex-direction: column; gap: var(--space-md); }
@@ -579,7 +575,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       display: flex; flex-direction: column; gap: var(--space-md);
     }
 
-    .target-inputs ::ng-deep .jiro-btn { width: auto; }
 
     .target-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md); }
 
@@ -603,7 +598,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
     /* Share panel */
     .header-btns { display: flex; gap: var(--space-sm); align-items: center; }
-    .header-btns ::ng-deep .jiro-btn { width: auto; }
 
     .share-panel {
       display: flex; align-items: center; gap: var(--space-sm);
@@ -618,7 +612,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       flex: 1; min-width: 0; padding: 6px 10px;
       border: 1px solid var(--border-color); border-radius: var(--border-radius);
       background: var(--bg-canvas); color: var(--text-secondary);
-      font-size: var(--font-size-sm); font-family: monospace; outline: none;
+      font-size: var(--font-size-sm); font-family: monospace;
     }
 
     .share-copy-btn {
@@ -662,9 +656,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
         flex-direction: column;
       }
 
-      .header-btns ::ng-deep .jiro-btn {
-        width: 100%;
-      }
+      .header-btns { --jiro-btn-width: 100%; }
     }
 
     @keyframes spin { to { transform: rotate(360deg); } }

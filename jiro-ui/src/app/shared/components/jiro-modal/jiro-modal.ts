@@ -1,16 +1,26 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, HostListener, Input, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { JiroIconComponent } from '../jiro-icon/jiro-icon';
+
+let modalSeq = 0;
 
 @Component({
   selector: 'jiro-modal',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, JiroIconComponent],
   template: `
     <div class="modal-backdrop" (click)="onBackdropClick($event)">
-      <div class="modal-content" [style.max-width]="maxWidth">
+      <div
+        class="modal-content"
+        role="dialog"
+        aria-modal="true"
+        [attr.aria-labelledby]="title ? titleId : null"
+        [style.max-width]="maxWidth">
         <div class="modal-header" *ngIf="title">
-          <h2>{{ title }}</h2>
-          <button class="modal-close" (click)="close.emit()">&times;</button>
+          <h2 [id]="titleId">{{ title }}</h2>
+          <button type="button" class="modal-close" (click)="close.emit()" aria-label="Close">
+            <jiro-icon name="x" [size]="18" />
+          </button>
         </div>
         <div class="modal-body">
           <ng-content></ng-content>
@@ -21,15 +31,12 @@ import { CommonModule } from '@angular/common';
   styles: [`
     .modal-backdrop {
       position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
+      inset: 0;
       background: rgba(0, 0, 0, 0.5);
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 1000;
+      z-index: var(--z-modal);
       padding: var(--space-lg);
       animation: fadeIn 0.15s ease;
     }
@@ -40,7 +47,7 @@ import { CommonModule } from '@angular/common';
       border-radius: var(--border-radius-lg);
       box-shadow: var(--shadow-lg);
       width: 100%;
-      max-height: 90vh;
+      max-height: 90dvh;
       overflow-y: auto;
       animation: slideUp 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     }
@@ -49,6 +56,7 @@ import { CommonModule } from '@angular/common';
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: var(--space-md);
       padding: var(--space-lg) var(--space-lg) 0;
     }
 
@@ -58,17 +66,23 @@ import { CommonModule } from '@angular/common';
     }
 
     .modal-close {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      margin: -8px -8px -8px 0;
       background: none;
       border: none;
-      font-size: 24px;
+      border-radius: var(--border-radius);
       cursor: pointer;
       color: var(--text-muted);
-      padding: var(--space-xs);
-      line-height: 1;
+      flex-shrink: 0;
     }
 
     .modal-close:hover {
       color: var(--text-primary);
+      background: var(--bg-surface-hover);
     }
 
     .modal-body {
@@ -90,6 +104,13 @@ export class JiroModalComponent {
   @Input() title = '';
   @Input() maxWidth = '520px';
   @Output() close = new EventEmitter<void>();
+
+  readonly titleId = `jiro-modal-title-${++modalSeq}`;
+
+  @HostListener('document:keydown.escape')
+  onEscape() {
+    this.close.emit();
+  }
 
   onBackdropClick(event: MouseEvent) {
     if ((event.target as HTMLElement).classList.contains('modal-backdrop')) {

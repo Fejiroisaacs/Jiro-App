@@ -352,7 +352,6 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
 
     .header-actions { display: flex; gap: var(--space-sm); align-items: center; flex-shrink: 0; }
 
-    .header-actions ::ng-deep .jiro-btn { width: auto; }
 
     /* ── Empty state ── */
     .empty-state {
@@ -368,7 +367,6 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
 
     .empty-state h3 { font-size: var(--font-size-xl); font-weight: 600; }
 
-    .empty-action ::ng-deep .jiro-btn { width: auto; }
 
     /* ── Loading ── */
     .state-message {
@@ -679,7 +677,6 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
       background: var(--bg-surface);
       color: var(--text-primary);
       font-size: var(--font-size-md);
-      outline: none;
       transition: border-color 0.2s, box-shadow 0.2s;
       width: 100%;
       box-sizing: border-box;
@@ -741,7 +738,6 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
       margin-top: var(--space-xs);
     }
 
-    .form-actions ::ng-deep .jiro-btn { width: auto; }
 
     .delete-confirm { display: flex; flex-direction: column; gap: var(--space-xs); }
 

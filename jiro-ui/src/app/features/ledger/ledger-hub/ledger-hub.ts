@@ -212,7 +212,6 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
 
     .header-actions { display: flex; gap: var(--space-sm); flex-shrink: 0; align-items: center; }
 
-    .header-actions ::ng-deep .jiro-btn { width: auto; }
 
     /* ── Summary Bar ── */
     .summary-bar {
@@ -473,7 +472,6 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
 
     .empty-state h3 { font-size: var(--font-size-xl); font-weight: 600; }
 
-    .empty-action ::ng-deep .jiro-btn { width: auto; }
 
     /* ── Spinner ── */
     .state-message {

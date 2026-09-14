@@ -37,6 +37,7 @@ import { JiroButtonComponent } from '../../shared/components/jiro-button/jiro-bu
           <p>This verification link is invalid or has expired.</p>
           <jiro-button
             *ngIf="authService.isAuthenticated()"
+            block
             variant="primary"
             [disabled]="resending()"
             (click)="resend()">

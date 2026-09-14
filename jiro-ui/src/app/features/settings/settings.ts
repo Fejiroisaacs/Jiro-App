@@ -1,19 +1,21 @@
-import { Component, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService, UserSettings } from '../../core/services/auth.service';
-import { SettingsService } from '../../core/services/settings.service';
+import { SettingsService, Theme } from '../../core/services/settings.service';
 import { UploadService } from '../../core/services/upload.service';
 import { JiroCardComponent } from '../../shared/components/jiro-card/jiro-card';
 import { JiroButtonComponent } from '../../shared/components/jiro-button/jiro-button';
 import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-input';
+import { JiroPageHeaderComponent } from '../../shared/components/jiro-page-header/jiro-page-header';
+import { ToastService } from '../../core/services/toast.service';
 @Component({
   selector: 'app-settings',
   standalone: true,
-  imports: [CommonModule, FormsModule, JiroCardComponent, JiroButtonComponent, JiroInputComponent],
+  imports: [CommonModule, FormsModule, JiroCardComponent, JiroButtonComponent, JiroInputComponent, JiroPageHeaderComponent],
   template: `
     <div class="settings">
-      <h1>Settings</h1>
+      <jiro-page-header heading="Settings" subtitle="Account, profile, preferences and theme" />
 
       <!-- Account -->
       <jiro-card class="settings-section">
@@ -155,20 +157,11 @@ import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-inpu
         </div>
       </jiro-card>
 
-      <div class="save-status" *ngIf="saved()">
-        Settings saved
-      </div>
     </div>
   `,
   styles: [`
     .settings {
       max-width: 640px;
-    }
-
-    .settings h1 {
-      font-size: var(--font-size-2xl);
-      font-weight: 700;
-      margin-bottom: var(--space-xl);
     }
 
     .settings-section {
@@ -281,7 +274,6 @@ import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-inpu
       font-size: var(--font-size-sm);
       font-family: inherit;
       resize: vertical;
-      outline: none;
       transition: border-color 0.15s;
     }
 
@@ -308,24 +300,10 @@ import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-inpu
       color: var(--text-primary);
       font-size: var(--font-size-sm);
       cursor: pointer;
-      outline: none;
     }
 
     .jiro-select:focus {
       border-color: var(--color-primary);
-    }
-
-    .save-status {
-      position: fixed;
-      bottom: var(--space-lg);
-      right: var(--space-lg);
-      background: var(--color-accent);
-      color: white;
-      padding: var(--space-sm) var(--space-lg);
-      border-radius: var(--border-radius);
-      font-size: var(--font-size-sm);
-      box-shadow: var(--shadow-md);
-      animation: fadeIn 0.2s ease;
     }
 
     @keyframes fadeIn {
@@ -401,7 +379,7 @@ import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-inpu
       width: 100%;
       height: 100%;
       background: var(--color-primary);
-      color: #fff;
+      color: var(--text-on-primary);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -419,7 +397,7 @@ import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-inpu
       display: inline-block;
       padding: 7px 16px;
       background: var(--color-primary);
-      color: #fff;
+      color: var(--text-on-primary);
       border-radius: var(--border-radius);
       font-size: var(--font-size-sm);
       font-weight: 500;
@@ -451,7 +429,7 @@ import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-inpu
 })
 export class SettingsComponent implements OnInit {
   settings = signal<UserSettings>({});
-  saved = signal(false);
+  private readonly toast = inject(ToastService);
   weightUnit = 'lbs';
   timezone = 'America/New_York';
 
@@ -466,18 +444,11 @@ export class SettingsComponent implements OnInit {
   avatarProgress = signal(0);
   avatarError = signal<string | null>(null);
 
-  themes = [
-    { value: 'earth', label: 'Earth', color: '#5C4033' },
-    { value: 'clay', label: 'Clay', color: '#C4956A' },
-    { value: 'sand', label: 'Sand', color: '#D4C5A9' },
+  // Swatches show each theme's primary colour.
+  themes: { value: Theme; label: string; color: string }[] = [
+    { value: 'earth', label: 'Earth', color: '#6E3128' },
     { value: 'forest', label: 'Forest', color: '#4A6741' },
-    { value: 'royal-blue', label: 'Royal Blue', color: '#2B55CC' },
-    { value: 'midnight', label: 'Midnight', color: '#1A2B4A' },
-    { value: 'crimson', label: 'Crimson', color: '#A32020' },
-    { value: 'plum', label: 'Plum', color: '#6B3585' },
-    { value: 'sage', label: 'Sage', color: '#5A7A65' },
     { value: 'slate', label: 'Slate', color: '#475B70' },
-    { value: 'rust', label: 'Rust', color: '#A0422A' },
   ];
 
   commonTimezones = [
@@ -527,8 +498,7 @@ export class SettingsComponent implements OnInit {
 
     this.authService.updateSettings(updates).subscribe({
       next: () => {
-        this.saved.set(true);
-        setTimeout(() => this.saved.set(false), 2000);
+        this.toast.success('Settings saved');
       },
     });
   }
@@ -583,8 +553,7 @@ export class SettingsComponent implements OnInit {
     this.authService.updateProfile(payload).subscribe({
       next: () => {
         this.profileSaving.set(false);
-        this.saved.set(true);
-        setTimeout(() => this.saved.set(false), 2000);
+        this.toast.success('Profile saved');
       },
       error: (err) => {
         this.profileSaving.set(false);

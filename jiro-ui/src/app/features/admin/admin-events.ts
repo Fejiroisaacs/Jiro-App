@@ -73,7 +73,7 @@ const EVENT_TYPES = [
     .filter-bar { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
     .filter-input {
       padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px;
-      background: var(--bg-surface); color: var(--text-primary); font-size: 14px; outline: none;
+      background: var(--bg-surface); color: var(--text-primary); font-size: 14px;
     }
     .filter-input:focus { border-color: var(--color-primary); }
     select.filter-input { min-width: 150px; }

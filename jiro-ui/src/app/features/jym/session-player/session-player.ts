@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -14,6 +14,7 @@ import { SettingsService } from '../../../core/services/settings.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
+import { ToastService } from '../../../core/services/toast.service';
 
 interface SetRow {
   setNumber: number;
@@ -68,8 +69,8 @@ interface ExerciseBlock {
               <polyline points="7,3 7,8 15,8"/>
             </svg>
           </button>
-          <jiro-button variant="secondary" type="button" (click)="showExitConfirm.set(true)">Exit</jiro-button>
-          <jiro-button variant="primary" type="button" (click)="finishSession()" [disabled]="finishing()">
+          <jiro-button size="sm" variant="secondary" type="button" (click)="showExitConfirm.set(true)">Exit</jiro-button>
+          <jiro-button size="sm" variant="primary" type="button" (click)="finishSession()" [disabled]="finishing()">
             {{ finishing() ? 'Finishing...' : 'Finish' }}
           </jiro-button>
         </div>
@@ -340,10 +341,6 @@ interface ExerciseBlock {
       </div>
     </jiro-modal>
 
-    <!-- Template saved confirmation -->
-    <div *ngIf="templateSavedName()" class="template-saved-toast">
-      Template "{{ templateSavedName() }}" saved
-    </div>
 
     <!-- Exercise picker overlay -->
     <div *ngIf="showExPicker()" class="overlay">
@@ -491,27 +488,12 @@ interface ExerciseBlock {
       width: 100%; padding: 9px 12px; border: 1px solid var(--border-color);
       border-radius: var(--border-radius-sm); background: var(--bg-surface);
       color: var(--text-primary); font-size: var(--font-size-base); font-family: inherit;
-      outline: none; box-sizing: border-box;
+ box-sizing: border-box;
     }
     .template-name-input:focus { border-color: var(--color-primary); }
 
     .template-save-error {
       font-size: var(--font-size-sm); color: #e05c5c; margin-top: var(--space-xs);
-    }
-
-    .template-saved-toast {
-      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-      background: var(--bg-sidebar); color: var(--text-on-dark);
-      padding: 10px 20px; border-radius: 20px; font-size: var(--font-size-sm);
-      font-weight: 500; z-index: 200; white-space: nowrap;
-      animation: fadeSlideUp 0.25s ease, fadeOut 0.4s ease 2s forwards;
-    }
-    @keyframes fadeSlideUp {
-      from { opacity: 0; transform: translateX(-50%) translateY(8px); }
-      to   { opacity: 1; transform: translateX(-50%) translateY(0); }
-    }
-    @keyframes fadeOut {
-      to { opacity: 0; }
     }
 
     .rest-skip-btn {
@@ -560,17 +542,8 @@ interface ExerciseBlock {
 
     .test-notice { background: rgba(122,59,46,0.1); color: var(--color-primary); border: 1px solid rgba(122,59,46,0.2); }
 
-    .session-bar ::ng-deep .jiro-btn { width: auto; }
 
-    .session-bar ::ng-deep .btn-secondary {
-      background: rgba(255,255,255,0.15);
-      border-color: rgba(255,255,255,0.3);
-      color: white;
-    }
 
-    .session-bar ::ng-deep .btn-primary {
-      background: white; color: var(--color-primary);
-    }
 
     /* Body */
     .player-body { max-width: 700px; overflow-x: hidden; }
@@ -589,7 +562,7 @@ interface ExerciseBlock {
       border: 1px solid var(--border-color); border-radius: var(--border-radius);
       background: var(--bg-surface); color: var(--text-primary);
       font-size: var(--font-size-sm); font-family: inherit;
-      resize: vertical; outline: none; line-height: 1.5;
+      resize: vertical; line-height: 1.5;
       transition: border-color 0.15s;
     }
 
@@ -616,7 +589,7 @@ interface ExerciseBlock {
       width: 80px; padding: 6px 10px;
       border: 1px solid var(--border-color); border-radius: var(--border-radius);
       background: var(--bg-canvas); color: var(--text-primary);
-      font-size: var(--font-size-sm); outline: none; font-family: inherit;
+      font-size: var(--font-size-sm); font-family: inherit;
     }
 
     .bw-input:focus { border-color: var(--color-primary); }
@@ -710,7 +683,7 @@ interface ExerciseBlock {
       border: 1px solid transparent; border-radius: var(--border-radius);
       background: transparent; color: var(--text-secondary);
       font-size: var(--font-size-xs); font-family: inherit;
-      resize: none; outline: none; line-height: 1.5;
+      resize: none; line-height: 1.5;
       transition: border-color 0.15s, background 0.15s;
     }
 
@@ -776,7 +749,7 @@ interface ExerciseBlock {
       width: 100%; padding: 8px 10px;
       border: 1px solid var(--border-color); border-radius: var(--border-radius);
       background: var(--bg-canvas); color: var(--text-primary);
-      font-size: var(--font-size-md); outline: none; box-sizing: border-box;
+      font-size: var(--font-size-md); box-sizing: border-box;
       font-family: inherit; transition: border-color 0.15s;
     }
 
@@ -884,7 +857,7 @@ interface ExerciseBlock {
       padding: 10px 14px; border: 1px solid var(--border-color);
       border-radius: var(--border-radius); background: var(--bg-canvas);
       color: var(--text-primary); font-size: var(--font-size-md);
-      outline: none; font-family: inherit;
+ font-family: inherit;
     }
 
     .picker-search:focus { border-color: var(--color-primary); }
@@ -934,7 +907,7 @@ interface ExerciseBlock {
       padding: 10px 14px; border: 1px solid var(--border-color);
       border-radius: var(--border-radius); background: var(--bg-canvas);
       color: var(--text-primary); font-size: var(--font-size-md);
-      font-family: inherit; outline: none; width: 100%;
+      font-family: inherit; width: 100%;
     }
     .create-select:focus { border-color: var(--color-primary); }
 
@@ -979,11 +952,6 @@ interface ExerciseBlock {
       .type-btn { flex: 1; padding: 6px 4px; font-size: 0.65rem; }
 
       /* Exercise + Finish share second sub-row */
-      .session-bar ::ng-deep .jiro-btn {
-        padding: 8px 10px;
-        font-size: var(--font-size-xs);
-        white-space: nowrap;
-      }
     }
 
     /* ── Set table on very small screens ── */
@@ -1064,7 +1032,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   showTemplateSave = signal(false);
   templateSaving = signal(false);
   templateSaveError = signal('');
-  templateSavedName = signal('');
+  private readonly toast = inject(ToastService);
   templateName = '';
 
   // Inline exercise creation
@@ -1507,8 +1475,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
         this.showTemplateSave.set(false);
         this.templateSaving.set(false);
         this.templateName = '';
-        this.templateSavedName.set(name);
-        setTimeout(() => this.templateSavedName.set(''), 2800);
+        this.toast.success(`Template "${name}" saved`);
       },
       error: () => {
         this.templateSaving.set(false);

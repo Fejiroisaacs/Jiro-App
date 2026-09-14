@@ -46,7 +46,7 @@ import { environment } from '../../../environments/environment';
     .secret-input {
       width: 100%; padding: 11px 14px; border: 1px solid var(--border-color);
       border-radius: var(--border-radius); background: var(--bg-canvas);
-      color: var(--text-primary); font-size: 15px; outline: none; box-sizing: border-box;
+      color: var(--text-primary); font-size: 15px; box-sizing: border-box;
     }
     .secret-input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(122,59,46,0.12); }
     .login-btn {

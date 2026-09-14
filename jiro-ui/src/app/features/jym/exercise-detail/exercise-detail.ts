@@ -274,7 +274,6 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
       margin-top: var(--space-xs);
     }
 
-    .confirm-actions ::ng-deep .jiro-btn { width: auto; }
 
     .exercise-detail { max-width: 900px; width: 100%; overflow-x: hidden; }
 
@@ -379,7 +378,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
       padding: 6px 10px; border: 1px solid var(--border-color);
       border-radius: var(--border-radius); background: var(--bg-surface);
       color: var(--text-primary); font-size: var(--font-size-sm);
-      outline: none; cursor: pointer; font-family: inherit;
+ cursor: pointer; font-family: inherit;
     }
 
     .weight-select:focus { border-color: var(--color-primary); }

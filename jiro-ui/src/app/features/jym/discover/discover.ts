@@ -131,14 +131,13 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
       flex-wrap: wrap; align-items: center;
     }
 
-    .search-bar ::ng-deep .jiro-btn { width: auto; flex-shrink: 0; }
 
     .search-input {
       flex: 1; min-width: 160px;
       padding: 10px 14px; border: 1px solid var(--border-color);
       border-radius: var(--border-radius); background: var(--bg-surface);
       color: var(--text-primary); font-size: var(--font-size-md);
-      outline: none; transition: border-color 0.2s; font-family: inherit;
+ transition: border-color 0.2s; font-family: inherit;
     }
 
     .search-input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(122,59,46,0.15); }

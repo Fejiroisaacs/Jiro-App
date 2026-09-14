@@ -629,7 +629,6 @@ function computePresetRanges(preset: Preset): DateRange | null {
       color: var(--text-primary);
       font-size: var(--font-size-sm);
       font-family: inherit;
-      outline: none;
       transition: border-color 0.15s;
     }
     .date-input:focus { border-color: var(--color-primary); }
@@ -642,7 +641,6 @@ function computePresetRanges(preset: Preset): DateRange | null {
     }
 
     .custom-apply { display: flex; justify-content: flex-end; }
-    .custom-apply ::ng-deep .jiro-btn { width: auto; }
 
     /* ── State messages ── */
     .state-center {

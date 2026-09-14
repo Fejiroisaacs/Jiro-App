@@ -117,10 +117,6 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
       margin-top: var(--space-sm);
     }
 
-    .dialog-actions ::ng-deep .jiro-btn {
-      width: auto;
-    }
-
     .btn-ghost {
       background: none;
       border: none;

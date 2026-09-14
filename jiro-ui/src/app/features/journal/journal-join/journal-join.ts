@@ -38,7 +38,7 @@ type State = 'loading' | 'joining' | 'success' | 'error' | 'no-token' | 'not-log
           </div>
           <h2>You're in!</h2>
           <p class="text-secondary">You've joined <strong>{{ groupName() }}</strong>. Start reading and writing together.</p>
-          <jiro-button variant="primary" type="button" (click)="router.navigate(['/journal/groups', groupId()])">
+          <jiro-button block variant="primary" type="button" (click)="router.navigate(['/journal/groups', groupId()])">
             Open Group
           </jiro-button>
           <a routerLink="/journal" class="secondary-link">Back to Journaly</a>
@@ -53,7 +53,7 @@ type State = 'loading' | 'joining' | 'success' | 'error' | 'no-token' | 'not-log
           </div>
           <h2>Invite problem</h2>
           <p class="text-secondary">{{ errorMessage() }}</p>
-          <jiro-button variant="primary" type="button" (click)="router.navigate(['/journal'])">
+          <jiro-button block variant="primary" type="button" (click)="router.navigate(['/journal'])">
             Go to Journaly
           </jiro-button>
         </div>
@@ -67,7 +67,7 @@ type State = 'loading' | 'joining' | 'success' | 'error' | 'no-token' | 'not-log
           </div>
           <h2>Invalid link</h2>
           <p class="text-secondary">This invite link appears to be incomplete. Ask the group owner to resend the invite.</p>
-          <jiro-button variant="primary" type="button" (click)="router.navigate(['/journal'])">
+          <jiro-button block variant="primary" type="button" (click)="router.navigate(['/journal'])">
             Go to Journaly
           </jiro-button>
         </div>
@@ -81,7 +81,7 @@ type State = 'loading' | 'joining' | 'success' | 'error' | 'no-token' | 'not-log
           </div>
           <h2>Sign in to join</h2>
           <p class="text-secondary">You need a Jiro account to accept this group invite.</p>
-          <jiro-button variant="primary" type="button" (click)="goToLogin()">
+          <jiro-button block variant="primary" type="button" (click)="goToLogin()">
             Sign In
           </jiro-button>
           <p class="create-account text-secondary">

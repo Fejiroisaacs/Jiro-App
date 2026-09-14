@@ -1,12 +1,16 @@
 import { Component } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive, Router } from '@angular/router';
 import { AdminService } from '../../core/services/admin.service';
+import { JiroToasterComponent } from '../../shared/components/jiro-toaster/jiro-toaster';
+import { JiroConfirmComponent } from '../../shared/components/jiro-confirm/jiro-confirm';
 
 @Component({
   selector: 'app-admin-layout',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, JiroToasterComponent, JiroConfirmComponent],
   template: `
+    <jiro-toaster />
+    <jiro-confirm />
     <div class="admin-shell">
       <nav class="sidebar">
         <div class="sidebar-brand">Jiro Admin</div>

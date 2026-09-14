@@ -1,4 +1,4 @@
-import { Component, signal, effect, computed, inject } from '@angular/core';
+import { Component, signal, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterOutlet, RouterLink, RouterLinkActive, Router, NavigationEnd } from '@angular/router';
@@ -7,12 +7,18 @@ import { filter, map, startWith } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { SettingsService } from '../../core/services/settings.service';
 import { FeedbackService } from '../../core/services/feedback.service';
+import { ToastService } from '../../core/services/toast.service';
+import { JiroToasterComponent } from '../../shared/components/jiro-toaster/jiro-toaster';
+import { JiroConfirmComponent } from '../../shared/components/jiro-confirm/jiro-confirm';
+import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
 
 @Component({
   selector: 'app-main-layout',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [CommonModule, FormsModule, RouterOutlet, RouterLink, RouterLinkActive, JiroToasterComponent, JiroConfirmComponent, JiroMarkComponent],
   template: `
+    <jiro-toaster />
+    <jiro-confirm />
     <div class="layout" [class.sidebar-collapsed]="collapsed()">
       <!-- Sidebar -->
       <aside class="sidebar">
@@ -52,41 +58,41 @@ import { FeedbackService } from '../../core/services/feedback.service';
           </div>
 
           <a routerLink="/jym" routerLinkActive="active" class="nav-item">
-            <img src="/icons/jym-icon.svg" width="28" height="28" alt="Jym" />
+            <jiro-mark name="jym" [size]="28" />
             <span *ngIf="!collapsed()" class="nav-label">Jym</span>
           </a>
           @if (navContext() === 'jym') {
             <a routerLink="/jym/exercises" routerLinkActive="active" class="nav-item nav-sub-item">
-              <img src="/icons/nav-exercises.svg" width="20" height="20" alt="Exercises" />
+              <jiro-mark name="exercises" [size]="20" />
               <span *ngIf="!collapsed()" class="nav-label">Exercises</span>
             </a>
             <a routerLink="/jym/plan" routerLinkActive="active" class="nav-item nav-sub-item">
-              <img src="/icons/nav-plan.svg" width="20" height="20" alt="Plan" />
+              <jiro-mark name="plan" [size]="20" />
               <span *ngIf="!collapsed()" class="nav-label">Plan</span>
             </a>
             <a routerLink="/jym/track" routerLinkActive="active" class="nav-item nav-sub-item">
-              <img src="/icons/nav-track.svg" width="20" height="20" alt="Track" />
+              <jiro-mark name="track" [size]="20" />
               <span *ngIf="!collapsed()" class="nav-label">Track</span>
             </a>
           }
 
           <a routerLink="/culinara" routerLinkActive="active" class="nav-item">
-            <img src="/icons/culinara-icon.svg" width="28" height="28" alt="Culinara" />
+            <jiro-mark name="culinara" [size]="28" />
             <span *ngIf="!collapsed()" class="nav-label">Culinara</span>
           </a>
 
           <a routerLink="/journal" routerLinkActive="active" class="nav-item">
-            <img src="/icons/journaly-icon.svg" width="28" height="28" alt="Journaly" />
+            <jiro-mark name="journaly" [size]="28" />
             <span *ngIf="!collapsed()" class="nav-label">Journaly</span>
           </a>
 
           <a routerLink="/ledger" routerLinkActive="active" class="nav-item">
-            <img src="/icons/ledger-icon.svg" width="28" height="28" alt="Ledger" />
+            <jiro-mark name="ledger" [size]="28" />
             <span *ngIf="!collapsed()" class="nav-label">Ledger</span>
           </a>
 
           <a class="nav-item disabled">
-            <img src="/icons/echo-icon.svg" width="28" height="28" alt="Echo" />
+            <jiro-mark name="echo" [size]="28" />
             <span *ngIf="!collapsed()" class="nav-label">Echo</span>
           </a>
 
@@ -183,7 +189,6 @@ import { FeedbackService } from '../../core/services/feedback.service';
           rows="4">
         </textarea>
         <div class="fp-footer">
-          <span class="fp-toast" *ngIf="feedbackToast()">{{ feedbackToast() }}</span>
           <button
             class="fp-submit"
             [disabled]="!feedbackMessage.trim() || feedbackSending()"
@@ -199,64 +204,64 @@ import { FeedbackService } from '../../core/services/feedback.service';
           @case ('jym') {
             <!-- Jiro (back to hub) -->
             <a routerLink="/dashboard" class="mobile-nav-item" [class.active]="false">
-              <img src="/icons/favicon.svg" width="24" height="24" alt="Jiro" />
+              <jiro-mark name="jiro" [size]="24" />
               <span>Jiro</span>
             </a>
             <!-- Jym dashboard -->
             <a routerLink="/jym" routerLinkActive="active" [routerLinkActiveOptions]="{exact:true}" class="mobile-nav-item">
-              <img src="/icons/jym-icon.svg" width="24" height="24" alt="Jym" />
+              <jiro-mark name="jym" [size]="24" />
               <span>Jym</span>
             </a>
             <!-- Exercises -->
             <a routerLink="/jym/exercises" routerLinkActive="active" class="mobile-nav-item">
-              <img src="/icons/nav-exercises.svg" width="24" height="24" alt="Exercises" />
+              <jiro-mark name="exercises" [size]="24" />
               <span>Exercises</span>
             </a>
             <!-- Plan -->
             <a routerLink="/jym/plan" routerLinkActive="active" class="mobile-nav-item">
-              <img src="/icons/nav-plan.svg" width="24" height="24" alt="Plan" />
+              <jiro-mark name="plan" [size]="24" />
               <span>Plan</span>
             </a>
             <!-- Track -->
             <a routerLink="/jym/track" routerLinkActive="active" class="mobile-nav-item">
-              <img src="/icons/nav-track.svg" width="24" height="24" alt="Track" />
+              <jiro-mark name="track" [size]="24" />
               <span>Track</span>
             </a>
           }
           @case ('culinara') {
             <a routerLink="/dashboard" class="mobile-nav-item">
-              <img src="/icons/favicon.svg" width="24" height="24" alt="Jiro" />
+              <jiro-mark name="jiro" [size]="24" />
               <span>Jiro</span>
             </a>
             <a routerLink="/culinara" routerLinkActive="active" class="mobile-nav-item">
-              <img src="/icons/culinara-icon.svg" width="24" height="24" alt="Culinara" />
+              <jiro-mark name="culinara" [size]="24" />
               <span>Culinara</span>
             </a>
           }
           @case ('journal') {
             <a routerLink="/dashboard" class="mobile-nav-item">
-              <img src="/icons/favicon.svg" width="24" height="24" alt="Jiro" />
+              <jiro-mark name="jiro" [size]="24" />
               <span>Jiro</span>
             </a>
             <a routerLink="/journal" routerLinkActive="active" class="mobile-nav-item">
-              <img src="/icons/journaly-icon.svg" width="24" height="24" alt="Journaly" />
+              <jiro-mark name="journaly" [size]="24" />
               <span>Journaly</span>
             </a>
           }
           @case ('ledger') {
             <a routerLink="/dashboard" class="mobile-nav-item">
-              <img src="/icons/favicon.svg" width="24" height="24" alt="Jiro" />
+              <jiro-mark name="jiro" [size]="24" />
               <span>Jiro</span>
             </a>
             <a routerLink="/ledger" routerLinkActive="active" class="mobile-nav-item">
-              <img src="/icons/ledger-icon.svg" width="24" height="24" alt="Ledger" />
+              <jiro-mark name="ledger" [size]="24" />
               <span>Ledger</span>
             </a>
           }
           @default {
             <!-- Hub nav -->
             <a routerLink="/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{exact:true}" class="mobile-nav-item">
-              <img src="/icons/favicon.svg" width="24" height="24" alt="Jiro" />
+              <jiro-mark name="jiro" [size]="24" />
               <span>Home</span>
             </a>
             <a routerLink="/guide" routerLinkActive="active" class="mobile-nav-item">
@@ -297,7 +302,7 @@ import { FeedbackService } from '../../core/services/feedback.service';
       top: 0;
       left: 0;
       bottom: 0;
-      z-index: 100;
+      z-index: var(--z-sidebar);
     }
 
     .sidebar-collapsed .sidebar {
@@ -380,6 +385,14 @@ import { FeedbackService } from '../../core/services/feedback.service';
       cursor: not-allowed;
     }
 
+    /* Brand focus ring is invisible on the brown sidebar; use the cream text colour inset. */
+    .nav-item:focus-visible,
+    .mobile-nav-item:focus-visible,
+    .toggle-btn:focus-visible {
+      outline-color: var(--text-on-dark);
+      outline-offset: -2px;
+    }
+
     .nav-sub-item {
       padding-left: 24px;
       font-size: var(--font-size-xs);
@@ -426,7 +439,7 @@ import { FeedbackService } from '../../core/services/feedback.service';
       padding: 0 var(--space-lg);
       position: sticky;
       top: 0;
-      z-index: 50;
+      z-index: var(--z-topbar);
     }
 
     .topbar-right {
@@ -569,7 +582,7 @@ import { FeedbackService } from '../../core/services/feedback.service';
       height: calc(60px + env(safe-area-inset-bottom));
       background: var(--bg-sidebar);
       border-top: 1px solid rgba(255, 255, 255, 0.1);
-      z-index: 200;
+      z-index: var(--z-mobile-nav);
       align-items: stretch;
       padding-bottom: env(safe-area-inset-bottom);
     }
@@ -582,7 +595,7 @@ import { FeedbackService } from '../../core/services/feedback.service';
       justify-content: center;
       gap: 3px;
       color: var(--text-on-dark);
-      opacity: 0.55;
+      opacity: 0.75;
       text-decoration: none;
       font-size: 0.72rem;
       font-weight: 500;
@@ -602,7 +615,7 @@ import { FeedbackService } from '../../core/services/feedback.service';
     .feedback-backdrop {
       position: fixed;
       inset: 0;
-      z-index: 200;
+      z-index: var(--z-overlay);
     }
 
     /* ── Feedback FAB ── */
@@ -610,13 +623,13 @@ import { FeedbackService } from '../../core/services/feedback.service';
       position: fixed;
       bottom: var(--space-xl);
       right: var(--space-xl);
-      z-index: 201;
+      z-index: calc(var(--z-overlay) + 1);
       display: flex;
       align-items: center;
       gap: 6px;
       padding: 10px 16px;
       background: var(--color-primary);
-      color: #fff;
+      color: var(--text-on-primary);
       border: none;
       border-radius: 24px;
       font-size: var(--font-size-sm);
@@ -632,7 +645,7 @@ import { FeedbackService } from '../../core/services/feedback.service';
       position: fixed;
       bottom: calc(var(--space-xl) + 50px);
       right: var(--space-xl);
-      z-index: 201;
+      z-index: calc(var(--z-overlay) + 1);
       width: 320px;
       background: var(--bg-surface);
       border: 1px solid var(--border-color);
@@ -673,15 +686,14 @@ import { FeedbackService } from '../../core/services/feedback.service';
       width: 100%; padding: 10px 12px; border: 1px solid var(--border-color);
       border-radius: var(--border-radius); background: var(--bg-surface);
       color: var(--text-primary); font-size: var(--font-size-sm); font-family: inherit;
-      resize: vertical; outline: none; box-sizing: border-box;
+      resize: vertical; box-sizing: border-box;
     }
     .fp-textarea:focus { border-color: var(--color-primary); }
 
     .fp-footer { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-sm); }
-    .fp-toast { font-size: var(--font-size-xs); color: var(--color-primary); flex: 1; }
 
     .fp-submit {
-      padding: 8px 20px; background: var(--color-primary); color: #fff;
+      padding: 8px 20px; background: var(--color-primary); color: var(--text-on-primary);
       border: none; border-radius: var(--border-radius); font-size: var(--font-size-sm);
       font-weight: 600; font-family: inherit; cursor: pointer; transition: opacity 0.15s;
     }
@@ -740,22 +752,15 @@ export class MainLayoutComponent {
   feedbackType: 'bug' | 'feature' | 'other' = 'bug';
   feedbackMessage = '';
   feedbackSending = signal(false);
-  feedbackToast = signal('');
+  private readonly toast = inject(ToastService);
 
+  // Theme and dark-mode classes are applied on <html> by the root App
+  // component so that routes outside this layout are themed too.
   constructor(
     public authService: AuthService,
     public settingsService: SettingsService,
     private feedbackService: FeedbackService,
-  ) {
-    effect(() => {
-      const theme = settingsService.theme();
-      const dark = settingsService.darkMode();
-      const classes: string[] = [];
-      if (theme !== 'earth') classes.push(`theme-${theme}`);
-      if (dark) classes.push('dark');
-      document.documentElement.className = classes.join(' ');
-    });
-  }
+  ) {}
 
   userInitial(): string {
     const user = this.authService.user();
@@ -778,16 +783,12 @@ export class MainLayoutComponent {
       next: () => {
         this.feedbackSending.set(false);
         this.feedbackMessage = '';
-        this.feedbackToast.set('Thanks for your feedback!');
-        setTimeout(() => {
-          this.feedbackToast.set('');
-          this.feedbackOpen.set(false);
-        }, 2000);
+        this.feedbackOpen.set(false);
+        this.toast.success('Thanks, your feedback was sent.');
       },
       error: () => {
         this.feedbackSending.set(false);
-        this.feedbackToast.set('Failed to send. Try again.');
-        setTimeout(() => this.feedbackToast.set(''), 3000);
+        this.toast.error('Could not send feedback. Please try again.');
       },
     });
   }

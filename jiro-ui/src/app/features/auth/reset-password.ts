@@ -46,6 +46,7 @@ import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-inpu
           <div class="form-error" *ngIf="error()">{{ error() }}</div>
 
           <jiro-button
+            block
             variant="primary"
             [disabled]="!canSubmit() || loading()"
             (click)="submit()"

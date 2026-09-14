@@ -229,7 +229,6 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
       border-radius: var(--border-radius);
       padding: var(--space-md);
       cursor: pointer;
-      outline: none;
       transition: transform 0.15s ease-out, border-color 0.15s, box-shadow 0.15s;
     }
     .entry-card:hover, .entry-card:focus-visible {

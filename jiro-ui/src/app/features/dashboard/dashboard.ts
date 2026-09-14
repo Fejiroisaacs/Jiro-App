@@ -2,21 +2,21 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { JiroCardComponent } from '../../shared/components/jiro-card/jiro-card';
+import { JiroMarkComponent, MarkName } from '../../shared/components/jiro-mark/jiro-mark';
 import { AuthService } from '../../core/services/auth.service';
 
 interface ModuleCard {
   name: string;
   description: string;
-  icon: string;
+  mark: MarkName;
   route: string;
-  color: string;
   available: boolean;
 }
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterLink, JiroCardComponent],
+  imports: [CommonModule, RouterLink, JiroCardComponent, JiroMarkComponent],
   template: `
     <div class="dashboard">
       <div class="dashboard-header">
@@ -30,9 +30,7 @@ interface ModuleCard {
           [clickable]="mod.available"
           [routerLink]="mod.available ? mod.route : null"
           class="module-card">
-          <div class="module-icon" [style.background]="mod.color">
-            <img [src]="mod.icon" [alt]="mod.name + ' icon'" class="module-icon-img">
-          </div>
+          <jiro-mark [name]="mod.mark" [size]="48" class="module-mark" />
           <h3 class="module-name">{{ mod.name }}</h3>
           <p class="module-desc text-secondary">{{ mod.description }}</p>
           <span *ngIf="!mod.available" class="module-badge">Coming Soon</span>
@@ -65,30 +63,8 @@ interface ModuleCard {
       position: relative;
     }
 
-    .module-icon {
-      width: 48px;
-      height: 48px;
-      border-radius: var(--border-radius);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 24px;
+    .module-mark {
       margin-bottom: var(--space-md);
-      overflow: hidden;
-      flex-shrink: 0;
-    }
-
-    .module-icon-img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-    }
-
-    @media (max-width: 480px) {
-      .module-icon {
-        width: 40px;
-        height: 40px;
-      }
     }
 
     .module-name {
@@ -119,41 +95,36 @@ export class DashboardComponent {
     {
       name: 'Jym',
       description: 'Structured progressive overload tracking. Plan workouts, log sessions, chase PRs.',
-      icon: '/icons/jym-icon.svg',
+      mark: 'jym',
       route: '/jym',
-      color: 'rgba(122, 59, 46, 0.15)',
       available: true,
     },
     {
       name: 'Culinara',
       description: 'Recipe notebook. Track and plan meals, compare results, improve your dishes.',
-      icon: '/icons/culinara-icon.svg',
+      mark: 'culinara',
       route: '/culinara',
-      color: 'rgba(196, 149, 106, 0.25)',
       available: true,
     },
     {
       name: 'Journaly',
       description: 'Personal knowledge base. Organize and share your thoughts.',
-      icon: '/icons/journaly-icon.svg',
+      mark: 'journaly',
       route: '/journal',
-      color: 'rgba(122, 103, 65, 0.15)',
       available: true,
     },
     {
       name: 'Ledger',
       description: 'Financial tracking and budgeting.',
-      icon: '/icons/ledger-icon.svg',
+      mark: 'ledger',
       route: '/ledger',
-      color: 'rgba(122, 103, 65, 0.15)',
       available: true,
     },
     {
       name: 'Echo',
       description: 'Active reminder engine with multi-channel notifications. Never miss a critical task.',
-      icon: '/icons/echo-icon.svg',
+      mark: 'echo',
       route: '/echo',
-      color: 'rgba(74, 103, 65, 0.15)',
       available: false,
     },
   ];
@@ -163,6 +134,6 @@ export class DashboardComponent {
   userName(): string {
     const user = this.authService.user();
     if (!user) return '';
-    return user.email.split('@')[0];
+    return user.display_name || user.email.split('@')[0];
   }
 }

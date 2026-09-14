@@ -105,7 +105,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       border: 1px solid var(--border-color); border-radius: var(--border-radius-sm);
       background: var(--bg-canvas); color: var(--text-primary); padding: 8px var(--space-sm);
     }
-    .form-control:focus { outline: none; border-color: var(--color-primary); }
+    .form-control:focus { border-color: var(--color-primary); }
     .modal-actions { display: flex; justify-content: flex-end; gap: var(--space-sm); }
   `]
 })

@@ -38,6 +38,7 @@ import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-inpu
           </div>
 
           <jiro-button
+            block
             variant="primary"
             [disabled]="!email.trim() || loading()"
             (click)="submit()"
