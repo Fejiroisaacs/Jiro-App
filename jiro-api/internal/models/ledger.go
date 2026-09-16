@@ -122,8 +122,10 @@ type TransactionFilters struct {
 	AccountID  string
 	CategoryID string
 	Type       string
-	Page       int
-	Limit      int
+	// Q matches the description or the notes, case-insensitively.
+	Q     string
+	Page  int
+	Limit int
 }
 
 // ── Budgets ───────────────────────────────────────────────────────────────────

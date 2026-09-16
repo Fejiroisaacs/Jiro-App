@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import {
@@ -10,6 +10,12 @@ import {
 import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-card';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroMenuComponent, JiroMenuItem } from '../../../shared/components/jiro-menu/jiro-menu';
+import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
+import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
+import { ConfirmService } from '../../../core/services/confirm.service';
+import { ToastService } from '../../../core/services/toast.service';
 import { formatCurrency, formatSignedCurrency, formatDate, hexWithAlpha } from '../shared/ledger-utils';
 
 type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
@@ -21,54 +27,37 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
     FormsModule,
     JiroCardComponent,
     JiroButtonComponent,
-    JiroModalComponent
-],
+    JiroModalComponent,
+    JiroIconComponent,
+    JiroMenuComponent,
+    JiroPageHeaderComponent,
+    JiroEmptyStateComponent,
+  ],
   template: `
     <div class="accounts-page">
 
       <!-- ── Header ── -->
-      <div class="page-header">
-        <div>
-          <h1>Accounts</h1>
-          <p class="text-secondary">Manage your financial accounts</p>
-        </div>
-        <div class="header-actions">
-          <jiro-button variant="primary" type="button" (click)="openAddAccount()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            Add Account
-          </jiro-button>
-        </div>
-      </div>
+      <jiro-page-header heading="Accounts" subtitle="Manage your financial accounts">
+        <jiro-button actions type="button" (click)="openAddAccount()">
+          <jiro-icon name="plus" [size]="14" />
+          Add account
+        </jiro-button>
+      </jiro-page-header>
 
       <!-- ── Loading ── -->
       @if (loading()) {
-<div class="state-message">
-        <div class="spinner-lg"></div>
-        <p class="text-secondary">Loading accounts...</p>
-      </div>
-}
+        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+      }
 
       <!-- ── Empty State ── -->
       @if (!loading() && accounts().length === 0) {
-<div class="empty-state">
-        <div class="empty-icon">
-          <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="2" y="5" width="20" height="14" rx="2"/>
-            <line x1="2" y1="10" x2="22" y2="10"/>
-            <line x1="6" y1="15" x2="10" y2="15"/>
-          </svg>
-        </div>
-        <h3>No accounts yet</h3>
-        <p class="text-secondary">Add your first account to start tracking your finances and net worth.</p>
-        <div class="empty-action">
-          <jiro-button variant="primary" type="button" (click)="openAddAccount()">
-            Add your first account
-          </jiro-button>
-        </div>
-      </div>
-}
+        <jiro-empty-state
+          icon="bank"
+          heading="No accounts yet"
+          message="Add your first account to start tracking your finances and net worth.">
+          <jiro-button type="button" (click)="openAddAccount()">Add your first account</jiro-button>
+        </jiro-empty-state>
+      }
 
       <!-- ── Accounts Grid ── -->
       @if (!loading() && accounts().length > 0) {
@@ -76,7 +65,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
 
         <div class="accounts-grid">
           @for (account of accounts(); track account) {
-<jiro-card [clickable]="true" (click)="toggleDetail(account)">
+<jiro-card>
             <div class="acct-card">
 
               <!-- Top row: icon + badge -->
@@ -156,32 +145,32 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
               </div>
 
               <!-- Actions row -->
-              <div class="acct-actions" (click)="$event.stopPropagation()">
-                <button class="icon-btn" title="Edit account" (click)="openEditAccount(account)">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                  </svg>
+              <div class="acct-actions">
+                <button
+                  class="acct-disclosure"
+                  type="button"
+                  [attr.aria-expanded]="selectedAccountId() === account.id"
+                  [attr.aria-controls]="'acct-panel-' + account.id"
+                  (click)="toggleDetail(account)">
+                  {{ selectedAccountId() === account.id ? 'Hide' : 'Recent transactions' }}
+                  <jiro-icon [name]="selectedAccountId() === account.id ? 'caret-up' : 'caret-down'" [size]="14" />
                 </button>
-                <button class="icon-btn icon-btn--danger" title="Delete account" (click)="openDeleteAccount(account)">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="3,6 5,6 21,6"/>
-                    <path d="M19,6l-1,14a2,2,0,0,1-2,2H8a2,2,0,0,1-2-2L5,6"/>
-                    <path d="M10,11v6M14,11v6M9,6V4a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1V6"/>
-                  </svg>
-                </button>
+                <jiro-menu
+                  [items]="rowActions"
+                  [label]="'More actions for ' + account.name"
+                  (select)="onRowAction(account, $event)" />
               </div>
             </div>
 
             <!-- ── Detail Panel (expanded) ── -->
             @if (selectedAccountId() === account.id) {
-<div class="detail-panel" (click)="$event.stopPropagation()">
+<div class="detail-panel" [id]="'acct-panel-' + account.id">
               <div class="detail-header">
-                <span class="detail-title">Recent Transactions</span>
+                <span class="detail-title">Recent transactions</span>
               </div>
               @if (detailLoading()) {
 <div class="detail-loading">
-                <div class="spinner-sm"></div>
+                <span class="spinner spinner--sm"></span>
               </div>
 }
               @if (!detailLoading() && selectedAccountDetail()?.recent_transactions?.length === 0) {
@@ -215,6 +204,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
 }
               </div>
 }
+              <button class="acct-collapse" type="button" (click)="toggleDetail(account)">Collapse</button>
             </div>
 }
           </jiro-card>
@@ -352,27 +342,6 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
       </jiro-modal>
 }
 
-      <!-- ── Delete Confirmation Modal ── -->
-      @if (deletingAccount()) {
-<jiro-modal title="Delete Account?" maxWidth="420px" (close)="deletingAccount.set(null)">
-        <div class="delete-confirm">
-          <p>Delete <strong>{{ deletingAccount()!.name }}</strong>?</p>
-          <p class="text-secondary" style="font-size: var(--font-size-sm); margin-top: var(--space-xs);">
-            This action cannot be undone. If the account has transactions linked to it, deletion will fail.
-          </p>
-          @if (deleteError()) {
-<p class="form-error" style="margin-top: var(--space-sm);">{{ deleteError() }}</p>
-}
-          <div class="form-actions" style="margin-top: var(--space-lg);">
-            <jiro-button variant="secondary" type="button" (click)="cancelDelete()">Cancel</jiro-button>
-            <jiro-button variant="danger" type="button" [disabled]="deleteSaving()" (click)="confirmDelete()">
-              {{ deleteSaving() ? 'Deleting...' : 'Delete Account' }}
-            </jiro-button>
-          </div>
-        </div>
-      </jiro-modal>
-}
-
     </div>
   `,
   styles: [`
@@ -395,48 +364,11 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
 
 
     /* ── Empty state ── */
-    .empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: var(--space-md);
-      padding: var(--space-2xl) var(--space-lg);
-      text-align: center;
-    }
-
-    .empty-icon { color: var(--text-muted); opacity: 0.45; }
-
-    .empty-state h3 { font-size: var(--font-size-xl); font-weight: 600; }
 
 
     /* ── Loading ── */
-    .state-message {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: var(--space-2xl);
-      gap: var(--space-md);
-      text-align: center;
-    }
 
-    .spinner-lg {
-      width: 40px;
-      height: 40px;
-      border: 3px solid var(--border-color);
-      border-top-color: var(--color-primary);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-
-    .spinner-sm {
-      width: 24px;
-      height: 24px;
-      border: 2px solid var(--border-color);
-      border-top-color: var(--color-primary);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
+    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
 
     /* ── Accounts grid ── */
     .accounts-grid {
@@ -470,11 +402,11 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
       flex-shrink: 0;
     }
 
-    .acct-type-checking  { background: rgba(74,103,65,0.12);  color: #4A6741; }
-    .acct-type-savings   { background: rgba(74,103,65,0.18);  color: #3d7a33; }
-    .acct-type-credit    { background: rgba(193,88,42,0.12);  color: var(--color-danger); }
-    .acct-type-investment{ background: rgba(122,59,46,0.12);  color: var(--color-primary); }
-    .acct-type-cash      { background: rgba(107,94,87,0.12);  color: var(--text-secondary); }
+    .acct-type-checking  { background: rgba(var(--color-accent-rgb), 0.12); color: var(--color-accent); }
+    .acct-type-savings   { background: rgba(var(--color-accent-rgb), 0.20); color: var(--color-accent); }
+    .acct-type-credit    { background: rgba(var(--color-danger-rgb), 0.12);  color: var(--color-danger); }
+    .acct-type-investment{ background: rgba(var(--color-primary-rgb), 0.12);  color: var(--color-primary); }
+    .acct-type-cash      { background: rgba(var(--shadow-rgb), 0.12);  color: var(--text-secondary); }
 
     .acct-badges {
       display: flex;
@@ -497,7 +429,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
       font-weight: 600;
       padding: 2px 8px;
       border-radius: 10px;
-      background: rgba(155,143,136,0.15);
+      background: rgba(var(--shadow-rgb), 0.15);
       color: var(--text-muted);
     }
 
@@ -541,31 +473,40 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
       border-top: 1px solid var(--border-color);
     }
 
-    .icon-btn {
-      width: 34px;
-      height: 34px;
-      display: flex;
+    .acct-actions { align-items: center; justify-content: space-between; }
+
+    .acct-disclosure {
+      display: inline-flex;
       align-items: center;
-      justify-content: center;
-      border: 1px solid var(--border-color);
-      border-radius: var(--border-radius);
+      gap: 6px;
+      min-height: 40px;
+      padding: 0 4px;
+      border: none;
+      background: none;
+      color: var(--text-secondary);
+      font: inherit;
+      font-size: var(--font-size-sm);
+      font-weight: 500;
+      cursor: pointer;
+      border-radius: var(--border-radius-sm);
+    }
+    .acct-disclosure:hover { color: var(--color-primary); }
+
+    .acct-collapse {
+      display: block;
+      width: 100%;
+      min-height: 40px;
+      margin-top: var(--space-sm);
+      border: none;
+      border-top: 1px solid var(--border-color);
       background: none;
       color: var(--text-muted);
+      font: inherit;
+      font-size: var(--font-size-sm);
       cursor: pointer;
-      transition: all 0.15s;
     }
+    .acct-collapse:hover { color: var(--color-primary); }
 
-    .icon-btn:hover {
-      border-color: var(--color-primary);
-      color: var(--color-primary);
-      background: rgba(122,59,46,0.06);
-    }
-
-    .icon-btn--danger:hover {
-      border-color: var(--color-danger);
-      color: var(--color-danger);
-      background: rgba(193,88,42,0.06);
-    }
 
     /* ── Detail panel ── */
     .detail-panel {
@@ -758,10 +699,10 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
       left: 2px;
       width: 20px;
       height: 20px;
-      background: #fff;
+      background: var(--bg-surface);
       border-radius: 50%;
       transition: transform 0.2s;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+      box-shadow: 0 1px 3px rgba(var(--shadow-rgb), 0.2);
     }
 
     .toggle-btn.toggle-on .toggle-knob { transform: translateX(20px); }
@@ -780,11 +721,9 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
     }
 
 
-    .delete-confirm { display: flex; flex-direction: column; gap: var(--space-xs); }
 
     /* ── Responsive ── */
     @media (max-width: 768px) {
-      .page-header { flex-direction: column; }
 
       .accounts-grid {
         grid-template-columns: 1fr;
@@ -798,7 +737,6 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
       .nw-value { font-size: var(--font-size-lg); }
     }
 
-    @keyframes spin { to { transform: rotate(360deg); } }
   `],
 })
 export class AccountsPageComponent implements OnInit {
@@ -852,9 +790,13 @@ export class AccountsPageComponent implements OnInit {
   };
 
   // Delete
-  deletingAccount = signal<LedgerAccount | null>(null);
-  deleteSaving = signal(false);
-  deleteError = signal('');
+  private readonly confirmService = inject(ConfirmService);
+  private readonly toast = inject(ToastService);
+
+  readonly rowActions: JiroMenuItem[] = [
+    { id: 'edit', label: 'Edit', icon: 'pencil-simple' },
+    { id: 'delete', label: 'Delete', icon: 'trash', danger: true },
+  ];
 
   constructor(private ledgerService: LedgerService) {}
 
@@ -970,38 +912,32 @@ export class AccountsPageComponent implements OnInit {
       });
   }
 
+  // ── Row menu ──
+  onRowAction(account: LedgerAccount, action: string) {
+    if (action === 'edit') this.openEditAccount(account);
+    else if (action === 'delete') this.deleteAccount(account);
+  }
+
   // ── Delete ──
-  openDeleteAccount(account: LedgerAccount) {
-    this.deletingAccount.set(account);
-    this.deleteError.set('');
-  }
-
-  cancelDelete() {
-    this.deletingAccount.set(null);
-    this.deleteError.set('');
-    this.deleteSaving.set(false);
-  }
-
-  confirmDelete() {
-    const account = this.deletingAccount();
-    if (!account) return;
-    this.deleteSaving.set(true);
-    this.deleteError.set('');
+  async deleteAccount(account: LedgerAccount) {
+    const ok = await this.confirmService.confirm({
+      title: `Delete ${account.name}?`,
+      message: 'An account with transactions linked to it cannot be deleted. Move or remove them first.',
+      confirmLabel: 'Delete account',
+      danger: true,
+    });
+    if (!ok) return;
     this.ledgerService.deleteAccount(account.id).subscribe({
       next: () => {
-        this.deleteSaving.set(false);
-        this.deletingAccount.set(null);
         if (this.selectedAccountId() === account.id) {
           this.selectedAccountId.set(null);
           this.selectedAccountDetail.set(null);
         }
         this.loadAccounts();
+        this.toast.success(`${account.name} deleted`);
       },
       error: () => {
-        this.deleteSaving.set(false);
-        this.deleteError.set(
-          'Cannot delete this account — it may have transactions linked to it.'
-        );
+        this.toast.error('Could not delete the account. It may still have transactions linked to it.');
       },
     });
   }

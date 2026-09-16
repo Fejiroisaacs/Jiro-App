@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
@@ -9,55 +9,53 @@ import {
 import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-card';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
-import { periodLabel, clamp } from '../shared/ledger-utils';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
+import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
+import { ConfirmService } from '../../../core/services/confirm.service';
+import { ToastService } from '../../../core/services/toast.service';
+import { periodLabel, clamp, formatCurrency } from '../shared/ledger-utils';
 
 @Component({
   selector: 'app-budgets-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, JiroCardComponent, JiroButtonComponent, JiroModalComponent],
+  imports: [
+    CommonModule, FormsModule, JiroCardComponent, JiroButtonComponent, JiroModalComponent,
+    JiroIconComponent, JiroPageHeaderComponent, JiroEmptyStateComponent,
+  ],
   template: `
     <div class="budgets-page">
 
       <!-- Header -->
-      <div class="page-header">
-        <div>
-          <h1>Budgets</h1>
-          <p class="text-secondary">Track your spending against limits</p>
-        </div>
-        <jiro-button variant="primary" type="button" (click)="openAddModal()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <line x1="12" y1="5" x2="12" y2="19"/>
-            <line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-          Add Budget
+      <jiro-page-header heading="Budgets" subtitle="Track your spending against limits">
+        <jiro-button actions type="button" (click)="openAddModal()">
+          <jiro-icon name="plus" [size]="14" />
+          Add budget
         </jiro-button>
-      </div>
+      </jiro-page-header>
 
       <!-- Loading -->
       @if (loading()) {
-<div class="state-message">
-        <div class="spinner-lg"></div>
-        <p>Loading budgets...</p>
-      </div>
-}
+        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+      }
 
       <!-- Summary bar -->
       @if (!loading() && budgets().length > 0) {
 <div class="summary-bar">
         <div class="summary-item">
-          <span class="summary-label">Total Budgeted</span>
-          <span class="summary-value">\${{ totalBudgeted() | number:'1.2-2' }}</span>
+          <span class="summary-label">Total budgeted</span>
+          <span class="summary-value">{{ money(totalBudgeted()) }}</span>
         </div>
         <div class="summary-divider"></div>
         <div class="summary-item">
-          <span class="summary-label">Total Spent</span>
-          <span class="summary-value" [class.over]="totalSpent() > totalBudgeted()">\${{ totalSpent() | number:'1.2-2' }}</span>
+          <span class="summary-label">Total spent</span>
+          <span class="summary-value" [class.over]="totalSpent() > totalBudgeted()">{{ money(totalSpent()) }}</span>
         </div>
         <div class="summary-divider"></div>
         <div class="summary-item">
           <span class="summary-label">Remaining</span>
           <span class="summary-value" [class.over]="totalBudgeted() - totalSpent() < 0">
-            \${{ (totalBudgeted() - totalSpent()) | number:'1.2-2' }}
+            {{ money(totalBudgeted() - totalSpent()) }}
           </span>
         </div>
       </div>
@@ -65,22 +63,15 @@ import { periodLabel, clamp } from '../shared/ledger-utils';
 
       <!-- Empty state -->
       @if (!loading() && budgets().length === 0) {
-<div class="empty-state">
-        <div class="empty-icon">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <rect x="2" y="7" width="20" height="14" rx="2"/>
-            <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
-            <line x1="12" y1="12" x2="12" y2="16"/>
-            <line x1="10" y1="14" x2="14" y2="14"/>
-          </svg>
-        </div>
-        <h3>No budgets yet</h3>
-        <p class="text-secondary">Set limits on your spending categories to stay on track.</p>
-        <jiro-button variant="primary" type="button" (click)="openAddModal()">
-          Set your first budget
-        </jiro-button>
-      </div>
-}
+        <jiro-empty-state
+          icon="wallet"
+          heading="No budgets yet"
+          message="Set a limit on a spending category to stay on track.">
+          <jiro-button type="button" (click)="openAddModal()">
+            Set your first budget
+          </jiro-button>
+        </jiro-empty-state>
+      }
 
       <!-- Budget grid -->
       @if (!loading() && budgets().length > 0) {
@@ -93,7 +84,7 @@ import { periodLabel, clamp } from '../shared/ledger-utils';
             <div class="category-info">
               <span
                 class="color-dot"
-                [style.background]="budget.category_color || '#9B8F88'">
+                [style.background]="budget.category_color || 'var(--text-muted)'">
               </span>
               <span class="category-name">{{ budget.category_name }}</span>
             </div>
@@ -111,7 +102,7 @@ import { periodLabel, clamp } from '../shared/ledger-utils';
               </div>
             </div>
             <div class="progress-labels">
-              <span class="spent-label">\${{ budget.spent | number:'1.2-2' }} / \${{ budget.amount | number:'1.2-2' }}</span>
+              <span class="spent-label">{{ money(budget.spent) }} of {{ money(budget.amount) }} this {{ periodWord(budget.period) }}</span>
               <span class="pct-label" [class.warn]="budget.pct_used >= 80 && budget.pct_used < 100" [class.over]="budget.pct_used >= 100">
                 {{ budget.pct_used | number:'1.0-0' }}% used
               </span>
@@ -122,7 +113,7 @@ import { periodLabel, clamp } from '../shared/ledger-utils';
           <div class="remaining-row">
             @if (budget.remaining >= 0) {
 <span class="remaining-ok">
-              \${{ budget.remaining | number:'1.2-2' }} remaining
+              {{ money(budget.remaining) }} remaining
             </span>
 }
             @if (budget.remaining < 0) {
@@ -130,11 +121,12 @@ import { periodLabel, clamp } from '../shared/ledger-utils';
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
               </svg>
-              Over budget by \${{ (-budget.remaining) | number:'1.2-2' }}
+              Over budget by {{ money(-budget.remaining) }}
             </span>
 }
-            <button class="delete-btn" (click)="confirmDelete(budget)" title="Delete budget">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <button class="delete-btn" type="button" (click)="deleteBudget(budget)" title="Delete budget"
+              [attr.aria-label]="'Delete the ' + budget.category_name + ' budget'">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                 <polyline points="3,6 5,6 21,6"/>
                 <path d="M19,6l-1,14a2,2,0,0,1-2,2H8a2,2,0,0,1-2-2L5,6"/>
                 <path d="M10,11v6M14,11v6M9,6V4a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1V6"/>
@@ -243,24 +235,6 @@ import { periodLabel, clamp } from '../shared/ledger-utils';
       </jiro-modal>
 }
 
-      <!-- Delete Confirmation Modal -->
-      @if (deletingBudget()) {
-<jiro-modal title="Delete Budget?" maxWidth="420px" (close)="deletingBudget.set(null)">
-        <div class="delete-confirm">
-          <p>Delete the budget for <strong>{{ deletingBudget()!.category_name }}</strong>?</p>
-          <p class="text-secondary" style="font-size: var(--font-size-sm); margin-top: var(--space-xs);">
-            This will remove the spending limit. Your transaction history will not be affected.
-          </p>
-          <div class="form-actions" style="margin-top: var(--space-lg);">
-            <jiro-button variant="secondary" type="button" (click)="deletingBudget.set(null)">Cancel</jiro-button>
-            <jiro-button variant="danger" type="button" [disabled]="deleting()" (click)="deleteBudget()">
-              {{ deleting() ? 'Deleting...' : 'Delete' }}
-            </jiro-button>
-          </div>
-        </div>
-      </jiro-modal>
-}
-
     </div>
   `,
   styles: [`
@@ -269,19 +243,9 @@ import { periodLabel, clamp } from '../shared/ledger-utils';
     .budgets-page { max-width: 1000px; width: 100%; }
 
     /* ── Header ── */
-    .page-header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      margin-bottom: var(--space-lg);
-      gap: var(--space-md);
-    }
-
-    .page-header h1 { font-size: var(--font-size-2xl); font-weight: 700; }
 
 
     @media (max-width: 600px) {
-      .page-header { flex-direction: column; }
     }
 
     /* ── Summary bar ── */
@@ -329,46 +293,13 @@ import { periodLabel, clamp } from '../shared/ledger-utils';
     }
 
     /* ── State messages ── */
-    .state-message {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: var(--space-2xl);
-      gap: var(--space-md);
-      text-align: center;
-    }
+    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
 
-    .spinner-lg {
-      width: 40px; height: 40px;
-      border: 3px solid var(--border-color);
-      border-top-color: var(--color-primary);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
 
     /* ── Empty state ── */
-    .empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: var(--space-2xl) var(--space-lg);
-      gap: var(--space-md);
-      text-align: center;
-      border: 1px dashed var(--border-color);
-      border-radius: var(--border-radius);
-      background: var(--bg-surface);
-    }
 
-    .empty-icon {
-      color: var(--text-muted);
-      opacity: 0.5;
-    }
 
-    .empty-state h3 { font-size: var(--font-size-xl); font-weight: 600; color: var(--text-primary); }
 
-    .empty-state jiro-button { margin-top: var(--space-xs); }
 
     /* ── Budgets grid ── */
     .budgets-grid {
@@ -433,13 +364,13 @@ import { periodLabel, clamp } from '../shared/ledger-utils';
 
     .progress-fill {
       height: 100%;
-      background: #4A6741;
+      background: var(--color-accent);
       border-radius: 4px;
       transition: width 0.4s ease;
     }
 
-    .progress-fill.warn { background: #F59E0B; }
-    .progress-fill.over { background: #C1582A; }
+    .progress-fill.warn { background: var(--color-warning); }
+    .progress-fill.over { background: var(--color-danger); }
 
     .progress-labels {
       display: flex;
@@ -455,7 +386,7 @@ import { periodLabel, clamp } from '../shared/ledger-utils';
       color: var(--color-accent);
     }
 
-    .pct-label.warn { color: #F59E0B; }
+    .pct-label.warn { color: var(--color-warning); }
     .pct-label.over { color: var(--color-danger); }
 
     /* ── Remaining row ── */
@@ -482,6 +413,7 @@ import { periodLabel, clamp } from '../shared/ledger-utils';
 
     /* ── Delete button ── */
     .delete-btn {
+      min-width: 40px; min-height: 40px;
       flex-shrink: 0;
       background: none;
       border: 1px solid var(--border-color);
@@ -498,9 +430,9 @@ import { periodLabel, clamp } from '../shared/ledger-utils';
 
     .delete-btn:hover {
       color: var(--color-danger);
-      border-color: rgba(193,88,42,0.3);
-      background: rgba(193,88,42,0.05);
-      box-shadow: 1px 1px 0 rgba(193,88,42,0.2);
+      border-color: rgba(var(--color-danger-rgb), 0.3);
+      background: rgba(var(--color-danger-rgb), 0.05);
+      box-shadow: 1px 1px 0 rgba(var(--color-danger-rgb), 0.2);
     }
 
     /* ── Modal form ── */
@@ -590,13 +522,10 @@ import { periodLabel, clamp } from '../shared/ledger-utils';
     .seg-btn + .seg-btn { border-left: 1px solid var(--border-color); }
     .seg-btn.active {
       background: var(--color-primary);
-      color: #fff;
+      color: var(--text-on-primary);
     }
 
     /* ── Delete confirm ── */
-    .delete-confirm { display: flex; flex-direction: column; gap: var(--space-xs); }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
   `]
 })
 export class BudgetsPageComponent implements OnInit {
@@ -609,7 +538,8 @@ export class BudgetsPageComponent implements OnInit {
   saving = signal(false);
   deleting = signal(false);
   showAddModal = signal(false);
-  deletingBudget = signal<BudgetWithSpend | null>(null);
+  private readonly confirmService = inject(ConfirmService);
+  private readonly toast = inject(ToastService);
 
   showCatModal = signal(false);
   catSaving = signal(false);
@@ -718,21 +648,31 @@ export class BudgetsPageComponent implements OnInit {
     });
   }
 
-  confirmDelete(budget: BudgetWithSpend) {
-    this.deletingBudget.set(budget);
+  /** Budget amounts through the shared formatter: separators and one currency. */
+  money(value: number): string {
+    return formatCurrency(value);
   }
 
-  deleteBudget() {
-    const budget = this.deletingBudget();
-    if (!budget) return;
-    this.deleting.set(true);
+  /** "month" / "week" / "year", for the "of $400 this month" line. */
+  periodWord(period: string): string {
+    const map: Record<string, string> = { monthly: 'month', weekly: 'week', yearly: 'year' };
+    return map[period] ?? period;
+  }
+
+  async deleteBudget(budget: BudgetWithSpend) {
+    const ok = await this.confirmService.confirm({
+      title: `Delete the ${budget.category_name} budget?`,
+      message: 'The spending limit is removed. Your transaction history is not affected.',
+      confirmLabel: 'Delete budget',
+      danger: true,
+    });
+    if (!ok) return;
     this.ledgerService.deleteBudget(budget.id).subscribe({
       next: () => {
         this.budgets.update(list => list.filter(b => b.id !== budget.id));
-        this.deletingBudget.set(null);
-        this.deleting.set(false);
+        this.toast.success('Budget deleted');
       },
-      error: () => this.deleting.set(false),
+      error: () => this.toast.error('Could not delete the budget.'),
     });
   }
 

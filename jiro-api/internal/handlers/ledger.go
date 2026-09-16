@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/models"
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/services"
@@ -198,6 +199,7 @@ func (h *LedgerHandler) ListTransactions(c *gin.Context) {
 		AccountID:  c.Query("account_id"),
 		CategoryID: c.Query("category_id"),
 		Type:       c.Query("type"),
+		Q:          strings.TrimSpace(c.Query("q")),
 		Page:       page,
 		Limit:      limit,
 	}

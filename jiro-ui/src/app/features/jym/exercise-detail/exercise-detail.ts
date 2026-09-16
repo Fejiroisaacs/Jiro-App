@@ -4,7 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import { JymService, ExerciseWithHistory, SetHistory, ExerciseFormCheck } from '../../../core/services/jym.service';
 import { SettingsService } from '../../../core/services/settings.service';
-import { chartTones } from '../shared/chart-theme';
+import { chartTones } from '../../../shared/chart-theme';
 import { UploadService } from '../../../core/services/upload.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';

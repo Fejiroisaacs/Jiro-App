@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import { JymService, BodyWeight } from '../../../core/services/jym.service';
 import { SettingsService } from '../../../core/services/settings.service';
-import { chartTones } from '../shared/chart-theme';
+import { chartTones } from '../../../shared/chart-theme';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';

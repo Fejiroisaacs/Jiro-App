@@ -69,3 +69,14 @@ export function intervalLabel(interval: string | null): string {
   };
   return map[interval] ?? interval;
 }
+
+/**
+ * The colour a transaction is drawn in. Income, expense and transfer are the
+ * three kinds; transfers are informational rather than good or bad, so they
+ * take the neutral info tone.
+ */
+export function transactionColor(type: string): string {
+  if (type === 'income') return 'var(--color-accent)';
+  if (type === 'expense') return 'var(--color-danger)';
+  return 'var(--color-info)';
+}

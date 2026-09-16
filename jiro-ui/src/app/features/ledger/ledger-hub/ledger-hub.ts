@@ -10,6 +10,9 @@ import {
 } from '../../../core/services/ledger.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
+import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { LedgerTransactionFormComponent, TransactionPayload } from '../shared/transaction-form/ledger-transaction-form';
 import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hexWithAlpha } from '../shared/ledger-utils';
 
@@ -21,53 +24,38 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
     RouterLink,
     JiroButtonComponent,
     JiroModalComponent,
+    JiroIconComponent,
+    JiroPageHeaderComponent,
+    JiroEmptyStateComponent,
     LedgerTransactionFormComponent,
   ],
   template: `
     <div class="ledger-hub">
 
       <!-- ── Page Header ── -->
-      <div class="page-header">
-        <div>
-          <h1>Ledger</h1>
-          <p class="text-secondary">{{ currentMonthLabel }} overview</p>
-        </div>
-        <div class="header-actions">
-          <jiro-button variant="primary" type="button" (click)="openAddTransaction()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            Log Transaction
-          </jiro-button>
-        </div>
-      </div>
+      <jiro-page-header heading="Ledger" [subtitle]="currentMonthLabel + ' overview'">
+        <jiro-button actions type="button" (click)="openAddTransaction()">
+          <jiro-icon name="plus" [size]="14" />
+          Log transaction
+        </jiro-button>
+      </jiro-page-header>
 
       <!-- ── Loading ── -->
       @if (loading()) {
-<div class="state-message">
-        <div class="spinner-lg"></div>
-        <p class="text-secondary">Loading your finances...</p>
-      </div>
-}
+        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+      }
 
       <!-- ── No Accounts Empty State ── -->
       @if (!loading() && accounts().length === 0) {
-<div class="empty-state">
-        <div class="empty-icon">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="2" y="5" width="20" height="14" rx="2"/>
-            <line x1="2" y1="10" x2="22" y2="10"/>
-          </svg>
-        </div>
-        <h3>No accounts yet</h3>
-        <p class="text-secondary">Add your first account to start tracking your finances.</p>
-        <div class="empty-action">
-          <jiro-button variant="primary" type="button" (click)="router.navigate(['/ledger/accounts'])">
+        <jiro-empty-state
+          icon="bank"
+          heading="No accounts yet"
+          message="Add your first account to start tracking your finances.">
+          <jiro-button type="button" (click)="router.navigate(['/ledger/accounts'])">
             Add your first account
           </jiro-button>
-        </div>
-      </div>
-}
+        </jiro-empty-state>
+      }
 
       <!-- ── Main content (accounts exist) ── -->
       @if (!loading() && accounts().length > 0) {
@@ -111,8 +99,9 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
             <!-- Budgets empty -->
             @if (budgets().length === 0) {
 <div class="mini-empty">
-              <p class="text-secondary">No budgets set up yet.</p>
-              <a routerLink="/ledger/budgets" class="section-link">Create budget →</a>
+              <jiro-empty-state compact heading="No budgets yet" message="Set a limit on a category to track it here.">
+                <jiro-button size="sm" variant="secondary" routerLink="/ledger/budgets">Create a budget</jiro-button>
+              </jiro-empty-state>
             </div>
 }
 
@@ -122,7 +111,7 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
               @for (b of budgets(); track b) {
 <div class="budget-card">
                 <div class="budget-card-top">
-                  <span class="budget-cat-dot" [style.background]="b.category_color || '#9B8F88'"></span>
+                  <span class="budget-cat-dot" [style.background]="b.category_color || 'var(--text-muted)'"></span>
                   <span class="budget-cat-name">{{ b.category_name }}</span>
                   <span class="budget-pct" [class.pct-ok]="b.pct_used < 80" [class.pct-warn]="b.pct_used >= 80 && b.pct_used < 100" [class.pct-over]="b.pct_used >= 100">
                     {{ b.pct_used | number:'1.0-0' }}%
@@ -156,7 +145,9 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
             <!-- Transactions empty -->
             @if (transactions().length === 0) {
 <div class="mini-empty">
-              <p class="text-secondary">No transactions this month.</p>
+              <jiro-empty-state compact heading="Nothing logged this month" message="Your recent transactions show up here.">
+                <jiro-button size="sm" variant="secondary" type="button" (click)="openAddTransaction()">Log a transaction</jiro-button>
+              </jiro-empty-state>
             </div>
 }
 
@@ -189,13 +180,6 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
       
 }
 
-      <!-- ── FAB (mobile only) ── -->
-      <button class="fab" (click)="openAddTransaction()" aria-label="Log transaction">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-        </svg>
-      </button>
-
       <!-- ── Add Transaction Modal ── -->
       @if (showTxnModal()) {
 <jiro-modal title="Log Transaction" maxWidth="520px" (close)="closeAddTransaction()">
@@ -218,17 +202,6 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
     .ledger-hub { max-width: 1100px; width: 100%; }
 
     /* ── Header ── */
-    .page-header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      margin-bottom: var(--space-lg);
-      gap: var(--space-md);
-    }
-
-    .page-header h1 { font-size: var(--font-size-2xl); font-weight: 700; }
-
-    .header-actions { display: flex; gap: var(--space-sm); flex-shrink: 0; align-items: center; }
 
 
     /* ── Summary Bar ── */
@@ -364,7 +337,7 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
     }
 
     .pct-ok { color: var(--color-accent); }
-    .pct-warn { color: #F59E0B; }
+    .pct-warn { color: var(--color-warning); }
     .pct-over { color: var(--color-danger); }
 
     .budget-bar-track {
@@ -382,7 +355,7 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
     }
 
     .bar-ok { background: var(--color-accent); }
-    .bar-warn { background: #F59E0B; }
+    .bar-warn { background: var(--color-warning); }
     .bar-over { background: var(--color-danger); }
 
     .budget-amounts {
@@ -474,69 +447,19 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
     }
 
     /* ── Empty state (no accounts) ── */
-    .empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: var(--space-md);
-      padding: var(--space-2xl) var(--space-lg);
-      text-align: center;
-    }
 
-    .empty-icon {
-      color: var(--text-muted);
-      opacity: 0.5;
-    }
 
-    .empty-state h3 { font-size: var(--font-size-xl); font-weight: 600; }
 
 
     /* ── Spinner ── */
-    .state-message {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: var(--space-2xl);
-      gap: var(--space-md);
-      text-align: center;
-    }
+    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
 
-    .spinner-lg {
-      width: 40px;
-      height: 40px;
-      border: 3px solid var(--border-color);
-      border-top-color: var(--color-primary);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
 
     /* ── FAB ── */
-    .fab {
-      display: none;
-      position: fixed;
-      bottom: 24px;
-      right: 24px;
-      width: 56px;
-      height: 56px;
-      border-radius: 50%;
-      background: var(--color-primary);
-      color: #fff;
-      border: none;
-      cursor: pointer;
-      box-shadow: 4px 4px 0px rgba(92,64,51,0.25);
-      align-items: center;
-      justify-content: center;
-      z-index: 100;
-      transition: all 0.2s;
-    }
 
-    .fab:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 rgba(92,64,51,0.25); }
 
     /* ── Responsive ── */
     @media (max-width: 768px) {
-      .page-header { flex-direction: column; }
-      .header-actions { display: none; }
 
       .summary-bar {
         padding: var(--space-md) var(--space-lg);
@@ -566,10 +489,8 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
         flex-shrink: 0;
       }
 
-      .fab { display: flex; }
     }
 
-    @keyframes spin { to { transform: rotate(360deg); } }
   `],
 })
 export class LedgerHubComponent implements OnInit {

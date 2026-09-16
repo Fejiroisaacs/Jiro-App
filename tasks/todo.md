@@ -74,3 +74,33 @@ Plan: `~/.claude/plans/jaunty-rolling-dream.md`. Audit: `docs/UI-AUDIT-2026-09.m
 
 **Next: Phase 3b (Ledger)**, using the inputs recorded above.
 
+
+## Phase 3b: Ledger (in progress, plan in `~/.claude/plans/jaunty-rolling-dream.md`)
+
+- [x] 3b.0 Groundwork: move `chart-theme.ts` to `shared/`, add `transactionColor()` to `ledger-utils.ts`
+- [x] 3b.1 Search across the whole history: `q` param on the API (model, handler, service with COALESCE on notes), wired to the transaction search box; client-side `visibleTransactions` filter removed; `activeFilterCount()` on signals
+- [x] 3b.2 Transaction log: `jiro-page-header`, skeleton, three empty states, ConfirmService + toasts, edit modal reuses `ledger-transaction-form` via a new `initial` input, `transactionColor`, 40px targets
+- [x] 3b.3 Accounts: header becomes a disclosure button with `aria-expanded`, Edit/Delete into `jiro-menu`, panel gets Collapse, ConfirmService + toast, shared states
+- [x] 3b.4 Hub: floating button removed (it sits behind the 60px mobile bar), header action shown on mobile, `jiro-empty-state compact` for the two mini-empties, tokens
+- [x] 3b.5 Budgets: `formatCurrency` everywhere, ConfirmService + toast, tokens, period shown on each card
+- [x] 3b.6 Net worth + Compare: `chartTones()` at draw time, legend driven from the same tones, one `categoryRows()` feeding both layouts, shared states, snapshot modal prefilled from accounts, Compare reuses its chart instance
+- [x] Verification: `check:css`, production build, `go build ./...`, Playwright desktop + mobile, dark mode on both charts
+- [x] Commit per step, push at the end, review section below
+
+## Review (Phase 3b)
+
+**Delivered.** Ledger now uses the same primitives as the rest of the app: every one of its six pages has the shared header, empty state, spinner and in-app confirm, where before none of them imported any of those. Four hand-rolled confirm modals are gone. The last colour literals became tokens, so the module follows the theme, and both charts read the palette through `shared/chart-theme.ts` at draw time instead of being pinned to light-mode colours.
+
+**Three real bugs fixed, not just styling.**
+- **Search only covered loaded rows.** The box filtered the pages already fetched, so a term matching an older transaction returned nothing. `GET /ledger/transactions` now takes `q` and matches the description or the notes case-insensitively (`COALESCE` on notes, which is nullable); the box debounces, resets to page 1 and asks the server. Verified against the API and through the UI: the request carries `q`, and a transaction dated three months back is found from a fresh load.
+- **The hub's mobile button was unreachable.** The floating button sat at `z-index: 100` behind the 60px mobile bar at `z-index: 200`, and the header action was hidden under 768px. The floating button is gone; the header action shows at every width.
+- **Accounts fought their own controls.** The whole card was clickable while Edit and Delete sat inside it calling `stopPropagation()`, and the panel had no close control. It is now a proper disclosure with a row menu.
+
+**Smaller wins.** The edit modal reuses `ledger-transaction-form` instead of a second hand-written copy of the same fields, so there is one form and one set of validation rules. `transactionColor` in `ledger-utils` replaces two byte-identical helpers that both hard-coded a blue. Filter state moved onto signals, so the mobile filter badge updates when a filter changes rather than on the next unrelated change-detection tick. Budget amounts carry thousands separators and each card says which period it covers.
+
+**Already done, so skipped.** The plan called for prefilling the net-worth snapshot modal from the accounts totals. It already did.
+
+**Numbers.** Raw hex across the app: 152 down to 117, with zero left in `features/ledger`. Production build 386.78 kB initial, down from 395 kB. Go API builds clean.
+
+**Next: Phase 3c (Journaly).** The inputs are recorded above. The headline item is that journal-home never binds the week view's `weekChange`, so paging to another week shows nothing.
+

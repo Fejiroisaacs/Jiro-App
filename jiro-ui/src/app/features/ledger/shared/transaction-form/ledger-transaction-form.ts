@@ -29,9 +29,9 @@ export interface TransactionPayload {
       <div class="form-group">
         <label class="form-label">Type</label>
         <div class="type-toggle">
-          <button type="button" class="type-btn" [class.active]="form.type === 'expense'" (click)="setType('expense')">Expense</button>
-          <button type="button" class="type-btn" [class.active]="form.type === 'income'" (click)="setType('income')">Income</button>
-          <button type="button" class="type-btn" [class.active]="form.type === 'transfer'" (click)="setType('transfer')">Transfer</button>
+          <button type="button" class="type-btn" [disabled]="lockType" [attr.aria-pressed]="form.type === 'expense'" [class.active]="form.type === 'expense'" (click)="setType('expense')">Expense</button>
+          <button type="button" class="type-btn" [disabled]="lockType" [attr.aria-pressed]="form.type === 'income'" [class.active]="form.type === 'income'" (click)="setType('income')">Income</button>
+          <button type="button" class="type-btn" [disabled]="lockType" [attr.aria-pressed]="form.type === 'transfer'" [class.active]="form.type === 'transfer'" (click)="setType('transfer')">Transfer</button>
         </div>
       </div>
 
@@ -229,7 +229,8 @@ export interface TransactionPayload {
       cursor: pointer; transition: background 0.15s, color 0.15s;
     }
     .type-btn + .type-btn { border-left: 1px solid var(--border-color); }
-    .type-btn.active { background: var(--color-primary); color: #fff; }
+    .type-btn.active { background: var(--color-primary); color: var(--text-on-primary); }
+    .type-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
     /* Recurring toggle */
     .toggle-row { display: flex; align-items: center; justify-content: space-between; }
@@ -241,8 +242,8 @@ export interface TransactionPayload {
     .toggle-btn.on { background: var(--color-primary); }
     .toggle-knob {
       display: block; width: 18px; height: 18px; border-radius: 50%;
-      background: white; position: absolute; top: 3px; left: 3px;
-      transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+      background: var(--bg-surface); position: absolute; top: 3px; left: 3px;
+      transition: transform 0.2s; box-shadow: 0 1px 3px rgba(var(--shadow-rgb), 0.3);
     }
     .toggle-btn.on .toggle-knob { transform: translateX(20px); }
   `]
@@ -251,7 +252,11 @@ export class LedgerTransactionFormComponent implements OnInit {
   @Input() accounts: LedgerAccount[] = [];
   @Input() saving = false;
   @Input() error = '';
-  @Input() submitLabel = 'Log Transaction';
+  @Input() submitLabel = 'Log transaction';
+  /** Pre-fill the form; used when editing an existing transaction. */
+  @Input() initial: Partial<TransactionPayload> | null = null;
+  /** Transfers cannot change account or amount once written, so lock them. */
+  @Input() lockType = false;
 
   @Output() formSubmit = new EventEmitter<TransactionPayload>();
   @Output() formCancel = new EventEmitter<void>();
@@ -279,6 +284,23 @@ export class LedgerTransactionFormComponent implements OnInit {
 
   ngOnInit() {
     this.loadCategories();
+    if (this.initial) {
+      const i = this.initial;
+      this.form = {
+        ...this.form,
+        type: i.type ?? this.form.type,
+        account_id: i.account_id ?? '',
+        transfer_to_account_id: i.transfer_to_account_id ?? '',
+        category_id: i.category_id ?? '',
+        amount: i.amount ?? null,
+        description: i.description ?? '',
+        notes: i.notes ?? '',
+        is_recurring: i.is_recurring ?? false,
+        recurrence_interval: i.recurrence_interval ?? 'monthly',
+        date: i.date ?? this.form.date,
+      };
+      return;
+    }
     // Auto-select first account if only one available
     if (this.accounts.length === 1) {
       this.form.account_id = this.accounts[0].id;
