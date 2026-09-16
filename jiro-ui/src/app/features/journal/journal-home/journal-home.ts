@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -6,18 +6,29 @@ import {
   JournalService,
   JournalEntry,
   JournalStreak,
+  ListEntriesParams,
   MOODS,
+  moodColor as moodColorFor,
+  moodLabel as moodLabelFor,
+  moodMeta,
 } from '../../../core/services/journal.service';
+import { ConfirmService } from '../../../core/services/confirm.service';
+import { ToastService } from '../../../core/services/toast.service';
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
-import { JournalWeekViewComponent, toISO } from '../journal-week-view/journal-week-view';
+import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
+import { JournalWeekViewComponent, toISO, currentWeekBounds } from '../journal-week-view/journal-week-view';
+import { MoodTrendComponent } from '../mood-trend/mood-trend';
 import { JournalDayModalComponent } from '../journal-day-modal/journal-day-modal';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
-import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 
 @Component({
   selector: 'app-journal-home',
   standalone: true,
-  imports: [FormsModule, JiroPageHeaderComponent, JournalWeekViewComponent, JournalDayModalComponent, JiroButtonComponent, JiroModalComponent],
+  imports: [
+    FormsModule, JiroPageHeaderComponent, JournalWeekViewComponent,
+    JournalDayModalComponent, JiroButtonComponent, JiroEmptyStateComponent,
+    MoodTrendComponent,
+  ],
   template: `
     <div class="journal-home">
 
@@ -44,12 +55,16 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       </div>
 }
 
+      <!-- Mood distribution over the last 30 days -->
+      <journal-mood-trend [entries]="recentEntries()" />
+
       <!-- Week view calendar -->
       <journal-week-view
-        [entries]="entries()"
+        [entries]="weekEntries()"
         [loading]="loadingEntries()"
         (dayClick)="openDayModal($event)"
-        (entryClick)="openEntryModal($event)">
+        (entryClick)="openEntryModal($event)"
+        (weekChange)="onWeekChange($event)">
       </journal-week-view>
 
       <!-- Filters -->
@@ -57,46 +72,67 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
         <input
           type="search"
           class="filter-input"
+          aria-label="Search entries"
           placeholder="Search entries..."
-          [(ngModel)]="searchQ"
-          (ngModelChange)="onFilterChange()" />
-        <select class="filter-select" [(ngModel)]="filterMood" (ngModelChange)="onFilterChange()">
+          [ngModel]="searchQ()"
+          (ngModelChange)="onSearchChange($event)" />
+        <select class="filter-select" aria-label="Filter by mood" [ngModel]="filterMood()" (ngModelChange)="filterMood.set($event); applyFilters()">
           <option value="">All moods</option>
-          @for (m of moods; track m) {
+          @for (m of moods; track m.value) {
 <option [value]="m.value">{{ m.label }}</option>
 }
         </select>
         <input
           type="text"
           class="filter-input filter-tag"
+          aria-label="Filter by tag"
           placeholder="Filter by tag..."
-          [(ngModel)]="filterTag"
-          (ngModelChange)="onFilterChange()" />
+          [ngModel]="filterTag()"
+          (ngModelChange)="filterTag.set($event); applyFilters()" />
+      </div>
+
+      <!-- What the list below is showing. The calendar always shows a week; the
+           list follows it until a filter is on, and then it spans all time. -->
+      <div class="list-head">
+        <h2 class="list-title">{{ filtering() ? 'Matching entries' : 'Entries this week' }}</h2>
+        @if (filtering()) {
+          <button class="list-clear" type="button" (click)="clearFilters()">Back to this week</button>
+        }
       </div>
 
       <!-- Empty -->
       @if (!loadingEntries() && entries().length === 0) {
-<div class="state-box">
-        <h3>Start your first entry</h3>
-        <p class="text-secondary">A sentence is enough. Just begin.</p>
-        <jiro-button variant="primary" type="button" (click)="router.navigate(['/journal/new'])">Write now</jiro-button>
-      </div>
-}
+        @if (filtering()) {
+          <jiro-empty-state
+            icon="magnifying-glass"
+            heading="Nothing matches"
+            message="No entry matches this search, mood or tag.">
+            <jiro-button variant="secondary" type="button" (click)="clearFilters()">Back to this week</jiro-button>
+          </jiro-empty-state>
+        } @else {
+          <jiro-empty-state
+            icon="notebook"
+            heading="Nothing written this week"
+            message="A sentence is enough. Just begin.">
+            <jiro-button type="button" (click)="router.navigate(['/journal/new'])">Write now</jiro-button>
+          </jiro-empty-state>
+        }
+      }
 
       <!-- Entry list -->
       @if (!loadingEntries() && entries().length > 0) {
 <div class="entries-list">
-        @for (e of entries(); track e) {
+        @for (e of entries(); track e.id) {
 <div class="entry-card" (click)="router.navigate(['/journal', e.id, 'edit'])">
           <div class="entry-card-top">
             <div class="entry-meta">
               <span class="entry-date">{{ formatDate(e.created_at) }}</span>
               @if (e.mood) {
-<span class="mood-chip">{{ moodLabel(e.mood) }}</span>
+<span class="mood-chip" [style.border-left-color]="moodColor(e.mood)">{{ moodLabel(e.mood) }}</span>
 }
             </div>
             <div class="entry-card-actions" (click)="$event.stopPropagation()">
-              <button class="icon-btn danger" (click)="confirmDelete(e)" aria-label="Delete entry">
+              <button class="icon-btn danger" type="button" (click)="deleteEntry(e)" [attr.aria-label]="'Delete the entry from ' + formatDate(e.created_at)">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
                   <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
@@ -145,24 +181,10 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     </journal-day-modal>
 }
 
-    <!-- Delete confirm -->
-    @if (deleteTarget()) {
-<jiro-modal title="Delete Entry" (close)="deleteTarget.set(null)">
-      <p>Are you sure you want to delete this entry? This cannot be undone.</p>
-      <div class="modal-actions">
-        <jiro-button variant="secondary" type="button" (click)="deleteTarget.set(null)">Cancel</jiro-button>
-        <jiro-button variant="danger" type="button" [disabled]="deleting()" (click)="deleteEntry()">
-          {{ deleting() ? 'Deleting...' : 'Delete' }}
-        </jiro-button>
-      </div>
-    </jiro-modal>
-}
   `,
   styles: [`
     .journal-home { max-width: 860px; }
 
-    .page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: var(--space-xl); }
-    .page-header h1 { margin: 0 0 var(--space-xs); }
 
     /* Streak banner */
     .streak-banner {
@@ -172,7 +194,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       border-radius: var(--border-radius); padding: var(--space-md) var(--space-lg);
       margin-bottom: var(--space-xl);
     }
-    .flame-emoji { font-size: 1.5rem; line-height: 1; }
     .streak-info { display: flex; align-items: baseline; gap: var(--space-xs); }
     .streak-count { font-size: var(--font-size-xl); font-weight: 700; color: var(--color-primary); }
     .streak-label { font-size: var(--font-size-sm); color: var(--text-secondary); }
@@ -183,6 +204,20 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
     /* Filters */
     .filters-row { display: flex; gap: var(--space-sm); margin-bottom: var(--space-lg); flex-wrap: wrap; }
+
+    .list-head {
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: var(--space-sm); margin-bottom: var(--space-md);
+    }
+    .list-title {
+      font-family: var(--font-family-display);
+      font-size: var(--font-size-md); font-weight: 600; color: var(--text-primary);
+    }
+    .list-clear {
+      background: none; border: none; padding: 0;
+      color: var(--color-primary); font: inherit; font-size: var(--font-size-sm);
+      cursor: pointer; text-decoration: underline; white-space: nowrap;
+    }
     .filter-input, .filter-select {
       font-family: inherit; font-size: var(--font-size-sm);
       border: 1px solid var(--border-color); border-radius: var(--border-radius-sm);
@@ -192,7 +227,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     .filter-tag { min-width: 120px; }
 
     /* State */
-    .state-box { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--space-sm); padding: var(--space-xl) 0; }
 
     /* Entry cards */
     .entries-list { display: flex; flex-direction: column; gap: var(--space-md); }
@@ -205,10 +239,16 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     .entry-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-xs); }
     .entry-meta { display: flex; align-items: center; gap: var(--space-sm); }
     .entry-date { font-size: var(--font-size-xs); color: var(--text-secondary); }
-    .mood-chip { font-size: var(--font-size-xs); padding: 2px 8px; background: color-mix(in srgb, var(--color-primary) 12%, transparent); color: var(--color-primary); border-radius: 99px; }
+    .mood-chip {
+      font-size: var(--font-size-xs); padding: 2px 8px 2px 7px;
+      background: var(--bg-canvas); color: var(--text-secondary);
+      border: 1px solid var(--border-color);
+      border-left: 3px solid var(--border-color);
+      border-radius: var(--border-radius-sm);
+    }
     .entry-card-actions { display: flex; gap: var(--space-xs); opacity: 0.45; transition: opacity 0.15s; }
     .entry-card:hover .entry-card-actions { opacity: 1; }
-    .icon-btn { background: none; border: none; cursor: pointer; padding: 4px; border-radius: var(--border-radius-sm); color: var(--text-secondary); display: flex; align-items: center; transition: color 0.12s, background 0.12s; }
+    .icon-btn { background: none; border: none; cursor: pointer; width: 40px; height: 40px; border-radius: var(--border-radius-sm); color: var(--text-secondary); display: flex; align-items: center; justify-content: center; transition: color 0.12s, background 0.12s; }
     .icon-btn.danger:hover { color: var(--color-danger); background: color-mix(in srgb, var(--color-danger) 10%, transparent); }
     .entry-title { font-size: var(--font-size-md); font-weight: 600; margin: 0 0 var(--space-xs); }
     .entry-excerpt { font-size: var(--font-size-sm); color: var(--text-secondary); margin: 0 0 var(--space-sm); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
@@ -218,10 +258,8 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     .img-badge { display: flex; align-items: center; gap: 3px; font-size: var(--font-size-xs); color: var(--text-secondary); flex-shrink: 0; }
 
     /* Modal */
-    .modal-actions { display: flex; justify-content: flex-end; gap: var(--space-sm); }
 
     @media (max-width: 600px) {
-      .page-header { flex-direction: column; gap: var(--space-sm); }
       .streak-banner { flex-wrap: wrap; gap: var(--space-sm); }
       .filters-row { flex-direction: column; }
       .filter-input, .filter-select { min-width: 0; }
@@ -234,13 +272,34 @@ export class JournalHomeComponent implements OnInit {
   streak = signal<JournalStreak | null>(null);
   entries = signal<JournalEntry[]>([]);
   loadingEntries = signal(false);
+  /** Last 30 days, fetched once, feeding the mood chart only. */
+  recentEntries = signal<JournalEntry[]>([]);
 
-  searchQ = '';
-  filterMood = '';
-  filterTag = '';
+  /** The week the calendar is showing. Every fetch is bounded by it. */
+  week = signal<{ from: string; to: string }>(currentWeekBounds());
 
-  deleteTarget = signal<JournalEntry | null>(null);
-  deleting = signal(false);
+  searchQ = signal('');
+  filterMood = signal('');
+  filterTag = signal('');
+
+  /** True while a search, mood or tag narrows the list beyond the week. */
+  filtering = computed(() =>
+    !!(this.searchQ().trim() || this.filterMood() || this.filterTag())
+  );
+
+  /**
+   * The calendar only ever draws the selected week. While filtering, the list
+   * below spans all time, so the calendar takes the week's slice of it rather
+   * than showing matches from other weeks in the wrong columns.
+   */
+  weekEntries = computed(() => {
+    if (!this.filtering()) return this.entries();
+    const { from, to } = this.week();
+    return this.entries().filter(e => {
+      const day = toISO(new Date(e.created_at));
+      return day >= from && day <= to;
+    });
+  });
 
   dayModalDate = signal<string | null>(null);
   dayModalInitEntry = signal<JournalEntry | null>(null);
@@ -250,26 +309,70 @@ export class JournalHomeComponent implements OnInit {
     return this.entries().filter(e => toISO(new Date(e.created_at)) === date);
   });
 
+  private readonly confirmService = inject(ConfirmService);
+  private readonly toast = inject(ToastService);
+  private searchTimer: ReturnType<typeof setTimeout> | null = null;
+
   constructor(private svc: JournalService, public router: Router) { }
 
   ngOnInit() {
     this.svc.getStreak().subscribe(s => this.streak.set(s));
     this.loadEntries();
+    this.loadRecent();
+  }
+
+  /** The 30-day window behind the mood chart. Independent of the week. */
+  private loadRecent() {
+    const to = new Date();
+    const from = new Date(to);
+    from.setDate(from.getDate() - 29);
+    this.svc.listEntries({ from: toISO(from), to: toISO(to), limit: 200 }).subscribe({
+      next: e => this.recentEntries.set(e),
+      error: () => this.recentEntries.set([]),
+    });
   }
 
   loadEntries() {
     this.loadingEntries.set(true);
-    const params: any = {};
-    if (this.searchQ) params.q = this.searchQ;
-    if (this.filterMood) params.mood = this.filterMood;
-    if (this.filterTag) params.tag = this.filterTag;
+    const params: ListEntriesParams = { limit: 100 };
+    if (this.searchQ().trim()) params.q = this.searchQ().trim();
+    if (this.filterMood()) params.mood = this.filterMood();
+    if (this.filterTag()) params.tag = this.filterTag();
+    // Unfiltered, the list mirrors the calendar. Filtering within one week
+    // finds almost nothing, so a filter searches the whole journal instead.
+    if (!this.filtering()) {
+      params.from = this.week().from;
+      params.to = this.week().to;
+    }
     this.svc.listEntries(params).subscribe({
       next: e => { this.entries.set(e); this.loadingEntries.set(false); },
-      error: () => this.loadingEntries.set(false),
+      error: () => {
+        this.loadingEntries.set(false);
+        this.toast.error('Could not load your entries.');
+      },
     });
   }
 
-  onFilterChange() { this.loadEntries(); }
+  onWeekChange(range: { from: string; to: string }) {
+    this.week.set(range);
+    if (!this.filtering()) this.loadEntries();
+  }
+
+  applyFilters() { this.loadEntries(); }
+
+  onSearchChange(value: string) {
+    this.searchQ.set(value);
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => this.loadEntries(), 300);
+  }
+
+  clearFilters() {
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.searchQ.set('');
+    this.filterMood.set('');
+    this.filterTag.set('');
+    this.loadEntries();
+  }
 
   openDayModal(date: string) {
     this.dayModalInitEntry.set(null);
@@ -299,18 +402,25 @@ export class JournalHomeComponent implements OnInit {
 
   onDayModalDelete(id: string) {
     const entry = this.entries().find(e => e.id === id);
-    if (entry) this.confirmDelete(entry);
+    if (entry) this.deleteEntry(entry);
   }
 
-  confirmDelete(e: JournalEntry) { this.deleteTarget.set(e); }
-
-  deleteEntry() {
-    const e = this.deleteTarget();
-    if (!e) return;
-    this.deleting.set(true);
+  async deleteEntry(e: JournalEntry) {
+    const ok = await this.confirmService.confirm({
+      title: `Delete the entry from ${this.formatDate(e.created_at)}?`,
+      message: 'The entry and any images on it are removed permanently.',
+      confirmLabel: 'Delete entry',
+      danger: true,
+    });
+    if (!ok) return;
     this.svc.deleteEntry(e.id).subscribe({
-      next: () => { this.entries.update(es => es.filter(x => x.id !== e.id)); this.deleteTarget.set(null); this.deleting.set(false); },
-      error: () => this.deleting.set(false),
+      next: () => {
+        this.entries.update(es => es.filter(x => x.id !== e.id));
+        this.recentEntries.update(es => es.filter(x => x.id !== e.id));
+        this.svc.getStreak().subscribe(s => this.streak.set(s));
+        this.toast.success('Entry deleted');
+      },
+      error: () => this.toast.error('Could not delete the entry.'),
     });
   }
 
@@ -322,6 +432,7 @@ export class JournalHomeComponent implements OnInit {
     return body.length > 180 ? body.slice(0, 180) + '...' : body;
   }
 
-  moodIcon(value: string): string { return MOODS.find(m => m.value === value)?.icon ?? ''; }
-  moodLabel(value: string): string { return MOODS.find(m => m.value === value)?.label ?? value; }
+  moodIcon(value: string): string { return moodMeta(value)?.icon ?? ''; }
+  moodLabel(value: string): string { return moodLabelFor(value); }
+  moodColor(value: string): string { return moodColorFor(value); }
 }

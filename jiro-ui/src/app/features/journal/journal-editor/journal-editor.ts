@@ -54,7 +54,7 @@ import { UploadService } from '../../../core/services/upload.service';
       <!-- Loading skeleton -->
       @if (loading()) {
 <div class="state-center">
-        <div class="spinner-lg"></div>
+        <span class="spinner"></span>
       </div>
 }
 
@@ -265,7 +265,7 @@ import { UploadService } from '../../../core/services/upload.service';
       font-size: var(--font-size-xs);
       font-weight: 500;
       color: var(--color-primary);
-      background: rgba(122,59,46,0.1);
+      background: rgba(var(--color-primary-rgb), 0.1);
       padding: 2px 8px;
       border-radius: 10px;
     }
@@ -428,8 +428,8 @@ import { UploadService } from '../../../core/services/upload.service';
       width: 20px;
       height: 20px;
       border-radius: 50%;
-      background: rgba(0,0,0,0.6);
-      color: #fff;
+      background: rgba(0, 0, 0, 0.6);
+      color: #FFFFFF;
       border: none;
       cursor: pointer;
       display: flex;
@@ -473,8 +473,8 @@ import { UploadService } from '../../../core/services/upload.service';
     .lightbox {
       position: fixed;
       inset: 0;
-      background: rgba(0,0,0,0.85);
-      z-index: 9999;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: var(--z-overlay);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -497,8 +497,8 @@ import { UploadService } from '../../../core/services/upload.service';
         border-radius: var(--border-radius) var(--border-radius) 0 0;
         max-height: 50vh;
         overflow-y: auto;
-        z-index: 100;
-        box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+        z-index: var(--z-sticky);
+        box-shadow: 0 -4px 20px rgba(var(--shadow-rgb), 0.2);
         padding-bottom: calc(var(--space-lg) + env(safe-area-inset-bottom));
       }
 

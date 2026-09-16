@@ -104,3 +104,33 @@ Plan: `~/.claude/plans/jaunty-rolling-dream.md`. Audit: `docs/UI-AUDIT-2026-09.m
 
 **Next: Phase 3c (Journaly).** The inputs are recorded above. The headline item is that journal-home never binds the week view's `weekChange`, so paging to another week shows nothing.
 
+
+## Phase 3c: Journaly + mood trend chart (in progress, plan in `~/.claude/plans/jaunty-rolling-dream.md`)
+
+- [x] 3c.1 Week calendar actually navigates: bind `weekChange` on journal-home, fetch by week (`from`/`to`, `limit: 100`), list below shows that week; search/filters switch to an all-time results mode with an honest heading and Clear; 300ms debounce on search
+- [x] 3c.2 One mood palette: `color` on each `MOODS` entry, warm to cool in the Earth and Clay family, plus `moodColor()`/`moodMeta()` helpers; the week view's private hex map deleted; mood chips gain colour
+- [x] 3c.3 Mood distribution chart (roadmap item): new `features/journal/mood-trend/mood-trend.ts`, 30-day counts as CSS bars (no Chart.js), accessible rows, empty state under three entries
+- [x] 3c.4 Rest of the module: four hand-rolled confirms -> ConfirmService, toasts throughout (module has none today), shared states + skeleton week grid, `z-index` and colour literals -> tokens, aria labels and 40px targets, dead `.flame-emoji` CSS
+- [x] Verification: `check:css`, production build (journal chunk gains no charting library), Playwright week paging + search + dark mode + mobile
+- [x] Commit per step, push at the end, review section below
+
+## Review (Phase 3c)
+
+**The headline was a broken feature, not styling.** The Journaly home page never bound the week view's `weekChange` and sent no date bounds, so it held the 20 most recent entries and paging the calendar past them showed an empty grid. Paging now refetches that week, and the list beneath it is labelled "Entries this week" so the two always agree. Verified in the browser: paging back issues `entries?from=…&to=…&limit=100` for the week shown.
+
+**Search got better as a side effect.** Filtering inside a single week finds almost nothing, so a search, mood or tag now spans the whole journal under a heading that says "Matching entries", with a way back to the week. Searching "monstera" finds an entry from 19 days ago, which the old page could not do at all.
+
+**Mood has one palette.** It was eight hex values buried in a private map in the week view: amber, cyan, emerald, violet, orange, grey, slate, red, none of which belonged in Earth and Clay. It is now a `color` on each `MOODS` entry in the service, re-picked as one warm-to-cool scale, with `moodColor`, `moodLabel` and `moodMeta` helpers. Every hue was measured at 3:1 or better as a fill against both the light (#FFFDF9) and dark (#261D18) surface; the tightest pair, calm and sad, separate by hue rather than lightness. Mood chips on the entry cards now carry their colour, which they never did.
+
+**The roadmap's mood trend chart shipped with it**, since it needed exactly that palette. Thirty days of entries, one bar per mood, sorted by count. Deliberately plain CSS rather than Chart.js: it is eight rows of a single number, the journal bundle carries no charting library, and CSS bars follow the theme with no redraw. Each row is labelled for a screen reader ("Calm, 6 entries"), the bars are `aria-hidden`, and under three entries it shows an empty state instead of a near-blank chart.
+
+**Also.** Five destructive actions now ask first and report, where the module previously had no toasts at all and four hand-rolled modals. The week grid loads as a skeleton rather than dimming to 40% opacity. Each day column has one control instead of two that looked different and did the same thing. Search debounces at 300ms.
+
+**Found during the work.** The chart's classes were originally `mt-*`, which collides with the shell's mobile topbar title class in `main-layout.ts`. Angular's emulated encapsulation kept the styling correct, but the names are now `moodtrend-*` so a future reader is not misled.
+
+**Numbers.** Raw hex app-wide 117 to 118: the eight mood colours moved into the service and are counted there, while twelve literals left the journal components, so the module itself is down to zero outside that palette. Build 386.78 kB initial, and the journal chunk gained no charting library.
+
+**Test data note.** I seeded 17 journal entries with moods across the last 30 days on the throwaway `audit-tester@example.com` account so the chart had something real to draw.
+
+**Next: Phase 3d (Culinara)**, the last page batch: eight files, eleven icon buttons with no accessible name on the recipe detail, and cook mode as a full-screen overlay with no Escape key and no wake lock. Then Phase 4, the landing page.
+

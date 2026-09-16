@@ -26,7 +26,7 @@ type State = 'loading' | 'joining' | 'success' | 'error' | 'no-token' | 'not-log
         <!-- Loading / joining -->
         @if (state() === 'loading' || state() === 'joining') {
 <div class="join-state">
-          <div class="spinner-lg"></div>
+          <span class="spinner"></span>
           <p class="text-secondary">{{ state() === 'loading' ? 'Preparing...' : 'Joining group...' }}</p>
         </div>
 }
@@ -140,8 +140,8 @@ type State = 'loading' | 'joining' | 'success' | 'error' | 'no-token' | 'not-log
     }
 
     .join-icon { color: var(--text-secondary); }
-    .join-icon.success-icon { color: #4caf50; }
-    .join-icon.error-icon { color: #e67e22; }
+    .join-icon.success-icon { color: var(--color-positive); }
+    .join-icon.error-icon { color: var(--color-warning); }
     .join-state h2 { margin: 0; font-size: var(--font-size-lg); }
     .join-state p { margin: 0; font-size: var(--font-size-sm); }
 
