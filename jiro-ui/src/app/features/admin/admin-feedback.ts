@@ -1,5 +1,5 @@
 import { Component, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { AdminService, FeedbackItem } from '../../core/services/admin.service';
 
 const TYPE_LABELS: Record<string, string> = {
@@ -11,15 +11,20 @@ const TYPE_LABELS: Record<string, string> = {
 @Component({
   selector: 'app-admin-feedback',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   template: `
     <div class="feedback-page">
       <h1 class="page-title">Feedback</h1>
 
-      <div *ngIf="loading()" class="state-msg">Loading...</div>
-      <div *ngIf="error()" class="error-msg">{{ error() }}</div>
+      @if (loading()) {
+<div class="state-msg">Loading...</div>
+}
+      @if (error()) {
+<div class="error-msg">{{ error() }}</div>
+}
 
-      <div class="table-wrap" *ngIf="!loading() && items().length > 0">
+      @if (!loading() && items().length > 0) {
+<div class="table-wrap">
         <table class="feedback-table">
           <thead>
             <tr>
@@ -31,11 +36,14 @@ const TYPE_LABELS: Record<string, string> = {
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let item of items()">
+            @for (item of items(); track item) {
+<tr>
               <td class="time-cell">{{ formatTime(item.created_at) }}</td>
               <td class="user-cell">
                 <span class="user-email">{{ item.email }}</span>
-                <span class="dim" *ngIf="item.username"> · {{ item.username }}</span>
+                @if (item.username) {
+<span class="dim"> · {{ item.username }}</span>
+}
               </td>
               <td><span class="type-chip" [class]="'type-chip--' + item.type">{{ typeLabel(item.type) }}</span></td>
               <td class="msg-cell">{{ item.message }}</td>
@@ -43,17 +51,23 @@ const TYPE_LABELS: Record<string, string> = {
                 <button class="del-btn" (click)="delete(item.id)" title="Delete">✕</button>
               </td>
             </tr>
+}
           </tbody>
         </table>
       </div>
+}
 
-      <div *ngIf="!loading() && items().length === 0" class="state-msg">No feedback yet.</div>
+      @if (!loading() && items().length === 0) {
+<div class="state-msg">No feedback yet.</div>
+}
 
-      <div *ngIf="items().length > 0" class="pagination">
+      @if (items().length > 0) {
+<div class="pagination">
         <button class="page-btn" [disabled]="offset() === 0" (click)="changePage(-1)">Prev</button>
         <span class="page-label">Page {{ page() }}</span>
         <button class="page-btn" [disabled]="items().length < pageSize" (click)="changePage(1)">Next</button>
       </div>
+}
     </div>
   `,
   styles: [`

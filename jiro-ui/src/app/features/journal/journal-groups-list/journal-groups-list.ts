@@ -1,46 +1,47 @@
 import { Component, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { JournalService, JournalGroup } from '../../../core/services/journal.service';
-import { JournalQuickNavComponent } from '../journal-quick-nav/journal-quick-nav';
+import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 
 @Component({
   selector: 'app-journal-groups-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, JournalQuickNavComponent, JiroButtonComponent, JiroModalComponent],
+  imports: [FormsModule, RouterLink, JiroPageHeaderComponent, JiroButtonComponent, JiroModalComponent],
   template: `
     <div class="groups-page">
 
-      <div class="page-header">
-        <div>
-          <h1>Journaly</h1>
-          <p class="text-secondary">Your reflection space</p>
-        </div>
-      </div>
-
-      <journal-quick-nav></journal-quick-nav>
+      <jiro-page-header heading="Journaly" subtitle="Your reflection space">
+        <jiro-button actions variant="primary" type="button" routerLink="/journal/new">New entry</jiro-button>
+      </jiro-page-header>
 
       <div class="section-row">
         <h2 class="section-title">My Groups</h2>
         <jiro-button variant="secondary" type="button" (click)="showCreate.set(true)">+ New Group</jiro-button>
       </div>
 
-      <div *ngIf="loading()" class="state-box">
+      @if (loading()) {
+<div class="state-box">
         <div class="spinner-lg"></div>
       </div>
+}
 
-      <div *ngIf="!loading() && groups().length === 0" class="state-box">
+      @if (!loading() && groups().length === 0) {
+<div class="state-box">
         <h3>No groups yet</h3>
         <p class="text-secondary">Create a group and invite friends to journal together.</p>
         <jiro-button variant="primary" type="button" (click)="showCreate.set(true)">Create Group</jiro-button>
       </div>
+}
 
-      <div class="groups-grid" *ngIf="!loading() && groups().length > 0">
-        <div
-          *ngFor="let g of groups()"
+      @if (!loading() && groups().length > 0) {
+<div class="groups-grid">
+        @for (g of groups(); track g) {
+<div
+         
           class="group-card"
           (click)="router.navigate(['/journal/groups', g.id])">
           <div class="group-avatar">{{ g.name[0].toUpperCase() }}</div>
@@ -52,10 +53,13 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
             <polyline points="9,18 15,12 9,6"/>
           </svg>
         </div>
+}
       </div>
+}
     </div>
 
-    <jiro-modal *ngIf="showCreate()" title="New Group" (close)="showCreate.set(false)">
+    @if (showCreate()) {
+<jiro-modal title="New Group" (close)="showCreate.set(false)">
       <div class="modal-form">
         <label class="form-label">Group name</label>
         <input type="text" class="form-control" [(ngModel)]="newName" placeholder="e.g. Weekend Adventures" maxlength="100" />
@@ -67,6 +71,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
         </jiro-button>
       </div>
     </jiro-modal>
+}
   `,
   styles: [`
     .groups-page { max-width: 860px; }
@@ -105,7 +110,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       border: 1px solid var(--border-color); border-radius: var(--border-radius-sm);
       background: var(--bg-canvas); color: var(--text-primary); padding: 8px var(--space-sm);
     }
-    .form-control:focus { outline: none; border-color: var(--color-primary); }
+    .form-control:focus { border-color: var(--color-primary); }
     .modal-actions { display: flex; justify-content: flex-end; gap: var(--space-sm); }
   `]
 })

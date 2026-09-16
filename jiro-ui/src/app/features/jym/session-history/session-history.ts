@@ -1,48 +1,54 @@
-import { Component, OnInit, input, signal } from '@angular/core';
+import { Component, OnInit, inject, input, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { JymService, SessionSummary, SessionWithSets } from '../../../core/services/jym.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { UploadService } from '../../../core/services/upload.service';
+import { ConfirmService } from '../../../core/services/confirm.service';
+import { ToastService } from '../../../core/services/toast.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
-import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
+import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
+import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
 
 @Component({
   selector: 'app-session-history',
   standalone: true,
-  imports: [CommonModule, FormsModule, JiroButtonComponent, JiroModalComponent],
+  imports: [
+    CommonModule, FormsModule, JiroButtonComponent, JiroIconComponent,
+    JiroPageHeaderComponent, JiroEmptyStateComponent, JymPrBadgeComponent,
+  ],
   template: `
     <div class="session-history">
       <!-- Header -->
-      <div class="page-header">
-        @if (!embedded()) {
-        <div>
-          <h1>Session History</h1>
-          <p class="text-secondary">Your logged workouts</p>
-        </div>
-        }
+      @if (!embedded()) {
+        <jiro-page-header heading="Session history" subtitle="Your logged workouts">
+          <jiro-button actions type="button" (click)="startNew()">New session</jiro-button>
+        </jiro-page-header>
+      } @else {
         <div class="header-actions">
-          <jiro-button variant="primary" type="button" (click)="startNew()">+ New Session</jiro-button>
+          <jiro-button type="button" (click)="startNew()">New session</jiro-button>
         </div>
-      </div>
+      }
 
       <!-- Export row -->
       <div class="export-row">
         <div class="date-range">
           <div class="date-field">
-            <label class="date-label">From</label>
+            <label class="date-label" for="hist-from">From</label>
             <div class="date-wrapper">
-              <input type="date" class="date-input" [(ngModel)]="exportFrom" />
+              <input id="hist-from" type="date" class="date-input" [(ngModel)]="exportFrom" />
               @if (!exportFrom) {
                 <span class="date-placeholder">Select date</span>
               }
             </div>
           </div>
           <div class="date-field">
-            <label class="date-label">To</label>
+            <label class="date-label" for="hist-to">To</label>
             <div class="date-wrapper">
-              <input type="date" class="date-input" [(ngModel)]="exportTo" />
+              <input id="hist-to" type="date" class="date-input" [(ngModel)]="exportTo" />
               @if (!exportTo) {
                 <span class="date-placeholder">Select date</span>
               }
@@ -55,22 +61,26 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       </div>
 
       <!-- Loading -->
-      <div *ngIf="loading()" class="state-message">
-        <div class="spinner-lg"></div>
-        <p>Loading sessions...</p>
-      </div>
+      @if (loading()) {
+        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+      }
 
       <!-- Empty -->
-      <div *ngIf="!loading() && sessions().length === 0" class="state-message">
-        <h3>No sessions yet</h3>
-        <p class="text-secondary">Start your first workout session to see history here.</p>
-        <jiro-button variant="primary" type="button" (click)="startNew()">Start Workout</jiro-button>
-      </div>
+      @if (!loading() && sessions().length === 0) {
+        <jiro-empty-state
+          icon="barbell"
+          heading="No sessions yet"
+          message="Start your first workout to see it here.">
+          <jiro-button type="button" (click)="startNew()">Start a workout</jiro-button>
+        </jiro-empty-state>
+      }
 
       <!-- Session list -->
-      <div *ngIf="!loading() && sessions().length > 0" class="sessions-list">
-        <div
-          *ngFor="let s of sessions()"
+      @if (!loading() && sessions().length > 0) {
+<div class="sessions-list">
+        @for (s of sessions(); track s) {
+<div
+         
           class="session-card"
           [class.selected]="selectedId() === s.id"
           (click)="loadDetail(s)">
@@ -78,142 +88,137 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
           <div class="session-card-header">
             <div class="session-meta">
               <span class="session-date">{{ formatDate(s.started_at) }}</span>
-              <span class="session-routine" *ngIf="s.routine_name">{{ s.routine_name }}</span>
-              <span class="session-routine freestyle" *ngIf="!s.routine_name">Freestyle</span>
-              <span *ngIf="s.session_type === 'deload'" class="type-badge deload">Deload</span>
-              <span *ngIf="s.session_type === 'test'" class="type-badge test">Test</span>
+              @if (s.routine_name) {
+<span class="session-routine">{{ s.routine_name }}</span>
+}
+              @if (!s.routine_name) {
+<span class="session-routine freestyle">Freestyle</span>
+}
+              @if (s.session_type === 'deload') {
+<span class="type-badge deload">Deload</span>
+}
+              @if (s.session_type === 'test') {
+<span class="type-badge test">Test</span>
+}
             </div>
             <div class="session-right">
               <div class="session-stats">
                 <span class="stat-pill">{{ s.set_count }} sets</span>
-                <span *ngIf="s.ended_at" class="stat-pill">{{ formatDuration(s.started_at, s.ended_at) }}</span>
-                <span *ngIf="s.total_volume > 0" class="stat-pill vol-pill">{{ settingsService.toDisplay(s.total_volume) | number:'1.0-0' }} {{ settingsService.unitLabel() }}</span>
+                @if (s.ended_at) {
+<span class="stat-pill">{{ formatDuration(s.started_at, s.ended_at) }}</span>
+}
+                @if (s.total_volume > 0) {
+<span class="stat-pill vol-pill">{{ settingsService.toDisplay(s.total_volume) | number:'1.0-0' }} {{ settingsService.unitLabel() }}</span>
+}
               </div>
-              <button class="delete-session-btn" (click)="deleteSession($event, s)" title="Delete session">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="3,6 5,6 21,6"/>
-                  <path d="M19,6l-1,14a2,2,0,0,1-2,2H8a2,2,0,0,1-2-2L5,6"/>
-                  <path d="M10,11v6M14,11v6M9,6V4a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1V6"/>
-                </svg>
+              <button class="delete-session-btn" type="button" (click)="deleteSession($event, s)" title="Delete session"
+                [attr.aria-label]="'Delete session from ' + formatDate(s.started_at)">
+                <jiro-icon name="trash" [size]="16" />
               </button>
             </div>
           </div>
 
           <!-- Expanded detail -->
-          <div *ngIf="selectedId() === s.id" class="session-detail">
-            <div *ngIf="detailLoading()" class="detail-loading">
+          @if (selectedId() === s.id) {
+<div class="session-detail">
+            @if (detailLoading()) {
+<div class="detail-loading">
               <div class="spinner-sm"></div>
             </div>
+}
 
-            <div *ngIf="!detailLoading() && detail()" class="detail-sets">
-              <div *ngFor="let group of groupedSets(detail()!.sets)" class="detail-ex">
+            @if (!detailLoading() && detail()) {
+<div class="detail-sets">
+              @for (group of groupedSets(detail()!.sets); track group) {
+<div class="detail-ex">
                 <div class="detail-ex-name">{{ group.exerciseName }}</div>
                 <div class="detail-set-rows">
-                  <div *ngFor="let set of group.sets" class="detail-set-row">
+                  @for (set of group.sets; track set) {
+<div class="detail-set-row">
                     <span class="ds-num">Set {{ set.set_number }}</span>
                     <span class="ds-weight">{{ settingsService.toDisplay(set.weight) | number:'1.1-1' }} {{ settingsService.unitLabel() }}</span>
                     <span class="ds-x">×</span>
                     <span class="ds-reps">{{ set.reps_performed }} reps</span>
-                    <img *ngIf="set.is_pr" src="/icons/badge-icon.svg" class="pr-badge" alt="PR" />
+                    @if (set.is_pr) {
+<jym-pr-badge />
+}
                   </div>
+}
                 </div>
               </div>
+}
 
               <div class="detail-notes">
                 <span class="detail-notes-label">Notes</span>
-                <p class="detail-notes-text" *ngIf="detail()!.notes">{{ detail()!.notes }}</p>
-                <p class="detail-notes-text text-muted" *ngIf="!detail()!.notes" style="font-style: italic;">No notes for this session.</p>
+                @if (detail()!.notes) {
+<p class="detail-notes-text">{{ detail()!.notes }}</p>
+}
+                @if (!detail()!.notes) {
+<p class="detail-notes-text text-muted" style="font-style: italic;">No notes for this session.</p>
+}
               </div>
 
               <!-- Attachments panel -->
-              <div *ngIf="detail()!.attachments.length > 0" class="attachments-panel" (click)="$event.stopPropagation()">
+              @if (detail()!.attachments.length > 0) {
+<div class="attachments-panel" (click)="$event.stopPropagation()">
                 <div class="attachments-header">
                   <span class="section-label">Form Check / Photos</span>
                 </div>
 
                 <div class="attachments-grid">
-                  <div *ngFor="let a of detail()!.attachments" class="attachment-item">
-                    <video
-                      *ngIf="a.file_type === 'video/mp4' || a.file_type === 'video/webm'"
+                  @for (a of detail()!.attachments; track a) {
+<div class="attachment-item">
+                    @if (a.file_type === 'video/mp4' || a.file_type === 'video/webm') {
+<video
+                     
                       [src]="a.file_url"
                       class="attachment-media"
                       controls
                       preload="none"
                       (click)="$event.stopPropagation()">
                     </video>
-                    <img
-                      *ngIf="a.file_type === 'image/jpeg' || a.file_type === 'image/png'"
+}
+                    @if (a.file_type === 'image/jpeg' || a.file_type === 'image/png') {
+<img
+                     
                       [src]="a.file_url"
                       [alt]="a.label || 'Attachment'"
                       class="attachment-media attachment-img" />
+}
                     <div class="attachment-footer">
                       <span class="attachment-label">{{ a.label || (a.file_type.startsWith('video') ? 'Video' : 'Photo') }}</span>
-                      <button class="attachment-delete-btn"
+                      <button class="attachment-delete-btn" type="button"
                         [disabled]="deletingAttachment().has(a.id)"
-                        (click)="$event.stopPropagation(); confirmingAttachmentId.set(a.id)"
-                        title="Delete">
-                        <svg *ngIf="!deletingAttachment().has(a.id)" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                        </svg>
-                        <div *ngIf="deletingAttachment().has(a.id)" class="spinner-xs"></div>
+                        (click)="$event.stopPropagation(); deleteAttachment($event, a.id)"
+                        title="Delete clip" aria-label="Delete clip">
+                        @if (!deletingAttachment().has(a.id)) {
+                          <jiro-icon name="x" [size]="12" />
+                        } @else {
+                          <span class="spinner spinner--sm spinner-xs" aria-hidden="true"></span>
+                        }
                       </button>
                     </div>
                   </div>
+}
                 </div>
               </div>
+}
             </div>
+}
           </div>
+}
         </div>
+}
       </div>
+}
     </div>
 
-    <!-- Delete attachment confirmation -->
-    <jiro-modal *ngIf="confirmingAttachmentId()" title="Delete Clip?" maxWidth="400px" (close)="confirmingAttachmentId.set(null)">
-      <div class="delete-confirm">
-        <p class="text-secondary" style="font-size: var(--font-size-sm);">
-          This will permanently remove the clip. This cannot be undone.
-        </p>
-        <div class="form-actions" style="margin-top: var(--space-lg);">
-          <jiro-button variant="secondary" type="button" (click)="confirmingAttachmentId.set(null)">Cancel</jiro-button>
-          <jiro-button variant="danger" type="button"
-            [disabled]="deletingAttachment().has(confirmingAttachmentId()!)"
-            (click)="deleteAttachment($event, confirmingAttachmentId()!)">
-            {{ deletingAttachment().has(confirmingAttachmentId()!) ? 'Deleting...' : 'Delete' }}
-          </jiro-button>
-        </div>
-      </div>
-    </jiro-modal>
-
-    <!-- Delete session confirmation -->
-    <jiro-modal *ngIf="deletingSession()" title="Delete Session?" maxWidth="420px" (close)="deletingSession.set(null)">
-      <div class="delete-confirm">
-        <p>Delete this session from <strong>{{ formatDate(deletingSession()!.started_at) }}</strong>?</p>
-        <p class="text-secondary" style="font-size: var(--font-size-sm); margin-top: var(--space-xs);">
-          This will permanently remove the session and all {{ deletingSession()!.set_count }} sets logged. This cannot be undone.
-        </p>
-        <div class="form-actions" style="margin-top: var(--space-lg);">
-          <jiro-button variant="secondary" type="button" (click)="deletingSession.set(null)">Cancel</jiro-button>
-          <jiro-button variant="danger" type="button" [disabled]="deletingInProgress()" (click)="confirmDeleteSession()">
-            {{ deletingInProgress() ? 'Deleting...' : 'Delete Session' }}
-          </jiro-button>
-        </div>
-      </div>
-    </jiro-modal>
   `,
   styles: [`
     :host { display: block; }
 
     .session-history { max-width: 800px; width: 100%; }
 
-    .delete-confirm { display: flex; flex-direction: column; gap: var(--space-xs); }
-
-    .form-actions { display: flex; justify-content: flex-end; gap: var(--space-sm); }
-    .form-actions ::ng-deep .jiro-btn { width: auto; }
-
-    .page-header {
-      display: flex; align-items: flex-start; justify-content: space-between;
-      margin-bottom: var(--space-xl); gap: var(--space-md);
-    }
 
     .page-header h1 { font-size: var(--font-size-2xl); font-weight: 700; }
 
@@ -222,14 +227,12 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       gap: var(--space-sm); flex-shrink: 0;
     }
 
-    .header-actions ::ng-deep .jiro-btn { width: auto; }
 
     .export-row {
       display: flex; flex-direction: column; gap: var(--space-sm);
       margin-bottom: var(--space-lg);
     }
 
-    .export-row ::ng-deep .jiro-btn { width: auto; align-self: flex-start; }
 
     .date-range {
       display: flex; gap: var(--space-sm);
@@ -263,7 +266,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     }
 
     .date-input:focus {
-      outline: none;
       border-color: var(--color-primary);
     }
 
@@ -280,20 +282,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       z-index: 0;
     }
 
-    .state-message {
-      display: flex; flex-direction: column; align-items: center;
-      justify-content: center; padding: var(--space-2xl); gap: var(--space-md); text-align: center;
-    }
-
-    .state-message ::ng-deep .jiro-btn { width: auto; }
-
-    .spinner-lg {
-      width: 40px; height: 40px; border: 3px solid var(--border-color);
-      border-top-color: var(--color-primary); border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-
-    .empty-icon { font-size: 48px; }
+    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
 
     .sessions-list { display: flex; flex-direction: column; gap: var(--space-md); }
 
@@ -305,7 +294,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
     .session-card:hover { border-color: var(--color-primary); }
 
-    .session-card.selected { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(122,59,46,0.1); }
+    .session-card.selected { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.1); }
 
     .session-card-header {
       display: flex; align-items: center; justify-content: space-between;
@@ -328,9 +317,9 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       padding: 2px 8px; border-radius: 10px;
     }
 
-    .type-badge.deload { background: rgba(196,74,74,0.1); color: var(--color-danger); }
+    .type-badge.deload { background: rgba(var(--color-danger-rgb), 0.1); color: var(--color-danger); }
 
-    .type-badge.test { background: rgba(122,59,46,0.12); color: var(--color-primary); }
+    .type-badge.test { background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary); }
 
     .session-right { display: flex; align-items: center; gap: var(--space-sm); }
 
@@ -343,11 +332,11 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       flex-shrink: 0;
     }
 
-    .delete-session-btn:hover { color: var(--color-danger); background: rgba(196,74,74,0.1); }
+    .delete-session-btn:hover { color: var(--color-danger); background: rgba(var(--color-danger-rgb), 0.1); }
 
     .stat-pill {
       font-size: var(--font-size-xs); padding: 3px 10px;
-      background: rgba(122,59,46,0.1); color: var(--color-primary);
+      background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary);
       border-radius: 10px; font-weight: 500;
     }
 
@@ -392,7 +381,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
     .ds-reps { color: var(--text-primary); }
 
-    .pr-badge { width: 22px; height: 22px; flex-shrink: 0; }
+
 
     .detail-notes {
       margin-top: var(--space-md);
@@ -468,18 +457,13 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     }
 
     .attachment-delete-btn:hover:not(:disabled) {
-      background: rgba(196,74,74,0.1); color: var(--color-danger);
+      background: rgba(var(--color-danger-rgb), 0.1); color: var(--color-danger);
     }
 
     .attachment-delete-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    .spinner-xs {
-      width: 10px; height: 10px; border: 1.5px solid var(--border-color);
-      border-top-color: var(--color-primary); border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-    }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
+    /* narrower than the global .spinner--sm, which is 18px */
+    .spinner-xs { width: 12px; height: 12px; border-width: 1.5px; }
 
     @keyframes slideDown {
       from { opacity: 0; transform: translateY(-4px); }
@@ -516,15 +500,14 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 })
 export class SessionHistoryComponent implements OnInit {
   embedded = input(false);
+  private readonly confirmService = inject(ConfirmService);
+  private readonly toast = inject(ToastService);
   sessions = signal<SessionSummary[]>([]);
   loading = signal(true);
   selectedId = signal<string | null>(null);
   detail = signal<SessionWithSets | null>(null);
   detailLoading = signal(false);
-  deletingSession = signal<SessionSummary | null>(null);
-  deletingInProgress = signal(false);
   deletingAttachment = signal<Set<string>>(new Set());
-  confirmingAttachmentId = signal<string | null>(null);
   exporting = signal(false);
   exportFrom = '';
   exportTo = '';
@@ -579,50 +562,48 @@ export class SessionHistoryComponent implements OnInit {
     return `${Math.floor(mins / 60)}h ${mins % 60}m`;
   }
 
-  deleteSession(event: Event, s: SessionSummary) {
+  async deleteSession(event: Event, s: SessionSummary) {
     event.stopPropagation();
-    if (s.set_count > 1) {
-      this.deletingSession.set(s);
-      return;
-    }
-    this.doDeleteSession(s.id);
-  }
-
-  confirmDeleteSession() {
-    const s = this.deletingSession();
-    if (!s) return;
-    this.deletingInProgress.set(true);
-    this.doDeleteSession(s.id, () => {
-      this.deletingSession.set(null);
-      this.deletingInProgress.set(false);
-    }, () => this.deletingInProgress.set(false));
-  }
-
-  private doDeleteSession(id: string, onSuccess?: () => void, onError?: () => void) {
-    this.jymService.deleteSession(id).subscribe({
+    const sets = s.set_count === 1 ? '1 set' : `${s.set_count} sets`;
+    const ok = await this.confirmService.confirm({
+      title: `Delete the session from ${this.formatDate(s.started_at)}?`,
+      message: `This removes the session and the ${sets} logged in it. It cannot be undone.`,
+      confirmLabel: 'Delete session',
+      danger: true,
+    });
+    if (!ok) return;
+    this.jymService.deleteSession(s.id).subscribe({
       next: () => {
-        this.sessions.update(list => list.filter(x => x.id !== id));
-        if (this.selectedId() === id) {
+        this.sessions.update(list => list.filter(x => x.id !== s.id));
+        if (this.selectedId() === s.id) {
           this.selectedId.set(null);
           this.detail.set(null);
         }
-        onSuccess?.();
+        this.toast.success('Session deleted');
       },
-      error: () => onError?.(),
+      error: () => this.toast.error('Could not delete the session.'),
     });
   }
 
-  deleteAttachment(event: Event, id: string) {
+  async deleteAttachment(event: Event, id: string) {
     event.stopPropagation();
+    const ok = await this.confirmService.confirm({
+      title: 'Delete this clip?',
+      message: 'The form check clip is removed permanently.',
+      confirmLabel: 'Delete clip',
+      danger: true,
+    });
+    if (!ok) return;
     this.deletingAttachment.update(s => new Set([...s, id]));
     this.uploadService.deleteSessionAttachment(id).subscribe({
       next: () => {
         this.detail.update(d => d ? { ...d, attachments: d.attachments.filter(a => a.id !== id) } : d);
         this.deletingAttachment.update(s => { const n = new Set(s); n.delete(id); return n; });
-        this.confirmingAttachmentId.set(null);
+        this.toast.success('Clip deleted');
       },
       error: () => {
         this.deletingAttachment.update(s => { const n = new Set(s); n.delete(id); return n; });
+        this.toast.error('Could not delete the clip.');
       },
     });
   }

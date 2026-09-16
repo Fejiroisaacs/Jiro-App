@@ -1,5 +1,5 @@
 import { Component, EventEmitter, Input, OnInit, Output, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import {
   RecipeService,
@@ -29,7 +29,7 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
 @Component({
   selector: 'app-recipe-form',
   standalone: true,
-  imports: [CommonModule, FormsModule, JiroButtonComponent],
+  imports: [FormsModule, JiroButtonComponent],
   template: `
     <form (ngSubmit)="onSubmit()" class="recipe-form">
       <!-- Title -->
@@ -59,22 +59,28 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
       <div class="field">
         <label class="field-label">Tags</label>
         <div class="tag-chips">
-          <button
-            *ngFor="let tag of presetTags"
+          @for (tag of presetTags; track tag) {
+<button
+           
             type="button"
             class="tag-chip"
             [class.tag-chip--active]="selectedTags.has(tag)"
             (click)="toggleTag(tag)">
             {{ tag }}
           </button>
+}
         </div>
         <!-- Custom tags -->
-        <div class="custom-tags-row" *ngIf="customTagsList.length > 0">
-          <span *ngFor="let tag of customTagsList" class="custom-tag">
+        @if (customTagsList.length > 0) {
+<div class="custom-tags-row">
+          @for (tag of customTagsList; track tag) {
+<span class="custom-tag">
             {{ tag }}
             <button type="button" class="custom-tag-remove" (click)="removeTag(tag)" title="Remove">×</button>
           </span>
+}
         </div>
+}
         <!-- Custom tag input -->
         <div class="custom-tag-input-row">
           <input
@@ -98,7 +104,8 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
       <div class="field">
         <label class="field-label">Base Ingredients</label>
         <div class="ingredient-list">
-          <div *ngFor="let ing of ingredients; let i = index" class="ingredient-row">
+          @for (ing of ingredients; track ing; let i = $index) {
+<div class="ingredient-row">
             <input
               class="field-input ing-item"
               type="text"
@@ -115,6 +122,7 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
               &times;
             </button>
           </div>
+}
           <jiro-button type="button" variant="secondary" (click)="addIngredient()" class="add-ingredient-btn">
             + Add ingredient
           </jiro-button>
@@ -136,14 +144,16 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
       <div class="field">
         <label class="field-label">Dietary Flags</label>
         <div class="tag-chips">
-          <button
-            *ngFor="let flag of dietaryFlagOptions"
+          @for (flag of dietaryFlagOptions; track flag) {
+<button
+           
             type="button"
             class="tag-chip"
             [class.tag-chip--active]="dietaryFlags[flag.key]"
             (click)="toggleDietaryFlag(flag.key)">
             {{ flag.label }}
           </button>
+}
         </div>
       </div>
 
@@ -171,17 +181,21 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
       </div>
 
       <!-- Collection (create only) -->
-      <div class="field" *ngIf="!recipe">
+      @if (!recipe) {
+<div class="field">
         <label class="field-label">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
           Add to Collection
         </label>
         <select class="field-input" [(ngModel)]="selectedCollectionId" name="collection" (change)="onCollectionSelectChange()">
           <option value="">None</option>
-          <option *ngFor="let col of collections()" [value]="col.id">{{ col.name }}</option>
+          @for (col of collections(); track col) {
+<option [value]="col.id">{{ col.name }}</option>
+}
           <option value="__new__">+ New Collection</option>
         </select>
-        <div class="new-col-row" *ngIf="showNewCollectionInForm">
+        @if (showNewCollectionInForm) {
+<div class="new-col-row">
           <input
             class="field-input"
             [(ngModel)]="newCollectionNameInForm"
@@ -190,10 +204,14 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
             (keydown.enter)="createCollectionInForm(); $event.preventDefault()" />
           <button type="button" class="new-col-btn" (click)="createCollectionInForm()">Create</button>
         </div>
+}
       </div>
+}
 
       <!-- Error -->
-      <p *ngIf="error()" class="form-error">{{ error() }}</p>
+      @if (error()) {
+<p class="form-error">{{ error() }}</p>
+}
 
       <!-- Actions -->
       <div class="form-actions">
@@ -244,7 +262,6 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
       background: var(--bg-surface);
       color: var(--text-primary);
       font-size: var(--font-size-md);
-      outline: none;
       transition: border-color 0.2s;
       font-family: inherit;
       box-sizing: border-box;
@@ -424,10 +441,6 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
       gap: var(--space-sm);
       align-items: center;
       margin-top: var(--space-sm);
-    }
-
-    .form-actions ::ng-deep .jiro-btn {
-      width: auto;
     }
 
     .btn-ghost {

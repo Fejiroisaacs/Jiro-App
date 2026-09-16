@@ -1,61 +1,69 @@
 import { Component, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { JournalService, JournalCollection } from '../../../core/services/journal.service';
-import { JournalQuickNavComponent } from '../journal-quick-nav/journal-quick-nav';
+import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 
 @Component({
   selector: 'app-journal-collections-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, JournalQuickNavComponent, JiroButtonComponent, JiroModalComponent],
+  imports: [FormsModule, RouterLink, JiroPageHeaderComponent, JiroButtonComponent, JiroModalComponent],
   template: `
     <div class="collections-page">
 
-      <div class="page-header">
-        <div>
-          <h1>Journaly</h1>
-          <p class="text-secondary">Your reflection space</p>
-        </div>
-      </div>
-
-      <journal-quick-nav></journal-quick-nav>
+      <jiro-page-header heading="Journaly" subtitle="Your reflection space">
+        <jiro-button actions variant="primary" type="button" routerLink="/journal/new">New entry</jiro-button>
+      </jiro-page-header>
 
       <div class="section-row">
         <h2 class="section-title">Collections</h2>
         <jiro-button variant="secondary" type="button" (click)="showCreate.set(true)">+ New</jiro-button>
       </div>
 
-      <div *ngIf="loading()" class="state-box">
+      @if (loading()) {
+<div class="state-box">
         <div class="spinner-lg"></div>
       </div>
+}
 
-      <div *ngIf="!loading() && collections().length === 0" class="state-box">
+      @if (!loading() && collections().length === 0) {
+<div class="state-box">
         <h3>No collections yet</h3>
         <p class="text-secondary">Group related entries into collections — travel, family moments, and more.</p>
         <jiro-button variant="primary" type="button" (click)="showCreate.set(true)">Create Collection</jiro-button>
       </div>
+}
 
-      <div class="collections-grid" *ngIf="!loading() && collections().length > 0">
-        <div
-          *ngFor="let c of collections()"
+      @if (!loading() && collections().length > 0) {
+<div class="collections-grid">
+        @for (c of collections(); track c) {
+<div
+         
           class="collection-card"
           (click)="router.navigate(['/journal/collections', c.id])">
           <div class="collection-cover" [style.background-image]="c.cover_image_url ? 'url(' + c.cover_image_url + ')' : ''">
-            <img *ngIf="!c.cover_image_url" src="/icons/folder-icon.svg" width="48" height="48" alt="" />
+            @if (!c.cover_image_url) {
+<img src="/icons/folder-icon.svg" width="48" height="48" alt="" />
+}
           </div>
           <div class="collection-body">
             <span class="collection-name">{{ c.name }}</span>
             <span class="collection-count text-secondary">{{ c.entry_count }} {{ c.entry_count === 1 ? 'entry' : 'entries' }}</span>
-            <p class="collection-desc text-secondary" *ngIf="c.description">{{ c.description }}</p>
+            @if (c.description) {
+<p class="collection-desc text-secondary">{{ c.description }}</p>
+}
           </div>
         </div>
+}
       </div>
+}
     </div>
 
-    <jiro-modal *ngIf="showCreate()" title="New Collection" (close)="showCreate.set(false)">
+    @if (showCreate()) {
+<jiro-modal title="New Collection" (close)="showCreate.set(false)">
       <div class="modal-form">
         <label class="form-label">Name</label>
         <input type="text" class="form-control" [(ngModel)]="newName" placeholder="e.g. Europe Trip 2024" maxlength="100" />
@@ -69,6 +77,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
         </jiro-button>
       </div>
     </jiro-modal>
+}
   `,
   styles: [`
     .collections-page { max-width: 860px; }
@@ -113,7 +122,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       border: 1px solid var(--border-color); border-radius: var(--border-radius-sm);
       background: var(--bg-canvas); color: var(--text-primary); padding: 8px var(--space-sm);
     }
-    .form-control:focus { outline: none; border-color: var(--color-primary); }
+    .form-control:focus { border-color: var(--color-primary); }
     .modal-actions { display: flex; justify-content: flex-end; gap: var(--space-sm); }
 
     @media (max-width: 600px) {

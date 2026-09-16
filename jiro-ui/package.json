@@ -6,7 +6,9 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "check:css": "node scripts/check-css-vars.mjs",
+    "icons": "node scripts/build-icons.mjs"
   },
   "prettier": {
     "printWidth": 100,
@@ -40,6 +42,7 @@
     "@angular/build": "^21.2.2",
     "@angular/cli": "^21.2.2",
     "@angular/compiler-cli": "^21.2.4",
+    "@phosphor-icons/core": "^2.1.1",
     "typescript": "~5.9.2"
   }
 }

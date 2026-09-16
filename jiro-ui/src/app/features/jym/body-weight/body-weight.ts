@@ -1,40 +1,41 @@
-import { Component, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef, signal, input } from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef, inject, signal, input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import { JymService, BodyWeight } from '../../../core/services/jym.service';
 import { SettingsService } from '../../../core/services/settings.service';
+import { chartTones } from '../shared/chart-theme';
+import { ConfirmService } from '../../../core/services/confirm.service';
+import { ToastService } from '../../../core/services/toast.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
+import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 
 Chart.register(...registerables);
 
 @Component({
   selector: 'app-body-weight',
   standalone: true,
-  imports: [CommonModule, FormsModule, JiroButtonComponent],
+  imports: [CommonModule, FormsModule, JiroButtonComponent, JiroIconComponent, JiroPageHeaderComponent, JiroEmptyStateComponent],
   template: `
     <div class="body-weight">
       @if (!embedded()) {
-      <div class="page-header">
-        <div>
-          <h1>Body Weight</h1>
-          <p class="text-secondary">Track your weight and see how it correlates with strength</p>
-        </div>
-      </div>
+        <jiro-page-header heading="Body weight" subtitle="Track your weight and see how it moves with your strength" />
       }
 
       <!-- Log weight form -->
       <div class="log-card">
-        <h2 class="section-title">Log Weight</h2>
+        <h2 class="section-title">Log weight</h2>
         <form class="log-form" (ngSubmit)="logWeight()">
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label">Date</label>
-              <input class="form-input" type="date" [(ngModel)]="logDate" name="date" required />
+              <label class="form-label" for="bw-date">Date</label>
+              <input id="bw-date" class="form-input" type="date" [(ngModel)]="logDate" name="date" required />
             </div>
             <div class="form-group">
-              <label class="form-label">Weight ({{ settingsService.unitLabel() }})</label>
-              <input class="form-input" type="number" step="0.1" min="20" max="400"
+              <label class="form-label" for="bw-weight">Weight ({{ settingsService.unitLabel() }})</label>
+              <input id="bw-weight" class="form-input" type="number" step="0.1" min="20" max="400"
                 [(ngModel)]="weightValue" name="weight" placeholder="e.g. 82.5" required />
             </div>
             <jiro-button variant="primary" type="submit" [disabled]="saving() || !weightValue || !logDate">
@@ -45,28 +46,32 @@ Chart.register(...registerables);
       </div>
 
       <!-- Loading -->
-      <div *ngIf="loading()" class="state-message">
-        <div class="spinner-lg"></div>
-      </div>
+      @if (loading()) {
+        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+      }
 
-      <div *ngIf="!loading()">
+      @if (!loading()) {
+<div>
         <!-- Chart -->
         <div class="chart-section" [hidden]="weights().length < 2">
-          <h2 class="section-title">Weight Over Time</h2>
+          <h2 class="section-title">Weight over time</h2>
           <div class="chart-wrapper">
             <canvas #chartCanvas></canvas>
           </div>
         </div>
 
         <!-- Empty state -->
-        <div *ngIf="weights().length === 0" class="state-message">
-          <h3>No weight logged yet</h3>
-          <p class="text-secondary">Log your first weight above to start tracking.</p>
-        </div>
+        @if (weights().length === 0) {
+          <jiro-empty-state
+            icon="chart-line-up"
+            heading="No weight logged yet"
+            message="Log your first weight above to start tracking." />
+        }
 
         <!-- Recent weights table -->
-        <div *ngIf="weights().length > 0" class="table-section">
-          <h2 class="section-title">Recent Entries</h2>
+        @if (weights().length > 0) {
+<div class="table-section">
+          <h2 class="section-title">Recent entries</h2>
           <table class="weight-table">
             <thead>
               <tr>
@@ -77,41 +82,40 @@ Chart.register(...registerables);
               </tr>
             </thead>
             <tbody>
-              <tr *ngFor="let w of weights(); let i = index">
+              @for (w of weights(); track w; let i = $index) {
+<tr>
                 <td class="date-cell">{{ formatDate(w.recorded_at) }}</td>
                 <td class="weight-cell">{{ settingsService.toDisplay(w.weight_kg) | number:'1.1-1' }} {{ settingsService.unitLabel() }}</td>
                 <td class="change-cell">
-                  <span *ngIf="i < weights().length - 1" [class.positive]="delta(i) > 0" [class.negative]="delta(i) < 0">
+                  @if (i < weights().length - 1) {
+<span [class.positive]="delta(i) > 0" [class.negative]="delta(i) < 0">
                     {{ delta(i) > 0 ? '+' : '' }}{{ settingsService.toDisplay(delta(i)) | number:'1.1-1' }} {{ settingsService.unitLabel() }}
                   </span>
-                  <span *ngIf="i === weights().length - 1" class="text-muted">—</span>
+}
+                  @if (i === weights().length - 1) {
+<span class="text-muted">—</span>
+}
                 </td>
                 <td class="del-cell">
-                  <button class="del-btn" (click)="deleteWeight(w)" title="Delete">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <polyline points="3,6 5,6 21,6"/>
-                      <path d="M19,6l-1,14a2,2,0,0,1-2,2H8a2,2,0,0,1-2-2L5,6"/>
-                    </svg>
+                  <button class="del-btn" type="button" (click)="deleteWeight(w)" title="Delete entry"
+                    [attr.aria-label]="'Delete weight entry for ' + formatDate(w.recorded_at)">
+                    <jiro-icon name="trash" [size]="15" />
                   </button>
                 </td>
               </tr>
+}
             </tbody>
           </table>
         </div>
+}
       </div>
+}
     </div>
   `,
   styles: [`
     :host { display: block; }
 
     .body-weight { max-width: 800px; width: 100%; overflow-x: hidden; }
-
-    .page-header {
-      display: flex; align-items: flex-start; justify-content: space-between;
-      margin-bottom: var(--space-xl); gap: var(--space-md);
-    }
-
-    .page-header h1 { font-size: var(--font-size-2xl); font-weight: 700; }
 
     .log-card {
       background: var(--bg-surface); border: 1px solid var(--border-color);
@@ -127,7 +131,6 @@ Chart.register(...registerables);
       display: flex; align-items: flex-end; gap: var(--space-md); flex-wrap: wrap;
     }
 
-    .form-row ::ng-deep .jiro-btn { width: auto; flex-shrink: 0; margin-bottom: 0; }
 
     .form-group { display: flex; flex-direction: column; gap: var(--space-xs); flex: 1; min-width: 120px; }
 
@@ -147,7 +150,6 @@ Chart.register(...registerables);
       background: transparent;
       color: var(--text-primary); 
       font-size: var(--font-size-md);
-      outline: none; 
       transition: border-color 0.2s; 
       font-family: inherit; 
       width: 100%; 
@@ -156,16 +158,7 @@ Chart.register(...registerables);
 
     .form-input:focus { border-bottom-color: var(--color-primary); }
 
-    .state-message {
-      display: flex; flex-direction: column; align-items: center;
-      gap: var(--space-md); padding: var(--space-2xl); text-align: center;
-    }
-    
-    .spinner-lg {
-      width: 40px; height: 40px; border: 3px solid var(--border-color);
-      border-top-color: var(--color-primary); border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
+    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
 
     .chart-section { margin-bottom: var(--space-xl); }
 
@@ -205,19 +198,19 @@ Chart.register(...registerables);
     .weight-cell { font-weight: 600; }
 
     .change-cell .positive { color: var(--color-danger); }
-    .change-cell .negative { color: #4caf50; }
+    .change-cell .negative { color: var(--color-positive); }
 
     .del-cell { text-align: right; }
 
     .del-btn {
       background: none; border: none; cursor: pointer;
-      color: var(--text-muted); padding: 4px; border-radius: 4px;
-      display: inline-flex; align-items: center; transition: all 0.15s;
+      color: var(--text-muted); border-radius: var(--border-radius-sm);
+      width: 40px; height: 40px;
+      display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s;
     }
 
-    .del-btn:hover { color: var(--color-danger); background: rgba(196,74,74,0.1); }
+    .del-btn:hover { color: var(--color-danger); background: rgba(var(--color-danger-rgb), 0.1); }
 
-    @keyframes spin { to { transform: rotate(360deg); } }
   `]
 })
 export class BodyWeightComponent implements OnInit, AfterViewInit, OnDestroy {
@@ -235,6 +228,9 @@ export class BodyWeightComponent implements OnInit, AfterViewInit, OnDestroy {
   private chart: Chart | null = null;
   private dataLoaded = false;
   private viewReady = false;
+
+  private readonly confirmService = inject(ConfirmService);
+  private readonly toast = inject(ToastService);
 
   constructor(
     private jymService: JymService,
@@ -272,6 +268,7 @@ export class BodyWeightComponent implements OnInit, AfterViewInit, OnDestroy {
     const labels = sorted.map(w => this.formatDate(w.recorded_at));
     const values = sorted.map(w => this.settingsService.toDisplay(w.weight_kg));
 
+    const tone = chartTones();
     const config: ChartConfiguration = {
       type: 'line',
       data: {
@@ -279,11 +276,11 @@ export class BodyWeightComponent implements OnInit, AfterViewInit, OnDestroy {
         datasets: [{
           label: `Weight (${unit})`,
           data: values,
-          borderColor: '#7a3b2e',
-          backgroundColor: 'rgba(122,59,46,0.1)',
+          borderColor: tone.primary,
+          backgroundColor: tone.primaryFill,
           fill: true,
           tension: 0.3,
-          pointBackgroundColor: '#7a3b2e',
+          pointBackgroundColor: tone.primary,
           pointRadius: 4,
           pointHoverRadius: 6,
         }],
@@ -296,10 +293,10 @@ export class BodyWeightComponent implements OnInit, AfterViewInit, OnDestroy {
           tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.y} ${unit}` } },
         },
         scales: {
-          x: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 11 } } },
+          x: { grid: { color: tone.grid }, ticks: { font: { size: 11 }, color: tone.tick } },
           y: {
-            grid: { color: 'rgba(0,0,0,0.05)' },
-            ticks: { font: { size: 11 }, callback: v => `${v} ${unit}` },
+            grid: { color: tone.grid },
+            ticks: { font: { size: 11 }, color: tone.tick, callback: v => `${v} ${unit}` },
           },
         },
       },
@@ -325,12 +322,21 @@ export class BodyWeightComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  deleteWeight(bw: BodyWeight) {
+  async deleteWeight(bw: BodyWeight) {
+    const ok = await this.confirmService.confirm({
+      title: 'Delete this entry?',
+      message: `The weight logged on ${this.formatDate(bw.recorded_at)} will be removed.`,
+      confirmLabel: 'Delete entry',
+      danger: true,
+    });
+    if (!ok) return;
     this.jymService.deleteBodyWeight(bw.id).subscribe({
       next: () => {
         this.weights.update(ws => ws.filter(w => w.id !== bw.id));
         setTimeout(() => this.maybeDrawChart(), 0);
+        this.toast.success('Entry deleted');
       },
+      error: () => this.toast.error('Could not delete the entry.'),
     });
   }
 

@@ -1,10 +1,10 @@
 import { Component, Input } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 
 @Component({
   selector: 'jiro-card',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   template: `
     <div class="jiro-card" [class.clickable]="clickable">
       <ng-content></ng-content>

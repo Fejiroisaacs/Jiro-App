@@ -1,35 +1,69 @@
-import { Component, Input } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, booleanAttribute, input } from '@angular/core';
 
+/**
+ * The one button. Auto width by default; add `block` for full width.
+ * Consumers that need every button in a row to stretch can set
+ * `--jiro-btn-width: 100%` on the container instead of reaching in.
+ *
+ *   <jiro-button variant="primary" (click)="save()">Save</jiro-button>
+ *   <jiro-button block type="submit" [loading]="saving()">Sign in</jiro-button>
+ *   <jiro-button size="sm" variant="secondary">Edit</jiro-button>
+ *
+ * On a coloured surface (the session bar) use `inverse` for the one primary
+ * action and `ghost` for the rest; both take their colours from the surface.
+ */
 @Component({
   selector: 'jiro-button',
   standalone: true,
-  imports: [CommonModule],
+  host: { '[class.block]': 'block()' },
   template: `
     <button
       class="jiro-btn"
-      [class]="'jiro-btn jiro-btn--' + variant"
-      [disabled]="disabled || loading"
-      [type]="type">
-      <span *ngIf="loading" class="spinner"></span>
+      [class.jiro-btn--primary]="variant() === 'primary'"
+      [class.jiro-btn--secondary]="variant() === 'secondary'"
+      [class.jiro-btn--danger]="variant() === 'danger'"
+      [class.jiro-btn--inverse]="variant() === 'inverse'"
+      [class.jiro-btn--ghost]="variant() === 'ghost'"
+      [class.jiro-btn--sm]="size() === 'sm'"
+      [disabled]="disabled() || loading()"
+      [attr.aria-busy]="loading() ? 'true' : null"
+      [type]="type()">
+      @if (loading()) {
+        <span class="spinner spinner--sm jiro-btn__spinner" aria-hidden="true"></span>
+      }
       <ng-content></ng-content>
     </button>
   `,
   styles: [`
+    :host { display: inline-block; }
+    :host(.block) { display: block; --jiro-btn-width: 100%; }
+
     .jiro-btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
       gap: var(--space-sm);
+      width: var(--jiro-btn-width, auto);
+      min-height: 40px;
       padding: 10px 20px;
       border: 1px solid transparent;
       border-radius: var(--border-radius);
+      font-family: inherit;
       font-weight: 600;
       font-size: var(--font-size-sm);
+      line-height: 1.2;
       cursor: pointer;
-      transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-      width: 100%;
+      transition: background 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                  box-shadow 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                  transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
       box-shadow: 2px 2px 0px transparent;
+    }
+
+    .jiro-btn--sm {
+      min-height: 32px;
+      padding: 6px 12px;
+      font-size: var(--font-size-xs);
+      gap: var(--space-xs);
     }
 
     .jiro-btn:disabled {
@@ -51,7 +85,7 @@ import { CommonModule } from '@angular/common';
     }
     .jiro-btn--primary:hover:not(:disabled) {
       background: var(--color-primary-hover);
-      box-shadow: 4px 4px 0px rgba(92, 64, 51, 0.25);
+      box-shadow: 4px 4px 0px rgba(var(--shadow-rgb), 0.25);
       transform: translate(-2px, -2px);
     }
 
@@ -62,7 +96,7 @@ import { CommonModule } from '@angular/common';
     }
     .jiro-btn--secondary:hover:not(:disabled) {
       background: var(--color-secondary-hover);
-      box-shadow: 4px 4px 0px rgba(92, 64, 51, 0.15);
+      box-shadow: 4px 4px 0px rgba(var(--shadow-rgb), 0.15);
       transform: translate(-2px, -2px);
     }
 
@@ -73,27 +107,45 @@ import { CommonModule } from '@angular/common';
     }
     .jiro-btn--danger:hover:not(:disabled) {
       background: var(--color-danger-hover);
-      box-shadow: 4px 4px 0px rgba(193, 88, 42, 0.25);
+      box-shadow: 4px 4px 0px rgba(var(--color-danger-rgb), 0.25);
       transform: translate(-2px, -2px);
     }
 
-    .spinner {
-      width: 16px;
-      height: 16px;
-      border: 2px solid transparent;
-      border-top-color: currentColor;
-      border-radius: 50%;
-      animation: spin 0.6s linear infinite;
+    /* Primary action on a primary-coloured surface */
+    .jiro-btn--inverse {
+      background: var(--text-on-primary);
+      color: var(--color-primary);
+      border-color: var(--text-on-primary);
+    }
+    .jiro-btn--inverse:hover:not(:disabled) {
+      box-shadow: 4px 4px 0px rgba(var(--shadow-rgb), 0.35);
+      transform: translate(-2px, -2px);
     }
 
-    @keyframes spin {
-      to { transform: rotate(360deg); }
+    /* Secondary action on any coloured surface: inherits the surface's text colour */
+    .jiro-btn--ghost {
+      background: transparent;
+      color: inherit;
+      border-color: color-mix(in srgb, currentColor 45%, transparent);
+    }
+    .jiro-btn--ghost:hover:not(:disabled) {
+      background: color-mix(in srgb, currentColor 12%, transparent);
+      border-color: color-mix(in srgb, currentColor 75%, transparent);
+      box-shadow: 4px 4px 0px color-mix(in srgb, currentColor 25%, transparent);
+      transform: translate(-2px, -2px);
+    }
+
+    .jiro-btn__spinner {
+      border-color: transparent;
+      border-top-color: currentColor;
     }
   `]
 })
 export class JiroButtonComponent {
-  @Input() variant: 'primary' | 'secondary' | 'danger' = 'primary';
-  @Input() disabled = false;
-  @Input() loading = false;
-  @Input() type: 'button' | 'submit' = 'button';
+  variant = input<'primary' | 'secondary' | 'danger' | 'inverse' | 'ghost'>('primary');
+  size = input<'sm' | 'md'>('md');
+  type = input<'button' | 'submit'>('button');
+  disabled = input(false, { transform: booleanAttribute });
+  loading = input(false, { transform: booleanAttribute });
+  block = input(false, { transform: booleanAttribute });
 }

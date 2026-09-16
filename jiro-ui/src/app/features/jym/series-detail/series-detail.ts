@@ -6,28 +6,31 @@ import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import { JymService, SplitSeriesDetail, ExerciseProgression, Routine } from '../../../core/services/jym.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
+import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
+import { chartTones } from '../shared/chart-theme';
 
 Chart.register(...registerables);
 
 @Component({
   selector: 'app-series-detail',
   standalone: true,
-  imports: [CommonModule, FormsModule, JiroButtonComponent, JiroModalComponent],
+  imports: [CommonModule, FormsModule, JiroButtonComponent, JiroModalComponent, JiroEmptyStateComponent],
   template: `
     <div class="series-detail">
       <!-- Back -->
-      <button class="back-btn" (click)="goBack()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <button class="back-btn" type="button" (click)="goBack()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
           <polyline points="15,18 9,12 15,6"/>
         </svg>
-        My Series
+        My series
       </button>
 
-      <div *ngIf="loading()" class="state-message">
-        <div class="spinner-lg"></div>
-      </div>
+      @if (loading()) {
+        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+      }
 
-      <div *ngIf="!loading() && series()" class="content">
+      @if (!loading() && series()) {
+<div class="content">
         <!-- Header -->
         <div class="detail-header">
           <div>
@@ -38,11 +41,14 @@ Chart.register(...registerables);
                 {{ series()!.ended_at ? 'Ended' : 'Active' }}
               </span>
               <span class="meta-text">Started {{ formatDate(series()!.started_at) }}</span>
-              <span *ngIf="series()!.ended_at" class="meta-text">· Ended {{ formatDate(series()!.ended_at!) }}</span>
+              @if (series()!.ended_at) {
+<span class="meta-text">· Ended {{ formatDate(series()!.ended_at!) }}</span>
+}
               <span class="meta-text">· {{ series()!.session_count }} sessions</span>
             </div>
           </div>
-          <div *ngIf="!series()!.ended_at" class="header-btns">
+          @if (!series()!.ended_at) {
+<div class="header-btns">
             <jiro-button variant="primary" type="button" (click)="openRoutinePicker()">
               Start Session
             </jiro-button>
@@ -50,10 +56,12 @@ Chart.register(...registerables);
               End Series
             </jiro-button>
           </div>
+}
         </div>
 
         <!-- Progress bar (for fixed-length series) -->
-        <div *ngIf="series()!.duration_type !== 'open'" class="progress-section">
+        @if (series()!.duration_type !== 'open') {
+<div class="progress-section">
           <div class="progress-label">
             <span>Progress</span>
             <span class="progress-value">{{ progressText() }}</span>
@@ -62,14 +70,18 @@ Chart.register(...registerables);
             <div class="progress-fill" [style.width.%]="progressPct()"></div>
           </div>
         </div>
+}
 
         <!-- No sessions yet -->
-        <div *ngIf="series()!.sessions.length === 0" class="state-message">
-          <h3>No sessions logged yet</h3>
-          <p class="text-secondary">Start a session linked to this series to see progression data.</p>
-        </div>
+        @if (series()!.sessions.length === 0) {
+          <jiro-empty-state
+            icon="barbell"
+            heading="No sessions logged yet"
+            message="Start a session linked to this series to see progression data." />
+        }
 
-        <div *ngIf="series()!.sessions.length > 0">
+        @if (series()!.sessions.length > 0) {
+<div>
           <!-- Tab bar -->
           <div class="tab-bar">
             <button class="tab-btn" [class.active]="activeTab() === 'volume'" (click)="activeTab.set('volume')">Volume</button>
@@ -78,58 +90,78 @@ Chart.register(...registerables);
           </div>
 
           <!-- Volume chart -->
-          <div *ngIf="activeTab() === 'volume'" class="chart-block">
+          @if (activeTab() === 'volume') {
+<div class="chart-block">
             <h2 class="section-title">Total Volume per Session</h2>
             <p class="section-sub">Sum of weight × reps across all sets. Excludes deload sessions.</p>
             <div class="chart-wrapper">
               <canvas #volumeCanvas></canvas>
             </div>
           </div>
+}
 
           <!-- 1RM chart -->
-          <div *ngIf="activeTab() === 'orm'" class="chart-block">
+          @if (activeTab() === 'orm') {
+<div class="chart-block">
             <div class="orm-header">
               <h2 class="section-title">Estimated 1RM Progression</h2>
               <select class="ex-select" [(ngModel)]="selectedExId" (ngModelChange)="drawOrmChart()">
-                <option *ngFor="let ex of series()!.exercise_progressions" [value]="ex.exercise_id">
+                @for (ex of series()!.exercise_progressions; track ex) {
+<option [value]="ex.exercise_id">
                   {{ ex.exercise_name }}
                 </option>
+}
               </select>
             </div>
             <div class="chart-wrapper">
               <canvas #ormCanvas></canvas>
             </div>
           </div>
+}
 
           <!-- Compare tab -->
-          <div *ngIf="activeTab() === 'compare'" class="compare-block">
+          @if (activeTab() === 'compare') {
+<div class="compare-block">
             <h2 class="section-title">Series Comparison</h2>
             <p class="section-sub">Compare performance with another series of the same split.</p>
-            <div *ngIf="otherSeries().length === 0" class="no-compare">
+            @if (otherSeries().length === 0) {
+<div class="no-compare">
               <p class="text-secondary">No other series for <strong>{{ series()!.split_name }}</strong> to compare with yet.</p>
             </div>
-            <div *ngIf="otherSeries().length > 0" class="compare-controls">
+}
+            @if (otherSeries().length > 0) {
+<div class="compare-controls">
               <div class="form-row">
                 <div class="form-group">
                   <label class="form-label">Compare with</label>
                   <select class="ex-select" [(ngModel)]="compareSeriesId" (ngModelChange)="loadCompare()">
                     <option value="">Select a series...</option>
-                    <option *ngFor="let s of otherSeries()" [value]="s.id">{{ s.name }}</option>
+                    @for (s of otherSeries(); track s) {
+<option [value]="s.id">{{ s.name }}</option>
+}
                   </select>
                 </div>
-                <div class="form-group" *ngIf="compareSeriesId">
+                @if (compareSeriesId) {
+<div class="form-group">
                   <label class="form-label">Exercise</label>
                   <select class="ex-select" [(ngModel)]="compareExId" (ngModelChange)="drawCompareChart()">
                     <option value="">Select exercise...</option>
-                    <option *ngFor="let ex of compareExercises()" [value]="ex.exercise_id">{{ ex.exercise_name }}</option>
+                    @for (ex of compareExercises(); track ex) {
+<option [value]="ex.exercise_id">{{ ex.exercise_name }}</option>
+}
                   </select>
                 </div>
+}
               </div>
-              <div *ngIf="compareSeriesId && compareExId" class="chart-wrapper">
+              @if (compareSeriesId && compareExId) {
+<div class="chart-wrapper">
                 <canvas #compareCanvas></canvas>
               </div>
+}
             </div>
+}
           </div>
+}
 
           <!-- Sessions table -->
           <div class="sessions-section">
@@ -145,42 +177,60 @@ Chart.register(...registerables);
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let s of series()!.sessions; let i = index" [class.deload-row]="s.session_type === 'deload'">
+                @for (s of series()!.sessions; track s; let i = $index) {
+<tr [class.deload-row]="s.session_type === 'deload'">
                   <td class="num-cell">{{ i + 1 }}</td>
                   <td>{{ formatDate(s.date) }}</td>
                   <td>
-                    <span *ngIf="s.session_type === 'normal'" class="type-dot normal"></span>
-                    <span *ngIf="s.session_type === 'deload'" class="type-chip deload">Deload</span>
-                    <span *ngIf="s.session_type === 'test'" class="type-chip test">Test</span>
+                    @if (s.session_type === 'normal') {
+<span class="type-dot normal"></span>
+}
+                    @if (s.session_type === 'deload') {
+<span class="type-chip deload">Deload</span>
+}
+                    @if (s.session_type === 'test') {
+<span class="type-chip test">Test</span>
+}
                   </td>
                   <td>{{ s.set_count }}</td>
                   <td>{{ s.total_volume | number:'1.0-0' }} kg</td>
                 </tr>
+}
               </tbody>
             </table>
           </div>
         </div>
+}
       </div>
+}
 
       <!-- Routine picker modal -->
-      <jiro-modal *ngIf="showRoutinePicker()" title="Start Session" maxWidth="440px" (close)="showRoutinePicker.set(false)">
+      @if (showRoutinePicker()) {
+<jiro-modal title="Start Session" maxWidth="440px" (close)="showRoutinePicker.set(false)">
         <div class="routine-picker">
           <p class="picker-sub">Pick a routine for this session, or go freestyle.</p>
-          <div *ngIf="loadingRoutines()" class="picker-loading">
+          @if (loadingRoutines()) {
+<div class="picker-loading">
             <div class="spinner-sm"></div>
           </div>
-          <div *ngIf="!loadingRoutines()" class="routine-list">
-            <button *ngFor="let r of splitRoutines()" class="routine-row" (click)="startWithRoutine(r.id)">
+}
+          @if (!loadingRoutines()) {
+<div class="routine-list">
+            @for (r of splitRoutines(); track r) {
+<button class="routine-row" (click)="startWithRoutine(r.id)">
               <div class="routine-row-name">{{ r.name }}</div>
               <span class="routine-row-count">{{ r.items.length }} exercises</span>
             </button>
+}
             <button class="routine-row freestyle-row" (click)="startFreestyle()">
               <div class="routine-row-name">Freestyle</div>
               <span class="routine-row-count">No template</span>
             </button>
           </div>
+}
         </div>
       </jiro-modal>
+}
     </div>
   `,
   styles: [`
@@ -195,15 +245,11 @@ Chart.register(...registerables);
     }
     .back-btn:hover { color: var(--text-primary); }
 
+    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
+
     .state-message {
       display: flex; flex-direction: column; align-items: center;
       gap: var(--space-md); padding: var(--space-2xl); text-align: center;
-    }
-
-    .spinner-lg {
-      width: 40px; height: 40px; border: 3px solid var(--border-color);
-      border-top-color: var(--color-primary); border-radius: 50%;
-      animation: spin 0.8s linear infinite;
     }
 
     .content { display: flex; flex-direction: column; gap: var(--space-xl); }
@@ -211,7 +257,6 @@ Chart.register(...registerables);
     .detail-header {
       display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-lg);
     }
-    .detail-header ::ng-deep .jiro-btn { width: auto; flex-shrink: 0; }
 
     .header-btns { display: flex; gap: var(--space-sm); flex-shrink: 0; }
 
@@ -223,7 +268,7 @@ Chart.register(...registerables);
 
     .status-badge {
       font-size: var(--font-size-xs); font-weight: 600; padding: 2px 8px; border-radius: 10px;
-      background: rgba(76,175,80,0.12); color: #4caf50;
+      background: rgba(var(--color-accent-rgb), 0.12); color: var(--color-positive);
     }
     .status-badge:not(.active) { background: var(--bg-canvas); color: var(--text-muted); border: 1px solid var(--border-color); }
 
@@ -270,7 +315,7 @@ Chart.register(...registerables);
     .ex-select {
       padding: 8px 12px; border: 1px solid var(--border-color);
       border-radius: var(--border-radius); background: var(--bg-surface);
-      color: var(--text-primary); font-size: var(--font-size-sm); outline: none; cursor: pointer;
+      color: var(--text-primary); font-size: var(--font-size-sm); cursor: pointer;
     }
     .ex-select:focus { border-color: var(--color-primary); }
 
@@ -304,12 +349,12 @@ Chart.register(...registerables);
 
     .num-cell { color: var(--text-muted); font-weight: 500; }
 
-    .type-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #4caf50; }
+    .type-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--color-positive); }
     .type-chip {
       font-size: var(--font-size-xs); font-weight: 600; padding: 1px 6px; border-radius: 8px;
     }
-    .type-chip.deload { background: rgba(196,74,74,0.1); color: var(--color-danger); }
-    .type-chip.test { background: rgba(122,59,46,0.12); color: var(--color-primary); }
+    .type-chip.deload { background: rgba(var(--color-danger-rgb), 0.1); color: var(--color-danger); }
+    .type-chip.test { background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary); }
 
     .routine-picker { display: flex; flex-direction: column; gap: var(--space-md); }
 
@@ -332,7 +377,7 @@ Chart.register(...registerables);
       cursor: pointer; text-align: left; transition: border-color 0.15s, box-shadow 0.15s;
       width: 100%;
     }
-    .routine-row:hover { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(122,59,46,0.08); }
+    .routine-row:hover { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.08); }
 
     .routine-row-name { font-size: var(--font-size-md); font-weight: 500; color: var(--text-primary); }
 
@@ -341,7 +386,6 @@ Chart.register(...registerables);
     .freestyle-row { border-style: dashed; }
     .freestyle-row .routine-row-name { color: var(--text-secondary); }
 
-    @keyframes spin { to { transform: rotate(360deg); } }
   `]
 })
 export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
@@ -415,6 +459,7 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
     const sessions = s.sessions.filter(sess => sess.session_type !== 'deload');
     if (sessions.length === 0) return;
 
+    const tone = chartTones();
     const config: ChartConfiguration = {
       type: 'bar',
       data: {
@@ -422,8 +467,8 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
         datasets: [{
           label: 'Volume (kg)',
           data: sessions.map(sess => sess.total_volume),
-          backgroundColor: 'rgba(122,59,46,0.7)',
-          borderColor: '#7a3b2e',
+          backgroundColor: tone.primary,
+          borderColor: tone.primary,
           borderWidth: 1,
           borderRadius: 4,
         }],
@@ -442,7 +487,7 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
         },
         scales: {
           x: { grid: { display: false }, ticks: { font: { size: 11 } } },
-          y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 11 }, callback: v => `${v} kg` } },
+          y: { grid: { color: tone.grid }, ticks: { font: { size: 11 }, color: tone.tick, callback: v => `${v} kg` } },
         },
       },
     };
@@ -457,6 +502,7 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
     const ex = s.exercise_progressions.find(e => e.exercise_id === this.selectedExId);
     if (!ex || ex.points.length === 0) return;
 
+    const tone = chartTones();
     const config: ChartConfiguration = {
       type: 'line',
       data: {
@@ -464,10 +510,10 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
         datasets: [{
           label: 'Est. 1RM (kg)',
           data: ex.points.map(p => p.best_est_1rm),
-          borderColor: '#7a3b2e',
-          backgroundColor: 'rgba(122,59,46,0.1)',
+          borderColor: tone.primary,
+          backgroundColor: tone.primaryFill,
           fill: true, tension: 0.3,
-          pointBackgroundColor: '#7a3b2e', pointRadius: 4, pointHoverRadius: 6,
+          pointBackgroundColor: tone.primary, pointRadius: 4, pointHoverRadius: 6,
         }],
       },
       options: {
@@ -484,7 +530,7 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
         },
         scales: {
           x: { grid: { display: false }, ticks: { font: { size: 11 } } },
-          y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 11 }, callback: v => `${v} kg` } },
+          y: { grid: { color: tone.grid }, ticks: { font: { size: 11 }, color: tone.tick, callback: v => `${v} kg` } },
         },
       },
     };
@@ -513,6 +559,7 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
     const maxLen = Math.max(currentEx?.points.length ?? 0, otherEx?.points.length ?? 0);
     const labels = Array.from({ length: maxLen }, (_, i) => `S${i + 1}`);
 
+    const tone = chartTones();
     const config: ChartConfiguration = {
       type: 'line',
       data: {
@@ -521,18 +568,18 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
           {
             label: current.name,
             data: (currentEx?.points ?? []).map(p => p.best_est_1rm),
-            borderColor: '#7a3b2e',
-            backgroundColor: 'rgba(122,59,46,0.1)',
+            borderColor: tone.primary,
+            backgroundColor: tone.primaryFill,
             fill: false, tension: 0.3,
-            pointBackgroundColor: '#7a3b2e', pointRadius: 4,
+            pointBackgroundColor: tone.primary, pointRadius: 4,
           },
           {
             label: other.name,
             data: (otherEx?.points ?? []).map(p => p.best_est_1rm),
-            borderColor: '#9e9e9e',
-            backgroundColor: 'rgba(158,158,158,0.1)',
+            borderColor: tone.muted,
+            backgroundColor: tone.muted,
             fill: false, tension: 0.3,
-            pointBackgroundColor: '#9e9e9e', pointRadius: 4,
+            pointBackgroundColor: tone.muted, pointRadius: 4,
             borderDash: [5, 3],
           },
         ],
@@ -546,7 +593,7 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
         },
         scales: {
           x: { grid: { display: false }, ticks: { font: { size: 11 } } },
-          y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 11 }, callback: v => `${v} kg` } },
+          y: { grid: { color: tone.grid }, ticks: { font: { size: 11 }, color: tone.tick, callback: v => `${v} kg` } },
         },
       },
     };

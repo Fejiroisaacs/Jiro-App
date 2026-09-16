@@ -1,5 +1,5 @@
 import { Component, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { RecipeService, Recipe } from '../../../core/services/recipe.service';
@@ -8,12 +8,11 @@ import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-car
 @Component({
   selector: 'app-discover',
   standalone: true,
-  imports: [CommonModule, RouterLink, FormsModule, JiroCardComponent],
+  imports: [RouterLink, FormsModule, JiroCardComponent],
   template: `
     <div class="discover-page">
       <div class="page-header">
         <div>
-          <a routerLink="/culinara" class="back-link">← Culinara</a>
           <h1>Discover</h1>
           <p class="text-secondary">Recipes shared publicly by the community</p>
         </div>
@@ -28,43 +27,63 @@ import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-car
           (input)="onSearch()" />
       </div>
 
-      <div *ngIf="loading()" class="state-message">
+      @if (loading()) {
+<div class="state-message">
         <div class="spinner-lg"></div>
         <p>Loading...</p>
       </div>
+}
 
-      <div *ngIf="!loading() && recipes().length === 0" class="state-message">
+      @if (!loading() && recipes().length === 0) {
+<div class="state-message">
         <p class="text-secondary">No public recipes found{{ searchQuery ? ' matching your search' : '' }}.</p>
       </div>
+}
 
-      <div *ngIf="!loading() && recipes().length > 0" class="recipe-grid">
-        <jiro-card
-          *ngFor="let recipe of recipes()"
+      @if (!loading() && recipes().length > 0) {
+<div class="recipe-grid">
+        @for (recipe of recipes(); track recipe) {
+<jiro-card
+         
           [clickable]="true"
           [routerLink]="['/culinara/discover', recipe.id]"
           class="recipe-card">
           <div class="recipe-card-inner">
-            <div class="recipe-cover" *ngIf="recipe.cover_image_url">
+            @if (recipe.cover_image_url) {
+<div class="recipe-cover">
               <img [src]="recipe.cover_image_url" [alt]="recipe.title" class="cover-thumb">
             </div>
+}
             <h3 class="recipe-title">{{ recipe.title }}</h3>
-            <p class="recipe-desc text-secondary" *ngIf="recipe.description">{{ recipe.description }}</p>
-            <div class="tag-chips-row" *ngIf="recipe.tags && recipe.tags.length">
-              <span *ngFor="let tag of recipe.tags" class="recipe-tag">{{ tag }}</span>
+            @if (recipe.description) {
+<p class="recipe-desc text-secondary">{{ recipe.description }}</p>
+}
+            @if (recipe.tags && recipe.tags.length) {
+<div class="tag-chips-row">
+              @for (tag of recipe.tags; track tag) {
+<span class="recipe-tag">{{ tag }}</span>
+}
             </div>
+}
           </div>
         </jiro-card>
+}
       </div>
+}
 
-      <div *ngIf="recipes().length > 0" class="load-more-row">
-        <button
+      @if (recipes().length > 0) {
+<div class="load-more-row">
+        @if (recipes().length >= pageSize) {
+<button
           class="load-more-btn"
-          *ngIf="recipes().length >= pageSize"
+         
           [disabled]="loadingMore()"
           (click)="loadMore()">
           {{ loadingMore() ? 'Loading...' : 'Load more' }}
         </button>
+}
       </div>
+}
     </div>
   `,
   styles: [`
@@ -92,7 +111,6 @@ import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-car
       background: var(--bg-surface);
       color: var(--text-primary);
       font-size: var(--font-size-md);
-      outline: none;
     }
     .search-input:focus { border-color: var(--color-primary); }
     .search-input::placeholder { color: var(--text-muted); }

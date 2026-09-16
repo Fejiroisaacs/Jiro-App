@@ -12,6 +12,7 @@ import {
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Chart, registerables } from 'chart.js';
+import { parseDateOnly } from '../shared/ledger-utils';
 import {
   LedgerService,
   NetWorthSnapshot,
@@ -20,14 +21,13 @@ import {
 import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-card';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
-import { LedgerQuickNavComponent } from '../ledger-quick-nav/ledger-quick-nav';
 
 Chart.register(...registerables);
 
 @Component({
   selector: 'app-networth-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, JiroCardComponent, JiroButtonComponent, JiroModalComponent, LedgerQuickNavComponent],
+  imports: [CommonModule, FormsModule, JiroCardComponent, JiroButtonComponent, JiroModalComponent],
   template: `
     <div class="networth-page">
 
@@ -47,16 +47,17 @@ Chart.register(...registerables);
         </jiro-button>
       </div>
 
-      <ledger-quick-nav />
-
       <!-- Loading -->
-      <div *ngIf="loading()" class="state-message">
+      @if (loading()) {
+<div class="state-message">
         <div class="spinner-lg"></div>
         <p>Loading snapshots...</p>
       </div>
+}
 
       <!-- Empty state (no snapshots at all) -->
-      <div *ngIf="!loading() && snapshots().length === 0" class="empty-state">
+      @if (!loading() && snapshots().length === 0) {
+<div class="empty-state">
         <div class="empty-icon">
           <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/>
@@ -68,9 +69,11 @@ Chart.register(...registerables);
           Take your first snapshot
         </jiro-button>
       </div>
+}
 
       <!-- Content (has snapshots) -->
-      <ng-container *ngIf="!loading() && snapshots().length > 0">
+      @if (!loading() && snapshots().length > 0) {
+
 
         <!-- Current snapshot summary -->
         <jiro-card class="summary-card">
@@ -120,7 +123,8 @@ Chart.register(...registerables);
         <div class="snapshot-list-section">
           <h2 class="section-heading">Snapshot History</h2>
           <div class="snapshot-list">
-            <div *ngFor="let snap of displayedSnapshots()" class="snapshot-row">
+            @for (snap of displayedSnapshots(); track snap) {
+<div class="snapshot-row">
               <div class="snap-date">{{ formatDate(snap.snapshot_date) }}</div>
               <div class="snap-values">
                 <div class="snap-stat">
@@ -142,20 +146,26 @@ Chart.register(...registerables);
                 </div>
               </div>
             </div>
+}
           </div>
         </div>
 
-      </ng-container>
+      
+}
 
       <!-- Take Snapshot Modal -->
-      <jiro-modal *ngIf="showSnapshotModal()" title="Take Snapshot" maxWidth="480px" (close)="closeSnapshotModal()">
+      @if (showSnapshotModal()) {
+<jiro-modal title="Take Snapshot" maxWidth="480px" (close)="closeSnapshotModal()">
 
-        <div *ngIf="loadingAccounts()" class="accounts-loading">
+        @if (loadingAccounts()) {
+<div class="accounts-loading">
           <div class="spinner-sm"></div>
           <span>Loading accounts...</span>
         </div>
+}
 
-        <form *ngIf="!loadingAccounts()" class="modal-form" (ngSubmit)="submitSnapshot()">
+        @if (!loadingAccounts()) {
+<form class="modal-form" (ngSubmit)="submitSnapshot()">
 
           <div class="form-group">
             <label class="form-label">Snapshot Date</label>
@@ -209,7 +219,9 @@ Chart.register(...registerables);
           </div>
 
         </form>
+}
       </jiro-modal>
+}
 
     </div>
   `,
@@ -229,7 +241,6 @@ Chart.register(...registerables);
 
     .page-header h1 { font-size: var(--font-size-2xl); font-weight: 700; }
 
-    .page-header ::ng-deep .jiro-btn { width: auto; }
 
     @media (max-width: 600px) {
       .page-header { flex-direction: column; }
@@ -281,7 +292,7 @@ Chart.register(...registerables);
 
     .empty-state h3 { font-size: var(--font-size-xl); font-weight: 600; }
 
-    .empty-state ::ng-deep .jiro-btn { width: auto; margin-top: var(--space-xs); }
+    .empty-state jiro-button { margin-top: var(--space-xs); }
 
     /* ── Summary card ── */
     .summary-card { width: 100%; }
@@ -472,7 +483,6 @@ Chart.register(...registerables);
       background: transparent;
       color: var(--text-primary);
       font-size: var(--font-size-md);
-      outline: none;
       transition: border-color 0.2s;
       font-family: inherit;
       width: 100%;
@@ -517,7 +527,6 @@ Chart.register(...registerables);
       margin-top: var(--space-xs);
     }
 
-    .form-actions ::ng-deep .jiro-btn { width: auto; }
 
     @keyframes spin { to { transform: rotate(360deg); } }
   `]
@@ -620,7 +629,7 @@ export class NetWorthPageComponent implements OnInit, AfterViewInit, OnDestroy {
     }).subscribe({
       next: snap => {
         this.snapshots.update(list => [...list, snap].sort(
-          (a, b) => new Date(a.snapshot_date).getTime() - new Date(b.snapshot_date).getTime()
+          (a, b) => parseDateOnly(a.snapshot_date).getTime() - parseDateOnly(b.snapshot_date).getTime()
         ));
         this.savingSnapshot.set(false);
         this.closeSnapshotModal();
@@ -631,7 +640,7 @@ export class NetWorthPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-GB', {
+    return parseDateOnly(iso).toLocaleDateString('en-GB', {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
@@ -652,7 +661,7 @@ export class NetWorthPageComponent implements OnInit, AfterViewInit, OnDestroy {
     if (snaps.length === 0) return;
 
     const sorted = [...snaps].sort(
-      (a, b) => new Date(a.snapshot_date).getTime() - new Date(b.snapshot_date).getTime()
+      (a, b) => parseDateOnly(a.snapshot_date).getTime() - parseDateOnly(b.snapshot_date).getTime()
     );
     const labels = sorted.map(s => this.formatDate(s.snapshot_date));
     const values = sorted.map(s => s.net_worth);

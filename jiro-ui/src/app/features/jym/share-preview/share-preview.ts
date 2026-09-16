@@ -1,5 +1,5 @@
 import { Component, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { ActivatedRoute, Router } from '@angular/router';
 import { JymService, SharePreview } from '../../../core/services/jym.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -8,7 +8,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
 @Component({
   selector: 'app-share-preview',
   standalone: true,
-  imports: [CommonModule, JiroButtonComponent],
+  imports: [JiroButtonComponent],
   template: `
     <div class="share-page">
       <div class="share-container">
@@ -20,13 +20,15 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
         </div>
 
         <!-- Loading -->
-        <div *ngIf="loading()" class="state-message">
-          <div class="spinner"></div>
-          <p class="text-secondary">Loading split...</p>
-        </div>
+        @if (loading()) {
+          <div class="state-message" aria-busy="true">
+            <span class="spinner"></span>
+          </div>
+        }
 
         <!-- Error -->
-        <div *ngIf="!loading() && error()" class="state-message">
+        @if (!loading() && error()) {
+<div class="state-message">
           <div class="error-icon">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
               <circle cx="12" cy="12" r="10"/>
@@ -36,9 +38,11 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
           <h2>{{ errorTitle() }}</h2>
           <p class="text-secondary">{{ error() }}</p>
         </div>
+}
 
         <!-- Preview -->
-        <div *ngIf="!loading() && !error() && preview()" class="preview-card">
+        @if (!loading() && !error() && preview()) {
+<div class="preview-card">
           <div class="preview-header">
             <div>
               <p class="preview-label">Shared Split</p>
@@ -48,45 +52,60 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
           </div>
 
           <div class="routines-list">
-            <div *ngFor="let r of preview()!.routines" class="routine-row">
+            @for (r of preview()!.routines; track r) {
+<div class="routine-row">
               <div class="routine-header">
                 <span class="day-chip">Day {{ r.day_order }}</span>
                 <span class="routine-name">{{ r.name }}</span>
               </div>
               <div class="exercises-list">
-                <div *ngFor="let ex of r.exercises" class="ex-row">
+                @for (ex of r.exercises; track ex) {
+<div class="ex-row">
                   <span class="ex-name">{{ ex.name }}</span>
                   <span class="ex-meta">
-                    <span *ngIf="ex.muscle_group" class="ex-muscle">{{ ex.muscle_group }}</span>
+                    @if (ex.muscle_group) {
+<span class="ex-muscle">{{ ex.muscle_group }}</span>
+}
                     <span class="ex-targets">{{ ex.target_sets }}×{{ ex.target_reps }}</span>
                   </span>
                 </div>
-                <div *ngIf="r.exercises.length === 0" class="ex-empty text-secondary">No exercises</div>
+}
+                @if (r.exercises.length === 0) {
+<div class="ex-empty text-secondary">No exercises</div>
+}
               </div>
             </div>
+}
           </div>
 
           <div class="import-section">
-            <div *ngIf="!isLoggedIn()" class="import-info">
+            @if (!isLoggedIn()) {
+<div class="import-info">
               <p class="text-secondary">Sign in to import this split into your Jym library.</p>
               <jiro-button variant="primary" type="button" (click)="goToLogin()">
                 Sign in to Import
               </jiro-button>
             </div>
-            <div *ngIf="isLoggedIn() && !imported()" class="import-info">
+}
+            @if (isLoggedIn() && !imported()) {
+<div class="import-info">
               <p class="text-secondary">This split will be copied into your account — exercises will be matched by name or created for you.</p>
               <jiro-button variant="primary" type="button" [disabled]="importing()" (click)="importSplit()">
                 {{ importing() ? 'Importing...' : 'Import to My Account' }}
               </jiro-button>
             </div>
-            <div *ngIf="imported()" class="import-success">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4caf50" stroke-width="2">
+}
+            @if (imported()) {
+<div class="import-success">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-positive)" stroke-width="2">
                 <polyline points="20 6 9 17 4 12"/>
               </svg>
               <p>Split imported! <button class="link-btn" (click)="goToSplit()">Open it →</button></p>
             </div>
+}
           </div>
         </div>
+}
 
       </div>
     </div>
@@ -152,7 +171,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
 
     .day-chip {
       font-size: var(--font-size-xs); font-weight: 600; padding: 2px 8px;
-      background: rgba(122,59,46,0.1); color: var(--color-primary);
+      background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary);
       border-radius: 8px; white-space: nowrap;
     }
 
@@ -191,11 +210,10 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
       display: flex; flex-direction: column; gap: var(--space-md);
     }
 
-    .import-info ::ng-deep .jiro-btn { width: auto; align-self: flex-start; }
 
     .import-success {
       display: flex; align-items: center; gap: var(--space-sm);
-      color: #4caf50;
+      color: var(--color-positive);
     }
 
     .link-btn {

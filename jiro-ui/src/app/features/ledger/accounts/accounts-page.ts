@@ -1,5 +1,5 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import {
   LedgerService,
@@ -10,8 +10,7 @@ import {
 import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-card';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
-import { LedgerQuickNavComponent } from '../ledger-quick-nav/ledger-quick-nav';
-import { formatCurrency, formatDate, hexWithAlpha } from '../shared/ledger-utils';
+import { formatCurrency, formatSignedCurrency, formatDate, hexWithAlpha } from '../shared/ledger-utils';
 
 type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
 
@@ -19,13 +18,11 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
   selector: 'app-accounts-page',
   standalone: true,
   imports: [
-    CommonModule,
     FormsModule,
     JiroCardComponent,
     JiroButtonComponent,
-    JiroModalComponent,
-    LedgerQuickNavComponent,
-  ],
+    JiroModalComponent
+],
   template: `
     <div class="accounts-page">
 
@@ -45,16 +42,17 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
         </div>
       </div>
 
-      <ledger-quick-nav />
-
       <!-- ── Loading ── -->
-      <div *ngIf="loading()" class="state-message">
+      @if (loading()) {
+<div class="state-message">
         <div class="spinner-lg"></div>
         <p class="text-secondary">Loading accounts...</p>
       </div>
+}
 
       <!-- ── Empty State ── -->
-      <div *ngIf="!loading() && accounts().length === 0" class="empty-state">
+      @if (!loading() && accounts().length === 0) {
+<div class="empty-state">
         <div class="empty-icon">
           <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <rect x="2" y="5" width="20" height="14" rx="2"/>
@@ -70,60 +68,77 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
           </jiro-button>
         </div>
       </div>
+}
 
       <!-- ── Accounts Grid ── -->
-      <ng-container *ngIf="!loading() && accounts().length > 0">
+      @if (!loading() && accounts().length > 0) {
+
 
         <div class="accounts-grid">
-          <jiro-card *ngFor="let account of accounts()" [clickable]="true" (click)="toggleDetail(account)">
+          @for (account of accounts(); track account) {
+<jiro-card [clickable]="true" (click)="toggleDetail(account)">
             <div class="acct-card">
 
               <!-- Top row: icon + badge -->
               <div class="acct-top">
                 <div class="acct-icon-wrap" [class]="'acct-type-' + account.type">
-                  <ng-container [ngSwitch]="account.type">
+                  
+@switch (account.type) {
 
                     <!-- Checking: bank -->
-                    <svg *ngSwitchCase="'checking'" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    @case ('checking') {
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <line x1="3" y1="22" x2="21" y2="22"/>
                       <rect x="2" y="8" width="20" height="14"/>
                       <path d="M12 2L2 8h20L12 2z"/>
                       <rect x="9" y="12" width="2" height="6"/>
                       <rect x="13" y="12" width="2" height="6"/>
                     </svg>
+}
 
                     <!-- Savings: piggy bank -->
-                    <svg *ngSwitchCase="'savings'" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    @case ('savings') {
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M19 11c0 4.4-3.6 8-8 8s-8-3.6-8-8 3.6-8 8-8c1 0 2 .2 2.9.5"/>
                       <path d="M19 11h2l1 3-2 1"/>
                       <circle cx="9" cy="11" r="1" fill="currentColor"/>
                       <path d="M7 19v2M13 19v2"/>
                     </svg>
+}
 
                     <!-- Credit: credit card -->
-                    <svg *ngSwitchCase="'credit'" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    @case ('credit') {
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <rect x="1" y="4" width="22" height="16" rx="2"/>
                       <line x1="1" y1="10" x2="23" y2="10"/>
                     </svg>
+}
 
                     <!-- Investment: trending up -->
-                    <svg *ngSwitchCase="'investment'" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    @case ('investment') {
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
                       <polyline points="17 6 23 6 23 12"/>
                     </svg>
+}
 
                     <!-- Cash: banknotes -->
-                    <svg *ngSwitchDefault width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    @default {
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <rect x="1" y="6" width="22" height="12" rx="2"/>
                       <circle cx="12" cy="12" r="3"/>
                       <path d="M5 12h.01M19 12h.01"/>
                     </svg>
-                  </ng-container>
+}
+                  }
+
                 </div>
 
                 <div class="acct-badges">
                   <span class="type-label">{{ formatAccountType(account.type) }}</span>
-                  <span *ngIf="!account.is_active" class="inactive-badge">Inactive</span>
+                  @if (!account.is_active) {
+<span class="inactive-badge">Inactive</span>
+}
                 </div>
               </div>
 
@@ -159,38 +174,51 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
             </div>
 
             <!-- ── Detail Panel (expanded) ── -->
-            <div *ngIf="selectedAccountId() === account.id" class="detail-panel" (click)="$event.stopPropagation()">
+            @if (selectedAccountId() === account.id) {
+<div class="detail-panel" (click)="$event.stopPropagation()">
               <div class="detail-header">
                 <span class="detail-title">Recent Transactions</span>
               </div>
-              <div *ngIf="detailLoading()" class="detail-loading">
+              @if (detailLoading()) {
+<div class="detail-loading">
                 <div class="spinner-sm"></div>
               </div>
-              <div *ngIf="!detailLoading() && selectedAccountDetail()?.recent_transactions?.length === 0" class="detail-empty">
+}
+              @if (!detailLoading() && selectedAccountDetail()?.recent_transactions?.length === 0) {
+<div class="detail-empty">
                 <p class="text-muted">No transactions yet.</p>
               </div>
-              <div *ngIf="!detailLoading() && (selectedAccountDetail()?.recent_transactions?.length ?? 0) > 0" class="detail-txn-list">
-                <div *ngFor="let t of selectedAccountDetail()!.recent_transactions" class="detail-txn-row">
+}
+              @if (!detailLoading() && (selectedAccountDetail()?.recent_transactions?.length ?? 0) > 0) {
+<div class="detail-txn-list">
+                @for (t of selectedAccountDetail()!.recent_transactions; track t) {
+<div class="detail-txn-row">
                   <div class="detail-txn-left">
                     <span class="detail-txn-desc">{{ t.description || 'Untitled' }}</span>
-                    <span *ngIf="t.category_name" class="cat-chip"
+                    @if (t.category_name) {
+<span class="cat-chip"
                       [style.background]="hexWithAlpha(t.category_color, 0.12)"
                       [style.color]="t.category_color || 'var(--text-muted)'">
                       {{ t.category_name }}
                     </span>
+}
                   </div>
                   <div class="detail-txn-right">
                     <span class="detail-txn-amount"
                       [class.amount-pos]="t.type === 'income'"
                       [class.amount-neg]="t.type === 'expense'">
-                      {{ t.type === 'expense' ? '-' : '+' }}{{ formatCurrency(t.amount, account.currency) }}
+                      {{ formatSignedCurrency(t.amount, account.currency, t.type === 'transfer' ? 'never' : 'exceptZero') }}
                     </span>
                     <span class="detail-txn-date text-muted">{{ formatDate(t.date) }}</span>
                   </div>
                 </div>
+}
               </div>
+}
             </div>
+}
           </jiro-card>
+}
         </div>
 
         <!-- ── Net Worth Bar ── -->
@@ -215,10 +243,12 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
           </div>
         </div>
 
-      </ng-container>
+      
+}
 
       <!-- ── Add Account Modal ── -->
-      <jiro-modal *ngIf="showAddModal()" title="Add Account" maxWidth="480px" (close)="closeAddModal()">
+      @if (showAddModal()) {
+<jiro-modal title="Add Account" maxWidth="480px" (close)="closeAddModal()">
         <form class="modal-form" (ngSubmit)="submitAddAccount()">
           <div class="form-group">
             <label class="form-label">Account Name</label>
@@ -260,7 +290,9 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
               name="balance"
               placeholder="0.00" />
           </div>
-          <p *ngIf="addError()" class="form-error">{{ addError() }}</p>
+          @if (addError()) {
+<p class="form-error">{{ addError() }}</p>
+}
           <div class="form-actions">
             <jiro-button variant="secondary" type="button" (click)="closeAddModal()">Cancel</jiro-button>
             <jiro-button variant="primary" type="submit" [disabled]="addSaving() || !addForm.name.trim()">
@@ -269,9 +301,11 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
           </div>
         </form>
       </jiro-modal>
+}
 
       <!-- ── Edit Account Modal ── -->
-      <jiro-modal *ngIf="showEditModal()" title="Edit Account" maxWidth="480px" (close)="closeEditModal()">
+      @if (showEditModal()) {
+<jiro-modal title="Edit Account" maxWidth="480px" (close)="closeEditModal()">
         <form class="modal-form" (ngSubmit)="submitEditAccount()">
           <div class="form-group">
             <label class="form-label">Account Name</label>
@@ -305,7 +339,9 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
               </button>
             </div>
           </div>
-          <p *ngIf="editError()" class="form-error">{{ editError() }}</p>
+          @if (editError()) {
+<p class="form-error">{{ editError() }}</p>
+}
           <div class="form-actions">
             <jiro-button variant="secondary" type="button" (click)="closeEditModal()">Cancel</jiro-button>
             <jiro-button variant="primary" type="submit" [disabled]="editSaving() || !editForm.name.trim()">
@@ -314,15 +350,19 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
           </div>
         </form>
       </jiro-modal>
+}
 
       <!-- ── Delete Confirmation Modal ── -->
-      <jiro-modal *ngIf="deletingAccount()" title="Delete Account?" maxWidth="420px" (close)="deletingAccount.set(null)">
+      @if (deletingAccount()) {
+<jiro-modal title="Delete Account?" maxWidth="420px" (close)="deletingAccount.set(null)">
         <div class="delete-confirm">
           <p>Delete <strong>{{ deletingAccount()!.name }}</strong>?</p>
           <p class="text-secondary" style="font-size: var(--font-size-sm); margin-top: var(--space-xs);">
             This action cannot be undone. If the account has transactions linked to it, deletion will fail.
           </p>
-          <p *ngIf="deleteError()" class="form-error" style="margin-top: var(--space-sm);">{{ deleteError() }}</p>
+          @if (deleteError()) {
+<p class="form-error" style="margin-top: var(--space-sm);">{{ deleteError() }}</p>
+}
           <div class="form-actions" style="margin-top: var(--space-lg);">
             <jiro-button variant="secondary" type="button" (click)="cancelDelete()">Cancel</jiro-button>
             <jiro-button variant="danger" type="button" [disabled]="deleteSaving()" (click)="confirmDelete()">
@@ -331,6 +371,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
           </div>
         </div>
       </jiro-modal>
+}
 
     </div>
   `,
@@ -352,7 +393,6 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
 
     .header-actions { display: flex; gap: var(--space-sm); align-items: center; flex-shrink: 0; }
 
-    .header-actions ::ng-deep .jiro-btn { width: auto; }
 
     /* ── Empty state ── */
     .empty-state {
@@ -368,7 +408,6 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
 
     .empty-state h3 { font-size: var(--font-size-xl); font-weight: 600; }
 
-    .empty-action ::ng-deep .jiro-btn { width: auto; }
 
     /* ── Loading ── */
     .state-message {
@@ -679,7 +718,6 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
       background: var(--bg-surface);
       color: var(--text-primary);
       font-size: var(--font-size-md);
-      outline: none;
       transition: border-color 0.2s, box-shadow 0.2s;
       width: 100%;
       box-sizing: border-box;
@@ -741,7 +779,6 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
       margin-top: var(--space-xs);
     }
 
-    .form-actions ::ng-deep .jiro-btn { width: auto; }
 
     .delete-confirm { display: flex; flex-direction: column; gap: var(--space-xs); }
 
@@ -766,6 +803,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
 })
 export class AccountsPageComponent implements OnInit {
   readonly formatCurrency = formatCurrency;
+  readonly formatSignedCurrency = formatSignedCurrency;
   readonly formatDate = formatDate;
   readonly hexWithAlpha = hexWithAlpha;
 

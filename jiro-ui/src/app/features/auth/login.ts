@@ -1,5 +1,5 @@
 import { Component, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
@@ -10,13 +10,13 @@ import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-inpu
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, JiroCardComponent, JiroButtonComponent, JiroInputComponent],
+  imports: [FormsModule, RouterLink, JiroCardComponent, JiroButtonComponent, JiroInputComponent],
   template: `
     <div class="auth-page">
       <div class="auth-container">
         <div class="auth-header">
           <h1 class="auth-logo">Jiro</h1>
-          <p class="auth-subtitle">Jiro, just like Fejiro. Get it? :)</p>
+          <p class="auth-subtitle">Your life, in one place.</p>
         </div>
 
         <jiro-card>
@@ -40,7 +40,7 @@ import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-inpu
 
             <a routerLink="/forgot-password" class="forgot-link">Forgot password?</a>
 
-            <jiro-button type="submit" [loading]="loading()" [disabled]="!email || !password">
+            <jiro-button block type="submit" [loading]="loading()" [disabled]="!email || !password">
               Sign In
             </jiro-button>
           </form>

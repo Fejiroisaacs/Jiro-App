@@ -2,14 +2,14 @@ import {
   Component, Input, Output, EventEmitter,
   signal, OnChanges, SimpleChanges, HostListener,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { JournalEntry, JournalService, MOODS } from '../../../core/services/journal.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 
 @Component({
   selector: 'journal-day-modal',
   standalone: true,
-  imports: [CommonModule, JiroButtonComponent],
+  imports: [JiroButtonComponent],
   template: `
     <!-- Backdrop -->
     <div class="backdrop" (click)="close.emit()" aria-hidden="true"></div>
@@ -28,12 +28,14 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
 
       <!-- Header -->
       <div class="modal-header">
-        <button *ngIf="expanded() || expandLoading()" class="hdr-btn" (click)="expanded.set(null); expandLoading.set(false)" aria-label="Back to list">
+        @if (expanded() || expandLoading()) {
+<button class="hdr-btn" (click)="expanded.set(null); expandLoading.set(false)" aria-label="Back to list">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="15,18 9,12 15,6"/>
           </svg>
           Back
         </button>
+}
         <h2 id="dm-date" class="modal-date">{{ formattedDate }}</h2>
         <button class="hdr-btn hdr-close" (click)="close.emit()" aria-label="Close">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -46,34 +48,53 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
       <div class="modal-body">
 
         <!-- Empty state -->
-        <div *ngIf="!entries.length" class="empty-state">
+        @if (!entries.length) {
+<div class="empty-state">
           <p class="text-secondary">No entries for this day.</p>
           <jiro-button variant="primary" type="button" (click)="newEntry.emit()">Write now</jiro-button>
         </div>
+}
 
         <!-- Entry list -->
-        <div *ngIf="!expanded() && !expandLoading() && entries.length" class="entry-list">
-          <div
-            *ngFor="let e of entries"
+        @if (!expanded() && !expandLoading() && entries.length) {
+<div class="entry-list">
+          @for (e of entries; track e) {
+<div
+           
             class="entry-card"
             (click)="expandEntry(e)"
             tabindex="0"
             role="button"
             (keydown.enter)="expandEntry(e)">
-            <div class="card-author" *ngIf="showAuthor">{{ authorName(e) }}</div>
+            @if (showAuthor) {
+<div class="card-author">{{ authorName(e) }}</div>
+}
             <div class="card-meta">
-              <span class="mood-chip" *ngIf="e.mood">{{ moodLabel(e.mood) }}</span>
+              @if (e.mood) {
+<span class="mood-chip">{{ moodLabel(e.mood) }}</span>
+}
               <span class="entry-time">{{ formatTime(e.created_at) }}</span>
             </div>
-            <h3 class="card-title" *ngIf="e.title">{{ e.title }}</h3>
+            @if (e.title) {
+<h3 class="card-title">{{ e.title }}</h3>
+}
             <p class="card-excerpt">{{ excerpt(e.body) }}</p>
-            <div class="card-images" *ngIf="e.images?.length">
-              <img *ngFor="let img of (e.images || [])" [src]="img.file_url" class="thumb" alt="" />
+            @if (e.images?.length) {
+<div class="card-images">
+              @for (img of (e.images || []); track img) {
+<img [src]="img.file_url" class="thumb" alt="" />
+}
             </div>
-            <div class="tag-list" *ngIf="e.tags?.length">
-              <span class="tag-chip" *ngFor="let t of (e.tags || [])">{{ t }}</span>
+}
+            @if (e.tags?.length) {
+<div class="tag-list">
+              @for (t of (e.tags || []); track t) {
+<span class="tag-chip">{{ t }}</span>
+}
             </div>
-            <div class="card-delete-row" *ngIf="canEdit(e)" (click)="$event.stopPropagation()">
+}
+            @if (canEdit(e)) {
+<div class="card-delete-row" (click)="$event.stopPropagation()">
               <button class="card-delete-btn" (click)="deleteEntry.emit(e.id)" aria-label="Delete entry">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
@@ -82,38 +103,59 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
                 Delete
               </button>
             </div>
+}
           </div>
+}
 
           <div class="list-footer">
             <jiro-button variant="secondary" type="button" (click)="newEntry.emit()">New Entry</jiro-button>
           </div>
         </div>
+}
 
         <!-- Expand loading -->
-        <div *ngIf="expandLoading()" class="expand-loading">
+        @if (expandLoading()) {
+<div class="expand-loading">
           <div class="spinner"></div>
         </div>
+}
 
         <!-- Expanded entry -->
-        <div *ngIf="expanded() && !expandLoading()" class="expanded-view">
+        @if (expanded() && !expandLoading()) {
+<div class="expanded-view">
           <div class="exp-top">
-            <span class="exp-author" *ngIf="showAuthor">{{ authorName(expanded()!) }}</span>
-            <span class="mood-chip" *ngIf="expanded()!.mood">{{ moodLabel(expanded()!.mood!) }}</span>
+            @if (showAuthor) {
+<span class="exp-author">{{ authorName(expanded()!) }}</span>
+}
+            @if (expanded()!.mood) {
+<span class="mood-chip">{{ moodLabel(expanded()!.mood!) }}</span>
+}
           </div>
-          <h3 class="exp-title" *ngIf="expanded()!.title">{{ expanded()!.title }}</h3>
+          @if (expanded()!.title) {
+<h3 class="exp-title">{{ expanded()!.title }}</h3>
+}
           <p class="exp-body">{{ expanded()!.body }}</p>
-          <div class="exp-images" *ngIf="expanded()!.images?.length">
-            <img
-              *ngFor="let img of (expanded()!.images || [])"
+          @if (expanded()!.images?.length) {
+<div class="exp-images">
+            @for (img of (expanded()!.images || []); track img) {
+<img
+             
               [src]="img.file_url"
               class="exp-img"
               alt=""
               (click)="lightboxUrl.set(img.file_url)" />
+}
           </div>
-          <div class="tag-list" *ngIf="expanded()!.tags?.length">
-            <span class="tag-chip" *ngFor="let t of (expanded()!.tags || [])">{{ t }}</span>
+}
+          @if (expanded()!.tags?.length) {
+<div class="tag-list">
+            @for (t of (expanded()!.tags || []); track t) {
+<span class="tag-chip">{{ t }}</span>
+}
           </div>
-          <div class="exp-actions" *ngIf="canEdit(expanded()!)">
+}
+          @if (canEdit(expanded()!)) {
+<div class="exp-actions">
             <jiro-button variant="danger" type="button" (click)="deleteEntry.emit(expanded()!.id)">
               Delete
             </jiro-button>
@@ -121,15 +163,19 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
               Edit Entry
             </jiro-button>
           </div>
+}
         </div>
+}
 
       </div>
     </div>
 
     <!-- Lightbox -->
-    <div class="lightbox" *ngIf="lightboxUrl()" (click)="lightboxUrl.set(null)">
+    @if (lightboxUrl()) {
+<div class="lightbox" (click)="lightboxUrl.set(null)">
       <img [src]="lightboxUrl()!" alt="Full size image" />
     </div>
+}
   `,
   styles: [`
     :host {
@@ -229,7 +275,6 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
       border-radius: var(--border-radius);
       padding: var(--space-md);
       cursor: pointer;
-      outline: none;
       transition: transform 0.15s ease-out, border-color 0.15s, box-shadow 0.15s;
     }
     .entry-card:hover, .entry-card:focus-visible {

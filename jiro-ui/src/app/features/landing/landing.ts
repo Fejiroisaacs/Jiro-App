@@ -135,7 +135,7 @@ const bentoAnimation = trigger('bentoEntrance', [
           <p class="l-section-label">The Modules</p>
           <h2 class="l-section-title">Every corner of your life, covered.</h2>
 
-          <div class="l-bento" [@bentoEntrance]>
+          <div class="l-bento" [@.disabled]="reducedMotion" [@bentoEntrance]>
 
             <!-- Culinara — large -->
             <div class="l-card l-card--culinara" (mousemove)="onCardHover($event)" (mouseleave)="onCardLeave($event)">
@@ -1040,6 +1040,11 @@ export class LandingComponent implements OnInit {
   weekDots = [true, true, true, false, true, true, false];
   barHeights = [30, 42, 38, 50, 65, 55, 48];
 
+  /** Honour the OS setting: no tilt, glare, entrance stagger or smooth scroll. */
+  readonly reducedMotion =
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  private tiltFrame: number | null = null;
+
   ngOnInit() {
     if (this.auth.isAuthenticated()) {
       this.router.navigate(['/dashboard'], { replaceUrl: true });
@@ -1048,19 +1053,24 @@ export class LandingComponent implements OnInit {
 
   @HostListener('document:mousemove', ['$event'])
   onMouseMove(event: MouseEvent) {
-    if (!this.dashboardMockup) return;
+    if (!this.dashboardMockup || this.reducedMotion) return;
     if (!window.matchMedia('(hover: hover)').matches) return;
+    if (this.tiltFrame !== null) return; // one write per frame
 
-    const xPos = (event.clientX / window.innerWidth - 0.5) * 2;
-    const yPos = (event.clientY / window.innerHeight - 0.5) * 2;
-    const rotateX = yPos * -10;
-    const rotateY = xPos * 10;
-
-    this.dashboardMockup.nativeElement.style.transform =
-      `rotateX(${rotateX}deg) rotateY(${rotateY}deg) rotateZ(2deg) scale(0.95)`;
+    const { clientX, clientY } = event;
+    this.tiltFrame = requestAnimationFrame(() => {
+      this.tiltFrame = null;
+      const xPos = (clientX / window.innerWidth - 0.5) * 2;
+      const yPos = (clientY / window.innerHeight - 0.5) * 2;
+      const rotateX = yPos * -10;
+      const rotateY = xPos * 10;
+      this.dashboardMockup.nativeElement.style.transform =
+        `rotateX(${rotateX}deg) rotateY(${rotateY}deg) rotateZ(2deg) scale(0.95)`;
+    });
   }
 
   onCardHover(event: MouseEvent) {
+    if (this.reducedMotion) return;
     const card = event.currentTarget as HTMLElement;
     const rect = card.getBoundingClientRect();
     const x = (((event.clientX - rect.left) / rect.width) * 100).toFixed(1);
@@ -1076,6 +1086,6 @@ export class LandingComponent implements OnInit {
   }
 
   scrollToModules() {
-    document.getElementById('modules')?.scrollIntoView({ behavior: 'smooth' });
+    document.getElementById('modules')?.scrollIntoView({ behavior: this.reducedMotion ? 'auto' : 'smooth' });
   }
 }

@@ -1,5 +1,5 @@
 import { Component, OnInit, signal, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { Router } from '@angular/router';
 import { AdminService, AdminStats, EventDayStat } from '../../core/services/admin.service';
 import { Chart, BarController, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
@@ -9,15 +9,20 @@ Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip, L
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   template: `
     <div class="dashboard">
       <h1 class="page-title">Dashboard</h1>
 
-      <div *ngIf="loading()" class="loading">Loading...</div>
-      <div *ngIf="error()" class="error-msg">{{ error() }}</div>
+      @if (loading()) {
+<div class="loading">Loading...</div>
+}
+      @if (error()) {
+<div class="error-msg">{{ error() }}</div>
+}
 
-      <div *ngIf="stats() && !loading()" class="content">
+      @if (stats() && !loading()) {
+<div class="content">
         <!-- Stat cards -->
         <div class="stat-grid">
           <div class="stat-card">
@@ -42,6 +47,7 @@ Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip, L
           </div>
         </div>
       </div>
+}
     </div>
   `,
   styles: [`

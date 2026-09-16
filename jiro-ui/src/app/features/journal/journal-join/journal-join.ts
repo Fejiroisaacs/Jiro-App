@@ -1,5 +1,5 @@
 import { Component, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { JournalService } from '../../../core/services/journal.service';
 import { AuthService } from '../../../core/services/auth.service';
@@ -10,7 +10,7 @@ type State = 'loading' | 'joining' | 'success' | 'error' | 'no-token' | 'not-log
 @Component({
   selector: 'app-journal-join',
   standalone: true,
-  imports: [CommonModule, RouterLink, JiroButtonComponent],
+  imports: [RouterLink, JiroButtonComponent],
   template: `
     <div class="join-page">
       <div class="join-card">
@@ -24,13 +24,16 @@ type State = 'loading' | 'joining' | 'success' | 'error' | 'no-token' | 'not-log
         <h1 class="join-title">Journaly</h1>
 
         <!-- Loading / joining -->
-        <div *ngIf="state() === 'loading' || state() === 'joining'" class="join-state">
+        @if (state() === 'loading' || state() === 'joining') {
+<div class="join-state">
           <div class="spinner-lg"></div>
           <p class="text-secondary">{{ state() === 'loading' ? 'Preparing...' : 'Joining group...' }}</p>
         </div>
+}
 
         <!-- Success -->
-        <div *ngIf="state() === 'success'" class="join-state">
+        @if (state() === 'success') {
+<div class="join-state">
           <div class="join-icon success-icon" aria-hidden="true">
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
@@ -38,14 +41,16 @@ type State = 'loading' | 'joining' | 'success' | 'error' | 'no-token' | 'not-log
           </div>
           <h2>You're in!</h2>
           <p class="text-secondary">You've joined <strong>{{ groupName() }}</strong>. Start reading and writing together.</p>
-          <jiro-button variant="primary" type="button" (click)="router.navigate(['/journal/groups', groupId()])">
+          <jiro-button block variant="primary" type="button" (click)="router.navigate(['/journal/groups', groupId()])">
             Open Group
           </jiro-button>
           <a routerLink="/journal" class="secondary-link">Back to Journaly</a>
         </div>
+}
 
         <!-- Error -->
-        <div *ngIf="state() === 'error'" class="join-state">
+        @if (state() === 'error') {
+<div class="join-state">
           <div class="join-icon error-icon" aria-hidden="true">
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
@@ -53,13 +58,15 @@ type State = 'loading' | 'joining' | 'success' | 'error' | 'no-token' | 'not-log
           </div>
           <h2>Invite problem</h2>
           <p class="text-secondary">{{ errorMessage() }}</p>
-          <jiro-button variant="primary" type="button" (click)="router.navigate(['/journal'])">
+          <jiro-button block variant="primary" type="button" (click)="router.navigate(['/journal'])">
             Go to Journaly
           </jiro-button>
         </div>
+}
 
         <!-- No token in URL -->
-        <div *ngIf="state() === 'no-token'" class="join-state">
+        @if (state() === 'no-token') {
+<div class="join-state">
           <div class="join-icon" aria-hidden="true">
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
@@ -67,13 +74,15 @@ type State = 'loading' | 'joining' | 'success' | 'error' | 'no-token' | 'not-log
           </div>
           <h2>Invalid link</h2>
           <p class="text-secondary">This invite link appears to be incomplete. Ask the group owner to resend the invite.</p>
-          <jiro-button variant="primary" type="button" (click)="router.navigate(['/journal'])">
+          <jiro-button block variant="primary" type="button" (click)="router.navigate(['/journal'])">
             Go to Journaly
           </jiro-button>
         </div>
+}
 
         <!-- Not logged in -->
-        <div *ngIf="state() === 'not-logged-in'" class="join-state">
+        @if (state() === 'not-logged-in') {
+<div class="join-state">
           <div class="join-icon" aria-hidden="true">
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
@@ -81,13 +90,14 @@ type State = 'loading' | 'joining' | 'success' | 'error' | 'no-token' | 'not-log
           </div>
           <h2>Sign in to join</h2>
           <p class="text-secondary">You need a Jiro account to accept this group invite.</p>
-          <jiro-button variant="primary" type="button" (click)="goToLogin()">
+          <jiro-button block variant="primary" type="button" (click)="goToLogin()">
             Sign In
           </jiro-button>
           <p class="create-account text-secondary">
             No account? <a routerLink="/register" class="link">Create one free</a>
           </p>
         </div>
+}
 
       </div>
     </div>

@@ -1,47 +1,83 @@
 // ========================================
 // Jiro "Earth & Clay" Design System
 // ========================================
+//
+// Token layers:
+//   1. Brand palette  (--jiro-*)                     raw colours; components never use these directly
+//   2. Semantic tokens (--color-*, --bg-*, --text-*) what components consume
+//   3. Scales          (radius, type, space, z-index, shadow)
+//
+// Themes (html.theme-forest, html.theme-slate) and dark mode (html.dark) only
+// override semantic tokens, so components never branch on theme. Earth is the
+// default and needs no class. `npm run check:css` fails on any var() that is
+// referenced but not defined here or locally.
 
 :root {
-  // Primary palette
+  // 1. Brand palette
   --jiro-brown: #5C4033;
-  --jiro-maroon: #7A3B2E;
+  --jiro-maroon: #6E3128;
   --jiro-green: #4A6741;
   --jiro-sand: #D4C5A9;
-  --jiro-cream: #F5F0E8;
+  --jiro-cream: #F2ECE2;
   --jiro-clay: #C4956A;
-  --jiro-burnt-orange: #C1582A;
+  --jiro-burnt-orange: #BD5629;
 
-  // Semantic colors
+  // 2. Semantic colours
   --color-primary: var(--jiro-maroon);
-  --color-primary-hover: #8B4637;
+  --color-primary-hover: #7F3B30;
+  --color-primary-rgb: 110, 49, 40;
   --color-secondary: var(--jiro-sand);
   --color-secondary-hover: #C9B898;
   --color-accent: var(--jiro-green);
+  --color-accent-rgb: 74, 103, 65;
   --color-danger: var(--jiro-burnt-orange);
   --color-danger-hover: #A84A22;
+  --color-danger-rgb: 189, 86, 41;
 
-  // Background & surface
+  // Data and status colours. Tinted to the palette; distinct from the accent.
+  // All pass 4.5:1 as text on --bg-surface.
+  --color-positive: #3F6B37;
+  --color-negative: #A84A22;
+  --color-warning: #956B3D;
+  --color-warning-rgb: 149, 107, 61;
+  --color-info: #475B70;
+  --color-success: var(--color-positive);
+
+  // Surfaces
   --bg-page: var(--jiro-cream);
-  --bg-surface: #FFFFFF;
-  --bg-canvas: #F9F5EF;
-  --bg-surface-hover: #FAF7F2;
+  --bg-canvas: #F8F4EE;
+  --bg-surface: #FFFDF9;
+  --bg-surface-hover: #F5F0E8;
   --bg-sidebar: var(--jiro-brown);
+  --bg-main: var(--bg-page);
+  --surface-secondary: var(--bg-canvas);
 
-  // Text
+  // Module marks (jiro-mark): tile, drawing, and the cut-out lines inside it
+  --mark-bg: #E6DCC3;
+  --mark-fg: #5D4037;
+  --mark-cut: var(--mark-bg);
+
+  // Text (muted passes 4.5:1 on the page colour in all three light themes)
   --text-primary: #2D2420;
   --text-secondary: #6B5E57;
-  --text-muted: #9B8F88;
+  --text-muted: #756861;
   --text-on-dark: #F5F0E8;
   --text-on-primary: #FFFFFF;
+  --text-on-accent: #FFFFFF;
 
-  // Borders & shadows (Artisanal hard shadows)
+  // Borders and radius
   --border-color: #E0D6C8;
+  --border-radius-sm: 4px;
   --border-radius: 8px;
+  --border-radius-md: var(--border-radius);
   --border-radius-lg: 12px;
-  --shadow-sm: 2px 2px 0px rgba(92, 64, 51, 0.15);
-  --shadow-md: 4px 4px 0px rgba(92, 64, 51, 0.15);
-  --shadow-lg: 8px 8px 0px rgba(92, 64, 51, 0.15);
+  --border-radius-pill: 999px;
+
+  // Shadows: hard offsets, one light source (top-left), tinted to the theme
+  --shadow-rgb: 92, 64, 51;
+  --shadow-sm: 2px 2px 0px rgba(var(--shadow-rgb), 0.15);
+  --shadow-md: 4px 4px 0px rgba(var(--shadow-rgb), 0.15);
+  --shadow-lg: 8px 8px 0px rgba(var(--shadow-rgb), 0.15);
 
   // Spacing
   --space-xs: 4px;
@@ -50,6 +86,7 @@
   --space-lg: 24px;
   --space-xl: 32px;
   --space-2xl: 48px;
+  --space-3xl: 64px;
 
   // Typography
   --font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -57,190 +94,171 @@
   --font-size-xs: 0.75rem;
   --font-size-sm: 0.875rem;
   --font-size-md: 1rem;
+  --font-size-base: var(--font-size-md);
   --font-size-lg: 1.25rem;
   --font-size-xl: 1.5rem;
   --font-size-2xl: 2rem;
+  --font-size-3xl: 2.5rem;
+  --line-height-tight: 1.15;
+  --line-height-body: 1.5;
 
-  // Layout
+  // Layout. The two heights describe the sticky chrome above page content so
+  // in-page sticky elements can offset themselves: no top bar on desktop, a
+  // 48px one on phones; the module tab row is the reverse.
   --sidebar-width: 240px;
   --sidebar-collapsed-width: 64px;
-  --topbar-height: 56px;
+  --topbar-height: 0px;
+  --module-nav-height: 44px;
+
+  // z-index scale. Components use these, never raw numbers.
+  --z-dropdown: 30;
+  --z-sticky: 40;
+  --z-topbar: 50;
+  --z-sidebar: 100;
+  --z-mobile-nav: 200;
+  --z-overlay: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+  --z-texture: 600;
+}
+
+@media (max-width: 768px) {
+  :root {
+    --topbar-height: 48px;
+    --module-nav-height: 0px;
+  }
 }
 
 // ========================================
-// Theme overrides — applied as html.theme-X
-// Earth is default; no class needed.
+// Colour themes (light). Earth is :root.
 // ========================================
-
-html.theme-clay {
-  --color-primary: #9B6B3A;
-  --color-primary-hover: #865A30;
-  --color-secondary: #E8D5B8;
-  --color-secondary-hover: #D9C4A4;
-  --bg-sidebar: #7A5532;
-  --bg-page: #FCF8F3;
-  --bg-surface-hover: #F7F0E6;
-  --border-color: #E2D0B8;
-}
-
-html.theme-sand {
-  --color-primary: #7A6A55;
-  --color-primary-hover: #695A46;
-  --color-secondary: #DDD5C8;
-  --color-secondary-hover: #CCC4B7;
-  --bg-sidebar: #9B8B79;
-  --bg-page: #FDFBF8;
-  --bg-surface-hover: #F7F4EF;
-  --border-color: #DDD5C8;
-}
 
 html.theme-forest {
   --color-primary: #4A6741;
   --color-primary-hover: #3D5835;
+  --color-primary-rgb: 74, 103, 65;
   --color-secondary: #C8D8C0;
   --color-secondary-hover: #B8CCB0;
+  --color-accent: #9B6B3A;
+  --color-accent-rgb: 155, 107, 58;
   --bg-sidebar: #2E4228;
-  --bg-page: #F1F5EF;
+  --bg-page: #F0F4EE;
+  --bg-canvas: #F6F8F4;
+  --bg-surface: #FDFEFC;
   --bg-surface-hover: #EAF0E7;
   --border-color: #C8D8C0;
-}
-
-html.theme-royal-blue {
-  --color-primary: #2B55CC;
-  --color-primary-hover: #2244B4;
-  --color-secondary: #C8D4F0;
-  --color-secondary-hover: #B4C2E6;
-  --bg-sidebar: #1A3591;
-  --bg-page: #F2F5FF;
-  --bg-canvas: #EBF0FC;
-  --bg-surface-hover: #E8EEF9;
-  --border-color: #C8D4EE;
-  --shadow-sm: 2px 2px 0px rgba(27, 53, 145, 0.15);
-  --shadow-md: 4px 4px 0px rgba(27, 53, 145, 0.15);
-  --shadow-lg: 8px 8px 0px rgba(27, 53, 145, 0.15);
-}
-
-html.theme-midnight {
-  --color-primary: #1A2B4A;
-  --color-primary-hover: #142239;
-  --color-secondary: #B8C4D8;
-  --color-secondary-hover: #A4B2C8;
-  --bg-sidebar: #0F1C32;
-  --bg-page: #F0F2F7;
-  --bg-canvas: #E8ECF4;
-  --bg-surface-hover: #E0E6F0;
-  --border-color: #C4CCE0;
-  --shadow-sm: 2px 2px 0px rgba(15, 28, 50, 0.18);
-  --shadow-md: 4px 4px 0px rgba(15, 28, 50, 0.18);
-  --shadow-lg: 8px 8px 0px rgba(15, 28, 50, 0.18);
-}
-
-html.theme-crimson {
-  --color-primary: #A32020;
-  --color-primary-hover: #8B1A1A;
-  --color-secondary: #E8C0C0;
-  --color-secondary-hover: #D8AEAE;
-  --bg-sidebar: #7A1515;
-  --bg-page: #FFF2F2;
-  --bg-canvas: #FAEAEA;
-  --bg-surface-hover: #F7E5E5;
-  --border-color: #EAC8C8;
-  --shadow-sm: 2px 2px 0px rgba(122, 21, 21, 0.15);
-  --shadow-md: 4px 4px 0px rgba(122, 21, 21, 0.15);
-  --shadow-lg: 8px 8px 0px rgba(122, 21, 21, 0.15);
-}
-
-html.theme-plum {
-  --color-primary: #6B3585;
-  --color-primary-hover: #5A2B72;
-  --color-secondary: #D8C0E8;
-  --color-secondary-hover: #C8AEDC;
-  --bg-sidebar: #4A2260;
-  --bg-page: #F7F2FF;
-  --bg-canvas: #EFE8FA;
-  --bg-surface-hover: #EAE2F5;
-  --border-color: #D4C4E8;
-  --shadow-sm: 2px 2px 0px rgba(74, 34, 96, 0.15);
-  --shadow-md: 4px 4px 0px rgba(74, 34, 96, 0.15);
-  --shadow-lg: 8px 8px 0px rgba(74, 34, 96, 0.15);
-}
-
-html.theme-sage {
-  --color-primary: #5A7A65;
-  --color-primary-hover: #4A6A55;
-  --color-secondary: #C8D8CC;
-  --color-secondary-hover: #B8CCBC;
-  --bg-sidebar: #3A5545;
-  --bg-page: #F2F7F3;
-  --bg-canvas: #E8F0EA;
-  --bg-surface-hover: #E2EDE5;
-  --border-color: #C4D8C8;
-  --shadow-sm: 2px 2px 0px rgba(58, 85, 69, 0.15);
-  --shadow-md: 4px 4px 0px rgba(58, 85, 69, 0.15);
-  --shadow-lg: 8px 8px 0px rgba(58, 85, 69, 0.15);
+  --mark-bg: #DCE6D4;
+  --shadow-rgb: 46, 66, 40;
 }
 
 html.theme-slate {
   --color-primary: #475B70;
   --color-primary-hover: #3A4D62;
+  --color-primary-rgb: 71, 91, 112;
   --color-secondary: #C4CED8;
   --color-secondary-hover: #B4BEC8;
   --bg-sidebar: #2E3F52;
   --bg-page: #F2F4F7;
-  --bg-canvas: #E8ECF2;
+  --bg-canvas: #F7F8FA;
+  --bg-surface: #FDFDFE;
   --bg-surface-hover: #E0E6EE;
   --border-color: #C8D0DC;
-  --shadow-sm: 2px 2px 0px rgba(46, 63, 82, 0.15);
-  --shadow-md: 4px 4px 0px rgba(46, 63, 82, 0.15);
-  --shadow-lg: 8px 8px 0px rgba(46, 63, 82, 0.15);
-}
-
-html.theme-rust {
-  --color-primary: #A0422A;
-  --color-primary-hover: #8A3622;
-  --color-secondary: #E8C8BC;
-  --color-secondary-hover: #DEB8AC;
-  --bg-sidebar: #7A3020;
-  --bg-page: #FFF5F2;
-  --bg-canvas: #FAECE8;
-  --bg-surface-hover: #F5E5E0;
-  --border-color: #EAC8BC;
-  --shadow-sm: 2px 2px 0px rgba(122, 48, 32, 0.15);
-  --shadow-md: 4px 4px 0px rgba(122, 48, 32, 0.15);
-  --shadow-lg: 8px 8px 0px rgba(122, 48, 32, 0.15);
+  --mark-bg: #D9E0E8;
+  --shadow-rgb: 46, 63, 82;
 }
 
 // ========================================
-// Dark mode — html.dark, independent of color theme
+// Dark mode: derived from the brand, not zinc.
+// Fills are lifted so they read as text on the dark ground; labels on those
+// fills use the ground colour (white on the lifted primary would fail AA).
 // ========================================
 
 html.dark {
-  --bg-page: #111113;
-  --bg-canvas: #18181b;
-  --bg-surface: #1e1e21;
-  --bg-surface-hover: #28282c;
-  --bg-sidebar: #0d0d0f;
-  --text-primary: #f5f4f2;
-  --text-secondary: #a09890;
-  --text-muted: #706560;
-  --border-color: #2e2e33;
-  --shadow-sm: 2px 2px 0px rgba(0, 0, 0, 0.5);
-  --shadow-md: 4px 4px 0px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 8px 8px 0px rgba(0, 0, 0, 0.5);
+  --bg-page: #1A1310;
+  --bg-canvas: #211915;
+  --bg-surface: #261D18;
+  --bg-surface-hover: #302620;
+  --bg-sidebar: #130E0B;
+  --border-color: #3A2E27;
+  --mark-bg: rgba(241, 233, 223, 0.10);
+  --mark-fg: #F1E9DF;
+  --mark-cut: #1A1310;
+
+  --text-primary: #F1E9DF;
+  --text-secondary: #B8A89C;
+  --text-muted: #9C8B7E;
+  --text-on-dark: #F1E9DF;
+  --text-on-primary: #1A1310;
+  --text-on-accent: #1A1310;
+
+  --color-primary: #C47A66;
+  --color-primary-hover: #D28B77;
+  --color-primary-rgb: 196, 122, 102;
+  --color-secondary: #3A2E27;
+  --color-secondary-hover: #463830;
+  --color-accent: #8DB37E;
+  --color-accent-rgb: 141, 179, 126;
+  --color-danger: #D9805A;
+  --color-danger-hover: #E3906C;
+  --color-danger-rgb: 217, 128, 90;
+  --color-positive: #8DB37E;
+  --color-negative: #E08A66;
+  --color-warning: #D2A468;
+  --color-warning-rgb: 210, 164, 104;
+  --color-info: #8FAAC6;
+
+  --shadow-sm: 2px 2px 0px rgba(0, 0, 0, 0.45);
+  --shadow-md: 4px 4px 0px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 8px 8px 0px rgba(0, 0, 0, 0.45);
 }
 
-// Per-theme dark mode: lighten primary accent so it's readable on dark backgrounds
-html.dark                   { --color-primary: #b07060; --color-primary-hover: #c08070; }
-html.dark.theme-clay        { --color-primary: #c08850; --color-primary-hover: #d09860; }
-html.dark.theme-sand        { --color-primary: #a09070; --color-primary-hover: #b0a080; }
-html.dark.theme-forest      { --color-primary: #70a065; --color-primary-hover: #80b075; }
-html.dark.theme-royal-blue  { --color-primary: #5577e0; --color-primary-hover: #6688f0; }
-html.dark.theme-midnight    { --color-primary: #4060a0; --color-primary-hover: #5070b0; }
-html.dark.theme-crimson     { --color-primary: #d04040; --color-primary-hover: #e05050; }
-html.dark.theme-plum        { --color-primary: #9050b0; --color-primary-hover: #a060c0; }
-html.dark.theme-sage        { --color-primary: #7aaa85; --color-primary-hover: #8abb95; }
-html.dark.theme-slate       { --color-primary: #6a8aaa; --color-primary-hover: #7a9aba; }
-html.dark.theme-rust        { --color-primary: #c05840; --color-primary-hover: #d06850; }
+html.dark.theme-forest {
+  --bg-page: #121A10;
+  --bg-canvas: #182119;
+  --bg-surface: #1B241A;
+  --bg-surface-hover: #253022;
+  --bg-sidebar: #0D140C;
+  --border-color: #2E3B2B;
+  --mark-bg: rgba(230, 240, 225, 0.10);
+  --mark-fg: #EAF0E6;
+  --mark-cut: #121A10;
+  --text-primary: #EAF0E6;
+  --text-secondary: #B3BFAE;
+  --text-muted: #94A08F;
+  --text-on-dark: #EAF0E6;
+  --text-on-primary: #121A10;
+  --text-on-accent: #121A10;
+  --color-primary: #86B37A;
+  --color-primary-hover: #97C28B;
+  --color-primary-rgb: 134, 179, 122;
+  --color-secondary: #2E3B2B;
+  --color-secondary-hover: #3A4837;
+  --color-accent: #D2A468;
+  --color-accent-rgb: 210, 164, 104;
+}
+
+html.dark.theme-slate {
+  --bg-page: #12171C;
+  --bg-canvas: #171D24;
+  --bg-surface: #1A2129;
+  --bg-surface-hover: #242D37;
+  --bg-sidebar: #0D1116;
+  --border-color: #2B3540;
+  --mark-bg: rgba(225, 232, 240, 0.10);
+  --mark-fg: #E7ECF1;
+  --mark-cut: #12171C;
+  --text-primary: #E7ECF1;
+  --text-secondary: #AEB8C3;
+  --text-muted: #8F99A4;
+  --text-on-dark: #E7ECF1;
+  --text-on-primary: #12171C;
+  --text-on-accent: #12171C;
+  --color-primary: #8FAAC6;
+  --color-primary-hover: #A1BBD5;
+  --color-primary-rgb: 143, 170, 198;
+  --color-secondary: #2B3540;
+  --color-secondary-hover: #37424E;
+}
 
 // ========================================
 // Reset & base styles
@@ -257,6 +275,7 @@ html, body {
   overflow-x: hidden;
   font-family: var(--font-family);
   font-size: 16px;
+  line-height: var(--line-height-body);
   color: var(--text-primary);
   background: var(--bg-page);
   -webkit-font-smoothing: antialiased;
@@ -271,14 +290,14 @@ html {
   padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
 }
 
-// Global Texture Overlay
+// Global texture overlay
 body::after {
   content: "";
   position: fixed;
-  top: 0; left: 0; 
+  top: 0; left: 0;
   width: 100vw; height: 100vh;
   pointer-events: none;
-  z-index: 9999;
+  z-index: var(--z-texture);
   opacity: 0.035;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
 }
@@ -287,6 +306,11 @@ h1, h2, h3, h4, h5, h6, .font-display {
   font-family: var(--font-family-display);
   font-weight: 500;
   letter-spacing: -0.02em;
+  line-height: var(--line-height-tight);
+}
+
+h1, h2 {
+  text-wrap: balance;
 }
 
 a {
@@ -318,6 +342,39 @@ input, button, textarea, select {
 }
 
 // ========================================
+// Focus: one ring for keyboard users, none for pointer clicks
+// ========================================
+
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+// Text fields already change border and shadow on focus; hug the ring to the edge.
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline-offset: 0;
+}
+
+// ========================================
+// Motion: honour the OS setting. Durations stay non-zero so end events fire.
+// ========================================
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+// ========================================
 // Utility classes
 // ========================================
 
@@ -333,52 +390,23 @@ input, button, textarea, select {
   text-align: center;
 }
 
-// ========================================
-// Jym sub-tab container (shared by jym-exercises, jym-plan, jym-track)
-// ========================================
-
-.tab-strip {
-  display: inline-flex;
-  background: var(--bg-canvas);
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  padding: 3px;
-  position: sticky;
-  top: calc(var(--topbar-height, 56px) + 12px);
-  z-index: 40;
-  max-width: 480px;
-  margin: 12px 16px 0;
-  box-shadow: inset 0 1px 3px rgba(92, 64, 51, 0.06);
+// Loading spinner. Pages should use this instead of redefining .spinner-lg.
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-color);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: jiro-spin 0.8s linear infinite;
 }
 
-.tab-btn {
-  flex: 1;
-  padding: 7px 18px;
-  border: none;
-  border-radius: 7px;
-  background: none;
-  color: var(--text-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: 500;
-  font-family: inherit;
-  cursor: pointer;
-  transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
-  white-space: nowrap;
-  letter-spacing: 0.1px;
+.spinner--sm {
+  width: 18px;
+  height: 18px;
+  border-width: 2px;
 }
 
-.tab-btn:hover:not(.active) {
-  background: rgba(255, 255, 255, 0.6);
-  color: var(--text-primary);
+@keyframes jiro-spin {
+  to { transform: rotate(360deg); }
 }
 
-.tab-btn.active {
-  background: var(--bg-surface);
-  color: var(--color-primary);
-  font-weight: 600;
-  box-shadow: 0 1px 4px rgba(92, 64, 51, 0.14), 0 0 0 1px rgba(92, 64, 51, 0.06);
-}
-
-.tab-content {
-  padding-top: var(--space-lg, 24px);
-}

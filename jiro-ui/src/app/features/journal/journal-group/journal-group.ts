@@ -1,5 +1,5 @@
 import { Component, OnInit, signal, computed } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
@@ -19,7 +19,7 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
 @Component({
   selector: 'app-journal-group',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, JournalWeekViewComponent, JournalDayModalComponent, JiroButtonComponent, JiroModalComponent, SafeHtmlPipe],
+  imports: [FormsModule, RouterLink, JournalWeekViewComponent, JournalDayModalComponent, JiroButtonComponent, JiroModalComponent, SafeHtmlPipe],
   template: `
     <div class="group-page">
 
@@ -32,15 +32,18 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
             </svg>
             Groups
           </a>
-          <div class="group-header-info" *ngIf="group()">
+          @if (group()) {
+<div class="group-header-info">
             <div class="group-avatar-lg">{{ group()!.name[0].toUpperCase() }}</div>
             <div>
               <h1>{{ group()!.name }}</h1>
               <p class="text-secondary">{{ group()!.members.length }} member{{ group()!.members.length !== 1 ? 's' : '' }}</p>
             </div>
           </div>
+}
         </div>
-        <div class="header-actions" *ngIf="group()">
+        @if (group()) {
+<div class="header-actions">
           <jiro-button variant="secondary" type="button" (click)="showMembers.set(true)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
@@ -52,22 +55,28 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
             + Write
           </jiro-button>
         </div>
+}
       </div>
 
       <!-- Loading -->
-      <div *ngIf="loading()" class="state-center">
+      @if (loading()) {
+<div class="state-center">
         <div class="spinner-lg"></div>
         <p>Loading group...</p>
       </div>
+}
 
       <!-- Not found -->
-      <div *ngIf="!loading() && !group()" class="state-center">
+      @if (!loading() && !group()) {
+<div class="state-center">
         <h3>Group not found</h3>
         <p class="text-secondary">This group may have been deleted or you don't have access.</p>
         <jiro-button variant="primary" type="button" (click)="router.navigate(['/journal'])">Back to Journaly</jiro-button>
       </div>
+}
 
-      <div *ngIf="!loading() && group()">
+      @if (!loading() && group()) {
+<div>
 
         <!-- Week view calendar -->
         <journal-week-view
@@ -81,27 +90,36 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
         </journal-week-view>
 
         <!-- Feed: entries for current week -->
-        <div *ngIf="loadingEntries()" class="state-center">
+        @if (loadingEntries()) {
+<div class="state-center">
           <div class="spinner-lg"></div>
         </div>
+}
 
-        <div *ngIf="!loadingEntries() && weekEntries().length === 0" class="state-center">
+        @if (!loadingEntries() && weekEntries().length === 0) {
+<div class="state-center">
           <h3>No entries this week</h3>
           <p class="text-secondary">Click any day above or use "Write" to add an entry.</p>
           <jiro-button variant="primary" type="button" (click)="writeEntry()">Write Entry</jiro-button>
         </div>
+}
 
-        <div class="entries-feed" *ngIf="!loadingEntries() && weekEntries().length > 0">
-          <div *ngFor="let e of weekEntries()" class="entry-card">
+        @if (!loadingEntries() && weekEntries().length > 0) {
+<div class="entries-feed">
+          @for (e of weekEntries(); track e) {
+<div class="entry-card">
             <div class="entry-author">
               <div class="author-avatar">{{ authorInitial(e) }}</div>
               <div class="author-info">
                 <span class="author-name">{{ authorName(e) }}</span>
                 <span class="entry-date text-secondary">{{ formatDate(e.created_at) }}</span>
               </div>
-              <span class="mood-chip" *ngIf="e.mood" [innerHTML]="moodIcon(e.mood) | safeHtml"></span>
+              @if (e.mood) {
+<span class="mood-chip" [innerHTML]="moodIcon(e.mood) | safeHtml"></span>
+}
               <!-- Edit/delete for own entries -->
-              <div class="entry-actions" *ngIf="isOwnEntry(e)">
+              @if (isOwnEntry(e)) {
+<div class="entry-actions">
                 <button class="icon-btn" (click)="router.navigate(['/journal', e.id, 'edit'])" aria-label="Edit">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -114,24 +132,39 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
                   </svg>
                 </button>
               </div>
+}
             </div>
-            <h3 class="entry-title" *ngIf="e.title">{{ e.title }}</h3>
+            @if (e.title) {
+<h3 class="entry-title">{{ e.title }}</h3>
+}
             <p class="entry-body">{{ e.body }}</p>
-            <div class="entry-images" *ngIf="e.images?.length">
-              <img *ngFor="let img of e.images" [src]="img.file_url" [alt]="'Entry image'" class="entry-image" (click)="lightboxUrl.set(img.file_url)" />
+            @if (e.images?.length) {
+<div class="entry-images">
+              @for (img of e.images; track img) {
+<img [src]="img.file_url" [alt]="'Entry image'" class="entry-image" (click)="lightboxUrl.set(img.file_url)" />
+}
             </div>
-            <div class="tag-list" *ngIf="e.tags?.length">
-              <span *ngFor="let t of (e.tags || [])" class="tag-chip">{{ t }}</span>
+}
+            @if (e.tags?.length) {
+<div class="tag-list">
+              @for (t of (e.tags || []); track t) {
+<span class="tag-chip">{{ t }}</span>
+}
             </div>
+}
           </div>
+}
         </div>
+}
       </div>
+}
 
     </div>
 
     <!-- Day modal -->
-    <journal-day-modal
-      *ngIf="dayModalDate()"
+    @if (dayModalDate()) {
+<journal-day-modal
+     
       [date]="dayModalDate()!"
       [entries]="dayModalEntries()"
       [initialEntry]="dayModalInitEntry()"
@@ -143,11 +176,15 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
       (editEntry)="onDayModalEdit($event)"
       (deleteEntry)="onDayModalDelete($event)">
     </journal-day-modal>
+}
 
     <!-- Members modal -->
-    <jiro-modal *ngIf="showMembers()" title="Members" (close)="showMembers.set(false)">
-      <div *ngIf="group()" class="members-list">
-        <div *ngFor="let m of group()!.members" class="member-row">
+    @if (showMembers()) {
+<jiro-modal title="Members" (close)="showMembers.set(false)">
+      @if (group()) {
+<div class="members-list">
+        @for (m of group()!.members; track m) {
+<div class="member-row">
           <div class="member-avatar">{{ memberInitial(m) }}</div>
           <div class="member-info">
             <span class="member-name">{{ m.username || m.email }}</span>
@@ -156,10 +193,13 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
             </span>
           </div>
           <!-- Owner badge -->
-          <span class="owner-badge" *ngIf="m.user_id === group()!.owner_id">Owner</span>
+          @if (m.user_id === group()!.owner_id) {
+<span class="owner-badge">Owner</span>
+}
           <!-- Remove: owner can remove others, any member can leave -->
-          <button
-            *ngIf="canRemove(m)"
+          @if (canRemove(m)) {
+<button
+           
             class="icon-btn danger"
             (click)="removeMember(m)"
             [disabled]="removingMemberId() === m.user_id">
@@ -167,11 +207,15 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
           </button>
+}
         </div>
+}
       </div>
+}
 
       <!-- Invite section (owner only) -->
-      <div class="invite-section" *ngIf="isOwner()">
+      @if (isOwner()) {
+<div class="invite-section">
         <h4 class="invite-title">Invite someone</h4>
         <div class="invite-row">
           <input
@@ -184,12 +228,18 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
             {{ inviting() ? 'Sending...' : 'Invite' }}
           </jiro-button>
         </div>
-        <p class="invite-error" *ngIf="inviteError()">{{ inviteError() }}</p>
-        <p class="invite-success" *ngIf="inviteSuccess()">{{ inviteSuccess() }}</p>
+        @if (inviteError()) {
+<p class="invite-error">{{ inviteError() }}</p>
+}
+        @if (inviteSuccess()) {
+<p class="invite-success">{{ inviteSuccess() }}</p>
+}
       </div>
+}
 
       <!-- Rename group (owner only) -->
-      <div class="rename-section" *ngIf="isOwner()">
+      @if (isOwner()) {
+<div class="rename-section">
         <h4 class="invite-title">Rename group</h4>
         <div class="invite-row">
           <input
@@ -203,17 +253,22 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
           </jiro-button>
         </div>
       </div>
+}
 
       <!-- Delete group (owner only) -->
-      <div class="danger-zone" *ngIf="isOwner()">
-        <jiro-button variant="danger" type="button" (click)="confirmDeleteGroup.set(true)">Delete Group</jiro-button>
+      @if (isOwner()) {
+<div class="danger-zone">
+        <jiro-button block variant="danger" type="button" (click)="confirmDeleteGroup.set(true)">Delete Group</jiro-button>
       </div>
+}
     </jiro-modal>
+}
 
 
 
     <!-- Delete entry confirm -->
-    <jiro-modal *ngIf="deleteTarget()" title="Delete Entry" (close)="deleteTarget.set(null)">
+    @if (deleteTarget()) {
+<jiro-modal title="Delete Entry" (close)="deleteTarget.set(null)">
       <p>Delete this entry? This cannot be undone.</p>
       <div class="modal-actions">
         <jiro-button variant="secondary" type="button" (click)="deleteTarget.set(null)">Cancel</jiro-button>
@@ -222,9 +277,11 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
         </jiro-button>
       </div>
     </jiro-modal>
+}
 
     <!-- Delete group confirm -->
-    <jiro-modal *ngIf="confirmDeleteGroup()" title="Delete Group" (close)="confirmDeleteGroup.set(false)">
+    @if (confirmDeleteGroup()) {
+<jiro-modal title="Delete Group" (close)="confirmDeleteGroup.set(false)">
       <p>Are you sure you want to delete <strong>{{ group()?.name }}</strong>? All entries will be permanently removed.</p>
       <div class="modal-actions">
         <jiro-button variant="secondary" type="button" (click)="confirmDeleteGroup.set(false)">Cancel</jiro-button>
@@ -233,11 +290,14 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
         </jiro-button>
       </div>
     </jiro-modal>
+}
 
     <!-- Lightbox -->
-    <div class="lightbox" *ngIf="lightboxUrl()" (click)="lightboxUrl.set(null)">
+    @if (lightboxUrl()) {
+<div class="lightbox" (click)="lightboxUrl.set(null)">
       <img [src]="lightboxUrl()!" alt="Full size" />
     </div>
+}
   `,
   styles: [`
     .group-page { max-width: 760px; }
@@ -326,7 +386,7 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
       border: 1px solid var(--border-color); border-radius: var(--border-radius-sm);
       background: var(--bg-canvas); color: var(--text-primary); padding: 8px var(--space-sm);
     }
-    .invite-input:focus { outline: none; border-color: var(--color-primary); }
+    .invite-input:focus { border-color: var(--color-primary); }
     .invite-error { font-size: var(--font-size-xs); color: var(--color-danger); margin-top: var(--space-xs); }
     .invite-success { font-size: var(--font-size-xs); color: var(--color-success, #16a34a); margin-top: var(--space-xs); }
 
@@ -339,7 +399,7 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
       border: 1px solid var(--border-color); border-radius: var(--border-radius-sm);
       background: var(--bg-canvas); color: var(--text-primary); padding: 8px var(--space-sm);
     }
-    .form-control:focus { outline: none; border-color: var(--color-primary); }
+    .form-control:focus { border-color: var(--color-primary); }
     .body-area { resize: vertical; min-height: 100px; font-family: Georgia, serif; line-height: 1.6; }
     .mood-row-modal { display: flex; gap: var(--space-xs); overflow-x: auto; scrollbar-width: none; }
     .mood-row-modal::-webkit-scrollbar { display: none; }

@@ -3,6 +3,10 @@ import { AuthService } from './auth.service';
 
 const KG_TO_LBS = 2.20462;
 
+/** Colour themes that ship. Anything else stored on the user falls back to earth. */
+export const THEMES = ['earth', 'forest', 'slate'] as const;
+export type Theme = (typeof THEMES)[number];
+
 @Injectable({ providedIn: 'root' })
 export class SettingsService {
   private auth = inject(AuthService);
@@ -13,7 +17,10 @@ export class SettingsService {
   });
 
   weightUnit = computed<string>(() => this.parsedSettings()['weight_unit'] ?? 'lbs');
-  theme = computed<string>(() => this.parsedSettings()['theme'] ?? 'earth');
+  theme = computed<Theme>(() => {
+    const stored = this.parsedSettings()['theme'];
+    return (THEMES as readonly string[]).includes(stored) ? (stored as Theme) : 'earth';
+  });
 
   // Dark mode is stored in localStorage — works without a round-trip and persists across sessions
   private _darkMode = signal<boolean>(

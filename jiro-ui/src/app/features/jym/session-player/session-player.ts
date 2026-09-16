@@ -1,5 +1,5 @@
-import { Component, OnInit, OnDestroy, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
+
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import {
@@ -14,6 +14,11 @@ import { SettingsService } from '../../../core/services/settings.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
+import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
+import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
+import { ToastService } from '../../../core/services/toast.service';
 
 interface SetRow {
   setNumber: number;
@@ -42,7 +47,7 @@ interface ExerciseBlock {
 @Component({
   selector: 'app-session-player',
   standalone: true,
-  imports: [CommonModule, FormsModule, JiroButtonComponent, JiroModalComponent],
+  imports: [FormsModule, JiroButtonComponent, JiroModalComponent, JiroIconComponent, JiroSkeletonComponent, JiroEmptyStateComponent, JymPrBadgeComponent],
   template: `
     <!-- Sticky header bar -->
     <div class="session-bar">
@@ -61,55 +66,65 @@ interface ExerciseBlock {
             <button class="type-btn" [class.active]="settingsService.weightUnit() === 'lbs'" (click)="toggleUnit('lbs')">lbs</button>
             <button class="type-btn" [class.active]="settingsService.weightUnit() === 'kg'" (click)="toggleUnit('kg')">kg</button>
           </div>
-          <button class="save-template-btn" title="Save as Template" (click)="showTemplateSave.set(true)">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-              <polyline points="17,21 17,13 7,13 7,21"/>
-              <polyline points="7,3 7,8 15,8"/>
-            </svg>
+          <button class="save-template-btn" type="button" title="Save as template" aria-label="Save as template" (click)="showTemplateSave.set(true)">
+            <jiro-icon name="floppy-disk" [size]="15" />
           </button>
-          <jiro-button variant="secondary" type="button" (click)="showExitConfirm.set(true)">Exit</jiro-button>
-          <jiro-button variant="primary" type="button" (click)="finishSession()" [disabled]="finishing()">
+          <jiro-button size="sm" variant="ghost" type="button" (click)="showExitConfirm.set(true)">Exit</jiro-button>
+          <jiro-button size="sm" variant="inverse" type="button" (click)="finishSession()" [disabled]="finishing()">
             {{ finishing() ? 'Finishing...' : 'Finish' }}
           </jiro-button>
         </div>
-        <p *ngIf="emptySessionError()" class="empty-session-error">{{ emptySessionError() }}</p>
+        @if (emptySessionError()) {
+<p class="empty-session-error">{{ emptySessionError() }}</p>
+}
       </div>
       <!-- Rest timer row — expands the bar after logging a set -->
-      <div *ngIf="restTimerActive()" class="rest-row" [class.rest-done]="restTimerDone()">
+      @if (restTimerActive()) {
+<div class="rest-row" [class.rest-done]="restTimerDone()">
         <span class="rest-label">Rest</span>
         <span class="rest-countdown">{{ restTimerDisplay() }}</span>
         <div class="rest-presets">
-          <button *ngFor="let d of restPresets" class="rest-chip"
+          @for (d of restPresets; track d) {
+<button class="rest-chip"
             [class.active]="restTimerDuration() === d"
             (click)="setRestDuration(d)">{{ restPresetLabel(d) }}</button>
-          <button class="rest-chip rest-add-btn" (click)="addRestTime(30)" title="Add 30 seconds">+30s</button>
+}
+          <button class="rest-chip rest-add-btn" type="button" (click)="addRestTime(30)" title="Add 30 seconds" aria-label="Add 30 seconds">+30s</button>
         </div>
-        <button class="rest-skip-btn" (click)="skipRestTimer()">✕</button>
+        <button class="rest-skip-btn" type="button" (click)="skipRestTimer()" aria-label="Skip rest" title="Skip rest"><jiro-icon name="x" [size]="12" /></button>
         <div class="rest-progress">
           <div class="rest-progress-fill"
             [style.width.%]="(restTimerRemaining() / restTimerDuration()) * 100"></div>
         </div>
       </div>
+}
     </div>
 
     <!-- Deload / Test notice -->
-    <div *ngIf="sessionType() === 'deload'" class="type-notice deload-notice">
-      Deload session: take it easy and foucus on recovery.
+    @if (sessionType() === 'deload') {
+<div class="type-notice deload-notice">
+      Deload session: take it easy and focus on recovery.
     </div>
-    <div *ngIf="sessionType() === 'test'" class="type-notice test-notice">
-      Light weight baby!!! Use this session to find new 1RMs and set new PRs.
+}
+    @if (sessionType() === 'test') {
+<div class="type-notice test-notice">
+      Test session: work up to a top set and see where your 1RM stands.
     </div>
+}
 
     <!-- Loading -->
     <div class="player-body">
-      <div *ngIf="loading()" class="state-message">
-        <div class="spinner-lg"></div>
-        <p>Loading session...</p>
-      </div>
+      @if (loading()) {
+        <div class="loading-blocks" aria-busy="true" aria-label="Loading session">
+          <jiro-skeleton height="56px" />
+          <jiro-skeleton height="180px" />
+          <jiro-skeleton height="180px" />
+        </div>
+      }
 
       <!-- Session notes -->
-      <div *ngIf="!loading()" class="notes-panel">
+      @if (!loading()) {
+<div class="notes-panel">
         <textarea
           class="notes-input"
           [(ngModel)]="sessionNotes"
@@ -118,11 +133,14 @@ interface ExerciseBlock {
           (blur)="saveNotes()">
         </textarea>
       </div>
+}
 
       <!-- Body weight panel -->
-      <div *ngIf="!loading()" class="bw-panel">
+      @if (!loading()) {
+<div class="bw-panel">
         <span class="bw-label">Body weight</span>
-        <div *ngIf="!bwLogged()" class="bw-row">
+        @if (!bwLogged()) {
+<div class="bw-row">
           <input
             class="bw-input"
             type="number"
@@ -137,38 +155,52 @@ interface ExerciseBlock {
             {{ bwSaving() ? '...' : 'Log' }}
           </button>
         </div>
-        <span *ngIf="bwLogged()" class="bw-logged">✓ {{ bwValue }} {{ settingsService.unitLabel() }} logged</span>
+}
+        @if (bwLogged()) {
+<span class="bw-logged">✓ {{ bwValue }} {{ settingsService.unitLabel() }} logged</span>
+}
       </div>
+}
 
       <!-- Session body -->
-      <div *ngIf="!loading()" class="exercises">
+      @if (!loading()) {
+<div class="exercises">
         <!-- Empty state -->
-        <div *ngIf="blocks().length === 0" class="no-exercises">
-          <h3>No exercises yet</h3>
-          <p class="text-secondary">Tap "+ Add Exercise" below to add your first lift.</p>
-        </div>
+        @if (blocks().length === 0) {
+          <jiro-empty-state compact icon="barbell" heading="No exercises yet" message="Add your first lift to start logging sets.">
+            <jiro-button size="sm" type="button" (click)="addExercise()">Add exercise</jiro-button>
+          </jiro-empty-state>
+        }
 
         <!-- Exercise blocks -->
-        <div *ngFor="let block of blocks(); let bi = index" class="ex-block">
-          <div class="block-header" [class.block-open]="!isCollapsed(bi)" (click)="toggleBlock(bi)">
+        @for (block of blocks(); track block; let bi = $index) {
+<div class="ex-block">
+          <div class="block-header" role="button" tabindex="0" [class.block-open]="!isCollapsed(bi)" [attr.aria-expanded]="!isCollapsed(bi)" (click)="toggleBlock(bi)" (keydown.enter)="toggleBlock(bi)" (keydown.space)="$event.preventDefault(); toggleBlock(bi)">
             <div class="block-title">
               <h3>{{ block.exerciseName }}</h3>
-              <span *ngIf="block.muscleGroup" class="mg-tag">{{ block.muscleGroup }}</span>
-              <span *ngIf="isCollapsed(bi) && savedCount(bi) > 0" class="sets-done-tag">{{ savedCount(bi) }} sets</span>
+              @if (block.muscleGroup) {
+<span class="mg-tag">{{ block.muscleGroup }}</span>
+}
+              @if (isCollapsed(bi) && savedCount(bi) > 0) {
+<span class="sets-done-tag">{{ savedCount(bi) }} sets</span>
+}
             </div>
-            <svg class="chevron" [class.open]="!isCollapsed(bi)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg class="chevron" aria-hidden="true" [class.open]="!isCollapsed(bi)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="6,9 12,15 18,9"/>
             </svg>
           </div>
 
-          <ng-container *ngIf="!isCollapsed(bi)">
+          @if (!isCollapsed(bi)) {
+
             <!-- Progressive overload suggestion -->
-            <div *ngIf="block.suggestion && !allSaved(bi)" class="overload-hint">
+            @if (block.suggestion && !allSaved(bi)) {
+<div class="overload-hint">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="23,6 13.5,15.5 8.5,10.5 1,18"/><polyline points="17,6 23,6 23,12"/>
               </svg>
               {{ block.suggestion }}
             </div>
+}
 
             <!-- Exercise note -->
             <div class="ex-note-wrap">
@@ -186,12 +218,13 @@ interface ExerciseBlock {
               <span class="sh weight">Weight ({{ settingsService.unitLabel() }})</span>
               <span class="sh reps">Reps</span>
               <span class="sh rpe">RPE</span>
-              <span class="sh warmup-col" title="Warm-up set">W</span>
+              <span class="sh warmup-col" title="Warm-up"><jiro-icon name="fire" [size]="14" label="Warm-up" /></span>
               <span class="sh action"></span>
             </div>
 
             <!-- Set rows -->
-            <ng-container *ngFor="let row of block.sets; let si = index">
+            @for (row of block.sets; track row; let si = $index) {
+
               <div class="set-row" [class.set-done]="row.saved" [class.set-warmup]="row.isWarmup">
                 <span class="set-num-cell">{{ row.setNumber }}</span>
 
@@ -205,7 +238,9 @@ interface ExerciseBlock {
                     [placeholder]="row.ghostWeight || '0'"
                     [class.has-ghost]="row.ghostWeight && !row.weight"
                     [disabled]="row.saved" />
-                  <span *ngIf="row.ghostWeight && !row.weight" class="ghost-hint">{{ row.ghostWeight }}</span>
+                  @if (row.ghostWeight && !row.weight) {
+<span class="ghost-hint">{{ row.ghostWeight }}</span>
+}
                 </div>
 
                 <div class="input-wrap">
@@ -217,7 +252,9 @@ interface ExerciseBlock {
                     [placeholder]="row.ghostReps || '0'"
                     [class.has-ghost]="row.ghostReps && !row.reps"
                     [disabled]="row.saved" />
-                  <span *ngIf="row.ghostReps && !row.reps" class="ghost-hint">{{ row.ghostReps }}</span>
+                  @if (row.ghostReps && !row.reps) {
+<span class="ghost-hint">{{ row.ghostReps }}</span>
+}
                 </div>
 
                 <input
@@ -231,32 +268,44 @@ interface ExerciseBlock {
                   [disabled]="row.saved" />
 
                 <button
+                  type="button"
                   class="warmup-btn"
                   [class.warmup-active]="row.isWarmup"
+                  [attr.aria-pressed]="row.isWarmup"
+                  [attr.aria-label]="'Warm-up, set ' + row.setNumber"
                   title="{{ row.isWarmup ? 'Warm-up set' : 'Mark as warm-up' }}"
-                  (click)="toggleWarmup(bi, si)">W</button>
+                  (click)="toggleWarmup(bi, si)"><jiro-icon name="fire" [size]="16" /></button>
 
                 <div class="action-cell">
-                  <img *ngIf="row.saved && row.isPR" src="/icons/badge-icon.svg" class="pr-badge" title="Personal Record" alt="PR" />
-                  <button
-                    *ngIf="!row.saved"
-                    class="log-btn"
+                  @if (row.saved && row.isPR) {
+<jym-pr-badge />
+}
+                  @if (!row.saved) {
+<button type="button" class="log-btn" [attr.aria-label]="'Log set ' + row.setNumber"
                     [disabled]="row.saving || !row.weight || !row.reps || (!!row.rpe && rpeInvalid(row.rpe))"
                     (click)="logSet(bi, si)">
-                    <span *ngIf="!row.saving">✓</span>
-                    <span *ngIf="row.saving" class="spinner-sm"></span>
+                    @if (!row.saving) {
+<jiro-icon name="check" [size]="18" />
+}
+                    @if (row.saving) {
+<span class="spinner-sm"></span>
+}
                   </button>
-                  <button *ngIf="row.saved" class="del-btn" (click)="deleteSet(bi, si)">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
+}
+                  @if (row.saved) {
+<button type="button" class="del-btn" [attr.aria-label]="'Remove set ' + row.setNumber" title="Remove set" (click)="deleteSet(bi, si)">
+                    <jiro-icon name="x" [size]="14" />
                   </button>
+}
                 </div>
               </div>
-              <div *ngIf="!row.saved && !!row.rpe && rpeInvalid(row.rpe)" class="rpe-err-msg">
+              @if (!row.saved && !!row.rpe && rpeInvalid(row.rpe)) {
+<div class="rpe-err-msg">
                 RPE must be between 1 and 10
               </div>
-            </ng-container>
+}
+            
+}
 
             <!-- Add set -->
             <button class="add-set-btn" (click)="addSet(bi)">+ Add Set</button>
@@ -278,30 +327,42 @@ interface ExerciseBlock {
                 accept="video/mp4,video/webm,image/jpeg,image/png"
                 style="display:none"
                 (change)="onFormCheckFileChange($event, bi)">
-              <div *ngIf="isFormCheckUploading(block.exerciseId)" class="fc-progress-bar">
+              @if (isFormCheckUploading(block.exerciseId)) {
+<div class="fc-progress-bar">
                 <div class="fc-progress-fill" [style.width.%]="getFormCheckProgress(block.exerciseId)"></div>
               </div>
-              <ng-container *ngIf="getFirstAttachment(block.exerciseId) as clip">
+}
+              @if (getFirstAttachment(block.exerciseId); as clip) {
+
                 <a [href]="clip.file_url" target="_blank" class="fc-clip-link">
-                  <img *ngIf="clip.file_type.startsWith('image/')" [src]="clip.file_url" class="fc-thumb" alt="form check">
-                  <span *ngIf="!clip.file_type.startsWith('image/')" class="fc-thumb-video">
+                  @if (clip.file_type.startsWith('image/')) {
+<img [src]="clip.file_url" class="fc-thumb" alt="form check">
+}
+                  @if (!clip.file_type.startsWith('image/')) {
+<span class="fc-thumb-video">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
                     </svg>
                   </span>
+}
                 </a>
-              </ng-container>
+              
+}
             </div>
-          </ng-container>
+          
+}
         </div>
+}
 
         <!-- Add exercise -->
         <button class="add-exercise-btn" (click)="addExercise()">+ Add Exercise</button>
       </div>
+}
     </div>
 
     <!-- Exit confirmation modal -->
-    <jiro-modal *ngIf="showExitConfirm()" title="Exit Workout?" maxWidth="400px" (close)="showExitConfirm.set(false)">
+    @if (showExitConfirm()) {
+<jiro-modal title="Exit Workout?" maxWidth="400px" (close)="showExitConfirm.set(false)">
       <p style="font-size:var(--font-size-sm);color:var(--text-secondary);line-height:1.6;margin-bottom:var(--space-lg)">
         Your sets are saved. You can resume this session any time from the Jym home page.
       </p>
@@ -317,9 +378,11 @@ interface ExerciseBlock {
         </div>
       </div>
     </jiro-modal>
+}
 
     <!-- Save as Template modal -->
-    <jiro-modal *ngIf="showTemplateSave()" title="Save as Template" maxWidth="420px" (close)="showTemplateSave.set(false)">
+    @if (showTemplateSave()) {
+<jiro-modal title="Save as Template" maxWidth="420px" (close)="showTemplateSave.set(false)">
       <p style="font-size:var(--font-size-sm);color:var(--text-secondary);margin-bottom:var(--space-md);">
         Give this workout layout a name to reuse it in future sessions.
       </p>
@@ -331,7 +394,9 @@ interface ExerciseBlock {
         (keydown.enter)="saveAsTemplate()"
         maxlength="80"
       />
-      <div *ngIf="templateSaveError()" class="template-save-error">{{ templateSaveError() }}</div>
+      @if (templateSaveError()) {
+<div class="template-save-error">{{ templateSaveError() }}</div>
+}
       <div style="display:flex;justify-content:flex-end;gap:var(--space-sm);margin-top:var(--space-md)">
         <jiro-button variant="secondary" type="button" (click)="showTemplateSave.set(false)">Cancel</jiro-button>
         <jiro-button variant="primary" type="button" [disabled]="!templateName.trim() || templateSaving()" (click)="saveAsTemplate()">
@@ -339,88 +404,82 @@ interface ExerciseBlock {
         </jiro-button>
       </div>
     </jiro-modal>
+}
 
-    <!-- Template saved confirmation -->
-    <div *ngIf="templateSavedName()" class="template-saved-toast">
-      Template "{{ templateSavedName() }}" saved
-    </div>
 
-    <!-- Exercise picker overlay -->
-    <div *ngIf="showExPicker()" class="overlay">
-      <div class="picker-panel">
-
-        <!-- Default: search + list -->
-        <ng-container *ngIf="!creatingExercise()">
-          <div class="picker-header">
-            <h3>Add Exercise</h3>
-            <button class="close-btn" (click)="showExPicker.set(false)">✕</button>
-          </div>
-          <input class="picker-search" type="text" [(ngModel)]="exSearch" (input)="filterExercises()" placeholder="Search exercises..." autofocus />
+    <!-- Exercise picker -->
+    @if (showExPicker()) {
+      <jiro-modal [title]="creatingExercise() ? 'New exercise' : 'Add exercise'" maxWidth="480px" (close)="showExPicker.set(false)">
+        @if (!creatingExercise()) {
+          <input class="picker-search" type="text" [(ngModel)]="exSearch" (input)="filterExercises()" placeholder="Search exercises..." aria-label="Search exercises" autofocus />
           <div class="picker-list">
-            <button *ngFor="let ex of filteredExercises()" class="picker-item" (click)="pickExercise(ex)">
-              <span class="pi-name">{{ ex.name }}</span>
-              <span *ngIf="ex.muscle_group" class="pi-mg">{{ ex.muscle_group }}</span>
-            </button>
-            <!-- Create shortcut: always visible at bottom, name pre-filled from search -->
-            <button class="picker-create-btn" (click)="startCreateExercise()">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-              </svg>
-              <span *ngIf="exSearch.trim()">Create "{{ exSearch.trim() }}"</span>
-              <span *ngIf="!exSearch.trim()">New Exercise</span>
+            @for (ex of filteredExercises(); track ex.id) {
+              <button type="button" class="picker-item" (click)="pickExercise(ex)">
+                <span class="pi-name">{{ ex.name }}</span>
+                @if (ex.muscle_group) {
+                  <span class="pi-mg">{{ ex.muscle_group }}</span>
+                }
+              </button>
+            }
+            @if (filteredExercises().length === 0 && exSearch.trim()) {
+              <p class="picker-none">Nothing matches "{{ exSearch.trim() }}".</p>
+            }
+            <!-- Create shortcut: always at the bottom, name pre-filled from the search -->
+            <button type="button" class="picker-create-btn" (click)="startCreateExercise()">
+              <jiro-icon name="plus" [size]="14" />
+              @if (exSearch.trim()) {
+                <span>Create "{{ exSearch.trim() }}"</span>
+              } @else {
+                <span>New exercise</span>
+              }
             </button>
           </div>
-        </ng-container>
-
-        <!-- Create mode: inline mini-form -->
-        <ng-container *ngIf="creatingExercise()">
-          <div class="picker-header">
-            <button class="back-btn" (click)="creatingExercise.set(false)">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="15,18 9,12 15,6"/>
-              </svg>
-            </button>
-            <h3>New Exercise</h3>
-            <button class="close-btn" (click)="showExPicker.set(false)">✕</button>
-          </div>
+        } @else {
+          <button type="button" class="back-btn" (click)="creatingExercise.set(false)">
+            <jiro-icon name="caret-left" [size]="14" /> Back to search
+          </button>
           <div class="create-form">
-            <label class="create-label">Name</label>
+            <label class="create-label" for="new-ex-name">Name</label>
             <input
+              id="new-ex-name"
               class="picker-search"
               type="text"
               [(ngModel)]="newExName"
               placeholder="e.g. Romanian Deadlift"
               (keydown.enter)="!newExSaving() && newExName.trim() && createAndPickExercise()"
-              style="margin:0"
             />
-            <label class="create-label" style="margin-top:var(--space-sm)">Muscle Group <span style="opacity:0.5">(optional)</span></label>
-            <select class="create-select" [(ngModel)]="newExMuscleGroup">
-              <option value="">— None —</option>
-              <option *ngFor="let mg of muscleGroups" [value]="mg">{{ mg }}</option>
+            <label class="create-label" for="new-ex-mg" style="margin-top:var(--space-sm)">Muscle group <span class="optional">(optional)</span></label>
+            <select id="new-ex-mg" class="create-select" [(ngModel)]="newExMuscleGroup">
+              <option value="">None</option>
+              @for (mg of muscleGroups; track mg) {
+                <option [value]="mg">{{ mg }}</option>
+              }
             </select>
-            <div *ngIf="newExError()" class="template-save-error" style="margin-top:var(--space-xs)">{{ newExError() }}</div>
+            @if (newExError()) {
+              <div class="template-save-error">{{ newExError() }}</div>
+            }
             <jiro-button
-              variant="primary"
+              block
               type="button"
-              style="margin-top:var(--space-md);width:100%"
-              [disabled]="!newExName.trim() || newExSaving()"
+              style="margin-top:var(--space-md)"
+              [disabled]="!newExName.trim()"
+              [loading]="newExSaving()"
               (click)="createAndPickExercise()">
-              {{ newExSaving() ? 'Creating...' : 'Create & Add to Session' }}
+              {{ newExSaving() ? 'Creating...' : 'Create and add to session' }}
             </jiro-button>
           </div>
-        </ng-container>
-
-      </div>
-    </div>
+        }
+      </jiro-modal>
+    }
   `,
   styles: [`
     :host { display: block; }
 
     /* Sticky bar */
     .session-bar {
-      position: sticky; top: 0; z-index: 200;
-      background: var(--color-primary); color: white;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+      position: sticky; top: var(--topbar-height, 0px); z-index: var(--z-sticky);
+      background: var(--color-primary); color: var(--text-on-primary);
+      box-shadow: 0 2px 12px rgba(var(--shadow-rgb), 0.25);
       margin: calc(-1 * var(--space-xl));
       margin-bottom: var(--space-xl);
     }
@@ -442,13 +501,13 @@ interface ExerciseBlock {
     .rest-row {
       display: flex; align-items: center; gap: var(--space-sm);
       padding: var(--space-xs) var(--space-xl);
-      background: rgba(0,0,0,0.15);
-      border-top: 1px solid rgba(255,255,255,0.1);
+      background: rgba(var(--shadow-rgb), 0.18);
+      border-top: 1px solid color-mix(in srgb, currentColor 15%, transparent);
       position: relative; overflow: hidden;
       transition: background 0.4s;
     }
 
-    .rest-row.rest-done { background: rgba(74,103,65,0.45); }
+    .rest-row.rest-done { background: rgba(var(--color-accent-rgb), 0.45); }
 
     .rest-label {
       font-size: var(--font-size-xs); text-transform: uppercase;
@@ -463,17 +522,17 @@ interface ExerciseBlock {
     .rest-presets { display: flex; gap: 4px; margin-left: auto; }
 
     .rest-chip {
-      padding: 2px 8px; border-radius: 10px;
-      border: 1px solid rgba(255,255,255,0.3); background: none;
-      color: rgba(255,255,255,0.65); font-size: var(--font-size-xs);
+      min-height: 28px; padding: 2px 8px; border-radius: 10px;
+      border: 1px solid color-mix(in srgb, currentColor 35%, transparent); background: none;
+      color: color-mix(in srgb, currentColor 88%, transparent); font-size: var(--font-size-xs);
       cursor: pointer; transition: all 0.15s; font-family: inherit; white-space: nowrap;
     }
 
-    .rest-chip:hover { border-color: rgba(255,255,255,0.7); color: white; }
+    .rest-chip:hover { border-color: color-mix(in srgb, currentColor 70%, transparent); color: inherit; }
 
     .rest-chip.active {
-      background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.7);
-      color: white; font-weight: 600;
+      background: var(--text-on-primary); border-color: var(--text-on-primary);
+      color: var(--color-primary); font-weight: 600;
     }
 
     .rest-add-btn { border-style: dashed; }
@@ -481,74 +540,65 @@ interface ExerciseBlock {
     .save-template-btn {
       display: flex; align-items: center; justify-content: center;
       width: 32px; height: 32px; border-radius: var(--border-radius-sm);
-      border: 1px solid rgba(255,255,255,0.25); background: none;
-      color: rgba(255,255,255,0.7); cursor: pointer; transition: all 0.15s;
+      border: 1px solid color-mix(in srgb, currentColor 30%, transparent); background: none;
+      color: color-mix(in srgb, currentColor 88%, transparent); cursor: pointer; transition: all 0.15s;
       flex-shrink: 0;
     }
-    .save-template-btn:hover { border-color: rgba(255,255,255,0.7); color: white; }
+    .save-template-btn:hover { border-color: color-mix(in srgb, currentColor 70%, transparent); color: inherit; }
 
     .template-name-input {
       width: 100%; padding: 9px 12px; border: 1px solid var(--border-color);
       border-radius: var(--border-radius-sm); background: var(--bg-surface);
       color: var(--text-primary); font-size: var(--font-size-base); font-family: inherit;
-      outline: none; box-sizing: border-box;
+ box-sizing: border-box;
     }
     .template-name-input:focus { border-color: var(--color-primary); }
 
     .template-save-error {
-      font-size: var(--font-size-sm); color: #e05c5c; margin-top: var(--space-xs);
-    }
-
-    .template-saved-toast {
-      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-      background: var(--bg-sidebar); color: var(--text-on-dark);
-      padding: 10px 20px; border-radius: 20px; font-size: var(--font-size-sm);
-      font-weight: 500; z-index: 200; white-space: nowrap;
-      animation: fadeSlideUp 0.25s ease, fadeOut 0.4s ease 2s forwards;
-    }
-    @keyframes fadeSlideUp {
-      from { opacity: 0; transform: translateX(-50%) translateY(8px); }
-      to   { opacity: 1; transform: translateX(-50%) translateY(0); }
-    }
-    @keyframes fadeOut {
-      to { opacity: 0; }
+      font-size: var(--font-size-sm); color: var(--color-negative); margin-top: var(--space-xs);
     }
 
     .rest-skip-btn {
-      padding: 3px 8px; border-radius: 10px;
-      border: 1px solid rgba(255,255,255,0.25); background: none;
-      color: rgba(255,255,255,0.55); cursor: pointer;
+      display: inline-flex; align-items: center; justify-content: center;
+      min-height: 28px; padding: 3px 8px; border-radius: 10px;
+      border: 1px solid color-mix(in srgb, currentColor 30%, transparent); background: none;
+      color: color-mix(in srgb, currentColor 88%, transparent); cursor: pointer;
       font-size: var(--font-size-xs); transition: all 0.15s; font-family: inherit;
     }
 
-    .rest-skip-btn:hover { border-color: rgba(255,255,255,0.7); color: white; }
+    .rest-skip-btn:hover { border-color: color-mix(in srgb, currentColor 70%, transparent); color: inherit; }
 
     .rest-progress {
       position: absolute; bottom: 0; left: 0; right: 0;
-      height: 3px; background: rgba(255,255,255,0.15);
+      height: 3px; background: color-mix(in srgb, currentColor 15%, transparent);
     }
 
     .rest-progress-fill {
-      height: 100%; background: rgba(255,255,255,0.75);
+      height: 100%; background: color-mix(in srgb, currentColor 75%, transparent);
       transition: width 1s linear;
     }
 
-    .rest-row.rest-done .rest-progress-fill { background: rgba(144,238,144,0.8); }
+    .rest-row.rest-done .rest-progress-fill { background: var(--color-positive); }
 
     .type-toggle {
       display: flex; border-radius: 6px; overflow: hidden;
-      border: 1px solid rgba(255,255,255,0.3);
+      border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
     }
 
     .type-btn {
-      padding: 5px 10px; background: transparent; border: none;
-      color: rgba(255,255,255,0.7); font-size: var(--font-size-xs);
+      min-height: 28px; padding: 5px 10px; background: transparent; border: none;
+      color: color-mix(in srgb, currentColor 88%, transparent); font-size: var(--font-size-xs);
+      font-family: inherit;
       cursor: pointer; transition: all 0.15s; white-space: nowrap;
     }
 
-    .type-btn + .type-btn { border-left: 1px solid rgba(255,255,255,0.3); }
+    .type-btn + .type-btn { border-left: 1px solid color-mix(in srgb, currentColor 35%, transparent); }
 
-    .type-btn.active { background: rgba(255,255,255,0.2); color: white; font-weight: 600; }
+    /* mirrors the Finish button: fill with the bar's own text colour so the
+       label stays readable on the maroon bar and on the lifted dark one.
+       currentColor cannot be used for the fill here: in a background it
+       resolves to this element's own colour, not the inherited one. */
+    .type-btn.active { background: var(--text-on-primary); color: var(--color-primary); font-weight: 600; }
 
     .type-notice {
       text-align: center; font-size: var(--font-size-sm); font-weight: 500;
@@ -556,21 +606,12 @@ interface ExerciseBlock {
       border-radius: var(--border-radius);
     }
 
-    .deload-notice { background: rgba(196,74,74,0.1); color: var(--color-danger); border: 1px solid rgba(196,74,74,0.2); }
+    .deload-notice { background: rgba(var(--color-danger-rgb), 0.1); color: var(--color-danger); border: 1px solid rgba(var(--color-danger-rgb), 0.2); }
 
-    .test-notice { background: rgba(122,59,46,0.1); color: var(--color-primary); border: 1px solid rgba(122,59,46,0.2); }
+    .test-notice { background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary); border: 1px solid rgba(var(--color-primary-rgb), 0.2); }
 
-    .session-bar ::ng-deep .jiro-btn { width: auto; }
 
-    .session-bar ::ng-deep .btn-secondary {
-      background: rgba(255,255,255,0.15);
-      border-color: rgba(255,255,255,0.3);
-      color: white;
-    }
 
-    .session-bar ::ng-deep .btn-primary {
-      background: white; color: var(--color-primary);
-    }
 
     /* Body */
     .player-body { max-width: 700px; overflow-x: hidden; }
@@ -589,7 +630,7 @@ interface ExerciseBlock {
       border: 1px solid var(--border-color); border-radius: var(--border-radius);
       background: var(--bg-surface); color: var(--text-primary);
       font-size: var(--font-size-sm); font-family: inherit;
-      resize: vertical; outline: none; line-height: 1.5;
+      resize: vertical; line-height: 1.5;
       transition: border-color 0.15s;
     }
 
@@ -616,13 +657,13 @@ interface ExerciseBlock {
       width: 80px; padding: 6px 10px;
       border: 1px solid var(--border-color); border-radius: var(--border-radius);
       background: var(--bg-canvas); color: var(--text-primary);
-      font-size: var(--font-size-sm); outline: none; font-family: inherit;
+      font-size: var(--font-size-sm); font-family: inherit;
     }
 
     .bw-input:focus { border-color: var(--color-primary); }
 
     .bw-save-btn {
-      padding: 6px 14px; background: var(--color-primary); color: white;
+      padding: 6px 14px; background: var(--color-primary); color: var(--text-on-primary); font-family: inherit;
       border: none; border-radius: var(--border-radius);
       font-size: var(--font-size-sm); font-weight: 500; cursor: pointer;
       transition: opacity 0.15s;
@@ -636,21 +677,7 @@ interface ExerciseBlock {
       font-size: var(--font-size-sm); color: var(--color-accent); font-weight: 500;
     }
 
-    .state-message {
-      display: flex; flex-direction: column; align-items: center;
-      gap: var(--space-md); padding: var(--space-2xl); text-align: center;
-    }
-
-    .spinner-lg {
-      width: 40px; height: 40px; border: 3px solid var(--border-color);
-      border-top-color: var(--color-primary); border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-
-    .no-exercises {
-      text-align: center; padding: var(--space-2xl);
-      display: flex; flex-direction: column; align-items: center; gap: var(--space-md);
-    }
+    .loading-blocks { display: flex; flex-direction: column; gap: var(--space-xl); }
 
     .exercises { display: flex; flex-direction: column; gap: var(--space-xl); }
 
@@ -673,10 +700,11 @@ interface ExerciseBlock {
       display: flex; align-items: center; gap: 6px;
       padding: 6px var(--space-lg);
       font-size: var(--font-size-xs); color: var(--color-primary);
-      background: rgba(122,59,46,0.06); border-bottom: 1px solid var(--border-color);
+      background: rgba(var(--color-primary-rgb), 0.06); border-bottom: 1px solid var(--border-color);
     }
 
     .block-header:hover { background: var(--bg-surface); }
+    .block-header:focus-visible { outline-offset: -2px; }
 
     .block-title { display: flex; align-items: center; gap: var(--space-sm); flex: 1; min-width: 0; }
 
@@ -684,7 +712,7 @@ interface ExerciseBlock {
 
     .sets-done-tag {
       font-size: var(--font-size-xs); padding: 2px 8px; border-radius: 10px;
-      background: rgba(122,59,46,0.1); color: var(--color-primary); font-weight: 500;
+      background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary); font-weight: 500;
     }
 
     .chevron {
@@ -694,7 +722,7 @@ interface ExerciseBlock {
     .chevron.open { transform: rotate(0deg); }
 
     .mg-tag {
-      background: rgba(122,59,46,0.12); color: var(--color-primary);
+      background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary);
       font-size: var(--font-size-xs); padding: 2px 8px; border-radius: 10px;
     }
 
@@ -710,7 +738,7 @@ interface ExerciseBlock {
       border: 1px solid transparent; border-radius: var(--border-radius);
       background: transparent; color: var(--text-secondary);
       font-size: var(--font-size-xs); font-family: inherit;
-      resize: none; outline: none; line-height: 1.5;
+      resize: none; line-height: 1.5;
       transition: border-color 0.15s, background 0.15s;
     }
 
@@ -725,7 +753,7 @@ interface ExerciseBlock {
     /* Set table */
     .set-header-row {
       display: grid;
-      grid-template-columns: 40px 1fr 1fr 64px 34px 52px;
+      grid-template-columns: 40px 1fr 1fr 64px 44px minmax(52px, auto);
       gap: var(--space-sm);
       padding: var(--space-xs) var(--space-lg);
       border-bottom: 1px solid var(--border-color);
@@ -740,7 +768,7 @@ interface ExerciseBlock {
 
     .set-row {
       display: grid;
-      grid-template-columns: 40px 1fr 1fr 64px 34px 52px;
+      grid-template-columns: 40px 1fr 1fr 64px 44px minmax(52px, auto);
       gap: var(--space-sm);
       align-items: center;
       padding: var(--space-xs) var(--space-lg);
@@ -750,22 +778,21 @@ interface ExerciseBlock {
 
     .set-row:last-of-type { border-bottom: none; }
 
-    .set-row.set-done { background: rgba(122,59,46,0.04); }
+    .set-row.set-done { background: rgba(var(--color-primary-rgb), 0.04); }
 
-    .set-row.set-warmup { background: rgba(200,160,80,0.06); }
+    .set-row.set-warmup { background: rgba(var(--color-warning-rgb), 0.08); }
 
     .warmup-btn {
-      width: 28px; height: 28px; border-radius: 4px;
+      width: 40px; height: 40px; border-radius: var(--border-radius-sm);
       background: none; border: 1px solid var(--border-color);
-      color: var(--text-muted); font-size: var(--font-size-xs);
-      font-weight: 700; cursor: pointer; transition: all 0.15s;
-      font-family: inherit; display: flex; align-items: center; justify-content: center;
+      color: var(--text-muted); cursor: pointer; transition: all 0.15s;
+      display: flex; align-items: center; justify-content: center;
     }
 
-    .warmup-btn:hover { border-color: #c8a050; color: #c8a050; }
+    .warmup-btn:hover { border-color: var(--color-warning); color: var(--color-warning); }
 
     .warmup-btn.warmup-active {
-      background: rgba(200,160,80,0.15); border-color: #c8a050; color: #c8a050;
+      background: rgba(var(--color-warning-rgb), 0.15); border-color: var(--color-warning); color: var(--color-warning);
     }
 
     .set-num-cell { font-size: var(--font-size-sm); font-weight: 500; color: var(--text-muted); text-align: center; }
@@ -773,10 +800,10 @@ interface ExerciseBlock {
     .input-wrap { position: relative; }
 
     .set-input {
-      width: 100%; padding: 8px 10px;
+      width: 100%; min-height: 44px; padding: 8px 10px;
       border: 1px solid var(--border-color); border-radius: var(--border-radius);
       background: var(--bg-canvas); color: var(--text-primary);
-      font-size: var(--font-size-md); outline: none; box-sizing: border-box;
+      font-size: var(--font-size-md); box-sizing: border-box;
       font-family: inherit; transition: border-color 0.15s;
     }
 
@@ -784,11 +811,11 @@ interface ExerciseBlock {
 
     .set-input:disabled { opacity: 0.7; background: transparent; border-color: transparent; }
 
-    .set-input.has-ghost::placeholder { color: rgba(122,59,46,0.5); font-style: italic; }
+    .set-input.has-ghost::placeholder { color: rgba(var(--color-primary-rgb), 0.55); font-style: italic; }
 
     .ghost-hint {
       position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
-      font-size: var(--font-size-xs); color: rgba(122,59,46,0.5);
+      font-size: var(--font-size-xs); color: rgba(var(--color-primary-rgb), 0.55);
       pointer-events: none;
     }
 
@@ -805,9 +832,9 @@ interface ExerciseBlock {
     .action-cell { display: flex; align-items: center; justify-content: center; gap: var(--space-xs); }
 
     .log-btn {
-      width: 34px; height: 34px; border-radius: 50%;
-      background: var(--color-primary); color: white; border: none;
-      cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center;
+      width: 40px; height: 40px; border-radius: 50%;
+      background: var(--color-primary); color: var(--text-on-primary); border: none;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
       transition: opacity 0.15s;
     }
 
@@ -816,7 +843,7 @@ interface ExerciseBlock {
     .log-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
     .del-btn {
-      width: 28px; height: 28px; border-radius: 4px;
+      width: 40px; height: 40px; border-radius: var(--border-radius-sm);
       background: none; color: var(--text-muted); border: 1px solid var(--border-color);
       cursor: pointer; display: flex; align-items: center; justify-content: center;
       transition: all 0.15s;
@@ -824,12 +851,10 @@ interface ExerciseBlock {
 
     .del-btn:hover { color: var(--color-danger); border-color: var(--color-danger); }
 
-    .pr-badge { width: 28px; height: 28px; display: block; }
-
     .spinner-sm {
       width: 14px; height: 14px;
-      border: 2px solid rgba(255,255,255,0.4);
-      border-top-color: white; border-radius: 50%;
+      border: 2px solid color-mix(in srgb, currentColor 40%, transparent);
+      border-top-color: currentColor; border-radius: 50%;
       animation: spin 0.6s linear infinite; display: inline-block;
     }
 
@@ -837,10 +862,11 @@ interface ExerciseBlock {
       width: 100%; padding: var(--space-sm);
       background: none; border: none; border-top: 1px solid var(--border-color);
       color: var(--text-muted); font-size: var(--font-size-sm); cursor: pointer;
+      font-family: inherit; min-height: 44px;
       transition: all 0.15s;
     }
 
-    .add-set-btn:hover { color: var(--color-primary); background: rgba(122,59,46,0.04); }
+    .add-set-btn:hover { color: var(--color-primary); background: rgba(var(--color-primary-rgb), 0.04); }
 
     .add-exercise-btn {
       width: 100%; padding: var(--space-md);
@@ -850,96 +876,66 @@ interface ExerciseBlock {
       transition: all 0.15s; font-family: inherit; margin-top: var(--space-sm);
     }
 
-    .add-exercise-btn:hover { color: var(--color-primary); border-color: var(--color-primary); background: rgba(122,59,46,0.04); }
+    .add-exercise-btn:hover { color: var(--color-primary); border-color: var(--color-primary); background: rgba(var(--color-primary-rgb), 0.04); }
 
-    /* Exercise picker overlay */
-    .overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.45);
-      display: flex; align-items: flex-end; justify-content: center;
-      z-index: 500; animation: fadeIn 0.15s ease;
-    }
-
-    .picker-panel {
-      width: 100%; max-width: 480px;
-      background: var(--bg-surface); border-radius: var(--border-radius) var(--border-radius) 0 0;
-      max-height: 60vh; display: flex; flex-direction: column;
-      box-shadow: 0 -4px 24px rgba(0,0,0,0.2);
-    }
-
-    .picker-header {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: var(--space-md) var(--space-lg);
-      border-bottom: 1px solid var(--border-color);
-    }
-
-    .picker-header h3 { font-size: var(--font-size-md); font-weight: 600; }
-
-    .close-btn {
-      background: none; border: none; color: var(--text-muted);
-      font-size: 18px; cursor: pointer; padding: var(--space-xs);
-    }
-
+    /* Exercise picker (inside jiro-modal) */
     .picker-search {
-      margin: var(--space-sm) var(--space-md);
+      width: 100%; box-sizing: border-box;
       padding: 10px 14px; border: 1px solid var(--border-color);
       border-radius: var(--border-radius); background: var(--bg-canvas);
       color: var(--text-primary); font-size: var(--font-size-md);
-      outline: none; font-family: inherit;
+      font-family: inherit;
     }
-
     .picker-search:focus { border-color: var(--color-primary); }
 
-    .picker-list { overflow-y: auto; flex: 1; padding: var(--space-xs) var(--space-md); }
+    .picker-list { max-height: 50dvh; overflow-y: auto; margin-top: var(--space-sm); }
 
     .picker-item {
-      display: flex; align-items: center; justify-content: space-between;
-      width: 100%; padding: var(--space-sm) var(--space-md);
+      display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm);
+      width: 100%; min-height: 44px; padding: var(--space-sm) var(--space-md);
       background: none; border: none; border-radius: var(--border-radius);
-      cursor: pointer; text-align: left; transition: background 0.15s;
+      cursor: pointer; text-align: left; font-family: inherit; transition: background 0.15s;
     }
-
-    .picker-item:hover { background: rgba(122,59,46,0.08); }
+    .picker-item:hover { background: var(--bg-surface-hover); }
 
     .pi-name { font-size: var(--font-size-md); color: var(--text-primary); font-weight: 500; }
+    .pi-mg { font-size: var(--font-size-xs); color: var(--text-muted); white-space: nowrap; }
 
-    .pi-mg { font-size: var(--font-size-xs); color: var(--text-muted); }
+    .picker-none { padding: var(--space-md); font-size: var(--font-size-sm); color: var(--text-muted); text-align: center; }
 
     .picker-create-btn {
       display: flex; align-items: center; gap: var(--space-xs);
-      width: 100%; padding: var(--space-sm) var(--space-md);
+      width: 100%; min-height: 44px; padding: var(--space-sm) var(--space-md);
       background: none; border: none; border-top: 1px solid var(--border-color);
       color: var(--color-primary); font-size: var(--font-size-sm);
       font-weight: 500; cursor: pointer; text-align: left;
       font-family: inherit; margin-top: var(--space-xs);
       transition: background 0.15s;
     }
-    .picker-create-btn:hover { background: rgba(122,59,46,0.06); }
+    .picker-create-btn:hover { background: rgba(var(--color-primary-rgb), 0.06); }
 
     .back-btn {
-      display: flex; align-items: center; justify-content: center;
-      background: none; border: none; color: var(--text-muted);
-      cursor: pointer; padding: var(--space-xs); margin-right: var(--space-xs);
+      display: inline-flex; align-items: center; gap: 4px;
+      background: none; border: none; padding: 0; margin-bottom: var(--space-md);
+      color: var(--text-secondary); font-size: var(--font-size-sm); font-family: inherit; cursor: pointer;
     }
     .back-btn:hover { color: var(--text-primary); }
 
-    .create-form {
-      display: flex; flex-direction: column;
-      padding: var(--space-md) var(--space-lg) var(--space-lg);
-    }
+    .create-form { display: flex; flex-direction: column; }
     .create-label {
       font-size: var(--font-size-sm); font-weight: 500;
       color: var(--text-secondary); margin-bottom: 6px; display: block;
     }
+    .create-label .optional { color: var(--text-muted); font-weight: 400; }
     .create-select {
       padding: 10px 14px; border: 1px solid var(--border-color);
       border-radius: var(--border-radius); background: var(--bg-canvas);
       color: var(--text-primary); font-size: var(--font-size-md);
-      font-family: inherit; outline: none; width: 100%;
+      font-family: inherit; width: 100%;
     }
     .create-select:focus { border-color: var(--color-primary); }
 
     @keyframes spin { to { transform: rotate(360deg); } }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
     /* ── Mobile responsive ── */
     @media (max-width: 768px) {
@@ -979,27 +975,22 @@ interface ExerciseBlock {
       .type-btn { flex: 1; padding: 6px 4px; font-size: 0.65rem; }
 
       /* Exercise + Finish share second sub-row */
-      .session-bar ::ng-deep .jiro-btn {
-        padding: 8px 10px;
-        font-size: var(--font-size-xs);
-        white-space: nowrap;
-      }
     }
 
     /* ── Set table on very small screens ── */
     @media (max-width: 480px) {
       .set-header-row,
       .set-row {
-        grid-template-columns: 28px 1fr 1fr 46px 28px 40px;
+        grid-template-columns: 24px 1fr 1fr 44px 36px minmax(40px, auto);
         padding: var(--space-xs) var(--space-md);
         gap: 4px;
       }
 
-      .set-input { padding: 6px 6px; font-size: var(--font-size-sm); }
+      .set-input { min-height: 40px; padding: 6px 6px; font-size: var(--font-size-sm); }
 
-      .log-btn { width: 30px; height: 30px; font-size: 14px; }
+      .log-btn { width: 36px; height: 36px; }
 
-      .warmup-btn { width: 24px; height: 24px; font-size: 0.6rem; }
+      .warmup-btn, .del-btn { width: 36px; height: 36px; }
 
       .ex-note-wrap { padding: var(--space-xs) var(--space-md); }
     }
@@ -1064,7 +1055,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   showTemplateSave = signal(false);
   templateSaving = signal(false);
   templateSaveError = signal('');
-  templateSavedName = signal('');
+  private readonly toast = inject(ToastService);
   templateName = '';
 
   // Inline exercise creation
@@ -1507,8 +1498,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
         this.showTemplateSave.set(false);
         this.templateSaving.set(false);
         this.templateName = '';
-        this.templateSavedName.set(name);
-        setTimeout(() => this.templateSavedName.set(''), 2800);
+        this.toast.success(`Template "${name}" saved`);
       },
       error: () => {
         this.templateSaving.set(false);

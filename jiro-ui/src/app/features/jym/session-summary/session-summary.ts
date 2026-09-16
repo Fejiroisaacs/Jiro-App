@@ -1,6 +1,7 @@
 import { Component, OnInit, ViewChild, ElementRef, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
+import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
 
 // ─── Data types ────────────────────────────────────────────────────────────────
 
@@ -69,7 +70,7 @@ function capitalize(s: string): string {
 @Component({
   selector: 'app-session-summary',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, JymPrBadgeComponent],
   template: `
     <!-- ════════════════════════════════════════════════════════════════
          In-app view
@@ -102,7 +103,8 @@ function capitalize(s: string): string {
           <h1 class="hero-title">Workout Complete!</h1>
 
           <!-- Only shown when PRs were hit -->
-          <div class="pr-pill" *ngIf="prCount() > 0">
+          @if (prCount() > 0) {
+<div class="pr-pill">
             <svg width="13" height="13" viewBox="0 0 100 100" aria-hidden="true">
               <path d="M30 40 v45 l20 -15 l20 15 v-45 z" fill="#5D4037"/>
               <circle cx="50" cy="35" r="26" fill="#BF360C"/>
@@ -112,36 +114,41 @@ function capitalize(s: string): string {
             </svg>
             {{ prCount() }} new PR{{ prCount() === 1 ? '' : 's' }}!
           </div>
+}
 
-          <span class="type-pill" *ngIf="sessionType() !== 'normal'">
+          @if (sessionType() !== 'normal') {
+<span class="type-pill">
             {{ sessionType() === 'deload' ? 'Deload' : 'Test' }} Session
           </span>
+}
         </div>
       </div>
 
       <!-- ── Stats ──────────────────────────────────────────────────── -->
       <div class="stats-row">
         <div class="stat-card">
-          <div class="stat-stripe" style="background:#4a90d9"></div>
+          <div class="stat-stripe stripe-duration"></div>
           <div class="stat-value">{{ durationStr() }}</div>
           <div class="stat-label">Duration</div>
         </div>
         <div class="stat-card">
-          <div class="stat-stripe" style="background:#f0a030"></div>
+          <div class="stat-stripe stripe-volume"></div>
           <div class="stat-value">{{ totalVolume() }}</div>
           <div class="stat-label">Volume</div>
         </div>
         <div class="stat-card">
-          <div class="stat-stripe" style="background:#2ecc71"></div>
+          <div class="stat-stripe stripe-sets"></div>
           <div class="stat-value">{{ totalSets() }}</div>
           <div class="stat-label">Work Sets</div>
         </div>
       </div>
 
       <!-- ── Muscle Groups ───────────────────────────────────────────── -->
-      <section class="section" *ngIf="muscleGroups().length > 0">
+      @if (muscleGroups().length > 0) {
+<section class="section">
         <h2 class="section-label">Muscle Groups</h2>
-        <div class="mg-row" *ngFor="let mg of muscleGroups()">
+        @for (mg of muscleGroups(); track mg) {
+<div class="mg-row">
           <span class="mg-dot" [style.background]="mg.color"></span>
           <span class="mg-name">{{ mg.group }}</span>
           <div class="mg-track">
@@ -149,41 +156,48 @@ function capitalize(s: string): string {
           </div>
           <span class="mg-pct">{{ mg.percentage | number:'1.0-0' }}%</span>
         </div>
+}
       </section>
+}
 
       <!-- ── Session Highlights ──────────────────────────────────────── -->
-      <section class="section" *ngIf="liftHighlights().length > 0">
+      @if (liftHighlights().length > 0) {
+<section class="section">
         <h2 class="section-label">Session Highlights</h2>
-        <div class="lift-card" *ngFor="let lift of liftHighlights()"
+        @for (lift of liftHighlights(); track lift) {
+<div class="lift-card"
           [style.border-left-color]="liftColor(lift)">
           <div class="lift-meta">
             <span class="lift-name">{{ lift.exerciseName }}</span>
-            <span class="lift-muscle" *ngIf="lift.muscleGroup">{{ lift.muscleGroup }}</span>
+            @if (lift.muscleGroup) {
+<span class="lift-muscle">{{ lift.muscleGroup }}</span>
+}
           </div>
           <div class="lift-aside">
-            <span class="pr-icon" *ngIf="lift.isPR" aria-label="Personal Record">
-              <svg width="22" height="22" viewBox="0 0 100 100" aria-hidden="true">
-                <path d="M30 40 v45 l20 -15 l20 15 v-45 z" fill="#5D4037"/>
-                <circle cx="50" cy="35" r="26" fill="#BF360C"/>
-                <circle cx="50" cy="35" r="20" fill="#E6DCC3"/>
-                <text x="50" y="42" font-family="sans-serif" font-weight="bold"
-                  font-size="20" fill="#5D4037" text-anchor="middle">PR</text>
-              </svg>
-            </span>
-            <span class="best-tag" *ngIf="!lift.isPR">Best</span>
+            @if (lift.isPR) {
+<jym-pr-badge />
+}
+            @if (!lift.isPR) {
+<span class="best-tag">Best</span>
+}
             <span class="lift-weight">{{ lift.weight | number:'1.0-1' }} × {{ lift.reps }}</span>
           </div>
         </div>
+}
       </section>
+}
 
-      <section class="section" *ngIf="liftHighlights().length === 0">
+      @if (liftHighlights().length === 0) {
+<section class="section">
         <p class="empty-note">No sets were logged this session.</p>
       </section>
+}
 
       <!-- ── Actions ────────────────────────────────────────────────── -->
       <div class="action-row">
         <button class="btn-share" (click)="shareWorkout()" [disabled]="sharing()">
-          <svg *ngIf="!sharing()" width="16" height="16" viewBox="0 0 24 24" fill="none"
+          @if (!sharing()) {
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" stroke-width="2.5"
             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="18" cy="5" r="3"/>
@@ -192,7 +206,10 @@ function capitalize(s: string): string {
             <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
             <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
           </svg>
-          <span *ngIf="sharing()" class="spinner" aria-hidden="true"></span>
+}
+          @if (sharing()) {
+<span class="spinner" aria-hidden="true"></span>
+}
           {{ sharing() ? 'Sharing...' : 'Share Workout' }}
         </button>
         <button class="btn-done" (click)="done()">Done</button>
@@ -256,12 +273,15 @@ function capitalize(s: string): string {
       <div class="sc-body">
 
         <!-- Top 3 lifts -->
-        <div class="sc-lifts" *ngIf="topLifts().length > 0">
+        @if (topLifts().length > 0) {
+<div class="sc-lifts">
           <div class="sc-slabel">TOP LIFTS</div>
-          <div class="sc-lift" *ngFor="let lift of topLifts(); let i = index">
+          @for (lift of topLifts(); track lift; let i = $index) {
+<div class="sc-lift">
             <span class="sc-rank">{{ i + 1 }}</span>
             <span class="sc-lname">{{ lift.exerciseName }}</span>
-            <span class="sc-pr" *ngIf="lift.isPR">
+            @if (lift.isPR) {
+<span class="sc-pr">
               <svg width="14" height="14" viewBox="0 0 100 100">
                 <path d="M30 40 v45 l20 -15 l20 15 v-45 z" fill="#5D4037"/>
                 <circle cx="50" cy="35" r="26" fill="#BF360C"/>
@@ -270,14 +290,19 @@ function capitalize(s: string): string {
                   font-size="20" fill="#5D4037" text-anchor="middle">PR</text>
               </svg>
             </span>
+}
             <span class="sc-lw">{{ lift.weight | number:'1.0-1' }} × {{ lift.reps }}</span>
           </div>
+}
         </div>
+}
 
         <!-- Muscle group bars -->
-        <div class="sc-muscles" *ngIf="muscleGroups().length > 0">
+        @if (muscleGroups().length > 0) {
+<div class="sc-muscles">
           <div class="sc-slabel">MUSCLE GROUPS</div>
-          <div class="sc-mg" *ngFor="let mg of muscleGroups()">
+          @for (mg of muscleGroups(); track mg) {
+<div class="sc-mg">
             <span class="sc-mg-dot" [style.background]="mg.color"></span>
             <span class="sc-mg-name">{{ mg.group }}</span>
             <div class="sc-mg-track">
@@ -285,7 +310,9 @@ function capitalize(s: string): string {
             </div>
             <span class="sc-mg-pct">{{ mg.percentage | number:'1.0-0' }}%</span>
           </div>
+}
         </div>
+}
 
       </div>
 
@@ -346,6 +373,10 @@ function capitalize(s: string): string {
       text-align: center;
       color: var(--text-on-dark);
     }
+
+    /* The hero is a fixed dark banner and the share card below is rendered
+       off-screen by html-to-image, which cannot resolve CSS variables; both
+       keep literal colours on purpose. */
 
     /* amber glow ring behind the trophy */
     .trophy-ring {
@@ -436,6 +467,10 @@ function capitalize(s: string): string {
       top: 0; left: 0; right: 0;
       height: 3px;
     }
+
+    .stripe-duration { background: var(--color-info); }
+    .stripe-volume   { background: var(--color-warning); }
+    .stripe-sets     { background: var(--color-positive); }
 
     .stat-value {
       font-family: var(--font-family-display);
@@ -570,11 +605,7 @@ function capitalize(s: string): string {
       flex-shrink: 0;
     }
 
-    .pr-icon {
-      display: inline-flex;
-      align-items: center;
-      flex-shrink: 0;
-    }
+    jym-pr-badge { flex-shrink: 0; }
 
     .best-tag {
       font-size: 10px;
@@ -644,11 +675,13 @@ function capitalize(s: string): string {
 
     .btn-done:hover { opacity: 0.8; }
 
+    /* scoped override of the global .spinner: sized for a button and
+       tinted from the button's own text colour */
     .spinner {
       display: inline-block;
       width: 16px; height: 16px;
-      border: 2px solid rgba(255,255,255,0.3);
-      border-top-color: #fff;
+      border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
+      border-top-color: currentColor;
       border-radius: 50%;
       animation: spin 0.7s linear infinite;
       flex-shrink: 0;

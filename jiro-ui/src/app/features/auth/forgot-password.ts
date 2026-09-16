@@ -1,5 +1,5 @@
 import { Component, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
@@ -9,14 +9,15 @@ import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-inpu
 @Component({
   selector: 'app-forgot-password',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, JiroButtonComponent, JiroInputComponent],
+  imports: [FormsModule, RouterLink, JiroButtonComponent, JiroInputComponent],
   template: `
     <div class="auth-page">
       <div class="auth-card">
         <h1>Forgot password</h1>
         <p class="subtitle">Enter your email and we'll send you a reset link.</p>
 
-        <div *ngIf="sent(); else form">
+        @if (sent()) {
+<div>
           <div class="success-box">
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
               <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
@@ -26,8 +27,8 @@ import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-inpu
           </div>
           <a routerLink="/login" class="back-link">← Back to login</a>
         </div>
+} @else {
 
-        <ng-template #form>
           <div class="form-fields">
             <jiro-input
               [(ngModel)]="email"
@@ -38,6 +39,7 @@ import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-inpu
           </div>
 
           <jiro-button
+            block
             variant="primary"
             [disabled]="!email.trim() || loading()"
             (click)="submit()"
@@ -46,7 +48,10 @@ import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-inpu
           </jiro-button>
 
           <a routerLink="/login" class="back-link">← Back to login</a>
-        </ng-template>
+        
+}
+
+        
       </div>
     </div>
   `,

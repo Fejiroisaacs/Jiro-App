@@ -1,18 +1,21 @@
-import { Component, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, OnInit, inject, signal } from '@angular/core';
+
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { JymService, SplitWithRoutines, Routine, RoutineItem, Exercise, CreateSeriesRequest } from '../../../core/services/jym.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
+import { ConfirmService } from '../../../core/services/confirm.service';
+import { ToastService } from '../../../core/services/toast.service';
 
 @Component({
   selector: 'app-split-detail',
   standalone: true,
-  imports: [CommonModule, FormsModule, DragDropModule, JiroButtonComponent, JiroModalComponent],
+  imports: [FormsModule, DragDropModule, JiroButtonComponent, JiroModalComponent],
   template: `
-    <div class="split-detail" *ngIf="split()">
+    @if (split()) {
+<div class="split-detail">
       <!-- Header -->
       <div class="page-header">
         <div class="header-left">
@@ -23,9 +26,13 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
             All Splits
           </button>
           <div class="split-title-row">
-            <h1 *ngIf="!editingName()">{{ split()!.name }}</h1>
-            <input *ngIf="editingName()" class="title-input" [(ngModel)]="editName" (blur)="saveName()" (keydown.enter)="saveName()" autofocus />
-            <button class="edit-btn" (click)="startEditName()">
+            @if (!editingName()) {
+<h1>{{ split()!.name }}</h1>
+}
+            @if (editingName()) {
+<input class="title-input" [(ngModel)]="editName" (blur)="saveName()" (keydown.enter)="saveName()" autofocus />
+}
+            <button class="edit-btn" type="button" (click)="startEditName()" title="Rename split" aria-label="Rename split">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
@@ -52,8 +59,11 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
               </button>
             </div>
             <div class="tags-row">
-              <div *ngIf="!editingTags()" class="tags-display">
-                <span *ngFor="let tag of split()!.tags" class="tag-chip">{{ tag }}</span>
+              @if (!editingTags()) {
+<div class="tags-display">
+                @for (tag of split()!.tags; track tag) {
+<span class="tag-chip">{{ tag }}</span>
+}
                 <button class="tag-edit-btn" (click)="startEditTags()">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
@@ -61,11 +71,14 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
                   {{ split()!.tags.length ? '' : 'Add tags' }}
                 </button>
               </div>
-              <div *ngIf="editingTags()" class="tags-edit">
+}
+              @if (editingTags()) {
+<div class="tags-edit">
                 <input class="tag-input" type="text" [(ngModel)]="editTagsRaw" placeholder="PPL, Hypertrophy, Beginner" (keydown.enter)="saveTags()" (keydown.escape)="editingTags.set(false)" autofocus />
                 <button class="tag-save-btn" (click)="saveTags()">Save</button>
                 <button class="tag-cancel-btn" (click)="editingTags.set(false)">Cancel</button>
               </div>
+}
             </div>
           </div>
         </div>
@@ -90,38 +103,47 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       </div>
 
       <!-- Share panel -->
-      <div *ngIf="shareUrl()" class="share-panel">
+      @if (shareUrl()) {
+<div class="share-panel">
         <div class="share-url-row">
           <input class="share-url-input" [value]="shareUrl()" readonly />
           <button class="share-copy-btn" (click)="copyLink()" [class.copied]="copied()">
-            <svg *ngIf="!copied()" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            @if (!copied()) {
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
             </svg>
-            <svg *ngIf="copied()" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+}
+            @if (copied()) {
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="20 6 9 17 4 12"/>
             </svg>
+}
             {{ copied() ? 'Copied!' : 'Copy' }}
           </button>
         </div>
         <button class="share-revoke-btn" (click)="revokeShare()">Revoke link</button>
       </div>
+}
 
       <!-- Loading -->
-      <div *ngIf="loading()" class="state-message">
-        <div class="spinner-lg"></div>
-      </div>
+      @if (loading()) {
+        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+      }
 
       <!-- Routines (drag-drop columns) -->
-      <div *ngIf="!loading()" class="routines-board">
-        <div
-          *ngFor="let routine of routines(); let ri = index"
+      @if (!loading()) {
+<div class="routines-board">
+        @for (routine of routines(); track routine; let ri = $index) {
+<div
+         
           class="routine-column">
           <div class="routine-header">
             <div class="routine-title">
               <span class="day-chip">Day {{ routine.day_order }}</span>
               <span class="routine-name">{{ routine.name }}</span>
             </div>
-            <button class="icon-btn danger" (click)="deleteRoutine(routine, ri)" title="Delete day">
+            <button class="icon-btn danger" type="button" (click)="deleteRoutine(routine, ri)" title="Delete day"
+              [attr.aria-label]="'Delete training day ' + routine.name">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="3,6 5,6 21,6"/><path d="M19,6l-1,14a2,2,0,0,1-2,2H8a2,2,0,0,1-2-2L5,6"/>
                 <path d="M10,11v6M14,11v6M9,6V4a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1V6"/>
@@ -137,8 +159,9 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
             [cdkDropListConnectedTo]="getConnectedLists()"
             class="exercise-list"
             (cdkDropListDropped)="onDrop($event, ri)">
-            <div
-              *ngFor="let item of routine.items; let ii = index"
+            @for (item of routine.items; track item; let ii = $index) {
+<div
+             
               cdkDrag
               class="exercise-item">
               <div class="drag-handle" cdkDragHandle>
@@ -149,37 +172,49 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
               </div>
               <div class="item-info">
                 <span class="item-name">{{ item.exercise_name }}</span>
-                <span class="item-muscle" *ngIf="item.muscle_group">{{ item.muscle_group }}</span>
+                @if (item.muscle_group) {
+<span class="item-muscle">{{ item.muscle_group }}</span>
+}
               </div>
               <div class="item-targets">
                 <span class="target-text">{{ item.target_sets }}×{{ item.target_reps }}</span>
               </div>
-              <button class="icon-btn" (click)="removeItem(ri, ii)" title="Remove exercise">
+              <button class="icon-btn" type="button" (click)="removeItem(ri, ii)" title="Remove exercise"
+                [attr.aria-label]="'Remove ' + item.exercise_name + ' from ' + routine.name">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                   <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                 </svg>
               </button>
             </div>
+}
 
-            <div *ngIf="routine.items.length === 0" class="empty-list">
+            @if (routine.items.length === 0) {
+<div class="empty-list">
               Drag exercises here or click + Add
             </div>
+}
           </div>
 
           <button class="add-ex-btn" (click)="openExercisePicker(ri)">
             + Add Exercise
           </button>
         </div>
+}
 
-        <div *ngIf="routines().length === 0" class="board-empty">
+        @if (routines().length === 0) {
+<div class="board-empty">
           <p class="text-secondary">No training days yet. Add your first day to start building.</p>
           <jiro-button variant="primary" type="button" (click)="showAddRoutine.set(true)">+ Add Day</jiro-button>
         </div>
+}
       </div>
+}
     </div>
+}
 
     <!-- Add Routine Modal -->
-    <jiro-modal *ngIf="showAddRoutine()" title="Add Training Day" maxWidth="400px" (close)="showAddRoutine.set(false)">
+    @if (showAddRoutine()) {
+<jiro-modal title="Add Training Day" maxWidth="400px" (close)="showAddRoutine.set(false)">
       <form class="simple-form" (ngSubmit)="addRoutine()">
         <div class="form-group">
           <label class="form-label">Day Name</label>
@@ -197,30 +232,45 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
         </div>
       </form>
     </jiro-modal>
+}
 
     <!-- Exercise Picker Modal -->
-    <jiro-modal *ngIf="showExPicker()" title="Add Exercise" maxWidth="480px" (close)="showExPicker.set(false)">
+    @if (showExPicker()) {
+<jiro-modal title="Add Exercise" maxWidth="480px" (close)="showExPicker.set(false)">
       <div class="ex-picker">
-        <input *ngIf="!creatingExercise()" class="form-input" type="text" [(ngModel)]="exSearch" (input)="filterExercises()" placeholder="Search exercises..." />
-        <div *ngIf="!creatingExercise()" class="ex-picker-list">
-          <button
-            *ngFor="let ex of filteredExercises()"
+        @if (!creatingExercise()) {
+<input class="form-input" type="text" [(ngModel)]="exSearch" (input)="filterExercises()" placeholder="Search exercises..." />
+}
+        @if (!creatingExercise()) {
+<div class="ex-picker-list">
+          @for (ex of filteredExercises(); track ex) {
+<button
+           
             class="ex-pick-btn"
             (click)="addExerciseToRoutine(ex)">
             <span class="ex-pick-name">{{ ex.name }}</span>
-            <span class="ex-pick-muscle" *ngIf="ex.muscle_group">{{ ex.muscle_group }}</span>
+            @if (ex.muscle_group) {
+<span class="ex-pick-muscle">{{ ex.muscle_group }}</span>
+}
           </button>
-          <div *ngIf="filteredExercises().length === 0" class="no-results">
+}
+          @if (filteredExercises().length === 0) {
+<div class="no-results">
             <p class="text-secondary">No exercises match "{{ exSearch }}".</p>
           </div>
+}
         </div>
+}
 
         <!-- Create new exercise inline -->
-        <button *ngIf="!creatingExercise() && !pickerSelectedEx()" class="create-ex-inline-btn" (click)="startCreateExercise()">
+        @if (!creatingExercise() && !pickerSelectedEx()) {
+<button class="create-ex-inline-btn" (click)="startCreateExercise()">
           + Create New Exercise{{ exSearch.trim() ? ' "' + exSearch.trim() + '"' : '' }}
         </button>
+}
 
-        <div *ngIf="creatingExercise()" class="inline-create-form">
+        @if (creatingExercise()) {
+<div class="inline-create-form">
           <div class="form-group">
             <label class="form-label">Exercise Name *</label>
             <input class="form-input" type="text" [(ngModel)]="newExName" placeholder="e.g. Bulgarian Split Squat" />
@@ -229,10 +279,14 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
             <label class="form-label">Muscle Group</label>
             <select class="form-input" [(ngModel)]="newExMuscleGroup">
               <option value="">None</option>
-              <option *ngFor="let mg of muscleGroups" [value]="mg">{{ mg }}</option>
+              @for (mg of muscleGroups; track mg) {
+<option [value]="mg">{{ mg }}</option>
+}
             </select>
           </div>
-          <p *ngIf="newExError()" class="create-ex-error">{{ newExError() }}</p>
+          @if (newExError()) {
+<p class="create-ex-error">{{ newExError() }}</p>
+}
           <div class="form-actions">
             <jiro-button variant="secondary" type="button" (click)="creatingExercise.set(false)">Cancel</jiro-button>
             <jiro-button variant="primary" type="button" [disabled]="newExSaving() || !newExName.trim()" (click)="createAndPickExercise()">
@@ -240,9 +294,11 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
             </jiro-button>
           </div>
         </div>
+}
 
         <!-- Target sets/reps -->
-        <div *ngIf="pickerSelectedEx()" class="target-inputs">
+        @if (pickerSelectedEx()) {
+<div class="target-inputs">
           <div class="target-row">
             <div class="form-group">
               <label class="form-label">Sets</label>
@@ -257,11 +313,14 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
             Add {{ pickerSelectedEx()!.name }}
           </jiro-button>
         </div>
+}
       </div>
     </jiro-modal>
+}
 
     <!-- Start Series Modal -->
-    <jiro-modal *ngIf="showSeriesModal()" title="Start Series" maxWidth="440px" (close)="showSeriesModal.set(false)">
+    @if (showSeriesModal()) {
+<jiro-modal title="Start Series" maxWidth="440px" (close)="showSeriesModal.set(false)">
       <form class="simple-form" (ngSubmit)="createSeries()">
         <div class="form-group">
           <label class="form-label">Series Name</label>
@@ -275,14 +334,18 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
             <button type="button" class="dur-btn" [class.active]="seriesDuration === 'sessions'" (click)="seriesDuration = 'sessions'">Sessions</button>
           </div>
         </div>
-        <div class="form-group" *ngIf="seriesDuration === 'weeks'">
+        @if (seriesDuration === 'weeks') {
+<div class="form-group">
           <label class="form-label">Target Weeks</label>
           <input class="form-input" type="number" [(ngModel)]="seriesTargetWeeks" name="targetWeeks" min="1" max="52" />
         </div>
-        <div class="form-group" *ngIf="seriesDuration === 'sessions'">
+}
+        @if (seriesDuration === 'sessions') {
+<div class="form-group">
           <label class="form-label">Target Sessions</label>
           <input class="form-input" type="number" [(ngModel)]="seriesTargetSessions" name="targetSessions" min="1" max="200" />
         </div>
+}
         <div class="form-actions">
           <jiro-button variant="secondary" type="button" (click)="showSeriesModal.set(false)">Cancel</jiro-button>
           <jiro-button variant="primary" type="submit" [disabled]="creatingSeries() || !seriesName.trim()">
@@ -291,6 +354,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
         </div>
       </form>
     </jiro-modal>
+}
   `,
   styles: [`
     :host { display: block; }
@@ -302,7 +366,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       margin-bottom: var(--space-xl); gap: var(--space-md);
     }
 
-    .page-header ::ng-deep .jiro-btn { width: auto; flex-shrink: 0; }
 
     .header-left { display: flex; flex-direction: column; gap: var(--space-sm); }
 
@@ -325,7 +388,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       font-size: var(--font-size-2xl); font-weight: 700;
       border: none; border-bottom: 2px dashed var(--color-primary);
       background: transparent; color: var(--text-primary);
-      outline: none; padding: 0 var(--space-xs);
+ padding: 0 var(--space-xs);
     }
 
     .edit-btn {
@@ -333,7 +396,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       cursor: pointer; padding: var(--space-xs); border-radius: 4px;
     }
 
-    .edit-btn:hover { color: var(--color-primary); background: rgba(122,59,46,0.1); }
+    .edit-btn:hover { color: var(--color-primary); background: rgba(var(--color-primary-rgb), 0.1); }
 
     /* Visibility + Tags */
     .split-meta-row { display: flex; align-items: center; gap: var(--space-md); flex-wrap: wrap; margin-top: var(--space-xs); }
@@ -349,7 +412,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
     .vis-btn + .vis-btn { border-left: 1px solid var(--border-color); }
 
-    .vis-btn.active { background: rgba(122,59,46,0.1); color: var(--color-primary); }
+    .vis-btn.active { background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary); }
 
     .tags-row { display: flex; align-items: center; gap: var(--space-xs); flex-wrap: wrap; }
 
@@ -383,7 +446,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       padding: 4px 10px; border: 1px solid var(--color-primary);
       border-radius: var(--border-radius); background: var(--bg-surface);
       color: var(--text-primary); font-size: var(--font-size-sm);
-      outline: none; font-family: inherit; width: 240px;
+ font-family: inherit; width: 240px;
     }
 
     .tag-save-btn, .tag-cancel-btn {
@@ -391,21 +454,13 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       font-size: var(--font-size-xs); cursor: pointer; transition: all 0.15s;
     }
 
-    .tag-save-btn { background: var(--color-primary); color: #fff; border: 1px solid var(--color-primary); }
+    .tag-save-btn { background: var(--color-primary); color: var(--text-on-primary); border: 1px solid var(--color-primary); }
 
     .tag-cancel-btn { background: none; border: 1px solid var(--border-color); color: var(--text-muted); }
 
     .tag-cancel-btn:hover { border-color: var(--color-danger); color: var(--color-danger); }
 
-    .state-message {
-      display: flex; align-items: center; justify-content: center; padding: var(--space-2xl);
-    }
-
-    .spinner-lg {
-      width: 40px; height: 40px; border: 3px solid var(--border-color);
-      border-top-color: var(--color-primary); border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
+    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
 
     .routines-board {
       display: flex; gap: var(--space-lg); overflow-x: auto;
@@ -417,7 +472,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       gap: var(--space-md); padding: var(--space-2xl); text-align: center; width: 100%;
     }
 
-    .board-empty ::ng-deep .jiro-btn { width: auto; }
 
     .routine-column {
       min-width: 260px; max-width: 280px; flex-shrink: 0;
@@ -440,7 +494,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       padding: 4px 8px;
       border-radius: 2px;
       border: 1px solid var(--border-color);
-      box-shadow: 1px 1px 0 rgba(0,0,0,0.1);
+      box-shadow: 1px 1px 0 rgba(var(--shadow-rgb), 0.1);
       white-space: nowrap;
     }
 
@@ -456,7 +510,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     }
 
     .icon-btn:hover { color: var(--text-primary); background: var(--bg-surface-hover); }
-    .icon-btn.danger:hover { color: var(--color-danger); background: rgba(196, 74, 74, 0.1); }
+    .icon-btn.danger:hover { color: var(--color-danger); background: rgba(var(--color-danger-rgb), 0.1); }
 
     .exercise-list {
       padding: var(--space-sm); display: flex; flex-direction: column;
@@ -496,7 +550,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       padding: 4px 8px;
       border-radius: 2px;
       border: 1px solid var(--border-color);
-      box-shadow: 1px 1px 0 rgba(0,0,0,0.1);
+      box-shadow: 1px 1px 0 rgba(var(--shadow-rgb), 0.1);
       white-space: nowrap;
     }
 
@@ -514,7 +568,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       border-radius: 0 0 var(--border-radius) var(--border-radius);
     }
 
-    .add-ex-btn:hover { color: var(--color-primary); background: rgba(122,59,46,0.05); }
+    .add-ex-btn:hover { color: var(--color-primary); background: rgba(var(--color-primary-rgb), 0.05); }
 
     /* Modal forms */
     .simple-form { display: flex; flex-direction: column; gap: var(--space-md); }
@@ -536,7 +590,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       background: transparent;
       color: var(--text-primary); 
       font-size: var(--font-size-md);
-      outline: none; 
       transition: border-color 0.2s; 
       font-family: inherit; 
       width: 100%; 
@@ -547,7 +600,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
     .form-actions { display: flex; justify-content: flex-end; gap: var(--space-sm); margin-top: var(--space-xs); }
 
-    .form-actions ::ng-deep .jiro-btn { width: auto; }
 
     /* Exercise picker */
     .ex-picker { display: flex; flex-direction: column; gap: var(--space-md); }
@@ -565,7 +617,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       text-align: left; width: 100%; transition: background 0.15s;
     }
 
-    .ex-pick-btn:hover { background: rgba(122,59,46,0.08); }
+    .ex-pick-btn:hover { background: rgba(var(--color-primary-rgb), 0.08); }
 
     .ex-pick-name { font-size: var(--font-size-sm); font-weight: 500; color: var(--text-primary); }
 
@@ -579,7 +631,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       display: flex; flex-direction: column; gap: var(--space-md);
     }
 
-    .target-inputs ::ng-deep .jiro-btn { width: auto; }
 
     .target-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md); }
 
@@ -591,7 +642,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       text-align: center; transition: all 0.15s; font-family: inherit;
     }
 
-    .create-ex-inline-btn:hover { border-color: var(--color-primary); background: rgba(122,59,46,0.05); }
+    .create-ex-inline-btn:hover { border-color: var(--color-primary); background: rgba(var(--color-primary-rgb), 0.05); }
 
     .inline-create-form {
       background: var(--bg-canvas); border: 1px solid var(--border-color);
@@ -603,7 +654,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
     /* Share panel */
     .header-btns { display: flex; gap: var(--space-sm); align-items: center; }
-    .header-btns ::ng-deep .jiro-btn { width: auto; }
 
     .share-panel {
       display: flex; align-items: center; gap: var(--space-sm);
@@ -618,7 +668,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       flex: 1; min-width: 0; padding: 6px 10px;
       border: 1px solid var(--border-color); border-radius: var(--border-radius);
       background: var(--bg-canvas); color: var(--text-secondary);
-      font-size: var(--font-size-sm); font-family: monospace; outline: none;
+      font-size: var(--font-size-sm); font-family: monospace;
     }
 
     .share-copy-btn {
@@ -629,7 +679,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       white-space: nowrap; transition: all 0.15s;
     }
     .share-copy-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
-    .share-copy-btn.copied { border-color: #4caf50; color: #4caf50; }
+    .share-copy-btn.copied { border-color: var(--color-positive); color: var(--color-positive); }
 
     .share-revoke-btn {
       background: none; border: none; color: var(--text-muted);
@@ -653,7 +703,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     .dur-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
 
     .dur-btn.active {
-      background: rgba(122,59,46,0.1); border-color: var(--color-primary);
+      background: rgba(var(--color-primary-rgb), 0.1); border-color: var(--color-primary);
       color: var(--color-primary); font-weight: 500;
     }
 
@@ -662,15 +712,15 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
         flex-direction: column;
       }
 
-      .header-btns ::ng-deep .jiro-btn {
-        width: 100%;
-      }
+      .header-btns { --jiro-btn-width: 100%; }
     }
 
-    @keyframes spin { to { transform: rotate(360deg); } }
   `]
 })
 export class SplitDetailComponent implements OnInit {
+  private readonly confirmService = inject(ConfirmService);
+  private readonly toast = inject(ToastService);
+
   split = signal<SplitWithRoutines | null>(null);
   routines = signal<(Routine & { items: RoutineItem[] })[]>([]);
   loading = signal(true);
@@ -803,11 +853,20 @@ export class SplitDetailComponent implements OnInit {
     });
   }
 
-  deleteRoutine(routine: Routine, ri: number) {
+  async deleteRoutine(routine: Routine, ri: number) {
+    const ok = await this.confirmService.confirm({
+      title: `Delete ${routine.name}?`,
+      message: 'The training day and the exercises planned on it are removed from this split.',
+      confirmLabel: 'Delete day',
+      danger: true,
+    });
+    if (!ok) return;
     this.jymService.deleteRoutine(routine.id).subscribe({
       next: () => {
         this.routines.update(list => list.filter((_, i) => i !== ri));
+        this.toast.success(`${routine.name} deleted`);
       },
+      error: () => this.toast.error('Could not delete the training day.'),
     });
   }
 
