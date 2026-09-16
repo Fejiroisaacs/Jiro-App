@@ -137,9 +137,30 @@ Plan: `~/.claude/plans/jaunty-rolling-dream.md`. Audit: `docs/UI-AUDIT-2026-09.m
 
 ## Phase 3d: Culinara (in progress, plan in `~/.claude/plans/jaunty-rolling-dream.md`)
 
-- [ ] 3d.0 Shell: `mobileNav` route-data flag beside the existing `moduleNav` in `main-layout.ts`
-- [ ] 3d.1 Cook mode as a route `/culinara/:id/cook`: visible Exit (not a key), phone back gesture works, both navs hidden so the pinned footer owns the bottom, 44px stars, safe-area inset, screen wake lock re-requested on visibilitychange and feature-detected, Escape as a desktop extra; ~200 lines leave recipe-detail
-- [ ] 3d.2 Recipe detail actions: labelled Start cooking + `jiro-menu` (Share/Edit/Delete), names and 40px on the remaining icon buttons, grocery feedback becomes a toast
-- [ ] 3d.3 Other pages: `jiro-page-header`, shared states, toasts for silent actions, tokens, labels, three dead `.back-link` blocks removed (`recipe-share.ts` keeps its var() fallbacks: public page outside the shell)
-- [ ] Verification: `check:css`, production build, Playwright desktop + mobile at 360px and 360x640, wake lock called and released, dark mode
-- [ ] Commit per step, push at the end, review section below
+- [x] 3d.0 Shell: `mobileNav` route-data flag beside the existing `moduleNav` in `main-layout.ts`
+- [x] 3d.1 Cook mode as a route `/culinara/:id/cook`: visible Exit (not a key), phone back gesture works, both navs hidden so the pinned footer owns the bottom, 44px stars, safe-area inset, screen wake lock re-requested on visibilitychange and feature-detected, Escape as a desktop extra; ~200 lines leave recipe-detail
+- [x] 3d.2 Recipe detail actions: labelled Start cooking + `jiro-menu` (Share/Edit/Delete), names and 40px on the remaining icon buttons, grocery feedback becomes a toast
+- [x] 3d.3 Other pages: `jiro-page-header`, shared states, toasts for silent actions, tokens, labels, three dead `.back-link` blocks removed (`recipe-share.ts` keeps its var() fallbacks: public page outside the shell)
+- [x] Verification: `check:css`, production build, Playwright desktop + mobile at 360px and 360x640, wake lock called and released, dark mode
+- [x] Commit per step, push at the end, review section below
+
+## Review (Phase 3d) — page pass complete
+
+**Cook mode was the point of this batch.** It was a full-screen overlay on the recipe page: a refresh dumped you back on the recipe, the phone's back gesture did nothing, and nothing held a wake lock, so the screen dimmed and locked partway through a recipe. It is now a route at `/culinara/:id/cook`.
+
+On the mobile question that came up during planning: **exiting is a visible 44px button, never a key.** Escape is a desktop extra layered on top. Making it a route is what finally makes Android back and the iOS swipe-back work, which is the exit most people will actually reach for. Verified on a 360x640 screen: both navs step aside, the footer pins above the safe-area inset, Exit is visible without scrolling, and every rating star measures 44px.
+
+**Wake lock, measured not assumed.** With the API patched to record calls, entering cook mode logs `request:screen` and leaving logs `release`. With it patched to reject, which is the Firefox and low-battery path, the page renders and works with no console errors. It is also re-requested when the tab becomes visible again, because browsers drop the sentinel while hidden.
+
+**Two mobile problems the screenshots caught, which the numbers had not.** The footer put the notes field *below* the primary button, so the reading order was rate, act, then annotate; it is now one column in the right order with the notes field starting at one row. And the verify banner was eating 60px of a focus screen, so it steps aside there too.
+
+**A finding worth being straight about.** The cook screen first rendered ingredient amounts with no names. The cause was my own audit seed data, which wrote `{"name": …}` where the app's contract is `{"item": …}`; the API stores this field as opaque JSON so it accepted either. I corrected the fixture rather than the code. No application bug, but it is exactly the kind of thing a fixture can hide.
+
+**Scope note.** Six undersized controls turned up while measuring, three of them shell chrome rather than Culinara: the sidebar toggle, the verify banner's resend button and its dismiss. I fixed them with the others rather than leaving a known gap behind.
+
+**Numbers.** `recipe-detail` drops from 61.7 kB to 50.5 kB as cook mode leaves it. Raw hex app-wide 118 to 112, with the 19 remaining in Culinara all being `var(--token, #hex)` fallbacks on the public share page. Zero undefined CSS variables, zero legacy control-flow directives and zero `.spinner-lg` copies anywhere in the app.
+
+**The page pass is done.** Phases 0 through 3d cover the shell, Jym, Ledger, Journaly and Culinara.
+
+**Still open.** Phase 4, the landing page, which the audit deferred until real screenshots existed; they exist now. Two backend follow-ups: `GET /culinara/cook-streak` returns 500 when a trial has a null `date_cooked`, and `GET /jym/exercises` has no `last_performed_at`, which is why the exercise library shows the PR date instead. The cook checklist does not survive a refresh, which is stated rather than hidden.
+
