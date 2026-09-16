@@ -7,7 +7,7 @@ import { JymService, SplitSeriesDetail, ExerciseProgression, Routine } from '../
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
-import { chartTones } from '../shared/chart-theme';
+import { chartTones } from '../../../shared/chart-theme';
 
 Chart.register(...registerables);
 

@@ -125,6 +125,8 @@ export interface TransactionFilters {
   account_id?: string;
   category_id?: string;
   type?: string;
+  /** Free-text search over the description and the notes. */
+  q?: string;
   page?: number;
   limit?: number;
 }
@@ -177,6 +179,7 @@ export class LedgerService {
     if (filters.account_id) params = params.set('account_id', filters.account_id);
     if (filters.category_id) params = params.set('category_id', filters.category_id);
     if (filters.type) params = params.set('type', filters.type);
+    if (filters.q) params = params.set('q', filters.q);
     if (filters.page) params = params.set('page', filters.page.toString());
     if (filters.limit) params = params.set('limit', filters.limit.toString());
     return this.http.get<LedgerTransaction[]>(`${API}/transactions`, { params });

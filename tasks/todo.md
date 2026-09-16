@@ -74,3 +74,15 @@ Plan: `~/.claude/plans/jaunty-rolling-dream.md`. Audit: `docs/UI-AUDIT-2026-09.m
 
 **Next: Phase 3b (Ledger)**, using the inputs recorded above.
 
+
+## Phase 3b: Ledger (in progress, plan in `~/.claude/plans/jaunty-rolling-dream.md`)
+
+- [ ] 3b.0 Groundwork: move `chart-theme.ts` to `shared/`, add `transactionColor()` to `ledger-utils.ts`
+- [ ] 3b.1 Search across the whole history: `q` param on the API (model, handler, service with COALESCE on notes), wired to the transaction search box; client-side `visibleTransactions` filter removed; `activeFilterCount()` on signals
+- [ ] 3b.2 Transaction log: `jiro-page-header`, skeleton, three empty states, ConfirmService + toasts, edit modal reuses `ledger-transaction-form` via a new `initial` input, `transactionColor`, 40px targets
+- [ ] 3b.3 Accounts: header becomes a disclosure button with `aria-expanded`, Edit/Delete into `jiro-menu`, panel gets Collapse, ConfirmService + toast, shared states
+- [ ] 3b.4 Hub: floating button removed (it sits behind the 60px mobile bar), header action shown on mobile, `jiro-empty-state compact` for the two mini-empties, tokens
+- [ ] 3b.5 Budgets: `formatCurrency` everywhere, ConfirmService + toast, tokens, period shown on each card
+- [ ] 3b.6 Net worth + Compare: `chartTones()` at draw time, legend driven from the same tones, one `categoryRows()` feeding both layouts, shared states, snapshot modal prefilled from accounts, Compare reuses its chart instance
+- [ ] Verification: `check:css`, production build, `go build ./...`, Playwright desktop + mobile, dark mode on both charts
+- [ ] Commit per step, push at the end, review section below

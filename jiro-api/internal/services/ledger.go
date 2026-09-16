@@ -492,6 +492,13 @@ func (s *LedgerService) ListTransactions(ctx context.Context, userID uuid.UUID, 
 		args = append(args, f.Type)
 		argN++
 	}
+	// Free-text search over the description and the notes. COALESCE because
+	// notes is nullable and NULL ILIKE anything is NULL, not false.
+	if f.Q != "" {
+		query += fmt.Sprintf(" AND (t.description ILIKE $%d OR COALESCE(t.notes, '') ILIKE $%d)", argN, argN)
+		args = append(args, "%"+f.Q+"%")
+		argN++
+	}
 
 	query += " ORDER BY t.date DESC, t.created_at DESC"
 

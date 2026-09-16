@@ -1,10 +1,16 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
+import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
+import { ConfirmService } from '../../../core/services/confirm.service';
+import { ToastService } from '../../../core/services/toast.service';
 import { LedgerTransactionFormComponent, TransactionPayload } from '../shared/transaction-form/ledger-transaction-form';
-import { intervalLabel, parseDateOnly, formatSignedCurrency } from '../shared/ledger-utils';
+import { intervalLabel, parseDateOnly, formatSignedCurrency, transactionColor } from '../shared/ledger-utils';
 import {
   LedgerService,
   LedgerTransaction,
@@ -20,16 +26,6 @@ interface TransactionGroup {
   transactions: LedgerTransaction[];
 }
 
-interface EditForm {
-  category_id: string;
-  amount: number;
-  description: string;
-  notes: string;
-  date: string;
-  is_recurring: boolean;
-  recurrence_interval: 'weekly' | 'biweekly' | 'monthly' | 'yearly' | '';
-}
-
 @Component({
   selector: 'app-transaction-log',
   standalone: true,
@@ -38,40 +34,36 @@ interface EditForm {
     FormsModule,
     JiroButtonComponent,
     JiroModalComponent,
+    JiroIconComponent,
+    JiroPageHeaderComponent,
+    JiroEmptyStateComponent,
+    JiroSkeletonComponent,
     LedgerTransactionFormComponent,
   ],
   template: `
     <div class="transaction-log">
 
       <!-- ── Page Header ─────────────────────────────────────────────────────── -->
-      <div class="page-header">
-        <div>
-          <h1>Transactions</h1>
-          <p class="text-secondary">Your full financial ledger</p>
-        </div>
-        <div class="header-actions">
-          <jiro-button variant="primary" type="button" (click)="openAddModal()">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            Add Transaction
-          </jiro-button>
-        </div>
-      </div>
+      <jiro-page-header heading="Transactions" subtitle="Your full financial ledger">
+        <jiro-button actions type="button" (click)="openAddModal()">
+          <jiro-icon name="plus" [size]="14" />
+          Log transaction
+        </jiro-button>
+      </jiro-page-header>
 
       <!-- ── Desktop Filter Bar ──────────────────────────────────────────────── -->
       <div class="filter-bar desktop-filters">
         <div class="filter-group">
-          <label class="filter-label">From</label>
-          <input type="date" class="date-input" [(ngModel)]="filterFrom" (change)="applyFilters()" />
+          <label class="filter-label" for="tx-from">From</label>
+          <input id="tx-from" type="date" class="date-input" [ngModel]="filterFrom()" (ngModelChange)="filterFrom.set($event)" (change)="applyFilters()" />
         </div>
         <div class="filter-group">
-          <label class="filter-label">To</label>
-          <input type="date" class="date-input" [(ngModel)]="filterTo" (change)="applyFilters()" />
+          <label class="filter-label" for="tx-to">To</label>
+          <input id="tx-to" type="date" class="date-input" [ngModel]="filterTo()" (ngModelChange)="filterTo.set($event)" (change)="applyFilters()" />
         </div>
         <div class="filter-group">
-          <label class="filter-label">Account</label>
-          <select class="filter-select" [(ngModel)]="filterAccountId" (change)="applyFilters()">
+          <label class="filter-label" for="tx-account">Account</label>
+          <select id="tx-account" class="filter-select" [ngModel]="filterAccountId()" (ngModelChange)="filterAccountId.set($event)" (change)="applyFilters()">
             <option value="">All accounts</option>
             @for (a of accounts(); track a) {
 <option [value]="a.id">{{ a.name }}</option>
@@ -79,8 +71,8 @@ interface EditForm {
           </select>
         </div>
         <div class="filter-group">
-          <label class="filter-label">Category</label>
-          <select class="filter-select" [(ngModel)]="filterCategoryId" (change)="applyFilters()">
+          <label class="filter-label" for="tx-category">Category</label>
+          <select id="tx-category" class="filter-select" [ngModel]="filterCategoryId()" (ngModelChange)="filterCategoryId.set($event)" (change)="applyFilters()">
             <option value="">All categories</option>
             @for (c of flatCategories(); track c) {
 <option [value]="c.id">{{ c.name }}</option>
@@ -94,7 +86,9 @@ interface EditForm {
 <button
              
               class="type-btn"
-              [class.active]="filterType === t.value"
+              type="button"
+              [attr.aria-pressed]="filterType() === t.value"
+              [class.active]="filterType() === t.value"
               (click)="setType(t.value)">
               {{ t.label }}
             </button>
@@ -102,24 +96,22 @@ interface EditForm {
           </div>
         </div>
         <div class="filter-group search-group">
-          <label class="filter-label">Search</label>
+          <label class="filter-label" for="tx-search">Search</label>
           <div class="search-input-wrap">
-            <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            </svg>
+            <jiro-icon class="search-icon" name="magnifying-glass" [size]="14" />
             <input
-              type="text"
+              id="tx-search"
+              type="search"
               class="search-input"
-              placeholder="Search description..."
-              [(ngModel)]="searchQuery" />
+              placeholder="Search description or notes..."
+              [ngModel]="searchQuery()"
+              (ngModelChange)="onSearchChange($event)" />
           </div>
         </div>
         <div class="filter-group">
           <label class="filter-label">&nbsp;</label>
-          <button class="clear-btn" (click)="clearFilters()">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
+          <button class="clear-btn" type="button" (click)="clearFilters()">
+            <jiro-icon name="x" [size]="12" />
             Clear
           </button>
         </div>
@@ -127,8 +119,8 @@ interface EditForm {
 
       <!-- ── Mobile Filter Toggle ────────────────────────────────────────────── -->
       <div class="mobile-filter-header">
-        <button class="mobile-filter-toggle" (click)="mobileFiltersOpen.set(!mobileFiltersOpen())">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <button class="mobile-filter-toggle" type="button" [attr.aria-expanded]="mobileFiltersOpen()" (click)="mobileFiltersOpen.set(!mobileFiltersOpen())">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <line x1="4" y1="6" x2="20" y2="6"/>
             <line x1="8" y1="12" x2="16" y2="12"/>
             <line x1="10" y1="18" x2="14" y2="18"/>
@@ -143,7 +135,9 @@ interface EditForm {
 <button
            
             class="type-btn"
-            [class.active]="filterType === t.value"
+            type="button"
+            [attr.aria-pressed]="filterType() === t.value"
+            [class.active]="filterType() === t.value"
             (click)="setType(t.value)">
             {{ t.label }}
           </button>
@@ -155,16 +149,16 @@ interface EditForm {
       <div class="mobile-filter-panel" [class.open]="mobileFiltersOpen()">
         <div class="mobile-filter-grid">
           <div class="filter-group">
-            <label class="filter-label">From</label>
-            <input type="date" class="date-input" [(ngModel)]="filterFrom" (change)="applyFilters()" />
+            <label class="filter-label" for="tx-from-m">From</label>
+            <input id="tx-from-m" type="date" class="date-input" [ngModel]="filterFrom()" (ngModelChange)="filterFrom.set($event)" (change)="applyFilters()" />
           </div>
           <div class="filter-group">
-            <label class="filter-label">To</label>
-            <input type="date" class="date-input" [(ngModel)]="filterTo" (change)="applyFilters()" />
+            <label class="filter-label" for="tx-to-m">To</label>
+            <input id="tx-to-m" type="date" class="date-input" [ngModel]="filterTo()" (ngModelChange)="filterTo.set($event)" (change)="applyFilters()" />
           </div>
           <div class="filter-group">
-            <label class="filter-label">Account</label>
-            <select class="filter-select" [(ngModel)]="filterAccountId" (change)="applyFilters()">
+            <label class="filter-label" for="tx-account-m">Account</label>
+            <select id="tx-account-m" class="filter-select" [ngModel]="filterAccountId()" (ngModelChange)="filterAccountId.set($event)" (change)="applyFilters()">
               <option value="">All accounts</option>
               @for (a of accounts(); track a) {
 <option [value]="a.id">{{ a.name }}</option>
@@ -172,8 +166,8 @@ interface EditForm {
             </select>
           </div>
           <div class="filter-group">
-            <label class="filter-label">Category</label>
-            <select class="filter-select" [(ngModel)]="filterCategoryId" (change)="applyFilters()">
+            <label class="filter-label" for="tx-category-m">Category</label>
+            <select id="tx-category-m" class="filter-select" [ngModel]="filterCategoryId()" (ngModelChange)="filterCategoryId.set($event)" (change)="applyFilters()">
               <option value="">All categories</option>
               @for (c of flatCategories(); track c) {
 <option [value]="c.id">{{ c.name }}</option>
@@ -181,24 +175,22 @@ interface EditForm {
             </select>
           </div>
           <div class="filter-group full-width">
-            <label class="filter-label">Search</label>
+            <label class="filter-label" for="tx-search-m">Search</label>
             <div class="search-input-wrap">
-              <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-              </svg>
+              <jiro-icon class="search-icon" name="magnifying-glass" [size]="14" />
               <input
-                type="text"
+                id="tx-search-m"
+                type="search"
                 class="search-input"
-                placeholder="Search description..."
-                [(ngModel)]="searchQuery" />
+                placeholder="Search description or notes..."
+                [ngModel]="searchQuery()"
+                (ngModelChange)="onSearchChange($event)" />
             </div>
           </div>
           <div class="filter-group full-width">
-            <button class="clear-btn" (click)="clearFilters(); mobileFiltersOpen.set(false)">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
-              Clear Filters
+            <button class="clear-btn" type="button" (click)="clearFilters(); mobileFiltersOpen.set(false)">
+              <jiro-icon name="x" [size]="12" />
+              Clear filters
             </button>
           </div>
         </div>
@@ -206,42 +198,32 @@ interface EditForm {
 
       <!-- ── Loading ─────────────────────────────────────────────────────────── -->
       @if (loading()) {
-<div class="state-message">
-        <div class="spinner-lg"></div>
-        <p>Loading transactions...</p>
-      </div>
-}
+        <div class="tx-loading" aria-busy="true" aria-label="Loading transactions">
+          <jiro-skeleton [lines]="8" height="56px" />
+        </div>
+      }
 
-      <!-- ── Empty state (no transactions at all) ────────────────────────────── -->
+      <!-- ── Empty and no-result states ──────────────────────────────────────── -->
       @if (!loading() && allTransactions().length === 0) {
-<div class="state-message">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5">
-          <rect x="2" y="5" width="20" height="14" rx="2"/>
-          <line x1="2" y1="10" x2="22" y2="10"/>
-        </svg>
-        <h3>No transactions yet</h3>
-        <p class="text-secondary">Log your first transaction to start tracking your finances.</p>
-        <jiro-button variant="primary" type="button" (click)="openAddModal()">
-          Log Your First Transaction
-        </jiro-button>
-      </div>
-}
-
-      <!-- ── No-results state (filters return nothing) ───────────────────────── -->
-      @if (!loading() && allTransactions().length > 0 && visibleTransactions().length === 0) {
-<div class="state-message">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5">
-          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          <line x1="8" y1="11" x2="14" y2="11"/>
-        </svg>
-        <h3>No results</h3>
-        <p class="text-secondary">No transactions match your current filters.</p>
-        <button class="clear-btn-inline" (click)="clearFilters()">Clear filters</button>
-      </div>
-}
+        @if (activeFilterCount() > 0) {
+          <jiro-empty-state
+            icon="magnifying-glass"
+            heading="No matching transactions"
+            message="Nothing in your ledger matches these filters.">
+            <jiro-button variant="secondary" type="button" (click)="clearFilters()">Clear filters</jiro-button>
+          </jiro-empty-state>
+        } @else {
+          <jiro-empty-state
+            icon="receipt"
+            heading="No transactions yet"
+            message="Log your first transaction to start tracking where your money goes.">
+            <jiro-button type="button" (click)="openAddModal()">Log your first transaction</jiro-button>
+          </jiro-empty-state>
+        }
+      }
 
       <!-- ── Transaction list grouped by date ───────────────────────────────── -->
-      @if (!loading() && visibleTransactions().length > 0) {
+      @if (!loading() && allTransactions().length > 0) {
 <div class="transaction-list">
         @for (group of groupedTransactions(); track group) {
 
@@ -265,7 +247,7 @@ interface EditForm {
             <div class="tx-left">
               <div
                 class="tx-type-bar"
-                [style.background]="tx.category_color || getTypeColor(tx.type)">
+                [style.background]="tx.category_color || transactionColor(tx.type)">
               </div>
               <div class="tx-details">
                 <div class="tx-description">
@@ -312,11 +294,11 @@ interface EditForm {
             <div class="tx-right">
               <div
                 class="tx-amount"
-                [style.color]="getAmountColor(tx.type)">
+                [style.color]="transactionColor(tx.type)">
                 {{ formatAmount(tx.amount, tx.type) }}
               </div>
               <div class="tx-date-small">{{ formatDateShort(tx.date) }}</div>
-              <svg class="tx-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <svg class="tx-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                 <polyline points="9,18 15,12 9,6"/>
               </svg>
             </div>
@@ -328,8 +310,8 @@ interface EditForm {
         <!-- Load more -->
         @if (hasMore()) {
 <div class="load-more-row">
-          <jiro-button variant="secondary" type="button" [disabled]="loadingMore()" (click)="loadMore()">
-            {{ loadingMore() ? 'Loading...' : 'Load More' }}
+          <jiro-button variant="secondary" type="button" [loading]="loadingMore()" (click)="loadMore()">
+            Load more
           </jiro-button>
         </div>
 }
@@ -338,157 +320,39 @@ interface EditForm {
     </div>
 
     <!-- ── Edit Transaction Modal ──────────────────────────────────────────── -->
-    @if (editingTx()) {
-<jiro-modal
-     
-      title="Edit Transaction"
-      maxWidth="520px"
-      (close)="closeEditModal()">
-      @if (editForm) {
-<form class="tx-form" (ngSubmit)="saveEdit()">
-
-        <div class="tx-type-indicator" [style.background]="getTypeColor(editingTx()!.type) + '18'">
-          <span class="tx-type-pill" [style.background]="getTypeColor(editingTx()!.type)" [style.color]="'#fff'">
-            {{ editingTx()!.type | titlecase }}
-          </span>
-          <span class="tx-type-account">{{ getAccountName(editingTx()!.account_id) }}</span>
-        </div>
-
-        <!-- Amount — grayed out for transfers -->
-        <div class="form-group">
-          <label class="form-label">Amount</label>
-          <input
-            class="form-input"
-            type="number"
-            min="0"
-            step="0.01"
-            [(ngModel)]="editForm.amount"
-            name="amount"
-            placeholder="0.00"
-            [disabled]="editingTx()!.type === 'transfer'"
-            [class.field-disabled]="editingTx()!.type === 'transfer'" />
-          @if (editingTx()!.type === 'transfer') {
-<p class="field-hint">Amount cannot be changed on transfers.</p>
-}
-        </div>
-
-        <!-- Category — hidden for transfers -->
-        @if (editingTx()!.type !== 'transfer') {
-<div class="form-group">
-          <label class="form-label">Category</label>
-          <select class="form-input" [(ngModel)]="editForm.category_id" name="category_id">
-            <option value="">No category</option>
-            @for (c of flatCategoriesByType(editingTx()!.type); track c) {
-<option [value]="c.id">{{ c.name }}</option>
-}
-          </select>
-        </div>
-}
-
-        <div class="form-group">
-          <label class="form-label">Description</label>
-          <input
-            class="form-input"
-            type="text"
-            [(ngModel)]="editForm.description"
-            name="description"
-            placeholder="What was this for?" />
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Notes</label>
-          <textarea
-            class="form-input form-textarea"
-            [(ngModel)]="editForm.notes"
-            name="notes"
-            rows="2"
-            placeholder="Optional notes..."></textarea>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Date</label>
-          <input
-            class="form-input"
-            type="date"
-            [(ngModel)]="editForm.date"
-            name="date" />
-        </div>
-
-        <!-- Recurring toggle -->
-        <div class="form-group">
-          <div class="toggle-row">
-            <label class="form-label" style="margin:0">Recurring</label>
-            <button
-              type="button"
-              class="toggle-btn"
-              [class.on]="editForm.is_recurring"
-              (click)="editForm.is_recurring = !editForm.is_recurring">
-              <span class="toggle-knob"></span>
-            </button>
-          </div>
-        </div>
-
-        @if (editForm.is_recurring) {
-<div class="form-group">
-          <label class="form-label">Recurrence</label>
-          <select class="form-input" [(ngModel)]="editForm.recurrence_interval" name="recurrence_interval">
-            <option value="weekly">Weekly</option>
-            <option value="biweekly">Biweekly</option>
-            <option value="monthly">Monthly</option>
-            <option value="yearly">Yearly</option>
-          </select>
-        </div>
-}
-
-        <div class="form-actions">
-          <jiro-button variant="danger" type="button" [disabled]="saving() || deleting()" (click)="confirmDeleteTx()">
-            {{ deleting() ? 'Deleting...' : 'Delete' }}
-          </jiro-button>
-          <div class="form-actions-right">
-            <jiro-button variant="secondary" type="button" (click)="closeEditModal()">Cancel</jiro-button>
-            <jiro-button variant="primary" type="submit" [disabled]="saving() || deleting()">
-              {{ saving() ? 'Saving...' : 'Save' }}
-            </jiro-button>
-          </div>
-        </div>
-      </form>
-}
-    </jiro-modal>
-}
-
-    <!-- Delete confirmation nested within edit context -->
-    @if (confirmingDelete()) {
-<jiro-modal
-     
-      title="Delete Transaction?"
-      maxWidth="400px"
-      (close)="confirmingDelete.set(false)">
-      <div class="delete-confirm">
-        <p>Permanently delete <strong>{{ editingTx()?.description }}</strong>?</p>
-        <p class="text-secondary" style="font-size: var(--font-size-sm); margin-top: var(--space-xs);">
-          This action cannot be undone.
-        </p>
-        <div class="form-actions" style="margin-top: var(--space-lg);">
-          <jiro-button variant="secondary" type="button" (click)="confirmingDelete.set(false)">Cancel</jiro-button>
-          <jiro-button variant="danger" type="button" [disabled]="deleting()" (click)="executeDelete()">
-            {{ deleting() ? 'Deleting...' : 'Delete' }}
+    @if (editingTx(); as tx) {
+      <jiro-modal title="Edit transaction" maxWidth="520px" (close)="closeEditModal()">
+        <ledger-transaction-form
+          [accounts]="accounts()"
+          [saving]="saving()"
+          [initial]="editInitial()"
+          [lockType]="true"
+          submitLabel="Save changes"
+          (formSubmit)="saveEdit($event)"
+          (formCancel)="closeEditModal()">
+        </ledger-transaction-form>
+        @if (tx.type === 'transfer') {
+          <p class="field-hint">Account and amount cannot be changed on a transfer. Delete it and log it again instead.</p>
+        }
+        <div class="danger-row">
+          <jiro-button variant="danger" size="sm" type="button" (click)="deleteTransaction(tx)">
+            Delete transaction
           </jiro-button>
         </div>
-      </div>
-    </jiro-modal>
-}
+      </jiro-modal>
+    }
 
     <!-- ── Add Transaction Modal ───────────────────────────────────────────── -->
     @if (showAddModal()) {
 <jiro-modal
      
-      title="Add Transaction"
+      title="Log transaction"
       maxWidth="520px"
       (close)="closeAddModal()">
       <ledger-transaction-form
         [accounts]="accounts()"
         [saving]="saving()"
-        submitLabel="Add Transaction"
+        submitLabel="Log transaction"
         (formSubmit)="onAddSubmit($event)"
         (formCancel)="closeAddModal()">
       </ledger-transaction-form>
@@ -502,14 +366,13 @@ interface EditForm {
 
     /* ── Header ─────────────────────────────────────────────────────────────── */
 
-    .page-header {
-      display: flex; align-items: flex-start; justify-content: space-between;
-      margin-bottom: var(--space-lg); gap: var(--space-md);
+    .tx-loading { display: block; margin-top: var(--space-lg); }
+
+    .danger-row {
+      display: flex; justify-content: flex-start;
+      margin-top: var(--space-lg); padding-top: var(--space-md);
+      border-top: 1px solid var(--border-color);
     }
-
-    .page-header h1 { font-size: var(--font-size-2xl); font-weight: 700; }
-
-    .header-actions { display: flex; gap: var(--space-sm); flex-shrink: 0; align-items: center; }
 
 
     /* ── Filter bar ─────────────────────────────────────────────────────────── */
@@ -656,31 +519,6 @@ interface EditForm {
     }
 
     .full-width { grid-column: 1 / -1; }
-
-    /* ── State messages ─────────────────────────────────────────────────────── */
-
-    .state-message {
-      display: flex; flex-direction: column; align-items: center;
-      justify-content: center; padding: var(--space-2xl);
-      gap: var(--space-md); text-align: center;
-    }
-
-    .state-message h3 { font-size: var(--font-size-lg); font-weight: 600; }
-
-
-    .clear-btn-inline {
-      background: none; border: none;
-      color: var(--color-primary); font-size: var(--font-size-sm);
-      cursor: pointer; text-decoration: underline;
-    }
-
-    .spinner-lg {
-      width: 40px; height: 40px;
-      border: 3px solid var(--border-color);
-      border-top-color: var(--color-primary);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
 
     /* ── Transaction list ───────────────────────────────────────────────────── */
 
@@ -894,8 +732,6 @@ interface EditForm {
 
     .form-actions-right { display: flex; gap: var(--space-sm); }
 
-    .delete-confirm { display: flex; flex-direction: column; gap: var(--space-xs); }
-
     /* ── Responsive ─────────────────────────────────────────────────────────── */
 
     @media (max-width: 768px) {
@@ -934,7 +770,6 @@ export class TransactionLogComponent implements OnInit {
   mobileFiltersOpen = signal(false);
   showAddModal = signal(false);
   editingTx = signal<LedgerTransaction | null>(null);
-  confirmingDelete = signal(false);
 
   // ── Flat category list derived from tree ──────────────────────────────────
   flatCategories = computed<LedgerCategory[]>(() => {
@@ -949,14 +784,20 @@ export class TransactionLogComponent implements OnInit {
   });
 
   // ── Filter state ──────────────────────────────────────────────────────────
-  filterFrom = '';
-  filterTo = '';
-  filterAccountId = '';
-  filterCategoryId = '';
-  filterType = '';
-  searchQuery = '';
+  // Signals, so the mobile filter badge recomputes the moment a filter changes.
+  filterFrom = signal('');
+  filterTo = signal('');
+  filterAccountId = signal('');
+  filterCategoryId = signal('');
+  filterType = signal('');
+  searchQuery = signal('');
   private currentPage = 1;
+  private searchTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly PAGE_LIMIT = 50;
+
+  private readonly confirmService = inject(ConfirmService);
+  private readonly toast = inject(ToastService);
+  readonly transactionColor = transactionColor;
 
   readonly typeOptions = [
     { label: 'All', value: '' },
@@ -965,31 +806,35 @@ export class TransactionLogComponent implements OnInit {
     { label: 'Transfer', value: 'transfer' },
   ];
 
-  activeFilterCount = computed(() => {
-    let count = 0;
-    if (this.filterFrom) count++;
-    if (this.filterTo) count++;
-    if (this.filterAccountId) count++;
-    if (this.filterCategoryId) count++;
-    if (this.filterType) count++;
-    if (this.searchQuery) count++;
-    return count;
-  });
+  activeFilterCount = computed(() =>
+    [
+      this.filterFrom(), this.filterTo(), this.filterAccountId(),
+      this.filterCategoryId(), this.filterType(), this.searchQuery().trim(),
+    ].filter(Boolean).length
+  );
 
-  // ── Client-side search filter ─────────────────────────────────────────────
-  visibleTransactions = computed<LedgerTransaction[]>(() => {
-    const q = this.searchQuery.trim().toLowerCase();
-    if (!q) return this.allTransactions();
-    return this.allTransactions().filter(tx =>
-      tx.description.toLowerCase().includes(q) ||
-      (tx.notes && tx.notes.toLowerCase().includes(q))
-    );
+  /** Pre-fills the edit form from the transaction being edited. */
+  editInitial = computed<Partial<TransactionPayload> | null>(() => {
+    const tx = this.editingTx();
+    if (!tx) return null;
+    return {
+      type: tx.type as TransactionPayload['type'],
+      account_id: tx.account_id,
+      transfer_to_account_id: tx.transfer_to_account_id,
+      category_id: tx.category_id,
+      amount: Math.abs(tx.amount),
+      description: tx.description,
+      notes: tx.notes,
+      is_recurring: tx.is_recurring,
+      recurrence_interval: tx.recurrence_interval as TransactionPayload['recurrence_interval'],
+      date: tx.date.slice(0, 10),
+    };
   });
 
   // ── Grouped by date ───────────────────────────────────────────────────────
   groupedTransactions = computed<TransactionGroup[]>(() => {
     const groups = new Map<string, LedgerTransaction[]>();
-    for (const tx of this.visibleTransactions()) {
+    for (const tx of this.allTransactions()) {
       const d = tx.date.slice(0, 10);
       if (!groups.has(d)) groups.set(d, []);
       groups.get(d)!.push(tx);
@@ -1004,8 +849,6 @@ export class TransactionLogComponent implements OnInit {
   readonly intervalLabel = intervalLabel;
 
   // ── Form state ────────────────────────────────────────────────────────────
-  editForm: EditForm | null = null;
-
   constructor(private ledgerService: LedgerService) {}
 
   ngOnInit() {
@@ -1040,11 +883,12 @@ export class TransactionLogComponent implements OnInit {
       page: this.currentPage,
       limit: this.PAGE_LIMIT,
     };
-    if (this.filterFrom) filters.from = this.filterFrom;
-    if (this.filterTo) filters.to = this.filterTo;
-    if (this.filterAccountId) filters.account_id = this.filterAccountId;
-    if (this.filterCategoryId) filters.category_id = this.filterCategoryId;
-    if (this.filterType) filters.type = this.filterType;
+    if (this.filterFrom()) filters.from = this.filterFrom();
+    if (this.filterTo()) filters.to = this.filterTo();
+    if (this.filterAccountId()) filters.account_id = this.filterAccountId();
+    if (this.filterCategoryId()) filters.category_id = this.filterCategoryId();
+    if (this.filterType()) filters.type = this.filterType();
+    if (this.searchQuery().trim()) filters.q = this.searchQuery().trim();
 
     this.ledgerService.listTransactions(filters).subscribe({
       next: txs => {
@@ -1060,6 +904,7 @@ export class TransactionLogComponent implements OnInit {
       error: () => {
         this.loading.set(false);
         this.loadingMore.set(false);
+        this.toast.error('Could not load your transactions.');
       },
     });
   }
@@ -1068,18 +913,26 @@ export class TransactionLogComponent implements OnInit {
     this.loadTransactions();
   }
 
+  /** Search runs on the server, so debounce before asking for a new page 1. */
+  onSearchChange(value: string) {
+    this.searchQuery.set(value);
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => this.applyFilters(), 300);
+  }
+
   setType(value: string) {
-    this.filterType = value;
+    this.filterType.set(value);
     this.applyFilters();
   }
 
   clearFilters() {
-    this.filterFrom = '';
-    this.filterTo = '';
-    this.filterAccountId = '';
-    this.filterCategoryId = '';
-    this.filterType = '';
-    this.searchQuery = '';
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.filterFrom.set('');
+    this.filterTo.set('');
+    this.filterAccountId.set('');
+    this.filterCategoryId.set('');
+    this.filterType.set('');
+    this.searchQuery.set('');
     this.applyFilters();
   }
 
@@ -1092,42 +945,29 @@ export class TransactionLogComponent implements OnInit {
 
   openEditModal(tx: LedgerTransaction) {
     this.editingTx.set(tx);
-    this.confirmingDelete.set(false);
-    this.editForm = {
-      category_id: tx.category_id ?? '',
-      amount: Math.abs(tx.amount),
-      description: tx.description,
-      notes: tx.notes ?? '',
-      date: tx.date.slice(0, 10),
-      is_recurring: tx.is_recurring,
-      recurrence_interval: tx.recurrence_interval ?? '',
-    };
   }
 
   closeEditModal() {
     this.editingTx.set(null);
-    this.editForm = null;
-    this.confirmingDelete.set(false);
   }
 
-  saveEdit() {
+  saveEdit(payload: TransactionPayload) {
     const tx = this.editingTx();
-    if (!tx || !this.editForm) return;
+    if (!tx) return;
     this.saving.set(true);
 
     const req: Partial<LedgerTransaction> = {
-      description: this.editForm.description,
-      notes: this.editForm.notes || null,
-      date: this.editForm.date,
-      is_recurring: this.editForm.is_recurring,
-      recurrence_interval: this.editForm.is_recurring && this.editForm.recurrence_interval
-        ? this.editForm.recurrence_interval as LedgerTransaction['recurrence_interval']
-        : null,
+      description: payload.description,
+      notes: payload.notes || null,
+      date: payload.date,
+      is_recurring: payload.is_recurring,
+      recurrence_interval: payload.is_recurring ? payload.recurrence_interval : null,
     };
 
+    // A transfer writes two rows, so its account and amount are fixed once logged.
     if (tx.type !== 'transfer') {
-      req.category_id = this.editForm.category_id || null;
-      req.amount = this.editForm.amount;
+      req.category_id = payload.category_id || null;
+      req.amount = payload.amount;
     }
 
     this.ledgerService.updateTransaction(tx.id, req).subscribe({
@@ -1137,26 +977,32 @@ export class TransactionLogComponent implements OnInit {
         );
         this.saving.set(false);
         this.closeEditModal();
+        this.toast.success('Transaction saved');
       },
-      error: () => this.saving.set(false),
+      error: () => {
+        this.saving.set(false);
+        this.toast.error('Could not save the transaction.');
+      },
     });
   }
 
-  confirmDeleteTx() {
-    this.confirmingDelete.set(true);
-  }
-
-  executeDelete() {
-    const tx = this.editingTx();
-    if (!tx) return;
-    this.deleting.set(true);
+  async deleteTransaction(tx: LedgerTransaction) {
+    const ok = await this.confirmService.confirm({
+      title: `Delete ${tx.description || 'this transaction'}?`,
+      message: tx.type === 'transfer'
+        ? 'Both sides of the transfer are removed and the account balances are corrected.'
+        : 'The transaction is removed and the account balance is corrected. This cannot be undone.',
+      confirmLabel: 'Delete transaction',
+      danger: true,
+    });
+    if (!ok) return;
     this.ledgerService.deleteTransaction(tx.id).subscribe({
       next: () => {
         this.allTransactions.update(list => list.filter(t => t.id !== tx.id));
-        this.deleting.set(false);
         this.closeEditModal();
+        this.toast.success('Transaction deleted');
       },
-      error: () => this.deleting.set(false),
+      error: () => this.toast.error('Could not delete the transaction.'),
     });
   }
 
@@ -1190,18 +1036,6 @@ export class TransactionLogComponent implements OnInit {
     // in case an older row was stored unsigned.
     const signed = type === 'expense' ? -Math.abs(amount) : Math.abs(amount);
     return formatSignedCurrency(signed);
-  }
-
-  getAmountColor(type: string): string {
-    if (type === 'income') return 'var(--color-accent)';
-    if (type === 'expense') return 'var(--color-danger)';
-    return '#3B82F6';
-  }
-
-  getTypeColor(type: string): string {
-    if (type === 'income') return 'var(--color-accent)';
-    if (type === 'expense') return 'var(--color-danger)';
-    return '#3B82F6';
   }
 
   getAccountName(accountId: string | null): string {
