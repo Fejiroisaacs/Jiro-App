@@ -3,6 +3,7 @@ import { ConfirmService } from '../../../core/services/confirm.service';
 
 import { RouterLink } from '@angular/router';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
+import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 
 export interface ShopItem {
   id: string;
@@ -17,27 +18,25 @@ const STORAGE_KEY = 'culinara_shopping_list';
 @Component({
   selector: 'app-shopping-list',
   standalone: true,
-  imports: [RouterLink, JiroButtonComponent],
+  imports: [RouterLink, JiroButtonComponent, JiroPageHeaderComponent],
   template: `
     <div class="shopping-list">
-      <div class="page-header">
-        <div>
-          <h1>Grocery List</h1>
-          <p class="text-secondary">{{ uncheckedCount() }} item{{ uncheckedCount() !== 1 ? 's' : '' }} remaining</p>
-        </div>
-        <div class="header-actions">
+      <jiro-page-header
+        heading="Grocery list"
+        [subtitle]="uncheckedCount() + (uncheckedCount() === 1 ? ' item remaining' : ' items remaining')">
+        <div actions class="header-actions">
           @if (checkedCount() > 0) {
-<button class="action-btn" (click)="clearChecked()">
-            Clear checked ({{ checkedCount() }})
-          </button>
-}
+            <button class="action-btn" type="button" (click)="clearChecked()">
+              Clear checked ({{ checkedCount() }})
+            </button>
+          }
           @if (items().length > 0) {
-<button class="action-btn action-btn--danger" (click)="clearAll()">
-            Clear all
-          </button>
-}
+            <button class="action-btn action-btn--danger" type="button" (click)="clearAll()">
+              Clear all
+            </button>
+          }
         </div>
-      </div>
+      </jiro-page-header>
 
       <!-- Empty state -->
       @if (items().length === 0) {
@@ -76,7 +75,8 @@ const STORAGE_KEY = 'culinara_shopping_list';
               (change)="toggleItem(item.id)" />
             <span class="item-name">{{ item.item }}</span>
             <span class="item-amount">{{ item.amount }}</span>
-            <button class="remove-item" (click)="removeItem(item.id)" title="Remove">×</button>
+            <button class="remove-item" type="button" (click)="removeItem(item.id)" title="Remove"
+              [attr.aria-label]="'Remove ' + item.item + ' from the list'">×</button>
           </label>
 }
         </div>
@@ -89,26 +89,8 @@ const STORAGE_KEY = 'culinara_shopping_list';
       max-width: 640px;
     }
 
-    .page-header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      margin-bottom: var(--space-xl);
-      gap: var(--space-md);
-    }
 
-    .back-link {
-      display: inline-block;
-      color: var(--text-muted);
-      font-size: var(--font-size-sm);
-      text-decoration: none;
-      margin-bottom: var(--space-sm);
-      transition: color 0.15s;
-    }
 
-    .back-link:hover {
-      color: var(--text-primary);
-    }
 
     .page-header h1 {
       font-size: var(--font-size-2xl);

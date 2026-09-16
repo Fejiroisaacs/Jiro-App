@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { MealPlanService, MealPlan, MealPlanEntry, MealSlot } from '../../../core/services/meal-plan.service';
 import { RecipeService, Recipe } from '../../../core/services/recipe.service';
 import { ShoppingListComponent } from '../shopping-list/shopping-list';
+import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const SLOTS: { key: MealSlot; label: string }[] = [
@@ -35,33 +36,30 @@ function addWeeks(d: Date, n: number): Date {
 @Component({
   selector: 'app-meal-planner',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, JiroPageHeaderComponent],
   template: `
     <div class="planner-page">
       <!-- Header -->
-      <div class="page-header">
-        <div>
-          <h1>Meal Planner</h1>
-          <p class="text-secondary">{{ weekLabel() }}</p>
-        </div>
-        <div class="header-actions">
-          <button class="nav-btn" (click)="prevWeek()">‹ Prev</button>
-          <button class="nav-btn today-btn" (click)="goToday()">Today</button>
-          <button class="nav-btn" (click)="nextWeek()">Next ›</button>
-          <button class="grocery-btn" (click)="addAllToGrocery()" title="Add all planned recipes to grocery list">
+      <jiro-page-header heading="Meal planner" [subtitle]="weekLabel()">
+        <div actions class="header-actions">
+          <button class="nav-btn" type="button" (click)="prevWeek()" aria-label="Previous week">‹ Prev</button>
+          <button class="nav-btn today-btn" type="button" (click)="goToday()">Today</button>
+          <button class="nav-btn" type="button" (click)="nextWeek()" aria-label="Next week">Next ›</button>
+          <button class="grocery-btn" type="button" (click)="addAllToGrocery()" title="Add all planned recipes to grocery list"
+            aria-label="Add every planned recipe to the grocery list">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
               <line x1="3" y1="6" x2="21" y2="6"/>
               <path d="M16 10a4 4 0 0 1-8 0"/>
             </svg>
-            {{ groceryAdded() ? 'Added!' : 'Add to Grocery List' }}
+            Add to grocery list
           </button>
         </div>
-      </div>
+      </jiro-page-header>
 
       <!-- Loading -->
       @if (loading()) {
-<div class="loading-state">
+<div class="state-loading" aria-busy="true">
         <div class="spinner"></div>
       </div>
 }
@@ -96,7 +94,8 @@ function addWeeks(d: Date, n: number): Date {
                 class="entry-chip"
                 (click)="$event.stopPropagation()">
                 <span class="chip-title">{{ entry.recipe_title || entry.custom_label || 'Unnamed' }}</span>
-                <button class="chip-remove" (click)="removeEntry(entry)" title="Remove">×</button>
+                <button class="chip-remove" type="button" (click)="removeEntry(entry)" title="Remove from this day"
+                  [attr.aria-label]="'Remove ' + entry.recipe_title + ' from this day'">×</button>
               </div>
 }
 
@@ -162,23 +161,7 @@ function addWeeks(d: Date, n: number): Date {
       margin: 0 auto;
     }
 
-    .page-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: var(--space-md);
-      margin-bottom: var(--space-lg);
-      flex-wrap: wrap;
-    }
 
-    .back-link {
-      font-size: var(--font-size-sm);
-      color: var(--text-muted);
-      text-decoration: none;
-      display: block;
-      margin-bottom: 4px;
-    }
-    .back-link:hover { color: var(--text-secondary); }
 
     h1 { margin: 0 0 2px; font-size: var(--font-size-xl); }
     .text-secondary { margin: 0; color: var(--text-secondary); font-size: var(--font-size-sm); }
@@ -210,7 +193,7 @@ function addWeeks(d: Date, n: number): Date {
       gap: 6px;
       padding: 6px 14px;
       background: var(--color-primary);
-      color: #fff;
+      color: var(--text-on-primary);
       border: none;
       border-radius: var(--border-radius);
       font-size: var(--font-size-sm);
@@ -221,11 +204,7 @@ function addWeeks(d: Date, n: number): Date {
     }
     .grocery-btn:hover { opacity: 0.88; }
 
-    .loading-state {
-      display: flex;
-      justify-content: center;
-      padding: 80px;
-    }
+    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
     .spinner {
       width: 32px;
       height: 32px;
@@ -305,7 +284,7 @@ function addWeeks(d: Date, n: number): Date {
       align-items: center;
       gap: 4px;
       background: var(--color-primary);
-      color: #fff;
+      color: var(--text-on-primary);
       border-radius: 4px;
       padding: 3px 6px 3px 8px;
       font-size: 0.72rem;
@@ -331,7 +310,7 @@ function addWeeks(d: Date, n: number): Date {
       line-height: 1;
       transition: color 0.1s;
     }
-    .chip-remove:hover { color: #fff; }
+    .chip-remove:hover { color: var(--text-on-primary); }
 
     .add-placeholder {
       opacity: 0;
@@ -348,7 +327,7 @@ function addWeeks(d: Date, n: number): Date {
       position: fixed;
       inset: 0;
       background: rgba(0,0,0,0.4);
-      z-index: 200;
+      z-index: var(--z-sticky);
       display: flex;
       align-items: center;
       justify-content: center;

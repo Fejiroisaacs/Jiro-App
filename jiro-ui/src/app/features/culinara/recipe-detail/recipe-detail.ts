@@ -16,19 +16,11 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 import { RecipeFormComponent } from '../recipe-form/recipe-form';
 import { TrialModalComponent } from '../trial-modal/trial-modal';
 import { PromoteDialogComponent } from '../promote-dialog/promote-dialog';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroMenuComponent, JiroMenuItem } from '../../../shared/components/jiro-menu/jiro-menu';
+import { ToastService } from '../../../core/services/toast.service';
 
 type MobileTab = 'recipe' | 'trials';
-
-interface CookStep {
-  text: string;
-  done: boolean;
-}
-
-interface CookIngredient {
-  item: string;
-  amount: string;
-  checked: boolean;
-}
 
 @Component({
   selector: 'app-recipe-detail',
@@ -36,6 +28,8 @@ interface CookIngredient {
   imports: [
     RouterLink,
     JiroButtonComponent,
+    JiroIconComponent,
+    JiroMenuComponent,
     JiroModalComponent,
     RecipeFormComponent,
     TrialModalComponent,
@@ -46,7 +40,7 @@ interface CookIngredient {
       <!-- Loading -->
       @if (loading()) {
 <div class="state-center">
-        <div class="spinner-lg"></div>
+        <span class="spinner"></span>
       </div>
 }
 
@@ -91,11 +85,11 @@ interface CookIngredient {
 <div class="cover-hero">
               <img [src]="r.cover_image_url" [alt]="r.title" class="cover-hero-img">
               <div class="cover-hero-actions">
-                <label class="cover-action-btn" title="Change cover photo">
+                <label class="cover-action-btn" title="Change cover photo" aria-label="Change cover photo">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
                   <input type="file" accept="image/jpeg,image/png,image/webp" (change)="onCoverFileChange($event)" style="display:none">
                 </label>
-                <button class="cover-action-btn cover-action-btn--danger" title="Remove cover photo" (click)="removeCoverImage()">
+                <button class="cover-action-btn cover-action-btn--danger" type="button" title="Remove cover photo" aria-label="Remove cover photo" (click)="removeCoverImage()">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
                 </button>
               </div>
@@ -131,37 +125,14 @@ interface CookIngredient {
             <div class="panel-header">
               <h1 class="recipe-title">{{ r.title }}</h1>
               <div class="header-actions">
-                <button class="icon-btn" title="Cook mode" (click)="enterCookMode()">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54 5 5 0 0 1 7.08 0A5.11 5.11 0 0 1 16.59 6 4 4 0 0 1 18 13.87V21H6Z"/>
-                    <line x1="6" y1="17" x2="18" y2="17"/>
-                  </svg>
-                </button>
-                <button class="icon-btn" title="Share recipe" (click)="shareRecipe()">
-                  @if (!shareLoading()) {
-<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
-                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-                  </svg>
-}
-                  @if (shareLoading()) {
-<span class="btn-spinner"></span>
-}
-                </button>
-                <button class="icon-btn" title="Edit recipe" (click)="showEdit.set(true)">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                  </svg>
-                </button>
-                <button class="icon-btn danger" title="Delete recipe" (click)="confirmDelete()">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="3 6 5 6 21 6"/>
-                    <path d="M19 6l-1 14H6L5 6"/>
-                    <path d="M10 11v6M14 11v6"/>
-                    <path d="M9 6V4h6v2"/>
-                  </svg>
-                </button>
+                <jiro-button type="button" [routerLink]="['/culinara', r.id, 'cook']">
+                  <jiro-icon name="fork-knife" [size]="15" />
+                  Start cooking
+                </jiro-button>
+                <jiro-menu
+                  [items]="recipeActions"
+                  [label]="'More actions for ' + r.title"
+                  (select)="onRecipeAction($event)" />
               </div>
             </div>
 
@@ -314,7 +285,7 @@ interface CookIngredient {
 <div class="section">
               <div class="section-header">
                 <h3 class="section-title">Base Ingredients</h3>
-                <button class="add-grocery-btn" (click)="addToGrocery()" title="Add to grocery list">
+                <button class="add-grocery-btn" type="button" (click)="addToGrocery()" title="Add to grocery list" aria-label="Add these ingredients to the grocery list">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
                     <line x1="3" y1="6" x2="21" y2="6"/>
@@ -331,9 +302,6 @@ interface CookIngredient {
                 </div>
 }
               </div>
-              @if (groceryAdded()) {
-<p class="grocery-confirm">✓ Added to grocery list</p>
-}
             </div>
 }
 
@@ -487,109 +455,6 @@ interface CookIngredient {
       </jiro-modal>
 }
 
-      <!-- Cook mode overlay -->
-      @if (cookMode()) {
-<div class="cook-overlay">
-        <div class="cook-header">
-          <h2 class="cook-title">{{ recipe()?.title }}</h2>
-          <button class="cook-close" (click)="exitCookMode()" title="Exit without logging">
-            ✕ Exit
-          </button>
-        </div>
-
-        <div class="cook-body">
-          <!-- Ingredients checklist -->
-          @if (cookIngredients().length) {
-<div class="cook-section">
-            <h3 class="cook-section-title">Ingredients</h3>
-            <div class="cook-ingredients">
-              @for (ing of cookIngredients(); track ing; let i = $index) {
-<label
-               
-                class="cook-ingredient"
-                [class.cook-ingredient--checked]="ing.checked"
-                (click)="toggleCookIngredient(i)">
-                <input type="checkbox" [checked]="ing.checked" (click)="$event.stopPropagation()" (change)="toggleCookIngredient(i)" />
-                <span class="ing-item">{{ ing.item }}</span>
-                <span class="ing-amount">{{ ing.amount }}</span>
-              </label>
-}
-            </div>
-          </div>
-}
-
-          <!-- Steps -->
-          @if (cookSteps().length) {
-<div class="cook-section">
-            <h3 class="cook-section-title">Steps</h3>
-            <div class="cook-steps">
-              @for (step of cookSteps(); track step; let i = $index) {
-<div
-               
-                class="cook-step"
-                [class.cook-step--done]="step.done"
-                (click)="toggleStep(i)">
-                <div class="step-num">{{ i + 1 }}</div>
-                <p class="step-text">{{ step.text }}</p>
-                <div class="step-check">
-                  @if (step.done) {
-<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <polyline points="20 6 9 17 4 12"/>
-                  </svg>
-}
-                </div>
-              </div>
-}
-            </div>
-          </div>
-}
-
-          @if (cookIngredients().length === 0 && cookSteps().length === 0) {
-<div class="cook-empty">
-            <p class="text-secondary">No ingredients or instructions added to this recipe yet.</p>
-          </div>
-}
-        </div>
-
-        <!-- Sticky finish footer -->
-        <div class="cook-footer">
-          <div class="cook-footer-inner">
-            <div class="cook-footer-left">
-              <span class="cook-footer-label">Rate this cook</span>
-              <div class="cook-stars">
-                @for (s of [1,2,3,4,5]; track s) {
-<button
-                 
-                  type="button"
-                  class="cook-star"
-                  [class.cook-star--filled]="s <= cookRating()"
-                  (click)="cookRating.set(s === cookRating() ? 0 : s)">
-                  ★
-                </button>
-}
-              </div>
-              <textarea
-                class="cook-notes"
-                placeholder="Notes (optional)..."
-                rows="2"
-                (input)="cookNotes = $any($event.target).value"
-                [value]="cookNotes"></textarea>
-            </div>
-            <div class="cook-footer-actions">
-              <button class="cook-log-btn" (click)="finishCooking()" [disabled]="cookSaving()">
-                @if (!cookSaving()) {
-<span>Log Trial</span>
-}
-                @if (cookSaving()) {
-<span>Saving...</span>
-}
-              </button>
-              <button class="cook-skip-btn" (click)="exitCookMode()">Skip</button>
-            </div>
-          </div>
-        </div>
-      </div>
-}
     </div>
   `,
   styles: [`
@@ -607,14 +472,6 @@ interface CookIngredient {
       gap: var(--space-md);
     }
 
-    .spinner-lg {
-      width: 40px;
-      height: 40px;
-      border: 3px solid var(--border-color);
-      border-top-color: var(--color-primary);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
 
     /* Mobile tabs — only visible on small screens */
     .mobile-tabs {
@@ -716,7 +573,7 @@ interface CookIngredient {
       height: 30px;
       border-radius: 50%;
       background: rgba(0, 0, 0, 0.55);
-      color: #fff;
+      color: var(--text-on-primary);
       border: none;
       cursor: pointer;
       transition: background 0.15s;
@@ -873,7 +730,7 @@ interface CookIngredient {
     }
 
     .star-val {
-      color: #c49540;
+      color: var(--color-warning);
     }
 
     .stat-label {
@@ -945,7 +802,7 @@ interface CookIngredient {
       border: 1px solid var(--border-color);
       border-radius: var(--border-radius);
       box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-      z-index: 10;
+      z-index: 1;
       min-width: 160px;
       overflow: hidden;
     }
@@ -1005,6 +862,8 @@ interface CookIngredient {
     .add-grocery-btn {
       display: flex;
       align-items: center;
+      min-height: 40px;
+      padding: 0 12px;
       gap: 5px;
       background: none;
       border: 1px solid var(--border-color);
@@ -1023,12 +882,6 @@ interface CookIngredient {
       border-color: var(--color-primary);
     }
 
-    .grocery-confirm {
-      font-size: var(--font-size-xs);
-      color: var(--color-primary);
-      margin-top: var(--space-xs);
-      font-weight: 500;
-    }
 
     .ingredient-table {
       display: flex;
@@ -1148,7 +1001,7 @@ interface CookIngredient {
 
     .trial-rating {
       font-size: var(--font-size-xs);
-      color: #c49540;
+      color: var(--color-warning);
       font-weight: 500;
     }
 
@@ -1160,6 +1013,9 @@ interface CookIngredient {
     .text-btn {
       background: none;
       border: none;
+      min-height: 40px;
+      min-width: 44px;
+      padding: 0 10px;
       font-size: var(--font-size-xs);
       cursor: pointer;
       color: var(--color-primary);
@@ -1225,153 +1081,6 @@ interface CookIngredient {
     }
 
     /* ===== Cook mode overlay ===== */
-    .cook-overlay {
-      position: fixed;
-      inset: 0;
-      background: var(--bg-page);
-      z-index: 9000;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-
-    .cook-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: var(--space-md) var(--space-xl);
-      border-bottom: 1px solid var(--border-color);
-      background: var(--bg-surface);
-      flex-shrink: 0;
-    }
-
-    .cook-title {
-      font-size: var(--font-size-xl);
-      font-weight: 700;
-    }
-
-    .cook-close {
-      background: none;
-      border: 1px solid var(--border-color);
-      border-radius: var(--border-radius);
-      color: var(--text-secondary);
-      font-size: var(--font-size-sm);
-      font-weight: 500;
-      cursor: pointer;
-      padding: 8px 16px;
-      font-family: inherit;
-      transition: color 0.15s, border-color 0.15s;
-    }
-
-    .cook-close:hover {
-      color: var(--text-primary);
-      border-color: var(--text-secondary);
-    }
-
-    .cook-body {
-      flex: 1;
-      overflow-y: auto;
-      padding: var(--space-xl);
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-2xl);
-      max-width: 720px;
-      margin: 0 auto;
-      width: 100%;
-    }
-
-    .cook-section-title {
-      font-size: var(--font-size-sm);
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: var(--text-muted);
-      margin-bottom: var(--space-md);
-    }
-
-    .cook-ingredients {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      border: 1px solid var(--border-color);
-      border-radius: var(--border-radius);
-      overflow: hidden;
-    }
-
-    .cook-ingredient {
-      display: flex;
-      align-items: center;
-      gap: var(--space-md);
-      padding: 14px 16px;
-      border-bottom: 1px solid var(--border-color);
-      cursor: pointer;
-      transition: background 0.15s;
-      user-select: none;
-    }
-
-    .cook-ingredient:last-child {
-      border-bottom: none;
-    }
-
-    .cook-ingredient:hover {
-      background: var(--bg-surface);
-    }
-
-    .cook-ingredient input[type="checkbox"] {
-      width: 18px;
-      height: 18px;
-      accent-color: var(--color-primary);
-      cursor: pointer;
-      flex-shrink: 0;
-    }
-
-    .cook-ingredient .ing-item {
-      flex: 1;
-      font-size: var(--font-size-md);
-      transition: opacity 0.2s, text-decoration 0.2s;
-    }
-
-    .cook-ingredient .ing-amount {
-      font-size: var(--font-size-sm);
-      color: var(--text-secondary);
-    }
-
-    .cook-ingredient--checked .ing-item {
-      opacity: 0.45;
-      text-decoration: line-through;
-    }
-
-    .cook-ingredient--checked .ing-amount {
-      opacity: 0.45;
-    }
-
-    .cook-steps {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-sm);
-    }
-
-    .cook-step {
-      display: grid;
-      grid-template-columns: 44px 1fr 36px;
-      align-items: start;
-      gap: var(--space-md);
-      padding: var(--space-md) var(--space-lg);
-      border: 1px solid var(--border-color);
-      border-radius: var(--border-radius);
-      cursor: pointer;
-      transition: background 0.15s, border-color 0.15s;
-      background: var(--bg-surface);
-    }
-
-    .cook-step:hover {
-      border-color: var(--color-primary);
-    }
-
-    .cook-step--done {
-      opacity: 0.55;
-      background: var(--bg-canvas);
-    }
 
     .step-num {
       width: 32px;
@@ -1403,135 +1112,7 @@ interface CookIngredient {
       flex-shrink: 0;
     }
 
-    .cook-empty {
-      text-align: center;
-      padding: var(--space-2xl);
-    }
-
     /* Cook footer */
-    .cook-footer {
-      flex-shrink: 0;
-      border-top: 1px solid var(--border-color);
-      background: var(--bg-surface);
-      padding: var(--space-md) var(--space-xl);
-    }
-
-    .cook-footer-inner {
-      max-width: 720px;
-      margin: 0 auto;
-      display: flex;
-      align-items: flex-end;
-      gap: var(--space-lg);
-    }
-
-    .cook-footer-left {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-sm);
-    }
-
-    .cook-footer-label {
-      font-size: var(--font-size-xs);
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--text-muted);
-    }
-
-    .cook-stars {
-      display: flex;
-      gap: 4px;
-    }
-
-    .cook-star {
-      background: none;
-      border: none;
-      font-size: 24px;
-      cursor: pointer;
-      color: var(--border-color);
-      line-height: 1;
-      padding: 0 2px;
-      transition: color 0.15s, transform 0.1s;
-    }
-
-    .cook-star:hover,
-    .cook-star--filled {
-      color: #c49540;
-    }
-
-    .cook-star:hover {
-      transform: scale(1.15);
-    }
-
-    .cook-notes {
-      width: 100%;
-      padding: 8px 12px;
-      border: 1px solid var(--border-color);
-      border-radius: var(--border-radius);
-      background: var(--bg-canvas);
-      color: var(--text-primary);
-      font-size: var(--font-size-sm);
-      font-family: inherit;
-      resize: none;
-      transition: border-color 0.2s;
-      box-sizing: border-box;
-    }
-
-    .cook-notes:focus {
-      border-color: var(--color-primary);
-      box-shadow: 0 0 0 3px rgba(122, 59, 46, 0.12);
-    }
-
-    .cook-notes::placeholder {
-      color: var(--text-muted);
-    }
-
-    .cook-footer-actions {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-xs);
-      flex-shrink: 0;
-    }
-
-    .cook-log-btn {
-      padding: 10px 24px;
-      background: var(--color-primary);
-      color: #fff;
-      border: none;
-      border-radius: var(--border-radius);
-      font-size: var(--font-size-sm);
-      font-weight: 600;
-      cursor: pointer;
-      font-family: inherit;
-      transition: opacity 0.15s;
-      white-space: nowrap;
-    }
-
-    .cook-log-btn:hover:not([disabled]) {
-      opacity: 0.88;
-    }
-
-    .cook-log-btn[disabled] {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    .cook-skip-btn {
-      background: none;
-      border: none;
-      color: var(--text-muted);
-      font-size: var(--font-size-xs);
-      cursor: pointer;
-      padding: 4px 8px;
-      text-align: center;
-      font-family: inherit;
-      transition: color 0.15s;
-    }
-
-    .cook-skip-btn:hover {
-      color: var(--text-secondary);
-    }
 
     /* Public toggle */
     .public-toggle-row {
@@ -1547,6 +1128,8 @@ interface CookIngredient {
     .public-toggle-label { font-size: var(--font-size-sm); font-weight: 500; color: var(--text-primary); }
     .public-toggle-sub { font-size: var(--font-size-xs); color: var(--text-secondary); }
 
+    /* The pill stays 40x22; ::after grows the hit area to 44 without
+       changing how it looks. */
     .toggle-switch {
       position: relative;
       width: 40px; height: 22px;
@@ -1557,6 +1140,7 @@ interface CookIngredient {
       flex-shrink: 0;
       padding: 0;
     }
+    .toggle-switch::after { content: ''; position: absolute; inset: -11px -2px; }
     .toggle-switch--on { background: var(--color-primary); }
     .toggle-switch:disabled { opacity: 0.5; cursor: not-allowed; }
     .toggle-thumb {
@@ -1564,7 +1148,7 @@ interface CookIngredient {
       top: 3px; left: 3px;
       width: 16px; height: 16px;
       border-radius: 50%;
-      background: #fff;
+      background: var(--bg-surface);
       transition: transform 0.2s;
       display: block;
     }
@@ -1611,7 +1195,7 @@ interface CookIngredient {
       flex-shrink: 0;
       padding: 3px 10px;
       background: var(--color-primary);
-      color: #fff;
+      color: var(--text-on-primary);
       border: none;
       border-radius: var(--border-radius);
       font-size: var(--font-size-xs);
@@ -1671,13 +1255,11 @@ export class RecipeDetailComponent implements OnInit {
   editingTrial = signal<RecipeTrial | null>(null);
   promotingTrial = signal<RecipeTrial | null>(null);
   mobileTab = signal<MobileTab>('recipe');
-  cookMode = signal(false);
-  cookIngredients = signal<CookIngredient[]>([]);
-  cookSteps = signal<CookStep[]>([]);
-  cookRating = signal(0);
-  cookNotes = '';
-  cookSaving = signal(false);
-  groceryAdded = signal(false);
+  readonly recipeActions: JiroMenuItem[] = [
+    { id: 'share', label: 'Share', icon: 'share-network' },
+    { id: 'edit', label: 'Edit', icon: 'pencil-simple' },
+    { id: 'delete', label: 'Delete', icon: 'trash', danger: true },
+  ];
   shareUrl = signal('');
   shareLoading = signal(false);
   shareCopied = signal(false);
@@ -1831,6 +1413,7 @@ export class RecipeDetailComponent implements OnInit {
   }
 
   private readonly confirmService = inject(ConfirmService);
+  private readonly toast = inject(ToastService);
 
   async deleteTrial(trial: RecipeTrial) {
     const ok = await this.confirmService.confirm({
@@ -1863,78 +1446,18 @@ export class RecipeDetailComponent implements OnInit {
     });
   }
 
-  enterCookMode() {
-    const r = this.recipe();
-    if (!r) return;
-
-    const ingredients: CookIngredient[] = (r.base_ingredients ?? []).map(i => ({
-      item: i.item,
-      amount: i.amount,
-      checked: false,
-    }));
-
-    const steps: CookStep[] = (r.instructions ?? '')
-      .split('\n')
-      .map(s => s.trim())
-      .filter(s => s.length > 0)
-      .map(text => ({ text, done: false }));
-
-    this.cookIngredients.set(ingredients);
-    this.cookSteps.set(steps);
-    this.cookRating.set(0);
-    this.cookNotes = '';
-    this.cookMode.set(true);
-  }
-
-  exitCookMode() {
-    this.cookMode.set(false);
-    this.cookRating.set(0);
-    this.cookNotes = '';
-  }
-
-  finishCooking() {
-    const r = this.recipe();
-    if (!r) return;
-    this.cookSaving.set(true);
-    const req = {
-      date_cooked: new Date().toISOString(),
-      notes: this.cookNotes.trim() || undefined,
-      rating: this.cookRating() > 0 ? this.cookRating() : undefined,
-    };
-    this.recipeService.createTrial(r.id, req).subscribe({
-      next: (trial) => {
-        this.cookSaving.set(false);
-        this.recipe.update(rv => {
-          if (!rv) return rv;
-          return { ...rv, trials: [trial, ...rv.trials] };
-        });
-        this.exitCookMode();
-      },
-      error: () => {
-        this.cookSaving.set(false);
-        this.exitCookMode();
-      },
-    });
-  }
-
-  toggleStep(index: number) {
-    this.cookSteps.update(steps =>
-      steps.map((s, i) => i === index ? { ...s, done: !s.done } : s)
-    );
-  }
-
-  toggleCookIngredient(index: number) {
-    this.cookIngredients.update(list =>
-      list.map((ing, i) => i === index ? { ...ing, checked: !ing.checked } : ing)
-    );
+  onRecipeAction(action: string) {
+    if (action === 'share') this.shareRecipe();
+    else if (action === 'edit') this.showEdit.set(true);
+    else if (action === 'delete') void this.confirmDelete();
   }
 
   addToGrocery() {
     const r = this.recipe();
     if (!r?.base_ingredients?.length) return;
     ShoppingListComponent.addRecipe(r.title, r.base_ingredients);
-    this.groceryAdded.set(true);
-    setTimeout(() => this.groceryAdded.set(false), 2500);
+    // A toast, not an inline chip: the effect lands on the grocery page.
+    this.toast.success(`Ingredients added to your grocery list`);
   }
 
   shareRecipe() {

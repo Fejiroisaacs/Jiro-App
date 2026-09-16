@@ -520,7 +520,7 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
     .new-col-btn {
       padding: 8px 14px;
       background: var(--color-primary);
-      color: #fff;
+      color: var(--text-on-primary);
       border: none;
       border-radius: var(--border-radius);
       font-size: var(--font-size-sm);

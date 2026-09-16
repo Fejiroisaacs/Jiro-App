@@ -112,12 +112,14 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
           }
         }
 
-        <main class="content">
+        <main class="content" [class.content--focus]="!mobileNavAllowed()">
           <router-outlet />
         </main>
       </div>
 
-      <!-- Bottom bar (phone) -->
+      <!-- Bottom bar (phone). Hidden on focus screens such as cook mode, where
+           the page pins its own footer to the bottom of the viewport. -->
+      @if (mobileNavAllowed()) {
       <nav class="mobile-nav" aria-label="Sections">
         @for (t of mobileTabs(); track t.route) {
           <a class="mobile-nav-item" [routerLink]="t.route" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: !!t.exact }">
@@ -130,6 +132,7 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
           </a>
         }
       </nav>
+      }
     </div>
   `,
   styles: [`
@@ -180,8 +183,8 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 32px;
-      height: 32px;
+      width: 40px;
+      height: 40px;
       background: none;
       border: none;
       color: var(--text-on-dark);
@@ -323,6 +326,7 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
     .verify-text { flex: 1; }
 
     .verify-banner-btn {
+      min-height: 40px;
       background: none;
       border: 1px solid var(--color-primary);
       color: var(--color-primary);
@@ -344,9 +348,9 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 32px;
-      height: 32px;
-      margin: -6px -8px -6px 0;
+      width: 40px;
+      height: 40px;
+      margin: -10px -10px -10px 0;
       background: none;
       border: none;
       border-radius: var(--border-radius);
@@ -422,6 +426,9 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
         padding-bottom: calc(60px + env(safe-area-inset-bottom) + var(--space-md));
       }
 
+      /* No bottom bar to clear on a focus screen. */
+      .content--focus { padding-bottom: 0; }
+
       .mobile-nav { display: flex; }
     }
   `]
@@ -446,6 +453,7 @@ export class MainLayoutComponent {
 
   readonly currentModule = computed(() => moduleForUrl(this.nav().url));
   readonly moduleNavAllowed = computed(() => this.nav().moduleNav);
+  readonly mobileNavAllowed = computed(() => this.nav().mobileNav);
 
   readonly mobileTabs = computed<NavTab[]>(() => {
     const m = this.currentModule();
@@ -463,13 +471,20 @@ export class MainLayoutComponent {
   private readonly verifyDismissed = signal(readDismissed());
   readonly showVerifyBanner = computed(() => {
     const user = this.auth.user();
-    return !!user && !user.email_verified && !this.verifyDismissed();
+    if (!user || user.email_verified || this.verifyDismissed()) return false;
+    // Focus screens (cook mode) need the vertical space more than the nudge,
+    // and the banner is waiting on every other page.
+    return this.mobileNavAllowed();
   });
 
-  private readRoute(): { url: string; moduleNav: boolean } {
+  private readRoute(): { url: string; moduleNav: boolean; mobileNav: boolean } {
     let route = this.router.routerState.snapshot.root;
     while (route.firstChild) route = route.firstChild;
-    return { url: this.router.url, moduleNav: route.data['moduleNav'] !== false };
+    return {
+      url: this.router.url,
+      moduleNav: route.data['moduleNav'] !== false,
+      mobileNav: route.data['mobileNav'] !== false,
+    };
   }
 
   dismissVerify() {

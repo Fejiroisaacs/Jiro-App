@@ -6,6 +6,9 @@ import { RecipeService, Recipe, CookStreak, Collection } from '../../../core/ser
 import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-card';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
+import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { RecipeFormComponent } from '../recipe-form/recipe-form';
 
 type SortKey = 'newest' | 'trials' | 'rating' | 'az';
@@ -19,17 +22,16 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
     JiroCardComponent,
     JiroButtonComponent,
     JiroModalComponent,
+    JiroIconComponent,
+    JiroPageHeaderComponent,
+    JiroEmptyStateComponent,
     RecipeFormComponent
 ],
   template: `
     <div class="recipe-list">
       <!-- Header -->
-      <div class="page-header">
-        <div>
-          <h1>Culinara</h1>
-          <p class="text-secondary">Your recipe notebook</p>
-        </div>
-        <div class="header-right">
+      <jiro-page-header heading="Culinara" subtitle="Your recipe notebook">
+        <div actions class="header-right">
           @if (cookStreak()?.current_streak) {
 <div class="streak-badge">
             <span class="streak-flame">
@@ -47,12 +49,13 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
           </div>
 }
           <div class="header-actions">
-            <jiro-button variant="primary" type="button" (click)="showCreate.set(true)">
-              + New Recipe
+            <jiro-button type="button" (click)="showCreate.set(true)">
+              <jiro-icon name="plus" [size]="14" />
+              New recipe
             </jiro-button>
           </div>
         </div>
-      </div>
+      </jiro-page-header>
 
       <!-- Search + Sort -->
       <div class="controls-row">
@@ -138,29 +141,26 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
 
       <!-- Loading -->
       @if (loading()) {
-<div class="state-message">
-        <div class="spinner-lg"></div>
-        <p>Loading recipes...</p>
-      </div>
-}
+        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+      }
 
       <!-- Empty state -->
       @if (!loading() && allRecipes().length === 0) {
-<div class="state-message">
-        <h3>No recipes yet</h3>
-        <p class="text-secondary">Start your culinary lab by adding your first recipe.</p>
-        <jiro-button variant="primary" type="button" (click)="showCreate.set(true)">
-          Add First Recipe
-        </jiro-button>
-      </div>
-}
+        <jiro-empty-state
+          icon="fork-knife"
+          heading="No recipes yet"
+          message="Add your first recipe and start keeping notes on how each cook went.">
+          <jiro-button type="button" (click)="showCreate.set(true)">Add your first recipe</jiro-button>
+        </jiro-empty-state>
+      }
 
       <!-- No results for current filter -->
       @if (!loading() && allRecipes().length > 0 && displayedRecipes().length === 0) {
-<div class="state-message">
-        <p class="text-secondary">No recipes match your filters.</p>
-      </div>
-}
+        <jiro-empty-state
+          icon="magnifying-glass"
+          heading="No recipes match"
+          message="Try another search term, tag or collection." />
+      }
 
       <!-- Recipe grid -->
       @if (!loading() && displayedRecipes().length > 0) {
@@ -236,7 +236,7 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
       @if (showCreate()) {
 <jiro-modal
        
-        title="New Recipe"
+        title="New recipe"
         maxWidth="600px"
         (close)="showCreate.set(false)">
         <app-recipe-form
@@ -252,14 +252,6 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
       max-width: 1100px;
     }
 
-    .page-header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      margin-bottom: var(--space-xl);
-      gap: var(--space-md);
-      flex-wrap: wrap;
-    }
 
     .page-header h1 {
       font-size: var(--font-size-2xl);
@@ -331,7 +323,7 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
     .sort-pill--active {
       background: var(--color-primary);
       border-color: var(--color-primary);
-      color: #fff;
+      color: var(--text-on-primary);
     }
 
     .tag-filter {
@@ -365,24 +357,8 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
       color: var(--color-primary);
     }
 
-    .state-message {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: var(--space-2xl);
-      gap: var(--space-md);
-      text-align: center;
-    }
+    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
 
-    .spinner-lg {
-      width: 40px;
-      height: 40px;
-      border: 3px solid var(--border-color);
-      border-top-color: var(--color-primary);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
 
     .recipe-grid {
       display: grid;
@@ -438,7 +414,7 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
     }
 
     .star {
-      color: #c49540;
+      color: var(--color-warning);
       font-size: 14px;
     }
 
@@ -629,7 +605,7 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
 
     .new-collection-save {
       background: var(--color-primary);
-      color: #fff;
+      color: var(--text-on-primary);
       border: none;
       border-radius: 50%;
       width: 22px;
