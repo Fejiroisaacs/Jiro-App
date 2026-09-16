@@ -10,9 +10,12 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { chartTones } from '../../../shared/chart-theme';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import { LedgerService, ComparisonResponse } from '../../../core/services/ledger.service';
 import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-card';
+import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
+import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 
 Chart.register(...registerables);
@@ -68,17 +71,15 @@ function computePresetRanges(preset: Preset): DateRange | null {
 @Component({
   selector: 'app-comparison-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, JiroCardComponent, JiroButtonComponent],
+  imports: [
+    CommonModule, FormsModule, JiroCardComponent, JiroButtonComponent,
+    JiroPageHeaderComponent, JiroEmptyStateComponent,
+  ],
   template: `
     <div class="comparison-page">
 
       <!-- ── Header ── -->
-      <div class="page-header">
-        <div>
-          <h1>Compare Periods</h1>
-          <p class="text-secondary">Analyse how your finances changed between two periods</p>
-        </div>
-      </div>
+      <jiro-page-header heading="Compare periods" subtitle="See how your finances changed between two periods" />
 
       <!-- ── Period Selector ── -->
       <jiro-card>
@@ -175,33 +176,24 @@ function computePresetRanges(preset: Preset): DateRange | null {
 
       <!-- ── Loading ── -->
       @if (loading()) {
-<div class="state-center">
-        <div class="spinner-lg"></div>
-        <span class="state-label">Loading comparison...</span>
-      </div>
-}
+        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+      }
 
       <!-- ── Empty / No data state ── -->
       @if (!loading() && !result() && !loadError()) {
-<div class="state-center state-empty">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="empty-icon">
-          <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
-        </svg>
-        <p class="state-label">Select a period to compare</p>
-        <p class="state-sub">Choose a preset above or enter custom date ranges</p>
-      </div>
-}
+        <jiro-empty-state
+          icon="arrows-left-right"
+          heading="Select a period to compare"
+          message="Choose a preset above, or enter two custom date ranges." />
+      }
 
       <!-- ── Error state ── -->
       @if (!loading() && loadError()) {
-<div class="state-center state-error">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-        </svg>
-        <p class="state-label">Failed to load comparison</p>
-        <p class="state-sub">{{ loadError() }}</p>
-      </div>
-}
+        <jiro-empty-state
+          icon="warning-circle"
+          heading="Could not load the comparison"
+          [message]="loadError()!" />
+      }
 
       <!-- ── Results ── -->
       @if (!loading() && result()) {
@@ -307,11 +299,11 @@ function computePresetRanges(preset: Preset): DateRange | null {
               <h2 class="chart-title">Period Overview</h2>
               <div class="chart-legend">
                 <span class="legend-item">
-                  <span class="legend-dot" style="background: #7A3B2E;"></span>
+                  <span class="legend-dot" [style.background]="seriesColors().a"></span>
                   Period A
                 </span>
                 <span class="legend-item">
-                  <span class="legend-dot" style="background: #4A6741;"></span>
+                  <span class="legend-dot" [style.background]="seriesColors().b"></span>
                   Period B
                 </span>
               </div>
@@ -371,7 +363,7 @@ function computePresetRanges(preset: Preset): DateRange | null {
                   @for (cat of sortedCategories(); track cat) {
 <tr>
                     <td class="cat-name-cell">
-                      <span class="cat-color-dot" [style.background]="cat.color || '#9B8F88'"></span>
+                      <span class="cat-color-dot" [style.background]="cat.color || 'var(--text-muted)'"></span>
                       {{ cat.name }}
                     </td>
                     <td class="num-cell">{{ cat.a | currency }}</td>
@@ -415,7 +407,7 @@ function computePresetRanges(preset: Preset): DateRange | null {
               @for (cat of sortedCategories(); track cat) {
 <div class="mobile-cat-card">
                 <div class="mcc-header">
-                  <span class="cat-color-dot" [style.background]="cat.color || '#9B8F88'"></span>
+                  <span class="cat-color-dot" [style.background]="cat.color || 'var(--text-muted)'"></span>
                   <span class="mcc-name">{{ cat.name }}</span>
                 </div>
                 <div class="mcc-periods">
@@ -496,7 +488,6 @@ function computePresetRanges(preset: Preset): DateRange | null {
     }
 
     /* ── Header ── */
-    .page-header { display: flex; flex-direction: column; gap: var(--space-xs); }
 
     .page-title-row {
       display: flex;
@@ -572,8 +563,8 @@ function computePresetRanges(preset: Preset): DateRange | null {
       border-radius: 50%;
       flex-shrink: 0;
     }
-    .dot-a { background: #7A3B2E; }
-    .dot-b { background: #4A6741; }
+    .dot-a { background: var(--color-primary); }
+    .dot-b { background: var(--color-accent); }
 
     /* ── Range summary (presets) ── */
     .range-summary {
@@ -662,40 +653,13 @@ function computePresetRanges(preset: Preset): DateRange | null {
     .custom-apply { display: flex; justify-content: flex-end; }
 
     /* ── State messages ── */
-    .state-center {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: var(--space-md);
-      padding: var(--space-xl) var(--space-md);
-      text-align: center;
-    }
+    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
 
-    .spinner-lg {
-      width: 40px; height: 40px;
-      border: 3px solid var(--border-color);
-      border-top-color: var(--color-primary);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
 
-    .state-label {
-      font-size: var(--font-size-md);
-      color: var(--text-secondary);
-      font-weight: 500;
-      margin: 0;
-    }
 
-    .state-sub {
-      font-size: var(--font-size-sm);
-      color: var(--text-muted);
-      margin: 0;
-    }
 
     .empty-icon { color: var(--text-muted); }
 
-    .state-error .state-label { color: var(--color-danger); }
 
     /* ── Results body ── */
     .results-body {
@@ -726,9 +690,9 @@ function computePresetRanges(preset: Preset): DateRange | null {
       display: flex; align-items: center; justify-content: center;
       flex-shrink: 0;
     }
-    .income-icon  { background: rgba(74, 103, 65, 0.12); color: #4A6741; }
-    .expense-icon { background: rgba(193, 88, 42, 0.12); color: var(--color-danger); }
-    .net-icon     { background: rgba(122, 59, 46, 0.12); color: var(--color-primary); }
+    .income-icon  { background: rgba(var(--color-accent-rgb), 0.12); color: var(--color-accent); }
+    .expense-icon { background: rgba(var(--color-danger-rgb), 0.12); color: var(--color-danger); }
+    .net-icon     { background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary); }
 
     .summary-title {
       font-size: var(--font-size-xs);
@@ -770,12 +734,12 @@ function computePresetRanges(preset: Preset): DateRange | null {
     }
 
     .delta-positive {
-      background: rgba(74, 103, 65, 0.12);
-      color: #3a6a31;
+      background: rgba(var(--color-accent-rgb), 0.12);
+      color: var(--color-accent);
     }
 
     .delta-negative {
-      background: rgba(193, 88, 42, 0.12);
+      background: rgba(var(--color-danger-rgb), 0.12);
       color: var(--color-danger);
     }
 
@@ -943,12 +907,12 @@ function computePresetRanges(preset: Preset): DateRange | null {
     }
 
     .delta-badge.delta-positive {
-      background: rgba(74, 103, 65, 0.12);
-      color: #3a6a31;
+      background: rgba(var(--color-accent-rgb), 0.12);
+      color: var(--color-accent);
     }
 
     .delta-badge.delta-negative {
-      background: rgba(193, 88, 42, 0.12);
+      background: rgba(var(--color-danger-rgb), 0.12);
       color: var(--color-danger);
     }
 
@@ -1041,7 +1005,6 @@ function computePresetRanges(preset: Preset): DateRange | null {
     .mcc-delta { display: flex; }
 
     /* ── Keyframes ── */
-    @keyframes spin { to { transform: rotate(360deg); } }
 
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(6px); }
@@ -1080,6 +1043,12 @@ export class ComparisonPageComponent implements OnInit, AfterViewInit, OnDestroy
   customATo   = '';
   customBFrom = '';
   customBTo   = '';
+
+  /**
+   * The two period colours, read once per redraw so the legend dots and the
+   * chart bars come from the same place and cannot drift apart.
+   */
+  seriesColors = signal<{ a: string; b: string }>({ a: 'var(--color-primary)', b: 'var(--color-accent)' });
 
   // ── Sorting ────────────────────────────────────────────────────────────────
   sortColumn = signal<string>('delta');
@@ -1208,6 +1177,9 @@ export class ComparisonPageComponent implements OnInit, AfterViewInit, OnDestroy
 
     if (this.chart) { this.chart.destroy(); this.chart = null; }
 
+    // Read at draw time so a theme or dark-mode change lands on the next redraw.
+    const tone = chartTones();
+    this.seriesColors.set({ a: tone.primary, b: tone.accent });
     const labels = ['Income', 'Expenses', 'Net Cashflow'];
     const aData  = [res.summary.income.a, res.summary.expenses.a, res.summary.net.a];
     const bData  = [res.summary.income.b, res.summary.expenses.b, res.summary.net.b];
@@ -1220,14 +1192,14 @@ export class ComparisonPageComponent implements OnInit, AfterViewInit, OnDestroy
           {
             label: 'Period A',
             data: aData,
-            backgroundColor: '#7A3B2E',
+            backgroundColor: tone.primary,
             borderRadius: 4,
             borderSkipped: false,
           },
           {
             label: 'Period B',
             data: bData,
-            backgroundColor: '#4A6741',
+            backgroundColor: tone.accent,
             borderRadius: 4,
             borderSkipped: false,
           },
@@ -1250,14 +1222,14 @@ export class ComparisonPageComponent implements OnInit, AfterViewInit, OnDestroy
         },
         scales: {
           x: {
-            grid: { color: 'rgba(0,0,0,0.04)' },
-            ticks: { font: { size: 12 }, color: '#6B5E57' },
+            grid: { color: tone.grid },
+            ticks: { font: { size: 12 }, color: tone.tick },
           },
           y: {
-            grid: { color: 'rgba(0,0,0,0.04)' },
+            grid: { color: tone.grid },
             ticks: {
               font: { size: 11 },
-              color: '#9B8F88',
+              color: tone.muted,
               callback: v => `$${Number(v).toLocaleString()}`,
             },
           },

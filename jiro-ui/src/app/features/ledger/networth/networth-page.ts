@@ -12,6 +12,7 @@ import {
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Chart, registerables } from 'chart.js';
+import { chartTones } from '../../../shared/chart-theme';
 import { parseDateOnly } from '../shared/ledger-utils';
 import {
   LedgerService,
@@ -21,55 +22,44 @@ import {
 import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-card';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
+import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 
 Chart.register(...registerables);
 
 @Component({
   selector: 'app-networth-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, JiroCardComponent, JiroButtonComponent, JiroModalComponent],
+  imports: [
+    CommonModule, FormsModule, JiroCardComponent, JiroButtonComponent, JiroModalComponent,
+    JiroIconComponent, JiroPageHeaderComponent, JiroEmptyStateComponent,
+  ],
   template: `
     <div class="networth-page">
 
       <!-- Header -->
-      <div class="page-header">
-        <div>
-          <h1>Net Worth</h1>
-          <p class="text-secondary">Track your financial position over time</p>
-        </div>
-        <jiro-button variant="primary" type="button" (click)="openSnapshotModal()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M20.188 10.934a8.714 8.714 0 1 1-8.188-5.868"/>
-            <path d="M20.188 4v4h-4"/>
-          </svg>
-          Take Snapshot
+      <jiro-page-header heading="Net worth" subtitle="Track your financial position over time">
+        <jiro-button actions type="button" (click)="openSnapshotModal()">
+          <jiro-icon name="chart-line-up" [size]="14" />
+          Take snapshot
         </jiro-button>
-      </div>
+      </jiro-page-header>
 
       <!-- Loading -->
       @if (loading()) {
-<div class="state-message">
-        <div class="spinner-lg"></div>
-        <p>Loading snapshots...</p>
-      </div>
-}
+        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+      }
 
       <!-- Empty state (no snapshots at all) -->
       @if (!loading() && snapshots().length === 0) {
-<div class="empty-state">
-        <div class="empty-icon">
-          <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/>
-          </svg>
-        </div>
-        <h3>No snapshots yet</h3>
-        <p class="text-secondary">Take your first snapshot to start tracking your net worth over time.</p>
-        <jiro-button variant="primary" type="button" (click)="openSnapshotModal()">
-          Take your first snapshot
-        </jiro-button>
-      </div>
-}
+        <jiro-empty-state
+          icon="chart-line-up"
+          heading="No snapshots yet"
+          message="Take your first snapshot to start tracking your net worth over time.">
+          <jiro-button type="button" (click)="openSnapshotModal()">Take your first snapshot</jiro-button>
+        </jiro-empty-state>
+      }
 
       <!-- Content (has snapshots) -->
       @if (!loading() && snapshots().length > 0) {
@@ -231,15 +221,7 @@ Chart.register(...registerables);
     .networth-page { max-width: 900px; width: 100%; display: flex; flex-direction: column; gap: var(--space-xl); }
 
     /* ── Header ── */
-    .page-header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: var(--space-md);
-      margin-bottom: 0;
-    }
 
-    .page-header h1 { font-size: var(--font-size-2xl); font-weight: 700; }
 
 
     @media (max-width: 600px) {
@@ -247,23 +229,8 @@ Chart.register(...registerables);
     }
 
     /* ── Loading ── */
-    .state-message {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: var(--space-2xl);
-      gap: var(--space-md);
-      text-align: center;
-    }
+    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
 
-    .spinner-lg {
-      width: 40px; height: 40px;
-      border: 3px solid var(--border-color);
-      border-top-color: var(--color-primary);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
 
     .spinner-sm {
       width: 16px; height: 16px;
@@ -275,24 +242,9 @@ Chart.register(...registerables);
     }
 
     /* ── Empty state ── */
-    .empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: var(--space-2xl) var(--space-lg);
-      gap: var(--space-md);
-      text-align: center;
-      border: 1px dashed var(--border-color);
-      border-radius: var(--border-radius);
-      background: var(--bg-surface);
-    }
 
-    .empty-icon { color: var(--text-muted); opacity: 0.45; }
 
-    .empty-state h3 { font-size: var(--font-size-xl); font-weight: 600; }
 
-    .empty-state jiro-button { margin-top: var(--space-xs); }
 
     /* ── Summary card ── */
     .summary-card { width: 100%; }
@@ -327,7 +279,7 @@ Chart.register(...registerables);
       color: var(--text-primary);
     }
 
-    .summary-networth.positive { color: #4A6741; }
+    .summary-networth.positive { color: var(--color-accent); }
     .summary-networth.negative { color: var(--color-danger); }
 
     .summary-date {
@@ -360,7 +312,7 @@ Chart.register(...registerables);
       color: var(--text-primary);
     }
 
-    .side-value.assets { color: #4A6741; }
+    .side-value.assets { color: var(--color-accent); }
     .side-value.liabilities { color: var(--color-danger); }
 
     /* ── Chart card ── */
@@ -450,7 +402,7 @@ Chart.register(...registerables);
       color: var(--text-primary);
     }
 
-    .snap-value.networth.positive { color: #4A6741; }
+    .snap-value.networth.positive { color: var(--color-accent); }
     .snap-value.networth.negative { color: var(--color-danger); }
     .snap-value.liabilities { color: var(--color-danger); }
 
@@ -503,8 +455,8 @@ Chart.register(...registerables);
       margin-top: var(--space-xs);
     }
 
-    .networth-preview.positive { border-color: rgba(74,103,65,0.3); background: rgba(74,103,65,0.06); }
-    .networth-preview.negative { border-color: rgba(193,88,42,0.3); background: rgba(193,88,42,0.06); }
+    .networth-preview.positive { border-color: rgba(var(--color-accent-rgb), 0.3); background: rgba(var(--color-accent-rgb), 0.06); }
+    .networth-preview.negative { border-color: rgba(var(--color-danger-rgb), 0.3); background: rgba(var(--color-danger-rgb), 0.06); }
 
     .preview-label {
       font-size: var(--font-size-sm);
@@ -517,7 +469,7 @@ Chart.register(...registerables);
       font-weight: 700;
     }
 
-    .networth-preview.positive .preview-value { color: #4A6741; }
+    .networth-preview.positive .preview-value { color: var(--color-accent); }
     .networth-preview.negative .preview-value { color: var(--color-danger); }
 
     .form-actions {
@@ -528,7 +480,6 @@ Chart.register(...registerables);
     }
 
 
-    @keyframes spin { to { transform: rotate(360deg); } }
   `]
 })
 export class NetWorthPageComponent implements OnInit, AfterViewInit, OnDestroy {
@@ -665,7 +616,8 @@ export class NetWorthPageComponent implements OnInit, AfterViewInit, OnDestroy {
     );
     const labels = sorted.map(s => this.formatDate(s.snapshot_date));
     const values = sorted.map(s => s.net_worth);
-    const accentColor = '#4A6741';
+    // Read at draw time so a theme or dark-mode change lands on the next redraw.
+    const tone = chartTones();
     const canvas = this.canvasRef.nativeElement;
 
     // Run outside Angular's zone so Chart.js's ResizeObserver doesn't trigger CD cycles
@@ -684,11 +636,11 @@ export class NetWorthPageComponent implements OnInit, AfterViewInit, OnDestroy {
           datasets: [{
             label: 'Net Worth',
             data: values,
-            borderColor: accentColor,
-            backgroundColor: `${accentColor}1a`,
+            borderColor: tone.accent,
+            backgroundColor: `${tone.accent}1a`,
             fill: true,
             tension: 0.3,
-            pointBackgroundColor: accentColor,
+            pointBackgroundColor: tone.accent,
             pointRadius: 4,
             pointHoverRadius: 6,
           }],
@@ -707,15 +659,15 @@ export class NetWorthPageComponent implements OnInit, AfterViewInit, OnDestroy {
           scales: {
             x: {
               title: { display: false },
-              grid: { color: 'rgba(0,0,0,0.05)' },
-              ticks: { font: { size: 11 }, color: '#9B8F88' },
+              grid: { color: tone.grid },
+              ticks: { font: { size: 11 }, color: tone.tick },
             },
             y: {
               title: { display: false },
-              grid: { color: 'rgba(0,0,0,0.05)' },
+              grid: { color: tone.grid },
               ticks: {
                 font: { size: 11 },
-                color: '#9B8F88',
+                color: tone.tick,
                 callback: v => `$${Number(v).toLocaleString()}`,
               },
             },

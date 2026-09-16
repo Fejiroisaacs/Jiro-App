@@ -270,9 +270,9 @@ interface TransactionGroup {
 <span
                    
                     class="category-chip"
-                    [style.background]="(tx.category_color || '#9B8F88') + '22'"
+                    [style.background]="(tx.category_color || 'var(--text-muted)') + '22'"
                     [style.color]="tx.category_color || 'var(--text-muted)'"
-                    [style.border-color]="(tx.category_color || '#9B8F88') + '55'">
+                    [style.border-color]="(tx.category_color || 'var(--text-muted)') + '55'">
                     {{ tx.category_name }}
                   </span>
 }
@@ -434,7 +434,7 @@ interface TransactionGroup {
     .type-btn:last-child { border-right: none; }
 
     .type-btn.active {
-      background: var(--color-primary); color: #fff; font-weight: 600;
+      background: var(--color-primary); color: var(--text-on-primary); font-weight: 600;
     }
 
     .search-group { flex: 1; min-width: 160px; }
@@ -471,7 +471,7 @@ interface TransactionGroup {
       min-height: 36px;
     }
 
-    .clear-btn:hover { border-color: var(--color-danger); color: var(--color-danger); background: rgba(193,88,42,0.05); }
+    .clear-btn:hover { border-color: var(--color-danger); color: var(--color-danger); background: rgba(var(--color-danger-rgb), 0.05); }
 
     /* ── Mobile filter ──────────────────────────────────────────────────────── */
 
@@ -494,7 +494,7 @@ interface TransactionGroup {
 
     .filter-badge {
       display: inline-flex; align-items: center; justify-content: center;
-      background: var(--color-primary); color: #fff;
+      background: var(--color-primary); color: var(--text-on-primary);
       font-size: 10px; font-weight: 700;
       width: 18px; height: 18px; border-radius: 50%;
     }
@@ -610,7 +610,7 @@ interface TransactionGroup {
 
     .transfer-indicator {
       display: flex; align-items: center; gap: 3px;
-      font-size: var(--font-size-xs); color: #3B82F6;
+      font-size: var(--font-size-xs); color: var(--color-info);
     }
 
     .tx-right {
@@ -717,7 +717,7 @@ interface TransactionGroup {
     .toggle-knob {
       position: absolute; top: 3px; left: 3px;
       width: 18px; height: 18px;
-      background: #fff; border-radius: 50%;
+      background: var(--bg-surface); border-radius: 50%;
       transition: transform 0.2s;
     }
 
