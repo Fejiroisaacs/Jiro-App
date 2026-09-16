@@ -40,3 +40,18 @@ Plan: `~/.claude/plans/jaunty-rolling-dream.md`. Audit: `docs/UI-AUDIT-2026-09.m
 - Session player bar still paints the primary button on a primary background (Phase 3).
 
 **Next: Phase 3 (pages).** Session player and exercise library, Ledger hub and transactions, Journaly home, Culinara list and detail; migrate control flow, hand-rolled confirms and toasts, `.state-message`/`.spinner-lg` copies, raw hex colours (196 left) as each page is touched. Then Phase 4, the landing page with real screenshots.
+
+## Phase 3a: Jym pages (in progress, plan in `~/.claude/plans/jaunty-rolling-dream.md`)
+
+- [x] 3a.0 Control-flow migration, whole app (736 directives, 58 files; `--format false`; build 395 kB) — commit eaf1387
+- [ ] 3a.1 Session player, same layout: bar literals -> `currentColor`/tokens, `inverse` + `ghost` button variants, Finish/Exit visible on the bar, `--color-warning-rgb`, 40px set-row controls (36 mobile), warm-up `fire` icon with `aria-pressed`, aria-labels on icon buttons, picker in `jiro-modal`, `jym-pr-badge`, skeleton + empty state
+- [ ] 3a.2 Exercise library as list rows: `forkJoin(listExercises, getPRs)`, best set + est. 1RM + PR date, `jiro-menu` row menu (Edit / Delete), ConfirmService + toasts, `jiro-page-header` when not embedded, empty + no-results states, skeleton
+- [ ] 3a.3 Other Jym pages: `jiro-page-header`, `jiro-empty-state`, `.spinner`, ConfirmService for the five `.delete-confirm` modals, tokens for hex/rgba, theme-aware chart palette in exercise-detail, session-summary on-screen tokens (share card + `MUSCLE_COLORS` untouched), aria-labels
+- [ ] Verification: `check:css`, production build, Playwright desktop + mobile, light + dark on the player, contrast on the bar buttons
+- [ ] Commit per step, push at the end, review section below
+
+## Phase 3b/3c/3d inputs (from explore traces, 2026-09-14; not yet acted on)
+
+- Ledger (hub, transactions, accounts, budgets, networth, compare, transaction form): 43 raw hex, 29 rgba, 6 `.spinner-lg` copies, 3 hand-rolled delete confirms; none import page-header / empty-state / icon / input / skeleton / toast / confirm. `getAmountColor` and `getTypeColor` duplicate each other with a `#3B82F6` transfer literal; budgets format currency with a hard `$`; net-worth and compare charts hard-code light-theme axis colours; compare duplicates the whole table for mobile; transaction search only filters pages already fetched; `activeFilterCount()` reads plain fields.
+- Journaly (home, week view, day modal): journal-home never binds the week view's `weekChange`, so paging weeks shows nothing; mood colours are an 8-entry hex map inside the week view only; filters fire per keystroke; one hand-rolled delete confirm; no toasts in the module; dead `.page-header` CSS and unused `moodIcon`.
+- Culinara (list, detail, discover, meal planner, shopping list, forms): list and discover hand-roll header + `.spinner-lg`; detail has 11 title-only icon buttons, cook mode at `z-index: 9000` with no Escape and no wake lock, inline `setTimeout` confirmations instead of toasts; three dead `.back-link` CSS blocks; `#c49540` star gold repeated.
