@@ -1,36 +1,36 @@
-import { Component, OnInit, signal, input, output } from '@angular/core';
+import { Component, OnInit, inject, signal, input, output } from '@angular/core';
 
 import { Router } from '@angular/router';
 import { JymService, SplitSeriesSummary } from '../../../core/services/jym.service';
+import { ConfirmService } from '../../../core/services/confirm.service';
+import { ToastService } from '../../../core/services/toast.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
+import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 
 @Component({
   selector: 'app-series-list',
   standalone: true,
-  imports: [JiroButtonComponent, JiroModalComponent],
+  imports: [
+    JiroButtonComponent, JiroModalComponent, JiroIconComponent,
+    JiroPageHeaderComponent, JiroEmptyStateComponent,
+  ],
   template: `
     <div class="series-list">
       @if (!embedded()) {
-      <div class="page-header">
-        <div>
-          <h1>My Series</h1>
-          <p class="text-secondary">Structured program runs and progression tracking</p>
-        </div>
-      </div>
+        <jiro-page-header heading="My series" subtitle="Structured program runs and progression tracking" />
       }
 
       @if (loading()) {
-<div class="state-message">
-        <div class="spinner-lg"></div>
-        <p>Loading...</p>
-      </div>
-}
+        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+      }
 
       <!-- Active Series -->
       @if (!loading() && activeSeries().length > 0) {
 <div class="section">
-        <h2 class="section-title">Active Series</h2>
+        <h2 class="section-title">Active series</h2>
         <div class="series-grid">
           @for (sr of activeSeries(); track sr) {
 <div class="series-card">
@@ -77,11 +77,9 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
                   Start
                 </jiro-button>
                 <button class="view-btn" (click)="view(sr.id)">View</button>
-                <button class="del-btn" (click)="deleteSeries($event, sr)" title="Delete series">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="3,6 5,6 21,6"/>
-                    <path d="M19,6l-1,14a2,2,0,0,1-2,2H8a2,2,0,0,1-2-2L5,6"/>
-                  </svg>
+                <button class="del-btn" type="button" (click)="deleteSeries($event, sr)" title="Delete series"
+                  [attr.aria-label]="'Delete series ' + sr.name">
+                  <jiro-icon name="trash" [size]="15" />
                 </button>
               </div>
             </div>
@@ -94,7 +92,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       <!-- Ended Series -->
       @if (!loading() && endedSeries().length > 0) {
 <div class="section">
-        <h2 class="section-title">Ended Series</h2>
+        <h2 class="section-title">Ended series</h2>
         <div class="series-grid">
           @for (sr of endedSeries(); track sr) {
 <div class="series-card" (click)="view(sr.id)">
@@ -117,11 +115,9 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
             <div class="card-footer">
               <span class="sessions-pill">{{ sr.session_count }} sessions</span>
-              <button class="del-btn" (click)="deleteSeries($event, sr)" title="Delete series">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="3,6 5,6 21,6"/>
-                  <path d="M19,6l-1,14a2,2,0,0,1-2,2H8a2,2,0,0,1-2-2L5,6"/>
-                </svg>
+              <button class="del-btn" type="button" (click)="deleteSeries($event, sr)" title="Delete series"
+                [attr.aria-label]="'Delete series ' + sr.name">
+                <jiro-icon name="trash" [size]="15" />
               </button>
             </div>
           </div>
@@ -132,12 +128,13 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
       <!-- Empty State -->
       @if (!loading() && series().length === 0) {
-<div class="state-message">
-        <h3>No series yet</h3>
-        <p class="text-secondary">Start a series from any of your splits to track structured progression.</p>
-        <a (click)="goToSplits.emit()" class="start-link">Go to Splits →</a>
-      </div>
-}
+        <jiro-empty-state
+          icon="chart-line-up"
+          heading="No series yet"
+          message="Start a series from any of your splits to track structured progression.">
+          <jiro-button variant="secondary" type="button" (click)="goToSplits.emit()">Go to splits</jiro-button>
+        </jiro-empty-state>
+      }
 
       <!-- Start a new series CTA (shown when series exist) -->
       @if (!loading() && series().length > 0) {
@@ -155,10 +152,8 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       @if (showRoutinePicker()) {
 <jiro-modal title="Choose Routine" maxWidth="420px" (close)="showRoutinePicker.set(false)">
         @if (loadingRoutines()) {
-<div class="picker-loading">
-          <div class="spinner-lg"></div>
-        </div>
-}
+          <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+        }
         @if (!loadingRoutines()) {
 <div class="routine-list">
           @for (r of pickerRoutines(); track r) {
@@ -184,13 +179,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
     .series-list { max-width: 900px; width: 100%; }
 
-    .page-header {
-      display: flex; align-items: flex-start; justify-content: space-between;
-      margin-bottom: var(--space-xl); gap: var(--space-md);
-    }
-
-    .page-header h1 { font-size: var(--font-size-2xl); font-weight: 700; }
-
     .section { margin-bottom: var(--space-xl); }
 
     .section-title {
@@ -198,16 +186,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       color: var(--text-secondary); margin-bottom: var(--space-md);
     }
 
-    .state-message {
-      display: flex; flex-direction: column; align-items: center;
-      gap: var(--space-md); padding: var(--space-2xl); text-align: center;
-    }
-
-    .spinner-lg {
-      width: 40px; height: 40px; border: 3px solid var(--border-color);
-      border-top-color: var(--color-primary); border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
+    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
 
     /* Series grid */
     .series-grid {
@@ -224,7 +203,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       position: relative;
     }
 
-    .series-card:hover { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(122,59,46,0.08); }
+    .series-card:hover { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.08); }
 
     .card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-sm); }
 
@@ -236,7 +215,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       font-size: var(--font-size-xs); font-weight: 600; padding: 3px 10px;
       border-radius: 10px; white-space: nowrap; flex-shrink: 0;
     }
-    .status-badge.active { background: rgba(76,175,80,0.12); color: #4caf50; }
+    .status-badge.active { background: rgba(var(--color-accent-rgb), 0.12); color: var(--color-positive); }
     .status-badge.ended { background: var(--bg-canvas); color: var(--text-muted); border: 1px solid var(--border-color); }
 
     .card-meta { display: flex; flex-direction: column; gap: 2px; }
@@ -256,14 +235,14 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
     .sessions-pill, .duration-pill {
       font-size: var(--font-size-xs); padding: 3px 10px; border-radius: 10px;
-      background: rgba(122,59,46,0.1); color: var(--color-primary); font-weight: 500;
+      background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary); font-weight: 500;
     }
 
     .duration-pill.open { background: var(--bg-canvas); color: var(--text-muted); }
 
     .view-btn {
       background: none; border: 1px solid var(--border-color);
-      border-radius: var(--border-radius); padding: 5px 12px;
+      border-radius: var(--border-radius); min-height: 32px; padding: 5px 12px; font-family: inherit;
       color: var(--text-secondary); font-size: var(--font-size-xs);
       cursor: pointer; transition: all 0.15s; white-space: nowrap;
     }
@@ -272,10 +251,10 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
     .del-btn {
       background: none; border: none; cursor: pointer;
-      color: var(--text-muted); padding: 4px; border-radius: 4px;
-      display: inline-flex; align-items: center; transition: all 0.15s;
+      color: var(--text-muted); width: 40px; height: 40px; border-radius: var(--border-radius-sm);
+      display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s;
     }
-    .del-btn:hover { color: var(--color-danger); background: rgba(196,74,74,0.1); }
+    .del-btn:hover { color: var(--color-danger); background: rgba(var(--color-danger-rgb), 0.1); }
 
     /* Start CTA */
     .start-cta {
@@ -295,11 +274,10 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
     .start-link:hover {
       border-color: var(--color-primary);
-      background: rgba(122,59,46,0.04);
+      background: rgba(var(--color-primary-rgb), 0.04);
     }
 
     /* Routine picker */
-    .picker-loading { display: flex; justify-content: center; padding: var(--space-xl); }
 
     .routine-list { display: flex; flex-direction: column; gap: var(--space-xs); }
 
@@ -311,15 +289,13 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       transition: all 0.15s; text-align: left; width: 100%; font-family: inherit;
     }
 
-    .routine-pick-btn:hover { border-color: var(--color-primary); background: rgba(122,59,46,0.05); }
+    .routine-pick-btn:hover { border-color: var(--color-primary); background: rgba(var(--color-primary-rgb), 0.05); }
 
     .routine-pick-btn.freestyle { color: var(--text-secondary); font-size: var(--font-size-sm); }
 
     .routine-pick-name { font-weight: 500; }
 
     .routine-pick-day { font-size: var(--font-size-xs); color: var(--text-muted); }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
 
     @media (max-width: 768px) {
       .del-btn {
@@ -354,6 +330,9 @@ export class SeriesListComponent implements OnInit {
   loadingRoutines = signal(false);
   pickerRoutines = signal<{ id: string; name: string; day_order: number }[]>([]);
   private selectedSeriesId = '';
+
+  private readonly confirmService = inject(ConfirmService);
+  private readonly toast = inject(ToastService);
 
   constructor(private jymService: JymService, public router: Router) { }
 
@@ -403,14 +382,23 @@ export class SeriesListComponent implements OnInit {
     });
   }
 
-  deleteSeries(event: Event, sr: SplitSeriesSummary) {
+  async deleteSeries(event: Event, sr: SplitSeriesSummary) {
     event.stopPropagation();
+    const ok = await this.confirmService.confirm({
+      title: `Delete ${sr.name}?`,
+      message: 'This removes the series and its progression history. The sessions themselves stay in your history.',
+      confirmLabel: 'Delete series',
+      danger: true,
+    });
+    if (!ok) return;
     this.jymService.deleteSeries(sr.id).subscribe({
       next: () => {
         this.series.update(list => list.filter(s => s.id !== sr.id));
         this.activeSeries.update(list => list.filter(s => s.id !== sr.id));
         this.endedSeries.update(list => list.filter(s => s.id !== sr.id));
+        this.toast.success(`${sr.name} deleted`);
       },
+      error: () => this.toast.error('Could not delete the series.'),
     });
   }
 

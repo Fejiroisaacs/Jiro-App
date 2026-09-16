@@ -3,40 +3,32 @@ import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { JymService, ExercisePR } from '../../../core/services/jym.service';
 import { SettingsService } from '../../../core/services/settings.service';
+import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
+import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
+import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
 
 @Component({
   selector: 'app-pr-wall',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, JiroPageHeaderComponent, JiroEmptyStateComponent, JymPrBadgeComponent],
   template: `
     <div class="pr-wall">
       @if (!embedded()) {
-        <div class="page-header">
-          <div>
-            <h1>PR Wall</h1>
-            <p class="text-secondary">Your best lifts, all in one place</p>
-          </div>
-        </div>
+        <jiro-page-header heading="PR Wall" subtitle="Your best lifts, all in one place" />
       }
 
       <!-- Loading -->
       @if (loading()) {
-<div class="state-message">
-        <div class="spinner-lg"></div>
-        <p>Loading personal records...</p>
-      </div>
-}
+        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+      }
 
       <!-- Empty state -->
       @if (!loading() && prs().length === 0) {
-<div class="state-message">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--text-muted)">
-          <circle cx="12" cy="8" r="6"/><path d="M8 14l-2 8 6-3 6 3-2-8"/>
-        </svg>
-        <h3>No personal records yet</h3>
-        <p class="text-secondary">Log some sets and your PRs will appear here automatically.</p>
-      </div>
-}
+        <jiro-empty-state
+          icon="star"
+          heading="No personal records yet"
+          message="Log some sets and your PRs appear here automatically." />
+      }
 
       <!-- PR groups by muscle group -->
       @if (!loading() && prs().length > 0) {
@@ -77,7 +69,7 @@ import { SettingsService } from '../../../core/services/settings.service';
 <div class="pr-row"
               (click)="router.navigate(['/jym/exercises', pr.exercise_id])">
               <span class="col-exercise ex-name">
-                <img src="/icons/badge-icon.svg" class="trophy" alt="PR" />
+                <jym-pr-badge />
                 {{ pr.name }}
               </span>
               <span class="col-lift lift-val">
@@ -103,13 +95,6 @@ import { SettingsService } from '../../../core/services/settings.service';
     :host { display: block; }
 
     .pr-wall { max-width: 900px; width: 100%; }
-
-    .page-header {
-      display: flex; align-items: flex-start; justify-content: space-between;
-      margin-bottom: var(--space-xl); gap: var(--space-md);
-    }
-
-    .page-header h1 { font-size: var(--font-size-2xl); font-weight: 700; }
 
     /* Summary strip */
     .summary-strip {
@@ -137,7 +122,7 @@ import { SettingsService } from '../../../core/services/settings.service';
 
     .mg-count {
       font-size: var(--font-size-xs); padding: 1px 7px; border-radius: 10px;
-      background: rgba(122,59,46,0.1); color: var(--color-primary); font-weight: 500;
+      background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary); font-weight: 500;
     }
 
     /* PR table */
@@ -170,14 +155,14 @@ import { SettingsService } from '../../../core/services/settings.service';
 
     .pr-row:last-child { border-bottom: none; }
 
-    .pr-row:hover { background: rgba(122,59,46,0.04); }
+    .pr-row:hover { background: rgba(var(--color-primary-rgb), 0.04); }
 
     .ex-name {
       font-size: var(--font-size-sm); font-weight: 500;
       color: var(--color-primary); display: flex; align-items: center; gap: var(--space-xs);
     }
 
-    .trophy { width: 22px; height: 22px; flex-shrink: 0; }
+
 
     .lift-val { font-size: var(--font-size-sm); font-weight: 600; }
 
@@ -188,18 +173,7 @@ import { SettingsService } from '../../../core/services/settings.service';
     .unit { font-size: var(--font-size-xs); color: var(--text-muted); font-weight: 400; }
 
     /* States */
-    .state-message {
-      display: flex; flex-direction: column; align-items: center;
-      gap: var(--space-md); padding: var(--space-2xl); text-align: center;
-    }
-
-    .spinner-lg {
-      width: 40px; height: 40px; border: 3px solid var(--border-color);
-      border-top-color: var(--color-primary); border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
+    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
 
     /* Mobile */
     @media (max-width: 600px) {

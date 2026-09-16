@@ -21,11 +21,10 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
 
         <!-- Loading -->
         @if (loading()) {
-<div class="state-message">
-          <div class="spinner"></div>
-          <p class="text-secondary">Loading split...</p>
-        </div>
-}
+          <div class="state-message" aria-busy="true">
+            <span class="spinner"></span>
+          </div>
+        }
 
         <!-- Error -->
         @if (!loading() && error()) {
@@ -98,7 +97,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
 }
             @if (imported()) {
 <div class="import-success">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4caf50" stroke-width="2">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-positive)" stroke-width="2">
                 <polyline points="20 6 9 17 4 12"/>
               </svg>
               <p>Split imported! <button class="link-btn" (click)="goToSplit()">Open it →</button></p>
@@ -172,7 +171,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
 
     .day-chip {
       font-size: var(--font-size-xs); font-weight: 600; padding: 2px 8px;
-      background: rgba(122,59,46,0.1); color: var(--color-primary);
+      background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary);
       border-radius: 8px; white-space: nowrap;
     }
 
@@ -214,7 +213,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
 
     .import-success {
       display: flex; align-items: center; gap: var(--space-sm);
-      color: #4caf50;
+      color: var(--color-positive);
     }
 
     .link-btn {

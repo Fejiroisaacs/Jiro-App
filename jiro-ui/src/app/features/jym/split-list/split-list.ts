@@ -1,56 +1,59 @@
-import { Component, OnInit, signal, input } from '@angular/core';
+import { Component, OnInit, inject, signal, input } from '@angular/core';
 
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { JymService, Split, CreateSeriesRequest } from '../../../core/services/jym.service';
+import { ConfirmService } from '../../../core/services/confirm.service';
+import { ToastService } from '../../../core/services/toast.service';
 import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-card';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
+import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
+
 @Component({
   selector: 'app-split-list',
   standalone: true,
-  imports: [FormsModule, JiroCardComponent, JiroButtonComponent, JiroModalComponent],
+  imports: [
+    FormsModule, JiroCardComponent, JiroButtonComponent, JiroModalComponent,
+    JiroIconComponent, JiroPageHeaderComponent, JiroEmptyStateComponent,
+  ],
   template: `
     <div class="split-list">
       <!-- Header -->
-      <div class="page-header">
-        @if (!embedded()) {
-        <div>
-          <h1>Splits</h1>
-          <p class="text-secondary">Manage your training splits</p>
-        </div>
-        }
-        <div class="header-actions">
-          <button class="discover-btn" (click)="router.navigate(['/jym/discover'])">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            </svg>
+      @if (!embedded()) {
+        <jiro-page-header heading="Splits" subtitle="Manage your training splits">
+          <button actions class="discover-btn" type="button" (click)="router.navigate(['/jym/discover'])">
+            <jiro-icon name="magnifying-glass" [size]="14" />
             Discover
           </button>
-          <jiro-button variant="primary" type="button" (click)="showCreate.set(true)">
-            + New Routine Split
-          </jiro-button>
+          <jiro-button actions type="button" (click)="showCreate.set(true)">New split</jiro-button>
+        </jiro-page-header>
+      } @else {
+        <div class="header-actions">
+          <button class="discover-btn" type="button" (click)="router.navigate(['/jym/discover'])">
+            <jiro-icon name="magnifying-glass" [size]="14" />
+            Discover
+          </button>
+          <jiro-button type="button" (click)="showCreate.set(true)">New split</jiro-button>
         </div>
-      </div>
+      }
 
       <!-- Loading -->
       @if (loading()) {
-<div class="state-message">
-        <div class="spinner-lg"></div>
-        <p>Loading splits...</p>
-      </div>
-}
+        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+      }
 
       <!-- Empty state -->
       @if (!loading() && splits().length === 0) {
-<div class="state-message">
-        <h3>No training splits yet</h3>
-        <p class="text-secondary">Create your first split to organise your training week.</p>
-        <jiro-button variant="primary" type="button" (click)="showCreate.set(true)">
-          Create First Split
-        </jiro-button>
-      </div>
-}
+        <jiro-empty-state
+          icon="squares-four"
+          heading="No training splits yet"
+          message="Create your first split to organise your training week.">
+          <jiro-button type="button" (click)="showCreate.set(true)">Create your first split</jiro-button>
+        </jiro-empty-state>
+      }
 
       <!-- Splits grid -->
       @if (!loading() && splits().length > 0) {
@@ -96,12 +99,9 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
                 Start
               </jiro-button>
             </div>
-            <button class="delete-split-btn" (click)="confirmDelete(split)" title="Delete split">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="3,6 5,6 21,6"/>
-                <path d="M19,6l-1,14a2,2,0,0,1-2,2H8a2,2,0,0,1-2-2L5,6"/>
-                <path d="M10,11v6M14,11v6M9,6V4a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1V6"/>
-              </svg>
+            <button class="delete-split-btn" type="button" (click)="deleteSplit(split)" title="Delete split"
+              [attr.aria-label]="'Delete split ' + split.name">
+              <jiro-icon name="trash" [size]="16" />
             </button>
           </div>
         </jiro-card>
@@ -189,32 +189,12 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       </jiro-modal>
 }
 
-      <!-- Delete Split Confirmation Modal -->
-      @if (deletingSplit()) {
-<jiro-modal title="Delete Split?" maxWidth="420px" (close)="deletingSplit.set(null)">
-        <div class="delete-confirm">
-          <p>Delete <strong>{{ deletingSplit()!.name }}</strong>?</p>
-          <p class="text-secondary" style="font-size: var(--font-size-sm); margin-top: var(--space-xs);">
-            This will permanently delete the split and all its routines. Sessions that used these routines are not affected.
-          </p>
-          <div class="form-actions" style="margin-top: var(--space-lg);">
-            <jiro-button variant="secondary" type="button" (click)="deletingSplit.set(null)">Cancel</jiro-button>
-            <jiro-button variant="danger" type="button" [disabled]="deleting()" (click)="deleteSplit()">
-              {{ deleting() ? 'Deleting...' : 'Delete' }}
-            </jiro-button>
-          </div>
-        </div>
-      </jiro-modal>
-}
-
       <!-- Start Session: choose routine modal -->
       @if (showRoutinePicker()) {
 <jiro-modal title="Choose Routine" maxWidth="420px" (close)="showRoutinePicker.set(false)">
         @if (loadingRoutines()) {
-<div class="picker-loading">
-          <div class="spinner-lg"></div>
-        </div>
-}
+          <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+        }
         @if (!loadingRoutines()) {
 <div class="routine-list">
           @for (r of pickerRoutines(); track r) {
@@ -240,29 +220,19 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
     .split-list { max-width: 1000px; width: 100%; }
 
-    .page-header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      margin-bottom: var(--space-lg);
-      gap: var(--space-md);
-    }
-
-    .page-header h1 { font-size: var(--font-size-2xl); font-weight: 700; }
-
-    .header-actions { display: flex; gap: var(--space-sm); flex-shrink: 0; align-items: center; }
+    .header-actions { display: flex; gap: var(--space-sm); align-items: center; margin-bottom: var(--space-lg); }
 
 
     .discover-btn {
       display: flex; align-items: center; gap: 6px;
-      padding: 8px 14px;
+      min-height: 40px; padding: 8px 14px; font-family: inherit;
       background: none; border: 1px solid var(--border-color);
       border-radius: var(--border-radius);
       color: var(--text-secondary); font-size: var(--font-size-sm);
       cursor: pointer; transition: all 0.15s; white-space: nowrap;
     }
 
-    .discover-btn:hover { border-color: var(--color-primary); color: var(--color-primary); background: rgba(122,59,46,0.05); }
+    .discover-btn:hover { border-color: var(--color-primary); color: var(--color-primary); background: rgba(var(--color-primary-rgb), 0.05); }
 
     .split-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: var(--space-xs); }
 
@@ -278,25 +248,8 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       white-space: nowrap;
     }
 
-    @media (max-width: 600px) {
-      .page-header { flex-direction: column; }
-      .header-actions { flex-shrink: 1; }
-    }
-
     /* ── State messages ── */
-    .state-message {
-      display: flex; flex-direction: column; align-items: center;
-      justify-content: center; padding: var(--space-2xl); gap: var(--space-md); text-align: center;
-    }
-
-
-    .spinner-lg {
-      width: 40px; height: 40px;
-      border: 3px solid var(--border-color);
-      border-top-color: var(--color-primary);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
+    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
 
     .splits-grid {
       display: grid;
@@ -322,7 +275,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       padding: 4px 8px;
       border-radius: 2px;
       border: 1px solid var(--border-color);
-      box-shadow: 1px 1px 0 rgba(0,0,0,0.1);
+      box-shadow: 1px 1px 0 rgba(var(--shadow-rgb), 0.1);
       white-space: nowrap;
     }
 
@@ -346,14 +299,13 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
     .delete-split-btn:hover {
       color: var(--color-danger);
-      border-color: rgba(196,74,74,0.3);
-      background: rgba(196,74,74,0.04);
-      box-shadow: 1px 1px 0 rgba(196,74,74,0.3);
+      border-color: rgba(var(--color-danger-rgb), 0.3);
+      background: rgba(var(--color-danger-rgb), 0.04);
+      box-shadow: 1px 1px 0 rgba(var(--color-danger-rgb), 0.3);
       top: -1px; 
       left: -1px;
     }
 
-    .delete-confirm { display: flex; flex-direction: column; gap: var(--space-xs); }
 
     .create-form { display: flex; flex-direction: column; gap: var(--space-md); }
 
@@ -389,7 +341,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     .form-actions { display: flex; justify-content: flex-end; gap: var(--space-sm); margin-top: var(--space-xs); }
 
 
-    .picker-loading { display: flex; justify-content: center; padding: var(--space-xl); }
 
     .routine-list { display: flex; flex-direction: column; gap: var(--space-xs); }
 
@@ -401,7 +352,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       transition: all 0.15s; text-align: left; width: 100%;
     }
 
-    .routine-pick-btn:hover { border-color: var(--color-primary); background: rgba(122,59,46,0.05); }
+    .routine-pick-btn:hover { border-color: var(--color-primary); background: rgba(var(--color-primary-rgb), 0.05); }
 
     .routine-pick-btn.freestyle { color: var(--text-secondary); font-size: var(--font-size-sm); }
 
@@ -419,11 +370,10 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     }
 
     .dtype-btn.active {
-      border-color: var(--color-primary); background: rgba(122,59,46,0.08);
+      border-color: var(--color-primary); background: rgba(var(--color-primary-rgb), 0.08);
       color: var(--color-primary); font-weight: 600;
     }
 
-    @keyframes spin { to { transform: rotate(360deg); } }
 
     @media (max-width: 600px) {
       .split-actions { gap: 0.3rem; }
@@ -441,8 +391,8 @@ export class SplitListComponent implements OnInit {
   loading = signal(true);
   saving = signal(false);
   showCreate = signal(false);
-  deletingSplit = signal<Split | null>(null);
-  deleting = signal(false);
+  private readonly confirmService = inject(ConfirmService);
+  private readonly toast = inject(ToastService);
   showRoutinePicker = signal(false);
   loadingRoutines = signal(false);
   pickerRoutines = signal<{ id: string; name: string; day_order: number }[]>([]);
@@ -522,21 +472,20 @@ export class SplitListComponent implements OnInit {
     });
   }
 
-  confirmDelete(split: Split) {
-    this.deletingSplit.set(split);
-  }
-
-  deleteSplit() {
-    const split = this.deletingSplit();
-    if (!split) return;
-    this.deleting.set(true);
+  async deleteSplit(split: Split) {
+    const ok = await this.confirmService.confirm({
+      title: `Delete ${split.name}?`,
+      message: 'This deletes the split and all its routines. Sessions you already logged from them are not affected.',
+      confirmLabel: 'Delete split',
+      danger: true,
+    });
+    if (!ok) return;
     this.jymService.deleteSplit(split.id).subscribe({
       next: () => {
         this.splits.update(list => list.filter(s => s.id !== split.id));
-        this.deletingSplit.set(null);
-        this.deleting.set(false);
+        this.toast.success(`${split.name} deleted`);
       },
-      error: () => this.deleting.set(false),
+      error: () => this.toast.error('Could not delete the split.'),
     });
   }
 

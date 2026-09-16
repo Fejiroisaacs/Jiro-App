@@ -1,6 +1,7 @@
 import { Component, OnInit, ViewChild, ElementRef, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
+import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
 
 // ─── Data types ────────────────────────────────────────────────────────────────
 
@@ -69,7 +70,7 @@ function capitalize(s: string): string {
 @Component({
   selector: 'app-session-summary',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, JymPrBadgeComponent],
   template: `
     <!-- ════════════════════════════════════════════════════════════════
          In-app view
@@ -126,17 +127,17 @@ function capitalize(s: string): string {
       <!-- ── Stats ──────────────────────────────────────────────────── -->
       <div class="stats-row">
         <div class="stat-card">
-          <div class="stat-stripe" style="background:#4a90d9"></div>
+          <div class="stat-stripe stripe-duration"></div>
           <div class="stat-value">{{ durationStr() }}</div>
           <div class="stat-label">Duration</div>
         </div>
         <div class="stat-card">
-          <div class="stat-stripe" style="background:#f0a030"></div>
+          <div class="stat-stripe stripe-volume"></div>
           <div class="stat-value">{{ totalVolume() }}</div>
           <div class="stat-label">Volume</div>
         </div>
         <div class="stat-card">
-          <div class="stat-stripe" style="background:#2ecc71"></div>
+          <div class="stat-stripe stripe-sets"></div>
           <div class="stat-value">{{ totalSets() }}</div>
           <div class="stat-label">Work Sets</div>
         </div>
@@ -174,15 +175,7 @@ function capitalize(s: string): string {
           </div>
           <div class="lift-aside">
             @if (lift.isPR) {
-<span class="pr-icon" aria-label="Personal Record">
-              <svg width="22" height="22" viewBox="0 0 100 100" aria-hidden="true">
-                <path d="M30 40 v45 l20 -15 l20 15 v-45 z" fill="#5D4037"/>
-                <circle cx="50" cy="35" r="26" fill="#BF360C"/>
-                <circle cx="50" cy="35" r="20" fill="#E6DCC3"/>
-                <text x="50" y="42" font-family="sans-serif" font-weight="bold"
-                  font-size="20" fill="#5D4037" text-anchor="middle">PR</text>
-              </svg>
-            </span>
+<jym-pr-badge />
 }
             @if (!lift.isPR) {
 <span class="best-tag">Best</span>
@@ -381,6 +374,10 @@ function capitalize(s: string): string {
       color: var(--text-on-dark);
     }
 
+    /* The hero is a fixed dark banner and the share card below is rendered
+       off-screen by html-to-image, which cannot resolve CSS variables; both
+       keep literal colours on purpose. */
+
     /* amber glow ring behind the trophy */
     .trophy-ring {
       display: inline-flex;
@@ -470,6 +467,10 @@ function capitalize(s: string): string {
       top: 0; left: 0; right: 0;
       height: 3px;
     }
+
+    .stripe-duration { background: var(--color-info); }
+    .stripe-volume   { background: var(--color-warning); }
+    .stripe-sets     { background: var(--color-positive); }
 
     .stat-value {
       font-family: var(--font-family-display);
@@ -604,11 +605,7 @@ function capitalize(s: string): string {
       flex-shrink: 0;
     }
 
-    .pr-icon {
-      display: inline-flex;
-      align-items: center;
-      flex-shrink: 0;
-    }
+    jym-pr-badge { flex-shrink: 0; }
 
     .best-tag {
       font-size: 10px;
@@ -678,11 +675,13 @@ function capitalize(s: string): string {
 
     .btn-done:hover { opacity: 0.8; }
 
+    /* scoped override of the global .spinner: sized for a button and
+       tinted from the button's own text colour */
     .spinner {
       display: inline-block;
       width: 16px; height: 16px;
-      border: 2px solid rgba(255,255,255,0.3);
-      border-top-color: #fff;
+      border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
+      border-top-color: currentColor;
       border-radius: 50%;
       animation: spin 0.7s linear infinite;
       flex-shrink: 0;

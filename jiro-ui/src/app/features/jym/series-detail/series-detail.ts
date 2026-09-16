@@ -6,28 +6,28 @@ import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import { JymService, SplitSeriesDetail, ExerciseProgression, Routine } from '../../../core/services/jym.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
+import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
+import { chartTones } from '../shared/chart-theme';
 
 Chart.register(...registerables);
 
 @Component({
   selector: 'app-series-detail',
   standalone: true,
-  imports: [CommonModule, FormsModule, JiroButtonComponent, JiroModalComponent],
+  imports: [CommonModule, FormsModule, JiroButtonComponent, JiroModalComponent, JiroEmptyStateComponent],
   template: `
     <div class="series-detail">
       <!-- Back -->
-      <button class="back-btn" (click)="goBack()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <button class="back-btn" type="button" (click)="goBack()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
           <polyline points="15,18 9,12 15,6"/>
         </svg>
-        My Series
+        My series
       </button>
 
       @if (loading()) {
-<div class="state-message">
-        <div class="spinner-lg"></div>
-      </div>
-}
+        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+      }
 
       @if (!loading() && series()) {
 <div class="content">
@@ -74,11 +74,11 @@ Chart.register(...registerables);
 
         <!-- No sessions yet -->
         @if (series()!.sessions.length === 0) {
-<div class="state-message">
-          <h3>No sessions logged yet</h3>
-          <p class="text-secondary">Start a session linked to this series to see progression data.</p>
-        </div>
-}
+          <jiro-empty-state
+            icon="barbell"
+            heading="No sessions logged yet"
+            message="Start a session linked to this series to see progression data." />
+        }
 
         @if (series()!.sessions.length > 0) {
 <div>
@@ -245,15 +245,11 @@ Chart.register(...registerables);
     }
     .back-btn:hover { color: var(--text-primary); }
 
+    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
+
     .state-message {
       display: flex; flex-direction: column; align-items: center;
       gap: var(--space-md); padding: var(--space-2xl); text-align: center;
-    }
-
-    .spinner-lg {
-      width: 40px; height: 40px; border: 3px solid var(--border-color);
-      border-top-color: var(--color-primary); border-radius: 50%;
-      animation: spin 0.8s linear infinite;
     }
 
     .content { display: flex; flex-direction: column; gap: var(--space-xl); }
@@ -272,7 +268,7 @@ Chart.register(...registerables);
 
     .status-badge {
       font-size: var(--font-size-xs); font-weight: 600; padding: 2px 8px; border-radius: 10px;
-      background: rgba(76,175,80,0.12); color: #4caf50;
+      background: rgba(var(--color-accent-rgb), 0.12); color: var(--color-positive);
     }
     .status-badge:not(.active) { background: var(--bg-canvas); color: var(--text-muted); border: 1px solid var(--border-color); }
 
@@ -353,12 +349,12 @@ Chart.register(...registerables);
 
     .num-cell { color: var(--text-muted); font-weight: 500; }
 
-    .type-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #4caf50; }
+    .type-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--color-positive); }
     .type-chip {
       font-size: var(--font-size-xs); font-weight: 600; padding: 1px 6px; border-radius: 8px;
     }
-    .type-chip.deload { background: rgba(196,74,74,0.1); color: var(--color-danger); }
-    .type-chip.test { background: rgba(122,59,46,0.12); color: var(--color-primary); }
+    .type-chip.deload { background: rgba(var(--color-danger-rgb), 0.1); color: var(--color-danger); }
+    .type-chip.test { background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary); }
 
     .routine-picker { display: flex; flex-direction: column; gap: var(--space-md); }
 
@@ -381,7 +377,7 @@ Chart.register(...registerables);
       cursor: pointer; text-align: left; transition: border-color 0.15s, box-shadow 0.15s;
       width: 100%;
     }
-    .routine-row:hover { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(122,59,46,0.08); }
+    .routine-row:hover { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.08); }
 
     .routine-row-name { font-size: var(--font-size-md); font-weight: 500; color: var(--text-primary); }
 
@@ -390,7 +386,6 @@ Chart.register(...registerables);
     .freestyle-row { border-style: dashed; }
     .freestyle-row .routine-row-name { color: var(--text-secondary); }
 
-    @keyframes spin { to { transform: rotate(360deg); } }
   `]
 })
 export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
@@ -464,6 +459,7 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
     const sessions = s.sessions.filter(sess => sess.session_type !== 'deload');
     if (sessions.length === 0) return;
 
+    const tone = chartTones();
     const config: ChartConfiguration = {
       type: 'bar',
       data: {
@@ -471,8 +467,8 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
         datasets: [{
           label: 'Volume (kg)',
           data: sessions.map(sess => sess.total_volume),
-          backgroundColor: 'rgba(122,59,46,0.7)',
-          borderColor: '#7a3b2e',
+          backgroundColor: tone.primary,
+          borderColor: tone.primary,
           borderWidth: 1,
           borderRadius: 4,
         }],
@@ -491,7 +487,7 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
         },
         scales: {
           x: { grid: { display: false }, ticks: { font: { size: 11 } } },
-          y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 11 }, callback: v => `${v} kg` } },
+          y: { grid: { color: tone.grid }, ticks: { font: { size: 11 }, color: tone.tick, callback: v => `${v} kg` } },
         },
       },
     };
@@ -506,6 +502,7 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
     const ex = s.exercise_progressions.find(e => e.exercise_id === this.selectedExId);
     if (!ex || ex.points.length === 0) return;
 
+    const tone = chartTones();
     const config: ChartConfiguration = {
       type: 'line',
       data: {
@@ -513,10 +510,10 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
         datasets: [{
           label: 'Est. 1RM (kg)',
           data: ex.points.map(p => p.best_est_1rm),
-          borderColor: '#7a3b2e',
-          backgroundColor: 'rgba(122,59,46,0.1)',
+          borderColor: tone.primary,
+          backgroundColor: tone.primaryFill,
           fill: true, tension: 0.3,
-          pointBackgroundColor: '#7a3b2e', pointRadius: 4, pointHoverRadius: 6,
+          pointBackgroundColor: tone.primary, pointRadius: 4, pointHoverRadius: 6,
         }],
       },
       options: {
@@ -533,7 +530,7 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
         },
         scales: {
           x: { grid: { display: false }, ticks: { font: { size: 11 } } },
-          y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 11 }, callback: v => `${v} kg` } },
+          y: { grid: { color: tone.grid }, ticks: { font: { size: 11 }, color: tone.tick, callback: v => `${v} kg` } },
         },
       },
     };
@@ -562,6 +559,7 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
     const maxLen = Math.max(currentEx?.points.length ?? 0, otherEx?.points.length ?? 0);
     const labels = Array.from({ length: maxLen }, (_, i) => `S${i + 1}`);
 
+    const tone = chartTones();
     const config: ChartConfiguration = {
       type: 'line',
       data: {
@@ -570,18 +568,18 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
           {
             label: current.name,
             data: (currentEx?.points ?? []).map(p => p.best_est_1rm),
-            borderColor: '#7a3b2e',
-            backgroundColor: 'rgba(122,59,46,0.1)',
+            borderColor: tone.primary,
+            backgroundColor: tone.primaryFill,
             fill: false, tension: 0.3,
-            pointBackgroundColor: '#7a3b2e', pointRadius: 4,
+            pointBackgroundColor: tone.primary, pointRadius: 4,
           },
           {
             label: other.name,
             data: (otherEx?.points ?? []).map(p => p.best_est_1rm),
-            borderColor: '#9e9e9e',
-            backgroundColor: 'rgba(158,158,158,0.1)',
+            borderColor: tone.muted,
+            backgroundColor: tone.muted,
             fill: false, tension: 0.3,
-            pointBackgroundColor: '#9e9e9e', pointRadius: 4,
+            pointBackgroundColor: tone.muted, pointRadius: 4,
             borderDash: [5, 3],
           },
         ],
@@ -595,7 +593,7 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
         },
         scales: {
           x: { grid: { display: false }, ticks: { font: { size: 11 } } },
-          y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 11 }, callback: v => `${v} kg` } },
+          y: { grid: { color: tone.grid }, ticks: { font: { size: 11 }, color: tone.tick, callback: v => `${v} kg` } },
         },
       },
     };

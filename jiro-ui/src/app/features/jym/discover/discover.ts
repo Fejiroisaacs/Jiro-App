@@ -4,73 +4,65 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { JymService, PublicSplitSummary } from '../../../core/services/jym.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
+import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 
 @Component({
   selector: 'app-discover',
   standalone: true,
-  imports: [FormsModule, JiroButtonComponent],
+  imports: [FormsModule, JiroButtonComponent, JiroIconComponent, JiroPageHeaderComponent, JiroEmptyStateComponent],
   template: `
     <div class="discover">
-      <div class="page-header">
-        <div>
-          <h1>Discover</h1>
-          <p class="text-secondary">Browse public training splits from the community</p>
-        </div>
-        <button class="back-btn" (click)="router.navigate(['/jym/splits'])">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="15,18 9,12 15,6"/>
-          </svg>
-          My Splits
+      <jiro-page-header heading="Discover" subtitle="Browse public training splits from the community">
+        <button actions class="back-btn" type="button" (click)="router.navigate(['/jym/splits'])">
+          <jiro-icon name="caret-left" [size]="14" />
+          My splits
         </button>
-      </div>
+      </jiro-page-header>
 
       <!-- Search bar -->
       <form class="search-bar" (ngSubmit)="search()">
         <input
           class="search-input"
-          type="text"
+          type="search"
+          aria-label="Search splits"
           [(ngModel)]="searchQuery"
           name="q"
           placeholder="Search splits..." />
         <input
           class="search-input tag-input"
           type="text"
+          aria-label="Filter by tag"
           [(ngModel)]="tagFilter"
           name="tag"
           placeholder="Filter by tag..." />
-        <jiro-button variant="primary" type="submit" [disabled]="loading()">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
+        <jiro-button type="submit" [disabled]="loading()">
+          <jiro-icon name="magnifying-glass" [size]="14" />
           Search
         </jiro-button>
       </form>
 
       <!-- Loading -->
       @if (loading()) {
-<div class="state-message">
-        <div class="spinner-lg"></div>
-        <p>Searching...</p>
-      </div>
-}
+        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+      }
 
       <!-- Empty -->
       @if (!loading() && splits().length === 0 && searched()) {
-<div class="state-message">
-        <h3>No splits found</h3>
-        <p class="text-secondary">Try a different search term or tag.</p>
-      </div>
-}
+        <jiro-empty-state
+          icon="magnifying-glass"
+          heading="No splits found"
+          message="Try a different search term or tag." />
+      }
 
       <!-- Prompt to search -->
       @if (!loading() && !searched()) {
-<div class="state-message prompt">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="prompt-icon">
-          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-        </svg>
-        <p class="text-secondary">Search for splits or browse by tag above.</p>
-      </div>
-}
+        <jiro-empty-state
+          icon="magnifying-glass"
+          heading="Find a split to borrow"
+          message="Search by name, or filter by tag, to see what the community trains." />
+      }
 
       <!-- Results grid -->
       @if (!loading() && splits().length > 0) {
@@ -127,17 +119,10 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
 
     .discover { max-width: 900px; width: 100%; }
 
-    .page-header {
-      display: flex; align-items: flex-start; justify-content: space-between;
-      margin-bottom: var(--space-lg); gap: var(--space-md);
-    }
-
-    .page-header h1 { font-size: var(--font-size-2xl); font-weight: 700; }
-
     .back-btn {
       display: flex; align-items: center; gap: 6px;
       background: none; border: 1px solid var(--border-color);
-      border-radius: var(--border-radius); padding: 8px 14px;
+      border-radius: var(--border-radius); min-height: 40px; padding: 8px 14px; font-family: inherit;
       color: var(--text-secondary); font-size: var(--font-size-sm);
       cursor: pointer; transition: all 0.15s; white-space: nowrap; flex-shrink: 0;
     }
@@ -158,22 +143,11 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
  transition: border-color 0.2s; font-family: inherit;
     }
 
-    .search-input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(122,59,46,0.15); }
+    .search-input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.15); }
 
     .tag-input { flex: 0 1 180px; }
 
-    .state-message {
-      display: flex; flex-direction: column; align-items: center;
-      justify-content: center; padding: var(--space-2xl); gap: var(--space-md); text-align: center;
-    }
-
-    .prompt-icon { color: var(--border-color); }
-
-    .spinner-lg {
-      width: 36px; height: 36px; border: 3px solid var(--border-color);
-      border-top-color: var(--color-primary); border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
+    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
 
     .splits-grid {
       display: grid;
@@ -192,7 +166,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
 
     .split-card:hover {
       border-color: var(--color-primary);
-      box-shadow: 0 0 0 3px rgba(122,59,46,0.08);
+      box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.08);
       top: -1px;
     }
 
@@ -201,7 +175,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
     .split-name { font-size: var(--font-size-lg); font-weight: 600; }
 
     .routine-badge {
-      background: rgba(122,59,46,0.12); color: var(--color-primary);
+      background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary);
       font-size: var(--font-size-xs); font-weight: 600;
       padding: 3px 10px; border-radius: 12px; white-space: nowrap; flex-shrink: 0;
     }
@@ -213,8 +187,8 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
     .tag-chip {
       font-size: 11px; font-weight: 500;
       padding: 2px 8px; border-radius: 10px;
-      background: rgba(122,59,46,0.08); color: var(--color-primary);
-      border: 1px solid rgba(122,59,46,0.18);
+      background: rgba(var(--color-primary-rgb), 0.08); color: var(--color-primary);
+      border: 1px solid rgba(var(--color-primary-rgb), 0.18);
     }
 
     .card-footer { font-size: var(--font-size-xs); margin-top: auto; padding-top: var(--space-xs); }
@@ -239,7 +213,6 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
 
     .page-label { font-size: var(--font-size-sm); min-width: 60px; text-align: center; }
 
-    @keyframes spin { to { transform: rotate(360deg); } }
   `]
 })
 export class DiscoverComponent implements OnInit {

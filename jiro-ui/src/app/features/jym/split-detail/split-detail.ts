@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -6,6 +6,8 @@ import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-
 import { JymService, SplitWithRoutines, Routine, RoutineItem, Exercise, CreateSeriesRequest } from '../../../core/services/jym.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
+import { ConfirmService } from '../../../core/services/confirm.service';
+import { ToastService } from '../../../core/services/toast.service';
 
 @Component({
   selector: 'app-split-detail',
@@ -30,7 +32,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
             @if (editingName()) {
 <input class="title-input" [(ngModel)]="editName" (blur)="saveName()" (keydown.enter)="saveName()" autofocus />
 }
-            <button class="edit-btn" (click)="startEditName()">
+            <button class="edit-btn" type="button" (click)="startEditName()" title="Rename split" aria-label="Rename split">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
@@ -125,10 +127,8 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
       <!-- Loading -->
       @if (loading()) {
-<div class="state-message">
-        <div class="spinner-lg"></div>
-      </div>
-}
+        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+      }
 
       <!-- Routines (drag-drop columns) -->
       @if (!loading()) {
@@ -142,7 +142,8 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
               <span class="day-chip">Day {{ routine.day_order }}</span>
               <span class="routine-name">{{ routine.name }}</span>
             </div>
-            <button class="icon-btn danger" (click)="deleteRoutine(routine, ri)" title="Delete day">
+            <button class="icon-btn danger" type="button" (click)="deleteRoutine(routine, ri)" title="Delete day"
+              [attr.aria-label]="'Delete training day ' + routine.name">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="3,6 5,6 21,6"/><path d="M19,6l-1,14a2,2,0,0,1-2,2H8a2,2,0,0,1-2-2L5,6"/>
                 <path d="M10,11v6M14,11v6M9,6V4a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1V6"/>
@@ -178,7 +179,8 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
               <div class="item-targets">
                 <span class="target-text">{{ item.target_sets }}×{{ item.target_reps }}</span>
               </div>
-              <button class="icon-btn" (click)="removeItem(ri, ii)" title="Remove exercise">
+              <button class="icon-btn" type="button" (click)="removeItem(ri, ii)" title="Remove exercise"
+                [attr.aria-label]="'Remove ' + item.exercise_name + ' from ' + routine.name">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                   <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                 </svg>
@@ -394,7 +396,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       cursor: pointer; padding: var(--space-xs); border-radius: 4px;
     }
 
-    .edit-btn:hover { color: var(--color-primary); background: rgba(122,59,46,0.1); }
+    .edit-btn:hover { color: var(--color-primary); background: rgba(var(--color-primary-rgb), 0.1); }
 
     /* Visibility + Tags */
     .split-meta-row { display: flex; align-items: center; gap: var(--space-md); flex-wrap: wrap; margin-top: var(--space-xs); }
@@ -410,7 +412,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
     .vis-btn + .vis-btn { border-left: 1px solid var(--border-color); }
 
-    .vis-btn.active { background: rgba(122,59,46,0.1); color: var(--color-primary); }
+    .vis-btn.active { background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary); }
 
     .tags-row { display: flex; align-items: center; gap: var(--space-xs); flex-wrap: wrap; }
 
@@ -452,21 +454,13 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       font-size: var(--font-size-xs); cursor: pointer; transition: all 0.15s;
     }
 
-    .tag-save-btn { background: var(--color-primary); color: #fff; border: 1px solid var(--color-primary); }
+    .tag-save-btn { background: var(--color-primary); color: var(--text-on-primary); border: 1px solid var(--color-primary); }
 
     .tag-cancel-btn { background: none; border: 1px solid var(--border-color); color: var(--text-muted); }
 
     .tag-cancel-btn:hover { border-color: var(--color-danger); color: var(--color-danger); }
 
-    .state-message {
-      display: flex; align-items: center; justify-content: center; padding: var(--space-2xl);
-    }
-
-    .spinner-lg {
-      width: 40px; height: 40px; border: 3px solid var(--border-color);
-      border-top-color: var(--color-primary); border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
+    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
 
     .routines-board {
       display: flex; gap: var(--space-lg); overflow-x: auto;
@@ -500,7 +494,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       padding: 4px 8px;
       border-radius: 2px;
       border: 1px solid var(--border-color);
-      box-shadow: 1px 1px 0 rgba(0,0,0,0.1);
+      box-shadow: 1px 1px 0 rgba(var(--shadow-rgb), 0.1);
       white-space: nowrap;
     }
 
@@ -516,7 +510,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     }
 
     .icon-btn:hover { color: var(--text-primary); background: var(--bg-surface-hover); }
-    .icon-btn.danger:hover { color: var(--color-danger); background: rgba(196, 74, 74, 0.1); }
+    .icon-btn.danger:hover { color: var(--color-danger); background: rgba(var(--color-danger-rgb), 0.1); }
 
     .exercise-list {
       padding: var(--space-sm); display: flex; flex-direction: column;
@@ -556,7 +550,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       padding: 4px 8px;
       border-radius: 2px;
       border: 1px solid var(--border-color);
-      box-shadow: 1px 1px 0 rgba(0,0,0,0.1);
+      box-shadow: 1px 1px 0 rgba(var(--shadow-rgb), 0.1);
       white-space: nowrap;
     }
 
@@ -574,7 +568,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       border-radius: 0 0 var(--border-radius) var(--border-radius);
     }
 
-    .add-ex-btn:hover { color: var(--color-primary); background: rgba(122,59,46,0.05); }
+    .add-ex-btn:hover { color: var(--color-primary); background: rgba(var(--color-primary-rgb), 0.05); }
 
     /* Modal forms */
     .simple-form { display: flex; flex-direction: column; gap: var(--space-md); }
@@ -623,7 +617,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       text-align: left; width: 100%; transition: background 0.15s;
     }
 
-    .ex-pick-btn:hover { background: rgba(122,59,46,0.08); }
+    .ex-pick-btn:hover { background: rgba(var(--color-primary-rgb), 0.08); }
 
     .ex-pick-name { font-size: var(--font-size-sm); font-weight: 500; color: var(--text-primary); }
 
@@ -648,7 +642,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       text-align: center; transition: all 0.15s; font-family: inherit;
     }
 
-    .create-ex-inline-btn:hover { border-color: var(--color-primary); background: rgba(122,59,46,0.05); }
+    .create-ex-inline-btn:hover { border-color: var(--color-primary); background: rgba(var(--color-primary-rgb), 0.05); }
 
     .inline-create-form {
       background: var(--bg-canvas); border: 1px solid var(--border-color);
@@ -685,7 +679,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       white-space: nowrap; transition: all 0.15s;
     }
     .share-copy-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
-    .share-copy-btn.copied { border-color: #4caf50; color: #4caf50; }
+    .share-copy-btn.copied { border-color: var(--color-positive); color: var(--color-positive); }
 
     .share-revoke-btn {
       background: none; border: none; color: var(--text-muted);
@@ -709,7 +703,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     .dur-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
 
     .dur-btn.active {
-      background: rgba(122,59,46,0.1); border-color: var(--color-primary);
+      background: rgba(var(--color-primary-rgb), 0.1); border-color: var(--color-primary);
       color: var(--color-primary); font-weight: 500;
     }
 
@@ -721,10 +715,12 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       .header-btns { --jiro-btn-width: 100%; }
     }
 
-    @keyframes spin { to { transform: rotate(360deg); } }
   `]
 })
 export class SplitDetailComponent implements OnInit {
+  private readonly confirmService = inject(ConfirmService);
+  private readonly toast = inject(ToastService);
+
   split = signal<SplitWithRoutines | null>(null);
   routines = signal<(Routine & { items: RoutineItem[] })[]>([]);
   loading = signal(true);
@@ -857,11 +853,20 @@ export class SplitDetailComponent implements OnInit {
     });
   }
 
-  deleteRoutine(routine: Routine, ri: number) {
+  async deleteRoutine(routine: Routine, ri: number) {
+    const ok = await this.confirmService.confirm({
+      title: `Delete ${routine.name}?`,
+      message: 'The training day and the exercises planned on it are removed from this split.',
+      confirmLabel: 'Delete day',
+      danger: true,
+    });
+    if (!ok) return;
     this.jymService.deleteRoutine(routine.id).subscribe({
       next: () => {
         this.routines.update(list => list.filter((_, i) => i !== ri));
+        this.toast.success(`${routine.name} deleted`);
       },
+      error: () => this.toast.error('Could not delete the training day.'),
     });
   }
 

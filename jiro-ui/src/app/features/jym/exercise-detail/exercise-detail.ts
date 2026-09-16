@@ -1,12 +1,17 @@
-import { Component, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef, signal, computed } from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import { JymService, ExerciseWithHistory, SetHistory, ExerciseFormCheck } from '../../../core/services/jym.service';
 import { SettingsService } from '../../../core/services/settings.service';
+import { chartTones } from '../shared/chart-theme';
 import { UploadService } from '../../../core/services/upload.service';
-import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
+import { ConfirmService } from '../../../core/services/confirm.service';
+import { ToastService } from '../../../core/services/toast.service';
+import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
 
 Chart.register(...registerables);
 
@@ -17,30 +22,20 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
 @Component({
   selector: 'app-exercise-detail',
   standalone: true,
-  imports: [CommonModule, JiroModalComponent, JiroButtonComponent],
+  imports: [CommonModule, JiroButtonComponent, JiroIconComponent, JiroPageHeaderComponent, JymPrBadgeComponent],
   template: `
     <div class="exercise-detail">
-      <!-- Back -->
-      <button class="back-btn" (click)="goBack()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="15,18 9,12 15,6"/>
-        </svg>
-        Exercise Library
-      </button>
-
       <!-- Loading -->
       @if (loading()) {
-<div class="state-message">
-        <div class="spinner-lg"></div>
-      </div>
-}
+        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+      }
 
       @if (!loading() && exercise()) {
 <div class="detail-body">
         <!-- Header -->
+        <jiro-page-header [heading]="exercise()!.name" backLink="/jym/exercises" backLabel="Exercises" />
         <div class="detail-header">
           <div class="detail-title">
-            <h1>{{ exercise()!.name }}</h1>
             @if (exercise()!.muscle_group) {
 <span class="mg-badge">{{ exercise()!.muscle_group }}</span>
 }
@@ -187,7 +182,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
                 <td class="orm-cell">{{ settingsService.toDisplay(entry.est_1rm) | number:'1.1-1' }} {{ settingsService.unitLabel() }}</td>
                 <td class="pr-cell">
                   @if (entry.is_pr) {
-<img src="/icons/badge-icon.svg" class="pr-badge" title="Personal Record" alt="PR" />
+<jym-pr-badge />
 }
                 </td>
               </tr>
@@ -198,16 +193,14 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
 
           @if (historyTotalPages() > 1) {
 <div class="pagination">
-            <button class="page-btn" [disabled]="historyPage() === 0" (click)="historyPage.set(historyPage() - 1)">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="15,18 9,12 15,6"/>
-              </svg>
+            <button class="page-btn" type="button" aria-label="Previous page of history" title="Previous page"
+              [disabled]="historyPage() === 0" (click)="historyPage.set(historyPage() - 1)">
+              <jiro-icon name="caret-left" [size]="14" />
             </button>
             <span class="page-info">{{ historyPage() + 1 }} / {{ historyTotalPages() }}</span>
-            <button class="page-btn" [disabled]="historyPage() === historyTotalPages() - 1" (click)="historyPage.set(historyPage() + 1)">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="9,18 15,12 9,6"/>
-              </svg>
+            <button class="page-btn" type="button" aria-label="Next page of history" title="Next page"
+              [disabled]="historyPage() === historyTotalPages() - 1" (click)="historyPage.set(historyPage() + 1)">
+              <jiro-icon name="caret-right" [size]="14" />
             </button>
           </div>
 }
@@ -248,18 +241,15 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
 <img
                       [src]="item.file_url" [alt]="item.label || 'Form check'" class="fc-media" />
 }
-                    <button class="fc-delete-btn"
+                    <button class="fc-delete-btn" type="button"
                       [disabled]="deletingFormCheck().has(item.id)"
-                      (click)="confirmingDeleteId.set(item.id)"
-                      title="Delete clip">
+                      (click)="deleteFormCheck(item.id)"
+                      title="Delete clip" aria-label="Delete clip">
                       @if (!deletingFormCheck().has(item.id)) {
-<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                      </svg>
-}
-                      @if (deletingFormCheck().has(item.id)) {
-<div class="spinner-xs"></div>
-}
+                        <jiro-icon name="x" [size]="12" />
+                      } @else {
+                        <span class="spinner spinner--sm spinner-xs" aria-hidden="true"></span>
+                      }
                     </button>
                   </div>
                   @if (item.label) {
@@ -275,16 +265,14 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
 
           @if (formTotalPages() > 1) {
 <div class="pagination">
-            <button class="page-btn" [disabled]="formPage() === 0" (click)="formPage.set(formPage() - 1)">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="15,18 9,12 15,6"/>
-              </svg>
+            <button class="page-btn" type="button" aria-label="Previous page of clips" title="Previous page"
+              [disabled]="formPage() === 0" (click)="formPage.set(formPage() - 1)">
+              <jiro-icon name="caret-left" [size]="14" />
             </button>
             <span class="page-info">{{ formPage() + 1 }} / {{ formTotalPages() }}</span>
-            <button class="page-btn" [disabled]="formPage() === formTotalPages() - 1" (click)="formPage.set(formPage() + 1)">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="9,18 15,12 9,6"/>
-              </svg>
+            <button class="page-btn" type="button" aria-label="Next page of clips" title="Next page"
+              [disabled]="formPage() === formTotalPages() - 1" (click)="formPage.set(formPage() + 1)">
+              <jiro-icon name="caret-right" [size]="14" />
             </button>
           </div>
 }
@@ -317,56 +305,13 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
 }
     </div>
 
-    <!-- Delete form check confirmation -->
-    @if (confirmingDeleteId()) {
-<jiro-modal title="Delete Clip?" maxWidth="400px" (close)="confirmingDeleteId.set(null)">
-      <div class="delete-confirm">
-        <p class="text-secondary" style="font-size: var(--font-size-sm);">
-          This will permanently remove the clip. This cannot be undone.
-        </p>
-        <div class="confirm-actions">
-          <jiro-button variant="secondary" type="button" (click)="confirmingDeleteId.set(null)">Cancel</jiro-button>
-          <jiro-button variant="danger" type="button"
-            [disabled]="deletingFormCheck().has(confirmingDeleteId()!)"
-            (click)="deleteFormCheck(confirmingDeleteId()!)">
-            {{ deletingFormCheck().has(confirmingDeleteId()!) ? 'Deleting...' : 'Delete' }}
-          </jiro-button>
-        </div>
-      </div>
-    </jiro-modal>
-}
   `,
   styles: [`
     :host { display: block; }
 
-    .delete-confirm { display: flex; flex-direction: column; gap: var(--space-md); }
-
-    .confirm-actions {
-      display: flex; justify-content: flex-end; gap: var(--space-sm);
-      margin-top: var(--space-xs);
-    }
-
-
     .exercise-detail { max-width: 900px; width: 100%; overflow-x: hidden; }
 
-    .back-btn {
-      display: flex; align-items: center; gap: var(--space-xs);
-      background: none; border: none; color: var(--text-muted);
-      font-size: var(--font-size-sm); cursor: pointer; padding: 0;
-      margin-bottom: var(--space-xl);
-    }
-
-    .back-btn:hover { color: var(--text-primary); }
-
-    .state-message {
-      display: flex; align-items: center; justify-content: center; padding: var(--space-2xl);
-    }
-
-    .spinner-lg {
-      width: 40px; height: 40px; border: 3px solid var(--border-color);
-      border-top-color: var(--color-primary); border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
+    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
 
     .detail-body { display: flex; flex-direction: column; gap: var(--space-xl); }
 
@@ -380,7 +325,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
     .detail-title h1 { font-size: var(--font-size-2xl); font-weight: 700; }
 
     .mg-badge {
-      background: rgba(122,59,46,0.12); color: var(--color-primary);
+      background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary);
       font-size: var(--font-size-sm); font-weight: 500;
       padding: 4px 12px; border-radius: 12px;
     }
@@ -408,8 +353,8 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
       font-size: var(--font-size-sm); line-height: 1.5;
     }
     .plateau-banner svg { flex-shrink: 0; margin-top: 1px; }
-    .plateau-banner.plateau { background: rgba(196,149,106,0.1); border-color: rgba(196,149,106,0.4); color: #8a5a2e; }
-    .plateau-banner.decline { background: rgba(196,74,74,0.08); border-color: rgba(196,74,74,0.3); color: var(--color-danger); }
+    .plateau-banner.plateau { background: rgba(var(--color-warning-rgb), 0.1); border-color: rgba(var(--color-warning-rgb), 0.4); color: var(--color-warning); }
+    .plateau-banner.decline { background: rgba(var(--color-danger-rgb), 0.08); border-color: rgba(var(--color-danger-rgb), 0.3); color: var(--color-danger); }
     .plateau-banner strong { font-weight: 600; }
 
     /* ── Chart tabs ── */
@@ -503,8 +448,8 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
     }
 
     .section-tab.active .tab-count {
-      background: rgba(122,59,46,0.1);
-      border-color: rgba(122,59,46,0.2);
+      background: rgba(var(--color-primary-rgb), 0.1);
+      border-color: rgba(var(--color-primary-rgb), 0.2);
       color: var(--color-primary);
     }
 
@@ -561,7 +506,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
 
     .history-table tr:last-child td { border-bottom: none; }
 
-    .history-table tr.is-pr { background: rgba(122,59,46,0.04); }
+    .history-table tr.is-pr { background: rgba(var(--color-primary-rgb), 0.04); }
 
     .date-cell { color: var(--text-secondary); }
 
@@ -571,7 +516,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
 
     .pr-cell { text-align: center; }
 
-    .pr-badge { width: 24px; height: 24px; display: block; margin: auto; }
+    jym-pr-badge { display: block; margin: auto; width: fit-content; }
 
     /* ── Pagination ── */
     .pagination {
@@ -637,18 +582,18 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
       position: absolute; top: 6px; right: 6px;
       width: 24px; height: 24px;
       display: flex; align-items: center; justify-content: center;
-      background: rgba(0,0,0,0.55); color: #fff;
+      background: rgba(0, 0, 0, 0.55); color: #FFFFFF;
       border: none; border-radius: 50%; cursor: pointer;
       padding: 0; transition: background 0.15s;
     }
 
-    .fc-delete-btn:hover:not(:disabled) { background: rgba(196,74,74,0.85); }
+    .fc-delete-btn:hover:not(:disabled) { background: rgba(var(--color-danger-rgb), 0.85); }
 
     .fc-delete-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
     .spinner-xs {
-      width: 10px; height: 10px; border: 1.5px solid rgba(255,255,255,0.4);
-      border-top-color: #fff; border-radius: 50%;
+      width: 10px; height: 10px; border: 1.5px solid color-mix(in srgb, currentColor 40%, transparent);
+      border-top-color: currentColor; border-radius: 50%;
       animation: spin 0.7s linear infinite;
     }
 
@@ -705,7 +650,8 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
   formChecks = signal<ExerciseFormCheck[]>([]);
   formChecksLoading = signal(true);
   deletingFormCheck = signal<Set<string>>(new Set());
-  confirmingDeleteId = signal<string | null>(null);
+  private readonly confirmService = inject(ConfirmService);
+  private readonly toast = inject(ToastService);
 
   groupedFormChecks = computed(() => {
     const checks = this.formChecks();
@@ -843,16 +789,24 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
 
-  deleteFormCheck(id: string) {
+  async deleteFormCheck(id: string) {
+    const ok = await this.confirmService.confirm({
+      title: 'Delete this clip?',
+      message: 'The form check clip is removed permanently.',
+      confirmLabel: 'Delete clip',
+      danger: true,
+    });
+    if (!ok) return;
     this.deletingFormCheck.update(s => new Set([...s, id]));
     this.uploadService.deleteSessionAttachment(id).subscribe({
       next: () => {
         this.formChecks.update(list => list.filter(c => c.id !== id));
         this.deletingFormCheck.update(s => { const n = new Set(s); n.delete(id); return n; });
-        this.confirmingDeleteId.set(null);
+        this.toast.success('Clip deleted');
       },
       error: () => {
         this.deletingFormCheck.update(s => { const n = new Set(s); n.delete(id); return n; });
+        this.toast.error('Could not delete the clip.');
       },
     });
   }
@@ -905,7 +859,7 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
     const labels = data.map(d => this.formatDate(d.date));
     const values = data.map(d => Math.round(this.settingsService.toDisplay(d.est_1rm) * 10) / 10);
     this.chart = new Chart(this.canvasRef.nativeElement,
-      this.lineConfig(labels, values, `Est. 1RM (${unit})`, '#7a3b2e',
+      this.lineConfig(labels, values, `Est. 1RM (${unit})`, chartTones().primary,
         'Estimated 1RM Progress', `Est. 1RM (${unit})`, unit));
   }
 
@@ -917,7 +871,7 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
     const labels = data.map(d => this.formatDate(d.date));
     const values = data.map(d => Math.round(this.settingsService.toDisplay(d.volume) * 10) / 10);
     this.chart = new Chart(this.canvasRef.nativeElement,
-      this.lineConfig(labels, values, `Volume (${unit}×reps)`, '#c4956a',
+      this.lineConfig(labels, values, `Volume (${unit}×reps)`, chartTones().warning,
         'Total Session Volume', `Volume (${unit}×reps)`, `${unit}×reps`));
   }
 
@@ -929,7 +883,7 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
     const labels = data.map(d => this.formatDate(d.date));
     const values = data.map(d => Math.round(this.settingsService.toDisplay(d.weight) * 10) / 10);
     this.chart = new Chart(this.canvasRef.nativeElement,
-      this.lineConfig(labels, values, `Max Weight (${unit})`, '#4a6741',
+      this.lineConfig(labels, values, `Max Weight (${unit})`, chartTones().accent,
         'Heaviest Set Per Session', `Weight (${unit})`, unit));
   }
 
@@ -945,7 +899,8 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
     const displayWeight = Math.round(this.settingsService.toDisplay(weight) * 10) / 10;
     const labels = sessions.map(s => this.formatDate(s.date));
     const maxSets = Math.max(...sessions.map(s => s.repsArr.length));
-    const barColors = ['#7a3b2e', '#c4956a', '#4a6741', '#d4c5a9'];
+    const tone = chartTones();
+    const barColors = [tone.primary, tone.warning, tone.accent, tone.secondary];
 
     const datasets = Array.from({ length: maxSets }, (_, i) => ({
       label: `Set ${i + 1}`,
@@ -966,7 +921,7 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
             display: true,
             text: `Reps at ${displayWeight} ${unit}`,
             font: { size: 13, weight: 'bold' },
-            color: '#2D2420',
+            color: tone.tick,
             padding: { top: 0, bottom: 10 },
           },
           legend: { display: maxSets > 1, labels: { boxWidth: 12, font: { size: 11 } } },
@@ -974,15 +929,15 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
         },
         scales: {
           x: {
-            title: { display: true, text: 'Date', font: { size: 11 }, color: '#9B8F88' },
-            grid: { color: 'rgba(0,0,0,0.05)' },
-            ticks: { font: { size: 11 } },
+            title: { display: true, text: 'Date', font: { size: 11 }, color: tone.muted },
+            grid: { color: tone.grid },
+            ticks: { font: { size: 11 }, color: tone.tick },
           },
           y: {
-            title: { display: true, text: 'Reps', font: { size: 11 }, color: '#9B8F88' },
-            grid: { color: 'rgba(0,0,0,0.05)' },
+            title: { display: true, text: 'Reps', font: { size: 11 }, color: tone.muted },
+            grid: { color: tone.grid },
             beginAtZero: true,
-            ticks: { font: { size: 11 }, stepSize: 1, callback: v => `${v}` },
+            ticks: { font: { size: 11 }, color: tone.tick, stepSize: 1, callback: v => `${v}` },
           },
         },
       },
@@ -995,6 +950,7 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
     labels: string[], values: number[], label: string, color: string,
     chartTitle: string, yAxisLabel: string, tooltipUnit: string,
   ): ChartConfiguration {
+    const tone = chartTones();
     return {
       type: 'line',
       data: {
@@ -1019,7 +975,7 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
             display: true,
             text: chartTitle,
             font: { size: 13, weight: 'bold' },
-            color: '#2D2420',
+            color: tone.tick,
             padding: { top: 0, bottom: 10 },
           },
           legend: { display: false },
@@ -1027,13 +983,13 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
         },
         scales: {
           x: {
-            title: { display: true, text: 'Date', font: { size: 11 }, color: '#9B8F88' },
-            grid: { color: 'rgba(0,0,0,0.05)' },
+            title: { display: true, text: 'Date', font: { size: 11 }, color: tone.muted },
+            grid: { color: tone.grid },
             ticks: { font: { size: 11 } },
           },
           y: {
-            title: { display: true, text: yAxisLabel, font: { size: 11 }, color: '#9B8F88' },
-            grid: { color: 'rgba(0,0,0,0.05)' },
+            title: { display: true, text: yAxisLabel, font: { size: 11 }, color: tone.muted },
+            grid: { color: tone.grid },
             ticks: { font: { size: 11 }, callback: v => `${v}` },
           },
         },

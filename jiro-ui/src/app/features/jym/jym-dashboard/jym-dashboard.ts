@@ -1,27 +1,30 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 
 import { Router, RouterLink } from '@angular/router';
 import { JymService, Split, SplitSeriesSummary, SessionSummary, Routine } from '../../../core/services/jym.service';
+import { ConfirmService } from '../../../core/services/confirm.service';
+import { ToastService } from '../../../core/services/toast.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
+import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
+
 @Component({
   selector: 'app-jym-dashboard',
   standalone: true,
-  imports: [RouterLink, JiroButtonComponent, JiroModalComponent],
+  imports: [
+    RouterLink, JiroButtonComponent, JiroModalComponent, JiroIconComponent,
+    JiroPageHeaderComponent, JiroEmptyStateComponent,
+  ],
   template: `
     <div class="jym-dash">
       <!-- Header -->
-      <div class="page-header">
-        <div>
-          <h1>Jym</h1>
-          <p class="text-secondary">Structured progressive overload tracking</p>
-        </div>
-        <div class="header-actions">
-          <jiro-button variant="secondary" type="button" (click)="startFreeSession()">
-            Freestyle Session
-          </jiro-button>
-        </div>
-      </div>
+      <jiro-page-header heading="Jym" subtitle="Structured progressive overload tracking">
+        <jiro-button actions variant="secondary" type="button" (click)="startFreeSession()">
+          Freestyle session
+        </jiro-button>
+      </jiro-page-header>
 
       <!-- Activity Stats -->
       @if (hasCompletedSessions()) {
@@ -108,11 +111,10 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
             <jiro-button variant="primary" type="button" (click)="$event.stopPropagation(); router.navigate(['/jym/session', s.id])">
               Resume
             </jiro-button>
-            <button class="ipc-discard-btn" title="Discard session" (click)="$event.stopPropagation(); confirmDiscardSession(s)">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="3,6 5,6 21,6"/>
-                <path d="M19,6l-1,14a2,2,0,0,1-2,2H8a2,2,0,0,1-2-2L5,6"/>
-              </svg>
+            <button class="ipc-discard-btn" type="button" title="Discard session"
+              [attr.aria-label]="'Discard ' + (s.routine_name || 'freestyle session')"
+              (click)="$event.stopPropagation(); discardSession(s)">
+              <jiro-icon name="trash" [size]="15" />
             </button>
           </div>
         </div>
@@ -120,28 +122,10 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       </div>
 }
 
-      <!-- Discard Session Confirmation Modal -->
-      @if (discardingSession()) {
-<jiro-modal title="Discard Session?" maxWidth="420px" (close)="discardingSession.set(null)">
-        <div class="delete-confirm">
-          <p>Discard <strong>{{ discardingSession()!.routine_name || 'Freestyle Session' }}</strong>?</p>
-          <p class="text-secondary" style="font-size: var(--font-size-sm); margin-top: var(--space-xs);">
-            This will permanently delete the session and all sets logged so far. This cannot be undone.
-          </p>
-          <div class="form-actions" style="margin-top: var(--space-lg);">
-            <jiro-button variant="secondary" type="button" (click)="discardingSession.set(null)">Cancel</jiro-button>
-            <jiro-button variant="danger" type="button" [disabled]="discardingInProgress()" (click)="doDiscardSession()">
-              {{ discardingInProgress() ? 'Discarding...' : 'Discard' }}
-            </jiro-button>
-          </div>
-        </div>
-      </jiro-modal>
-}
-
       <!-- Active Series -->
       @if (activeSeries().length > 0) {
 <div class="active-series-section">
-        <h2 class="section-title">Active Series</h2>
+        <h2 class="section-title">Active series</h2>
         <div class="active-series-list">
           @for (sr of activeSeries(); track sr) {
 <div class="asc">
@@ -182,22 +166,19 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       <!-- Your Splits summary -->
       <div class="splits-summary">
         <div class="splits-summary-header">
-          <h2 class="section-title">Your Splits</h2>
+          <h2 class="section-title">Your splits</h2>
           <a routerLink="/jym/splits" class="manage-link">
-            Manage Splits →
+            Manage splits →
           </a>
         </div>
         @if (loading()) {
-<div class="state-message">
-          <div class="spinner-lg"></div>
-        </div>
-}
+          <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+        }
         @if (!loading() && splits().length === 0) {
-<div class="empty-splits">
-          <p class="text-secondary">No splits yet.</p>
-          <a routerLink="/jym/splits" class="manage-link">Create your first split →</a>
-        </div>
-}
+          <jiro-empty-state compact heading="No splits yet" message="A split organises your training week.">
+            <jiro-button size="sm" variant="secondary" routerLink="/jym/splits">Create your first split</jiro-button>
+          </jiro-empty-state>
+        }
         @if (!loading() && splits().length > 0) {
 <div class="splits-row">
           @for (split of splits().slice(0, 4); track split) {
@@ -206,8 +187,9 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
               <span class="split-chip-name">{{ split.name }}</span>
               <span class="split-chip-days">{{ split.routine_count || 0 }} {{ (split.routine_count || 0) === 1 ? 'day' : 'days' }}</span>
             </div>
-            <button class="split-start-btn" title="Start workout from this split" (click)="startFromSplit(split.id)">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+            <button class="split-start-btn" type="button" title="Start workout from this split"
+              [attr.aria-label]="'Start a workout from ' + split.name" (click)="startFromSplit(split.id)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true">
                 <polygon points="5,3 19,12 5,21"/>
               </svg>
             </button>
@@ -229,18 +211,14 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
           <a routerLink="/jym/templates" class="manage-link">Manage →</a>
         </div>
         @if (loading()) {
-<div class="state-message">
-          <div class="spinner-lg"></div>
-        </div>
-}
+          <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+        }
         @if (!loading() && templates().length === 0) {
-<div class="empty-splits">
-          <p class="text-secondary">No templates yet.</p>
-          <p class="text-secondary" style="font-size:var(--font-size-sm)">
-            During a session, tap the save icon to store its layout as a reusable template.
-          </p>
-        </div>
-}
+          <jiro-empty-state
+            compact
+            heading="No templates yet"
+            message="During a session, use Save as template to keep its layout for next time." />
+        }
         @if (!loading() && templates().length > 0) {
 <div class="splits-row">
           @for (t of templates().slice(0, 4); track t) {
@@ -262,10 +240,8 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       @if (showRoutinePicker()) {
 <jiro-modal title="Choose Routine" maxWidth="420px" (close)="showRoutinePicker.set(false)">
         @if (loadingRoutines()) {
-<div class="picker-loading">
-          <div class="spinner-lg"></div>
-        </div>
-}
+          <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+        }
         @if (!loadingRoutines()) {
 <div class="routine-list">
           @for (r of pickerRoutines(); track r) {
@@ -291,22 +267,10 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
     .jym-dash { max-width: 1000px; width: 100%; }
 
-    .page-header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      margin-bottom: var(--space-lg);
-      gap: var(--space-md);
-    }
 
-    .page-header h1 { font-size: var(--font-size-2xl); font-weight: 700; }
-
-    .header-actions { display: flex; gap: var(--space-sm); flex-shrink: 0; align-items: center; }
 
 
     @media (max-width: 600px) {
-      .page-header { flex-direction: column; }
-      .header-actions { flex-shrink: 1; }
     }
 
     /* ── In Progress ── */
@@ -316,12 +280,12 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       display: flex; align-items: center; justify-content: space-between;
       gap: var(--space-md); padding: var(--space-md) var(--space-lg);
       background: var(--bg-surface); border: 1px solid var(--border-color);
-      border-left: 3px solid #4caf50;
+      border-left: 3px solid var(--color-positive);
       border-radius: var(--border-radius); cursor: pointer;
       transition: box-shadow 0.15s;
     }
 
-    .ipc:hover { box-shadow: 0 0 0 3px rgba(76,175,80,0.12); }
+    .ipc:hover { box-shadow: 0 0 0 3px rgba(var(--color-accent-rgb), 0.12); }
 
     .ipc-info { display: flex; flex-direction: column; gap: 2px; }
 
@@ -340,7 +304,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       transition: all 0.15s; flex-shrink: 0;
     }
 
-    .ipc-discard-btn:hover { color: var(--color-danger); border-color: var(--color-danger); background: rgba(196,74,74,0.08); }
+    .ipc-discard-btn:hover { color: var(--color-danger); border-color: var(--color-danger); background: rgba(var(--color-danger-rgb), 0.08); }
 
     /* ── Active Series ── */
     .active-series-section { margin-bottom: var(--space-xl); }
@@ -374,7 +338,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
     .asc-pill {
       font-size: var(--font-size-xs); padding: 2px 8px; border-radius: 10px;
-      background: rgba(122,59,46,0.1); color: var(--color-primary); font-weight: 500;
+      background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary); font-weight: 500;
     }
 
     .asc-actions { display: flex; align-items: center; gap: var(--space-sm); flex-shrink: 0; }
@@ -406,12 +370,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
     .manage-link:hover { opacity: 0.8; text-decoration: none; }
 
-    .empty-splits {
-      text-align: center; padding: var(--space-lg);
-      background: var(--bg-surface); border: 1px solid var(--border-color);
-      border-radius: var(--border-radius);
-      display: flex; flex-direction: column; align-items: center; gap: var(--space-sm);
-    }
 
     .splits-row { display: flex; gap: var(--space-sm); flex-wrap: wrap; }
 
@@ -424,7 +382,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       min-width: 120px;
     }
 
-    .split-chip:hover { border-color: var(--color-primary); background: rgba(122,59,46,0.04); }
+    .split-chip:hover { border-color: var(--color-primary); background: rgba(var(--color-primary-rgb), 0.04); }
 
     .split-chip-info { display: flex; flex-direction: column; gap: 2px; flex: 1; cursor: pointer; }
 
@@ -434,7 +392,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
     .split-start-btn {
       width: 30px; height: 30px; border-radius: 50%;
-      background: rgba(122,59,46,0.08); border: 1px solid transparent;
+      background: rgba(var(--color-primary-rgb), 0.08); border: 1px solid transparent;
       color: var(--color-primary); cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       flex-shrink: 0; transition: all 0.15s;
@@ -450,23 +408,8 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       color: var(--color-primary); font-size: var(--font-size-sm); font-weight: 500;
     }
 
-    /* ── State / spinner ── */
-    .state-message {
-      display: flex; flex-direction: column; align-items: center;
-      justify-content: center; padding: var(--space-xl); gap: var(--space-md); text-align: center;
-    }
-
-    .spinner-lg {
-      width: 40px; height: 40px;
-      border: 3px solid var(--border-color);
-      border-top-color: var(--color-primary);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-
-    .delete-confirm { display: flex; flex-direction: column; gap: var(--space-xs); }
-
-    .form-actions { display: flex; justify-content: flex-end; gap: var(--space-sm); margin-top: var(--space-xs); }
+    /* ── State ── */
+    .state-loading { display: flex; justify-content: center; padding: var(--space-xl); }
 
 
     /* ── Activity Stats ── */
@@ -533,20 +476,19 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
     .mg-fill { height: 100%; border-radius: 3px; transition: width 0.3s; min-width: 3px; }
 
-    .mg-fill-fresh { background: #4caf50; }
+    .mg-fill-fresh { background: var(--color-positive); }
 
-    .mg-fill-warm { background: #c4956a; }
+    .mg-fill-warm { background: var(--color-warning); }
 
     .mg-fill-cold { background: var(--border-color); }
 
     .mg-days { font-size: var(--font-size-xs); min-width: 54px; text-align: right; color: var(--text-muted); }
 
-    .day-fresh { color: #4caf50; font-weight: 500; }
+    .day-fresh { color: var(--color-positive); font-weight: 500; }
 
     .day-stale { color: var(--color-danger); }
 
     /* Routine picker */
-    .picker-loading { display: flex; justify-content: center; padding: var(--space-xl); }
 
     .routine-list { display: flex; flex-direction: column; gap: var(--space-xs); }
 
@@ -558,7 +500,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       transition: all 0.15s; text-align: left; width: 100%;
     }
 
-    .routine-pick-btn:hover { border-color: var(--color-primary); background: rgba(122,59,46,0.05); }
+    .routine-pick-btn:hover { border-color: var(--color-primary); background: rgba(var(--color-primary-rgb), 0.05); }
 
     .routine-pick-btn.freestyle { color: var(--text-secondary); font-size: var(--font-size-sm); }
 
@@ -566,7 +508,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
     .routine-pick-day { font-size: var(--font-size-xs); color: var(--text-muted); }
 
-    @keyframes spin { to { transform: rotate(360deg); } }
 
     @media (max-width: 600px) {
       .asc { flex-wrap: wrap; gap: var(--space-sm); padding: var(--space-md); }
@@ -647,8 +588,8 @@ export class JymDashboardComponent implements OnInit {
     return stats.length > 0 ? Math.max(...stats.map(s => s.sessionsLast28), 1) : 1;
   });
 
-  discardingSession = signal<SessionSummary | null>(null);
-  discardingInProgress = signal(false);
+  private readonly confirmService = inject(ConfirmService);
+  private readonly toast = inject(ToastService);
   showRoutinePicker = signal(false);
   loadingRoutines = signal(false);
   pickerRoutines = signal<{ id: string; name: string; day_order: number }[]>([]);
@@ -688,21 +629,21 @@ export class JymDashboardComponent implements OnInit {
     });
   }
 
-  confirmDiscardSession(s: SessionSummary) {
-    this.discardingSession.set(s);
-  }
-
-  doDiscardSession() {
-    const s = this.discardingSession();
-    if (!s) return;
-    this.discardingInProgress.set(true);
+  async discardSession(s: SessionSummary) {
+    const name = s.routine_name || 'this freestyle session';
+    const ok = await this.confirmService.confirm({
+      title: `Discard ${name}?`,
+      message: 'The session and every set logged in it so far are deleted. This cannot be undone.',
+      confirmLabel: 'Discard session',
+      danger: true,
+    });
+    if (!ok) return;
     this.jymService.deleteSession(s.id).subscribe({
       next: () => {
         this.inProgressSessions.update(list => list.filter(x => x.id !== s.id));
-        this.discardingSession.set(null);
-        this.discardingInProgress.set(false);
+        this.toast.success('Session discarded');
       },
-      error: () => this.discardingInProgress.set(false),
+      error: () => this.toast.error('Could not discard the session.'),
     });
   }
 
