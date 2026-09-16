@@ -4,19 +4,15 @@ import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { RecipeService, Recipe } from '../../../core/services/recipe.service';
 import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-card';
+import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 
 @Component({
   selector: 'app-discover',
   standalone: true,
-  imports: [RouterLink, FormsModule, JiroCardComponent],
+  imports: [RouterLink, FormsModule, JiroCardComponent, JiroPageHeaderComponent],
   template: `
     <div class="discover-page">
-      <div class="page-header">
-        <div>
-          <h1>Discover</h1>
-          <p class="text-secondary">Recipes shared publicly by the community</p>
-        </div>
-      </div>
+      <jiro-page-header heading="Discover" subtitle="Recipes shared publicly by the community" />
 
       <div class="controls-row">
         <input
@@ -29,7 +25,7 @@ import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-car
 
       @if (loading()) {
 <div class="state-message">
-        <div class="spinner-lg"></div>
+        <span class="spinner"></span>
         <p>Loading...</p>
       </div>
 }
@@ -89,17 +85,7 @@ import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-car
   styles: [`
     .discover-page { max-width: 1100px; }
 
-    .back-link {
-      font-size: var(--font-size-sm);
-      color: var(--text-secondary);
-      text-decoration: none;
-      display: inline-block;
-      margin-bottom: var(--space-xs);
-    }
-    .back-link:hover { color: var(--text-primary); text-decoration: none; }
 
-    .page-header { margin-bottom: var(--space-xl); }
-    .page-header h1 { font-size: var(--font-size-2xl); font-weight: 700; }
 
     .controls-row { margin-bottom: var(--space-lg); }
 
@@ -120,13 +106,6 @@ import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-car
       justify-content: center; padding: var(--space-2xl); gap: var(--space-md); text-align: center;
     }
 
-    .spinner-lg {
-      width: 40px; height: 40px;
-      border: 3px solid var(--border-color);
-      border-top-color: var(--color-primary);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
 
     .recipe-grid {
       display: grid;

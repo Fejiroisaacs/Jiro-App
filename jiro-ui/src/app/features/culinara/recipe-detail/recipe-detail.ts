@@ -40,7 +40,7 @@ type MobileTab = 'recipe' | 'trials';
       <!-- Loading -->
       @if (loading()) {
 <div class="state-center">
-        <div class="spinner-lg"></div>
+        <span class="spinner"></span>
       </div>
 }
 
@@ -472,14 +472,6 @@ type MobileTab = 'recipe' | 'trials';
       gap: var(--space-md);
     }
 
-    .spinner-lg {
-      width: 40px;
-      height: 40px;
-      border: 3px solid var(--border-color);
-      border-top-color: var(--color-primary);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
 
     /* Mobile tabs — only visible on small screens */
     .mobile-tabs {
@@ -581,7 +573,7 @@ type MobileTab = 'recipe' | 'trials';
       height: 30px;
       border-radius: 50%;
       background: rgba(0, 0, 0, 0.55);
-      color: #fff;
+      color: var(--text-on-primary);
       border: none;
       cursor: pointer;
       transition: background 0.15s;
@@ -738,7 +730,7 @@ type MobileTab = 'recipe' | 'trials';
     }
 
     .star-val {
-      color: #c49540;
+      color: var(--color-warning);
     }
 
     .stat-label {
@@ -810,7 +802,7 @@ type MobileTab = 'recipe' | 'trials';
       border: 1px solid var(--border-color);
       border-radius: var(--border-radius);
       box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-      z-index: 10;
+      z-index: 1;
       min-width: 160px;
       overflow: hidden;
     }
@@ -870,6 +862,8 @@ type MobileTab = 'recipe' | 'trials';
     .add-grocery-btn {
       display: flex;
       align-items: center;
+      min-height: 40px;
+      padding: 0 12px;
       gap: 5px;
       background: none;
       border: 1px solid var(--border-color);
@@ -1007,7 +1001,7 @@ type MobileTab = 'recipe' | 'trials';
 
     .trial-rating {
       font-size: var(--font-size-xs);
-      color: #c49540;
+      color: var(--color-warning);
       font-weight: 500;
     }
 
@@ -1019,6 +1013,9 @@ type MobileTab = 'recipe' | 'trials';
     .text-btn {
       background: none;
       border: none;
+      min-height: 40px;
+      min-width: 44px;
+      padding: 0 10px;
       font-size: var(--font-size-xs);
       cursor: pointer;
       color: var(--color-primary);
@@ -1131,6 +1128,8 @@ type MobileTab = 'recipe' | 'trials';
     .public-toggle-label { font-size: var(--font-size-sm); font-weight: 500; color: var(--text-primary); }
     .public-toggle-sub { font-size: var(--font-size-xs); color: var(--text-secondary); }
 
+    /* The pill stays 40x22; ::after grows the hit area to 44 without
+       changing how it looks. */
     .toggle-switch {
       position: relative;
       width: 40px; height: 22px;
@@ -1141,6 +1140,7 @@ type MobileTab = 'recipe' | 'trials';
       flex-shrink: 0;
       padding: 0;
     }
+    .toggle-switch::after { content: ''; position: absolute; inset: -11px -2px; }
     .toggle-switch--on { background: var(--color-primary); }
     .toggle-switch:disabled { opacity: 0.5; cursor: not-allowed; }
     .toggle-thumb {
@@ -1148,7 +1148,7 @@ type MobileTab = 'recipe' | 'trials';
       top: 3px; left: 3px;
       width: 16px; height: 16px;
       border-radius: 50%;
-      background: #fff;
+      background: var(--bg-surface);
       transition: transform 0.2s;
       display: block;
     }
@@ -1195,7 +1195,7 @@ type MobileTab = 'recipe' | 'trials';
       flex-shrink: 0;
       padding: 3px 10px;
       background: var(--color-primary);
-      color: #fff;
+      color: var(--text-on-primary);
       border: none;
       border-radius: var(--border-radius);
       font-size: var(--font-size-xs);

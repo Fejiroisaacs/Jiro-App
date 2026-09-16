@@ -12,7 +12,7 @@ import { RecipeService, Recipe } from '../../../core/services/recipe.service';
       <!-- Loading -->
       @if (loading()) {
 <div class="state-message">
-        <div class="spinner-lg"></div>
+        <span class="spinner"></span>
         <p>Loading recipe...</p>
       </div>
 }
@@ -22,7 +22,7 @@ import { RecipeService, Recipe } from '../../../core/services/recipe.service';
 <div class="state-message">
         <h3>Recipe not found</h3>
         <p class="text-secondary">This recipe may be private or no longer exists.</p>
-        <a routerLink="/culinara/discover" class="back-link">← Back to Discover</a>
+        <a routerLink="/culinara/discover" class="back-link">Back to Discover</a>
       </div>
 }
 
@@ -32,7 +32,7 @@ import { RecipeService, Recipe } from '../../../core/services/recipe.service';
 
         <!-- Back nav + action -->
         <div class="top-bar">
-          <a routerLink="/culinara/discover" class="back-link">← Discover</a>
+          <a routerLink="/culinara/discover" class="back-link">Back to Discover</a>
           <button
             class="import-btn"
             [disabled]="importing()"
@@ -165,13 +165,6 @@ import { RecipeService, Recipe } from '../../../core/services/recipe.service';
       display: flex; flex-direction: column; align-items: center;
       justify-content: center; padding: var(--space-2xl); gap: var(--space-md); text-align: center;
     }
-    .spinner-lg {
-      width: 40px; height: 40px;
-      border: 3px solid var(--border-color);
-      border-top-color: var(--color-primary);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
 
     .top-bar {
       display: flex; align-items: center; justify-content: space-between;
@@ -186,7 +179,7 @@ import { RecipeService, Recipe } from '../../../core/services/recipe.service';
 
     .import-btn {
       display: inline-flex; align-items: center; gap: 6px;
-      padding: 8px 16px; background: var(--color-primary); color: #fff;
+      padding: 8px 16px; background: var(--color-primary); color: var(--text-on-primary);
       border: none; border-radius: var(--border-radius);
       font-size: var(--font-size-sm); font-weight: 600; font-family: inherit;
       cursor: pointer; transition: opacity 0.15s;

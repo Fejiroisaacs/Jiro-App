@@ -183,8 +183,8 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 32px;
-      height: 32px;
+      width: 40px;
+      height: 40px;
       background: none;
       border: none;
       color: var(--text-on-dark);
@@ -326,6 +326,7 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
     .verify-text { flex: 1; }
 
     .verify-banner-btn {
+      min-height: 40px;
       background: none;
       border: 1px solid var(--color-primary);
       color: var(--color-primary);
@@ -347,9 +348,9 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 32px;
-      height: 32px;
-      margin: -6px -8px -6px 0;
+      width: 40px;
+      height: 40px;
+      margin: -10px -10px -10px 0;
       background: none;
       border: none;
       border-radius: var(--border-radius);
