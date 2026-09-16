@@ -181,7 +181,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
     :host {
       position: fixed;
       inset: 0;
-      z-index: 400;
+      z-index: var(--z-modal);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -207,7 +207,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
       max-height: 80vh;
       display: flex;
       flex-direction: column;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.18);
+      box-shadow: 0 10px 40px rgba(var(--shadow-rgb), 0.22);
       animation: modal-in 200ms ease-out forwards;
       overflow: hidden;
     }
@@ -280,7 +280,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
     .entry-card:hover, .entry-card:focus-visible {
       transform: translateY(-2px);
       border-color: var(--color-primary);
-      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+      box-shadow: 0 4px 14px rgba(var(--shadow-rgb), 0.12);
     }
 
     .card-author {
@@ -433,7 +433,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
       position: fixed;
       inset: 0;
       background: rgba(0, 0, 0, 0.9);
-      z-index: 9999;
+      z-index: var(--z-overlay);
       display: flex;
       align-items: center;
       justify-content: center;

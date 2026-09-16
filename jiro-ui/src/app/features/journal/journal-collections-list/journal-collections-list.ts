@@ -25,7 +25,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
       @if (loading()) {
 <div class="state-box">
-        <div class="spinner-lg"></div>
+        <span class="spinner"></span>
       </div>
 }
 
@@ -89,6 +89,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     .section-title { font-size: var(--font-size-lg); font-weight: 600; margin: 0; }
 
     .state-box { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--space-sm); padding: var(--space-xl) 0; }
+    .state-box .spinner { margin: 0 auto; }
 
     .collections-grid {
       display: grid;

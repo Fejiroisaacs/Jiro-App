@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -11,6 +11,8 @@ import {
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
+import { ConfirmService } from '../../../core/services/confirm.service';
+import { ToastService } from '../../../core/services/toast.service';
 
 @Component({
   selector: 'app-journal-collection',
@@ -61,7 +63,7 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
       <!-- Loading -->
       @if (loading()) {
 <div class="state-center">
-        <div class="spinner-lg"></div>
+        <span class="spinner"></span>
       </div>
 }
 
@@ -152,7 +154,7 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
         <input type="text" class="form-control" [(ngModel)]="editDesc" maxlength="255" placeholder="A brief description..." />
       </div>
       <div class="modal-actions">
-        <jiro-button variant="danger" type="button" (click)="confirmDeleteColl.set(true)">Delete</jiro-button>
+        <jiro-button variant="danger" type="button" (click)="deleteCollection()">Delete</jiro-button>
         <div style="flex:1"></div>
         <jiro-button variant="secondary" type="button" (click)="showEdit.set(false)">Cancel</jiro-button>
         <jiro-button variant="primary" type="button" [disabled]="!editName.trim() || saving()" (click)="saveEdit()">
@@ -162,29 +164,6 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
     </jiro-modal>
 }
 
-    <!-- Remove entry from collection confirm -->
-    @if (removeTarget()) {
-<jiro-modal title="Remove from Collection" (close)="removeTarget.set(null)">
-      <p>Remove <strong>{{ removeTarget()?.title || 'this entry' }}</strong> from the collection? The entry itself won't be deleted.</p>
-      <div class="modal-actions">
-        <jiro-button variant="secondary" type="button" (click)="removeTarget.set(null)">Cancel</jiro-button>
-        <jiro-button variant="danger" type="button" [disabled]="!!removingId()" (click)="removeEntry()">Remove</jiro-button>
-      </div>
-    </jiro-modal>
-}
-
-    <!-- Delete collection confirm -->
-    @if (confirmDeleteColl()) {
-<jiro-modal title="Delete Collection" (close)="confirmDeleteColl.set(false)">
-      <p>Delete <strong>{{ collection()?.name }}</strong>? The entries inside won't be deleted, just the collection.</p>
-      <div class="modal-actions">
-        <jiro-button variant="secondary" type="button" (click)="confirmDeleteColl.set(false)">Cancel</jiro-button>
-        <jiro-button variant="danger" type="button" [disabled]="deleting()" (click)="deleteCollection()">
-          {{ deleting() ? 'Deleting...' : 'Delete' }}
-        </jiro-button>
-      </div>
-    </jiro-modal>
-}
   `,
   styles: [`
     .collection-page { max-width: 860px; }
@@ -266,8 +245,10 @@ export class JournalCollectionComponent implements OnInit {
   removeTarget = signal<JournalEntry | null>(null);
   removingId = signal<string | null>(null);
 
-  confirmDeleteColl = signal(false);
   deleting = signal(false);
+
+  private readonly confirmService = inject(ConfirmService);
+  private readonly toast = inject(ToastService);
 
   constructor(
     private svc: JournalService,
@@ -326,11 +307,21 @@ export class JournalCollectionComponent implements OnInit {
     });
   }
 
-  deleteCollection() {
-    this.deleting.set(true);
+  async deleteCollection() {
+    const name = this.collection()?.name ?? 'this collection';
+    const ok = await this.confirmService.confirm({
+      title: `Delete ${name}?`,
+      message: 'The collection goes; the entries inside it stay in your journal.',
+      confirmLabel: 'Delete collection',
+      danger: true,
+    });
+    if (!ok) return;
     this.svc.deleteCollection(this.collId).subscribe({
-      next: () => { this.deleting.set(false); this.router.navigate(['/journal']); },
-      error: () => this.deleting.set(false),
+      next: () => {
+        this.toast.success(`${name} deleted`);
+        this.router.navigate(['/journal']);
+      },
+      error: () => this.toast.error('Could not delete the collection.'),
     });
   }
 

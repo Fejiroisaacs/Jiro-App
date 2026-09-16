@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -15,6 +15,8 @@ import { JournalDayModalComponent } from '../journal-day-modal/journal-day-modal
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
+import { ConfirmService } from '../../../core/services/confirm.service';
+import { ToastService } from '../../../core/services/toast.service';
 
 @Component({
   selector: 'app-journal-group',
@@ -61,7 +63,7 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
       <!-- Loading -->
       @if (loading()) {
 <div class="state-center">
-        <div class="spinner-lg"></div>
+        <span class="spinner"></span>
         <p>Loading group...</p>
       </div>
 }
@@ -92,7 +94,7 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
         <!-- Feed: entries for current week -->
         @if (loadingEntries()) {
 <div class="state-center">
-          <div class="spinner-lg"></div>
+          <span class="spinner"></span>
         </div>
 }
 
@@ -126,7 +128,7 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                   </svg>
                 </button>
-                <button class="icon-btn danger" (click)="confirmDelete(e)" aria-label="Delete">
+                <button class="icon-btn danger" type="button" (click)="deleteEntry(e)" aria-label="Delete this entry">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
                   </svg>
@@ -258,39 +260,13 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
       <!-- Delete group (owner only) -->
       @if (isOwner()) {
 <div class="danger-zone">
-        <jiro-button block variant="danger" type="button" (click)="confirmDeleteGroup.set(true)">Delete Group</jiro-button>
+        <jiro-button block variant="danger" type="button" (click)="deleteGroup()">Delete group</jiro-button>
       </div>
 }
     </jiro-modal>
 }
 
 
-
-    <!-- Delete entry confirm -->
-    @if (deleteTarget()) {
-<jiro-modal title="Delete Entry" (close)="deleteTarget.set(null)">
-      <p>Delete this entry? This cannot be undone.</p>
-      <div class="modal-actions">
-        <jiro-button variant="secondary" type="button" (click)="deleteTarget.set(null)">Cancel</jiro-button>
-        <jiro-button variant="danger" type="button" [disabled]="deleting()" (click)="deleteEntry()">
-          {{ deleting() ? 'Deleting...' : 'Delete' }}
-        </jiro-button>
-      </div>
-    </jiro-modal>
-}
-
-    <!-- Delete group confirm -->
-    @if (confirmDeleteGroup()) {
-<jiro-modal title="Delete Group" (close)="confirmDeleteGroup.set(false)">
-      <p>Are you sure you want to delete <strong>{{ group()?.name }}</strong>? All entries will be permanently removed.</p>
-      <div class="modal-actions">
-        <jiro-button variant="secondary" type="button" (click)="confirmDeleteGroup.set(false)">Cancel</jiro-button>
-        <jiro-button variant="danger" type="button" [disabled]="deletingGroup()" (click)="deleteGroup()">
-          {{ deletingGroup() ? 'Deleting...' : 'Delete Group' }}
-        </jiro-button>
-      </div>
-    </jiro-modal>
-}
 
     <!-- Lightbox -->
     @if (lightboxUrl()) {
@@ -374,7 +350,7 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
     .member-info { flex: 1; display: flex; flex-direction: column; gap: 1px; }
     .member-name { font-size: var(--font-size-sm); font-weight: 500; }
     .member-status { font-size: var(--font-size-xs); }
-    .member-status.pending { color: var(--color-warning, #d97706); }
+    .member-status.pending { color: var(--color-warning); }
     .owner-badge { font-size: var(--font-size-xs); padding: 2px 8px; background: color-mix(in srgb, var(--color-primary) 15%, transparent); color: var(--color-primary); border-radius: 99px; }
 
     /* Invite */
@@ -388,7 +364,7 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
     }
     .invite-input:focus { border-color: var(--color-primary); }
     .invite-error { font-size: var(--font-size-xs); color: var(--color-danger); margin-top: var(--space-xs); }
-    .invite-success { font-size: var(--font-size-xs); color: var(--color-success, #16a34a); margin-top: var(--space-xs); }
+    .invite-success { font-size: var(--font-size-xs); color: var(--color-success); margin-top: var(--space-xs); }
 
     .danger-zone { margin-top: var(--space-lg); padding-top: var(--space-lg); border-top: 1px solid var(--border-color); }
 
@@ -414,7 +390,7 @@ import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
 
     /* Lightbox */
     .lightbox {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 9999;
+      position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); z-index: var(--z-overlay);
       display: flex; align-items: center; justify-content: center; cursor: zoom-out;
     }
     .lightbox img { max-width: 90vw; max-height: 90vh; object-fit: contain; border-radius: var(--border-radius); }
@@ -469,7 +445,6 @@ export class JournalGroupComponent implements OnInit {
 
   showMembers = signal(false);
 
-  confirmDeleteGroup = signal(false);
 
   inviteEmail = '';
   inviting = signal(false);
@@ -481,11 +456,10 @@ export class JournalGroupComponent implements OnInit {
 
 
 
-  deleteTarget = signal<JournalEntry | null>(null);
-  deleting = signal(false);
-
-  deletingGroup = signal(false);
   removingMemberId = signal<string | null>(null);
+
+  private readonly confirmService = inject(ConfirmService);
+  private readonly toast = inject(ToastService);
 
   lightboxUrl = signal<string | null>(null);
 
@@ -550,7 +524,7 @@ export class JournalGroupComponent implements OnInit {
 
   onDayModalDelete(id: string) {
     const entry = this.entries().find(e => e.id === id);
-    if (entry) this.confirmDelete(entry);
+    if (entry) this.deleteEntry(entry);
   }
 
   isOwner(): boolean {
@@ -599,19 +573,34 @@ export class JournalGroupComponent implements OnInit {
     });
   }
 
-  removeMember(m: JournalGroupMember) {
+  async removeMember(m: JournalGroupMember) {
+    const leaving = m.user_id === this.auth.user()?.id;
+    const who = m.username ?? m.email ?? 'this member';
+    const ok = await this.confirmService.confirm({
+      title: leaving ? 'Leave this group?' : `Remove ${who}?`,
+      message: leaving
+        ? 'Your own entries stay in the group. You will need a new invite to come back.'
+        : 'They lose access to the group. The entries they wrote stay.',
+      confirmLabel: leaving ? 'Leave group' : 'Remove member',
+      danger: true,
+    });
+    if (!ok) return;
     this.removingMemberId.set(m.user_id);
     this.svc.removeMember(this.groupId, m.user_id).subscribe({
       next: () => {
         this.removingMemberId.set(null);
-        const uid = this.auth.user()?.id;
-        if (m.user_id === uid) {
+        if (leaving) {
+          this.toast.success('You left the group');
           this.router.navigate(['/journal']);
         } else {
+          this.toast.success(`${who} removed`);
           this.svc.getGroup(this.groupId).subscribe(g => this.group.set(g));
         }
       },
-      error: () => this.removingMemberId.set(null),
+      error: () => {
+        this.removingMemberId.set(null);
+        this.toast.error(leaving ? 'Could not leave the group.' : 'Could not remove that member.');
+      },
     });
   }
 
@@ -630,27 +619,38 @@ export class JournalGroupComponent implements OnInit {
     this.router.navigate(['/journal/new'], { queryParams: params });
   }
 
-  confirmDelete(e: JournalEntry) { this.deleteTarget.set(e); }
-
-  deleteEntry() {
-    const e = this.deleteTarget();
-    if (!e) return;
-    this.deleting.set(true);
+  async deleteEntry(e: JournalEntry) {
+    const ok = await this.confirmService.confirm({
+      title: 'Delete this entry?',
+      message: 'It is removed from the group for everyone, permanently.',
+      confirmLabel: 'Delete entry',
+      danger: true,
+    });
+    if (!ok) return;
     this.svc.deleteEntry(e.id).subscribe({
       next: () => {
         this.entries.update(es => es.filter(x => x.id !== e.id));
-        this.deleteTarget.set(null);
-        this.deleting.set(false);
+        this.toast.success('Entry deleted');
       },
-      error: () => this.deleting.set(false),
+      error: () => this.toast.error('Could not delete the entry.'),
     });
   }
 
-  deleteGroup() {
-    this.deletingGroup.set(true);
+  async deleteGroup() {
+    const name = this.group()?.name ?? 'this group';
+    const ok = await this.confirmService.confirm({
+      title: `Delete ${name}?`,
+      message: 'The group and every entry written in it are removed for all its members. This cannot be undone.',
+      confirmLabel: 'Delete group',
+      danger: true,
+    });
+    if (!ok) return;
     this.svc.deleteGroup(this.groupId).subscribe({
-      next: () => { this.deletingGroup.set(false); this.router.navigate(['/journal']); },
-      error: () => this.deletingGroup.set(false),
+      next: () => {
+        this.toast.success(`${name} deleted`);
+        this.router.navigate(['/journal']);
+      },
+      error: () => this.toast.error('Could not delete the group.'),
     });
   }
 
