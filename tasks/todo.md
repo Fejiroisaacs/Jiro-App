@@ -104,3 +104,12 @@ Plan: `~/.claude/plans/jaunty-rolling-dream.md`. Audit: `docs/UI-AUDIT-2026-09.m
 
 **Next: Phase 3c (Journaly).** The inputs are recorded above. The headline item is that journal-home never binds the week view's `weekChange`, so paging to another week shows nothing.
 
+
+## Phase 3c: Journaly + mood trend chart (in progress, plan in `~/.claude/plans/jaunty-rolling-dream.md`)
+
+- [ ] 3c.1 Week calendar actually navigates: bind `weekChange` on journal-home, fetch by week (`from`/`to`, `limit: 100`), list below shows that week; search/filters switch to an all-time results mode with an honest heading and Clear; 300ms debounce on search
+- [ ] 3c.2 One mood palette: `color` on each `MOODS` entry, warm to cool in the Earth and Clay family, plus `moodColor()`/`moodMeta()` helpers; the week view's private hex map deleted; mood chips gain colour
+- [ ] 3c.3 Mood distribution chart (roadmap item): new `features/journal/mood-trend/mood-trend.ts`, 30-day counts as CSS bars (no Chart.js), accessible rows, empty state under three entries
+- [ ] 3c.4 Rest of the module: four hand-rolled confirms -> ConfirmService, toasts throughout (module has none today), shared states + skeleton week grid, `z-index` and colour literals -> tokens, aria labels and 40px targets, dead `.flame-emoji` CSS
+- [ ] Verification: `check:css`, production build (journal chunk gains no charting library), Playwright week paging + search + dark mode + mobile
+- [ ] Commit per step, push at the end, review section below

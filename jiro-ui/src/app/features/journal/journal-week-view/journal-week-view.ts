@@ -3,7 +3,13 @@ import {
   signal, computed, OnChanges, SimpleChanges, AfterViewInit, ElementRef,
 } from '@angular/core';
 
-import { JournalEntry, MOODS } from '../../../core/services/journal.service';
+import {
+  JournalEntry,
+  moodColor as moodColorFor,
+  moodLabel as moodLabelFor,
+  moodMeta,
+} from '../../../core/services/journal.service';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 
 // ─── Exported helpers used by parent components ──────────────────────────────
 
@@ -34,7 +40,7 @@ export function currentWeekBounds(): { from: string; to: string } {
 @Component({
   selector: 'journal-week-view',
   standalone: true,
-  imports: [],
+  imports: [JiroSkeletonComponent],
   template: `
     <div class="wv">
 
@@ -59,25 +65,33 @@ export function currentWeekBounds(): { from: string; to: string } {
       </div>
 
       <!-- Day columns -->
-      <div class="wv-grid" [class.wv-loading]="loading">
+      @if (loading) {
+        <div class="wv-grid" aria-busy="true" aria-label="Loading this week">
+          @for (i of skeletonDays; track i) {
+            <div class="wv-day"><jiro-skeleton [lines]="2" height="46px" /></div>
+          }
+        </div>
+      } @else {
+      <div class="wv-grid">
         @for (day of weekDays(); track day) {
 <div
          
           class="wv-day"
           [class.wv-day--today]="isToday(day)">
 
-          <!-- Day header -->
-          <div class="wv-day-hdr" (click)="dayClick.emit(iso(day))" role="button" [attr.aria-label]="'View entries for ' + dayAbbr(day) + ' ' + day.getDate()">
+          <!-- Day header. Not itself a control: the button below is the one
+               way into a day, so there is one target per column. -->
+          <div class="wv-day-hdr">
             <span class="wv-day-name">{{ dayAbbr(day) }}</span>
             <span class="wv-day-num">{{ day.getDate() }}</span>
           </div>
 
-          <!-- Add button (always visible at top) -->
           <button
             class="wv-add"
+            type="button"
             (click)="dayClick.emit(iso(day))"
-            aria-label="Add entry for this day">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            [attr.aria-label]="'Open ' + dayAbbr(day) + ' ' + day.getDate()">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
               <line x1="12" y1="5" x2="12" y2="19"/>
               <line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
@@ -89,8 +103,12 @@ export function currentWeekBounds(): { from: string; to: string } {
 <div
              
               class="wv-note"
+              role="button"
+              tabindex="0"
               [style.border-left-color]="moodColor(e.mood)"
-              (click)="entryClick.emit(e)">
+              (click)="entryClick.emit(e)"
+              (keydown.enter)="entryClick.emit(e)"
+              (keydown.space)="$event.preventDefault(); entryClick.emit(e)">
               @if (showAuthor) {
 <div class="wv-note-author">{{ authorName(e) }}</div>
 }
@@ -108,6 +126,7 @@ export function currentWeekBounds(): { from: string; to: string } {
         </div>
 }
       </div>
+      }
 
     </div>
   `,
@@ -169,7 +188,7 @@ export function currentWeekBounds(): { from: string; to: string } {
       min-height: 170px;
     }
     .wv-grid::-webkit-scrollbar { display: none; }
-    .wv-grid.wv-loading { opacity: 0.4; pointer-events: none; }
+    .wv-note:focus-visible { outline-offset: 2px; }
 
     .wv-day {
       flex: 1;
@@ -303,6 +322,9 @@ export class JournalWeekViewComponent implements OnChanges, AfterViewInit {
   @Output() entryClick = new EventEmitter<JournalEntry>();
   @Output() weekChange = new EventEmitter<{ from: string; to: string }>();
 
+  /** Seven placeholder columns while the week loads. */
+  readonly skeletonDays = [0, 1, 2, 3, 4, 5, 6];
+
   private _ws = signal(getWeekStart(new Date()));
   private _entries = signal<JournalEntry[]>([]);
 
@@ -379,22 +401,17 @@ export class JournalWeekViewComponent implements OnChanges, AfterViewInit {
   iso(d: Date): string { return toISO(d); }
   dayAbbr(d: Date): string { return d.toLocaleDateString('en-US', { weekday: 'short' }); }
 
+  /** The palette lives beside MOODS in the service; a note with no mood keeps the hairline. */
   moodColor(mood: string | null | undefined): string {
-    if (!mood) return 'var(--border-color)';
-    const map: Record<string, string> = {
-      happy: '#f59e0b', calm: '#06b6d4', energised: '#10b981',
-      grateful: '#8b5cf6', anxious: '#f97316', sad: '#6b7280',
-      tired: '#94a3b8', stressed: '#ef4444',
-    };
-    return map[mood] ?? 'var(--border-color)';
+    return mood ? moodColorFor(mood) : 'var(--border-color)';
   }
 
   moodIcon(mood: string): string {
-    return MOODS.find(m => m.value === mood)?.icon ?? '';
+    return moodMeta(mood)?.icon ?? '';
   }
 
   moodLabel(mood: string): string {
-    return MOODS.find(m => m.value === mood)?.label ?? mood;
+    return moodLabelFor(mood);
   }
 
   authorName(e: JournalEntry): string {
