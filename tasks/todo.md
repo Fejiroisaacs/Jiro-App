@@ -44,14 +44,33 @@ Plan: `~/.claude/plans/jaunty-rolling-dream.md`. Audit: `docs/UI-AUDIT-2026-09.m
 ## Phase 3a: Jym pages (in progress, plan in `~/.claude/plans/jaunty-rolling-dream.md`)
 
 - [x] 3a.0 Control-flow migration, whole app (736 directives, 58 files; `--format false`; build 395 kB) — commit eaf1387
-- [ ] 3a.1 Session player, same layout: bar literals -> `currentColor`/tokens, `inverse` + `ghost` button variants, Finish/Exit visible on the bar, `--color-warning-rgb`, 40px set-row controls (36 mobile), warm-up `fire` icon with `aria-pressed`, aria-labels on icon buttons, picker in `jiro-modal`, `jym-pr-badge`, skeleton + empty state
-- [ ] 3a.2 Exercise library as list rows: `forkJoin(listExercises, getPRs)`, best set + est. 1RM + PR date, `jiro-menu` row menu (Edit / Delete), ConfirmService + toasts, `jiro-page-header` when not embedded, empty + no-results states, skeleton
-- [ ] 3a.3 Other Jym pages: `jiro-page-header`, `jiro-empty-state`, `.spinner`, ConfirmService for the five `.delete-confirm` modals, tokens for hex/rgba, theme-aware chart palette in exercise-detail, session-summary on-screen tokens (share card + `MUSCLE_COLORS` untouched), aria-labels
-- [ ] Verification: `check:css`, production build, Playwright desktop + mobile, light + dark on the player, contrast on the bar buttons
-- [ ] Commit per step, push at the end, review section below
+- [x] 3a.1 Session player, same layout: bar literals -> `currentColor`/tokens, `inverse` + `ghost` button variants, Finish/Exit visible on the bar, `--color-warning-rgb`, 40px set-row controls (36 mobile), warm-up `fire` icon with `aria-pressed`, aria-labels on icon buttons, picker in `jiro-modal`, `jym-pr-badge`, skeleton + empty state — commit f1a01fa
+- [x] 3a.2 Exercise library as list rows: `forkJoin(listExercises, getPRs)`, best set + est. 1RM + PR date, `jiro-menu` row menu (Edit / Delete), ConfirmService + toasts, `jiro-page-header` when not embedded, empty + no-results states, skeleton — commit 127711d
+- [x] 3a.3 Other Jym pages: `jiro-page-header`, `jiro-empty-state`, `.spinner`, ConfirmService (five hand-rolled modals plus four actions that had no confirm at all), tokens for hex/rgba, theme-aware charts via `features/jym/shared/chart-theme.ts`, session-summary on-screen tokens (share card + `MUSCLE_COLORS` untouched), aria-labels — commit bfb7902
+- [x] Verification: `check:css` 0 undefined (raw hex 196 -> 152), production build 395 kB, 0 legacy control-flow directives, Playwright desktop + mobile, light + dark on the player, contrast on the bar buttons (light 8.02-9.85, dark 4.74-5.52)
+- [x] Commit per step, push at the end, review section below
 
 ## Phase 3b/3c/3d inputs (from explore traces, 2026-09-14; not yet acted on)
 
 - Ledger (hub, transactions, accounts, budgets, networth, compare, transaction form): 43 raw hex, 29 rgba, 6 `.spinner-lg` copies, 3 hand-rolled delete confirms; none import page-header / empty-state / icon / input / skeleton / toast / confirm. `getAmountColor` and `getTypeColor` duplicate each other with a `#3B82F6` transfer literal; budgets format currency with a hard `$`; net-worth and compare charts hard-code light-theme axis colours; compare duplicates the whole table for mobile; transaction search only filters pages already fetched; `activeFilterCount()` reads plain fields.
 - Journaly (home, week view, day modal): journal-home never binds the week view's `weekChange`, so paging weeks shows nothing; mood colours are an 8-entry hex map inside the week view only; filters fire per keystroke; one hand-rolled delete confirm; no toasts in the module; dead `.page-header` CSS and unused `moodIcon`.
 - Culinara (list, detail, discover, meal planner, shopping list, forms): list and discover hand-roll header + `.spinner-lg`; detail has 11 title-only icon buttons, cook mode at `z-index: 9000` with no Escape and no wake lock, inline `setTimeout` confirmations instead of toasts; three dead `.back-link` CSS blocks; `#c49540` star gold repeated.
+
+## Review (Phase 3a)
+
+**Delivered.** The whole app is on Angular's built-in control flow (736 directives across 58 files). The session player keeps its layout but works in dark mode and on a phone: every white literal on the bar became `currentColor` or a token, Finish and Exit use two new `jiro-button` variants (`inverse`, `ghost`) so they read against the coloured bar, set-row controls are 40px (36px under 480px) with 44px inputs, the cryptic "W" column is a labelled fire icon with `aria-pressed`, and the exercise picker is a `jiro-modal` instead of a hand-rolled fixed overlay. The exercise library is a list: one row per exercise showing the best set, estimated 1RM and how long ago the PR was set, with edit and delete behind a new shared `jiro-menu`. Every other Jym page now uses the shared header, empty state, spinner and in-app confirm.
+
+**Beyond the plan (worth knowing).**
+- Four destructive actions had no confirmation at all and now ask first: delete a body-weight entry, delete a series, delete a training day, delete a form-check clip.
+- Chart.js cannot read CSS custom properties, so charts read the palette through a new `features/jym/shared/chart-theme.ts`. Colours are read at draw time, so a chart already on screen keeps its colours until it is redrawn after a theme change.
+- The first contrast pass used `currentColor` as a background for the active bar chip. In a `background`, `currentColor` resolves to the element's own `color`, which made the chip invisible; it now uses `var(--text-on-primary)` directly, like the Finish button.
+
+**Deliberately left alone.**
+- `session-summary.ts` share card (rendered off-screen by html-to-image, which cannot resolve CSS variables), its dark hero banner, and `MUSCLE_COLORS` (a categorical scale shared by both views). These are 43 of the 152 raw hex values left in the app.
+- `split-detail.ts` keeps its own header: it holds inline title editing, a visibility toggle and tag editing that `jiro-page-header` does not model.
+- `how-to-use.ts` is a long-form guide with its own typography, not an app page.
+
+**Backend follow-ups.** `GET /jym/exercises` has no `last_performed_at`, so the library shows the PR date rather than "last performed"; adding that field would let the row say when the exercise was last trained. `GET /culinara/cook-streak` still returns 500 when a trial has a null `date_cooked`.
+
+**Next: Phase 3b (Ledger)**, using the inputs recorded above.
+

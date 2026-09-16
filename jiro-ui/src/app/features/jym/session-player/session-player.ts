@@ -524,15 +524,15 @@ interface ExerciseBlock {
     .rest-chip {
       min-height: 28px; padding: 2px 8px; border-radius: 10px;
       border: 1px solid color-mix(in srgb, currentColor 35%, transparent); background: none;
-      color: color-mix(in srgb, currentColor 70%, transparent); font-size: var(--font-size-xs);
+      color: color-mix(in srgb, currentColor 88%, transparent); font-size: var(--font-size-xs);
       cursor: pointer; transition: all 0.15s; font-family: inherit; white-space: nowrap;
     }
 
     .rest-chip:hover { border-color: color-mix(in srgb, currentColor 70%, transparent); color: inherit; }
 
     .rest-chip.active {
-      background: color-mix(in srgb, currentColor 18%, transparent); border-color: color-mix(in srgb, currentColor 70%, transparent);
-      color: inherit; font-weight: 600;
+      background: var(--text-on-primary); border-color: var(--text-on-primary);
+      color: var(--color-primary); font-weight: 600;
     }
 
     .rest-add-btn { border-style: dashed; }
@@ -541,7 +541,7 @@ interface ExerciseBlock {
       display: flex; align-items: center; justify-content: center;
       width: 32px; height: 32px; border-radius: var(--border-radius-sm);
       border: 1px solid color-mix(in srgb, currentColor 30%, transparent); background: none;
-      color: color-mix(in srgb, currentColor 75%, transparent); cursor: pointer; transition: all 0.15s;
+      color: color-mix(in srgb, currentColor 88%, transparent); cursor: pointer; transition: all 0.15s;
       flex-shrink: 0;
     }
     .save-template-btn:hover { border-color: color-mix(in srgb, currentColor 70%, transparent); color: inherit; }
@@ -562,7 +562,7 @@ interface ExerciseBlock {
       display: inline-flex; align-items: center; justify-content: center;
       min-height: 28px; padding: 3px 8px; border-radius: 10px;
       border: 1px solid color-mix(in srgb, currentColor 30%, transparent); background: none;
-      color: color-mix(in srgb, currentColor 60%, transparent); cursor: pointer;
+      color: color-mix(in srgb, currentColor 88%, transparent); cursor: pointer;
       font-size: var(--font-size-xs); transition: all 0.15s; font-family: inherit;
     }
 
@@ -587,14 +587,18 @@ interface ExerciseBlock {
 
     .type-btn {
       min-height: 28px; padding: 5px 10px; background: transparent; border: none;
-      color: color-mix(in srgb, currentColor 75%, transparent); font-size: var(--font-size-xs);
+      color: color-mix(in srgb, currentColor 88%, transparent); font-size: var(--font-size-xs);
       font-family: inherit;
       cursor: pointer; transition: all 0.15s; white-space: nowrap;
     }
 
     .type-btn + .type-btn { border-left: 1px solid color-mix(in srgb, currentColor 35%, transparent); }
 
-    .type-btn.active { background: color-mix(in srgb, currentColor 18%, transparent); color: inherit; font-weight: 600; }
+    /* mirrors the Finish button: fill with the bar's own text colour so the
+       label stays readable on the maroon bar and on the lifted dark one.
+       currentColor cannot be used for the fill here: in a background it
+       resolves to this element's own colour, not the inherited one. */
+    .type-btn.active { background: var(--text-on-primary); color: var(--color-primary); font-weight: 600; }
 
     .type-notice {
       text-align: center; font-size: var(--font-size-sm); font-weight: 500;
