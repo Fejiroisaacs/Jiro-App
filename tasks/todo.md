@@ -134,3 +134,12 @@ Plan: `~/.claude/plans/jaunty-rolling-dream.md`. Audit: `docs/UI-AUDIT-2026-09.m
 
 **Next: Phase 3d (Culinara)**, the last page batch: eight files, eleven icon buttons with no accessible name on the recipe detail, and cook mode as a full-screen overlay with no Escape key and no wake lock. Then Phase 4, the landing page.
 
+
+## Phase 3d: Culinara (in progress, plan in `~/.claude/plans/jaunty-rolling-dream.md`)
+
+- [ ] 3d.0 Shell: `mobileNav` route-data flag beside the existing `moduleNav` in `main-layout.ts`
+- [ ] 3d.1 Cook mode as a route `/culinara/:id/cook`: visible Exit (not a key), phone back gesture works, both navs hidden so the pinned footer owns the bottom, 44px stars, safe-area inset, screen wake lock re-requested on visibilitychange and feature-detected, Escape as a desktop extra; ~200 lines leave recipe-detail
+- [ ] 3d.2 Recipe detail actions: labelled Start cooking + `jiro-menu` (Share/Edit/Delete), names and 40px on the remaining icon buttons, grocery feedback becomes a toast
+- [ ] 3d.3 Other pages: `jiro-page-header`, shared states, toasts for silent actions, tokens, labels, three dead `.back-link` blocks removed (`recipe-share.ts` keeps its var() fallbacks: public page outside the shell)
+- [ ] Verification: `check:css`, production build, Playwright desktop + mobile at 360px and 360x640, wake lock called and released, dark mode
+- [ ] Commit per step, push at the end, review section below

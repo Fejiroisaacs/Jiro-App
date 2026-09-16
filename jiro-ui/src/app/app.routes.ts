@@ -73,6 +73,15 @@ export const routes: Routes = [
         title: 'Shared recipe',
         loadComponent: () => import('./features/culinara/discover/discover-detail').then(m => m.CulinaraDiscoverDetailComponent),
       },
+      // Focus screen: both the module row and the bottom bar step aside so the
+      // cook footer owns the bottom of the viewport. Must precede 'culinara/:id',
+      // which matches by prefix.
+      {
+        path: 'culinara/:id/cook',
+        title: 'Cook mode',
+        data: { moduleNav: false, mobileNav: false },
+        loadComponent: () => import('./features/culinara/cook-mode/cook-mode').then(m => m.CookModeComponent),
+      },
       {
         path: 'culinara/:id',
         title: 'Recipe',
