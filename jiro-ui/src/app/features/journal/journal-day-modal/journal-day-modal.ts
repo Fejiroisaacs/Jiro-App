@@ -82,7 +82,12 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
             @if (e.images?.length) {
 <div class="card-images">
               @for (img of (e.images || []); track img) {
-<img [src]="img.file_url" class="thumb" alt="" />
+<img
+                [src]="img.file_url"
+                class="thumb"
+                [alt]="imageAlt(e, $index, (e.images || []).length)"
+                width="68"
+                height="68" />
 }
             </div>
 }
@@ -139,11 +144,13 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
 <div class="exp-images">
             @for (img of (expanded()!.images || []); track img) {
 <img
-             
+
               [src]="img.file_url"
               class="exp-img"
-              alt=""
-              (click)="lightboxUrl.set(img.file_url)" />
+              [alt]="expandedImageAlt($index)"
+              width="260"
+              height="160"
+              (click)="openLightbox(img.file_url, $index)" />
 }
           </div>
 }
@@ -173,7 +180,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
     <!-- Lightbox -->
     @if (lightboxUrl()) {
 <div class="lightbox" (click)="lightboxUrl.set(null)">
-      <img [src]="lightboxUrl()!" alt="Full size image" />
+      <img [src]="lightboxUrl()!" [alt]="expandedImageAlt(lightboxIndex())" />
     </div>
 }
   `,
@@ -503,6 +510,8 @@ export class JournalDayModalComponent implements OnChanges {
   expanded = signal<JournalEntry | null>(null);
   expandLoading = signal(false);
   lightboxUrl = signal<string | null>(null);
+  /** Which image in the expanded entry the lightbox is showing, for its alt. */
+  lightboxIndex = signal(0);
   touchStartY = 0;
 
   ngOnChanges(changes: SimpleChanges) {
@@ -547,6 +556,31 @@ export class JournalDayModalComponent implements OnChanges {
     if (this.expandLoading()) { this.expandLoading.set(false); return; }
     if (this.expanded())      { this.expanded.set(null);       return; }
     this.close.emit();
+  }
+
+  /**
+   * A name for a journal photo. There is no caption to draw on, so the entry
+   * itself is the only thing that distinguishes one photo from another: its
+   * title where there is one, otherwise the day. The position is included only
+   * when there is more than one, because "Photo 1 of 1" is noise.
+   */
+  imageAlt(e: JournalEntry, index: number, total: number): string {
+    const subject = e.title?.trim() || this.formattedDate;
+    return total > 1
+      ? `Photo ${index + 1} of ${total} from ${subject}`
+      : `Photo from ${subject}`;
+  }
+
+  /** The same, for the entry currently expanded. */
+  expandedImageAlt(index: number): string {
+    const e = this.expanded();
+    if (!e) return '';
+    return this.imageAlt(e, index, (e.images || []).length);
+  }
+
+  openLightbox(url: string, index: number) {
+    this.lightboxIndex.set(index);
+    this.lightboxUrl.set(url);
   }
 
   moodLabel(value: string): string {
