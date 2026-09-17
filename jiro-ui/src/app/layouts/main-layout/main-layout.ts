@@ -77,11 +77,21 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
         </nav>
 
         <div class="sidebar-footer">
-          <a routerLink="/settings" routerLinkActive="active" class="nav-item">
-            <jiro-icon name="gear" [size]="22" />
-            @if (!collapsed()) { <span class="nav-label">Settings</span> }
-          </a>
-          <jiro-user-menu direction="up" [compact]="collapsed()" />
+          @if (signedIn()) {
+            <a routerLink="/settings" routerLinkActive="active" class="nav-item">
+              <jiro-icon name="gear" [size]="22" />
+              @if (!collapsed()) { <span class="nav-label">Settings</span> }
+            </a>
+            <jiro-user-menu direction="up" [compact]="collapsed()" />
+          } @else {
+            <a routerLink="/login" class="nav-item">
+              <jiro-icon name="sign-out" [size]="22" />
+              @if (!collapsed()) { <span class="nav-label">Log in</span> }
+            </a>
+            @if (!collapsed()) {
+              <a routerLink="/register" class="guest-cta">Get started</a>
+            }
+          }
         </div>
       </aside>
 
@@ -93,7 +103,11 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
             <jiro-mark [name]="topbarMark()" [size]="26" />
             <span class="mt-title">{{ topbarTitle() }}</span>
           </div>
-          <jiro-user-menu direction="down" [compact]="true" />
+          @if (signedIn()) {
+            <jiro-user-menu direction="down" [compact]="true" />
+          } @else {
+            <a routerLink="/register" class="guest-cta guest-cta--compact">Get started</a>
+          }
         </header>
 
         @if (showVerifyBanner()) {
@@ -266,6 +280,26 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
       padding: var(--space-sm);
       border-top: 1px solid rgba(255, 255, 255, 0.1);
     }
+
+    /* Shown instead of the account menu on the public discover pages, where
+       there is no account yet. Borrows the primary button's shape rather than
+       pulling jiro-button into the shell for one link. */
+    .guest-cta {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      padding: 0 var(--space-md);
+      border-radius: var(--border-radius);
+      background: var(--color-primary);
+      color: var(--text-on-primary);
+      font-size: var(--font-size-sm);
+      font-weight: 600;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .guest-cta:hover { background: var(--color-primary-hover); }
+    .guest-cta--compact { padding: 0 var(--space-sm); }
 
     /* ── Main column ── */
     .main {
@@ -467,6 +501,13 @@ export class MainLayoutComponent {
     if (!m) return title || 'Jiro';
     return isSectionPath(m, this.nav().url) ? m.label : (title || m.label);
   });
+
+  /**
+   * The shell also serves the two public discover pages, where there is no
+   * account to show. Anything that only makes sense for a signed-in user hangs
+   * off this.
+   */
+  readonly signedIn = computed(() => !!this.auth.user());
 
   private readonly verifyDismissed = signal(readDismissed());
   readonly showVerifyBanner = computed(() => {
