@@ -203,3 +203,114 @@ Phases 0 through 4 are on `New-Features`: bugs and tokens, the shell, all four m
 - Cook mode's checklist does not survive a refresh. Known and stated rather than hidden.
 - The feature roadmap in `docs/UPCOMING-FEATURES.md` is untouched apart from the mood trend chart, which shipped in Phase 3c.
 
+
+## Roadmap features: effort order
+
+Ranked by real effort, grounded in what the code already has (plan in `~/.claude/plans/jaunty-rolling-dream.md`):
+
+1. Prompted entries (Journaly) — frontend only, no schema, no API
+2. Collection cover images (Journaly) — read path already complete; only upload missing
+3. Data export (Base) — one endpoint aggregating each module
+4. Deload auto-suggest (Jym) — one SQL line plus one card, now the rule is settled
+5. Global search (Base) — search across five modules plus a UI surface. Large
+6. Dashboard widgets (Base) — per-user layout in the existing settings JSON. Large
+7. Echo — whole module: RRULE, push, email. Has its own design doc
+
+## Roadmap builds 1-4 (done)
+
+- [x] 1 Prompted entries: `writing-prompts.ts` with ~30 real prompts + `promptForDay(date, offset)`; strip above the body when creating only, shuffle + dismiss (day-scoped localStorage), aria-live on shuffle, click-to-focus, tokens only
+- [x] 2 Collection covers: presign/confirm/delete triple on `UploadHandler` mirroring the recipe cover, `SetCollectionCoverURL` on `JournalService`, old object deleted on re-upload, `uploadCollectionCover` on the upload service, change/remove controls on the collection page
+- [x] 3 Data export: `handlers/export.go` aggregating every module through existing service methods, `GET /export/account.json` as an attachment, never any password hash or token; Settings section + download button
+- [x] 4 Deload suggest: `pr_count` on the session summary (`COUNT(...) FILTER (WHERE ss.is_pr)`), optional `session_type` on session create, `deload-rule.ts` (last 4 normal sessions, volume down AND zero PRs, half-vs-half means), card on the Jym home page with "Start next session as a deload" and a 7-day snooze
+- [x] Verification: serial builds, API restart, Playwright per build, dark mode + 360px
+- [x] Four commits, pushed when all green, review section below
+
+**Not from the video.** The Instagram reel could not be read: the URL returns only the app shell to a fetcher, so no caption or transcript reached me. Nothing in these builds comes from it. Paste a transcript or screenshots and it becomes build 5.
+
+## Review: roadmap builds 1-4
+
+Four agents wrote in parallel on disjoint files; I verified serially and
+committed each build on its own. Every commit builds by itself, not just the
+final tree.
+
+**Commits on `New-Features`:** `8e5db8f` prompts, `adeb481` covers, `cb520e2`
+deload, `3f943eb` export.
+
+### Verified, not assumed
+
+**Backend, 44 checks, all passing** (`scratchpad/verify-api.ps1`). Covers:
+presign returns a key namespaced to the signed-in user, 404 on a collection
+you do not own, 400 on a non-image and on over 5 MB, 403 on a key minted for
+another user, 400 on a bad extension, and delete clears the column. Sessions
+carry `pr_count` matching a hand count from the database. An unknown
+`session_type` is rejected with 400, `deload` is honoured, and omitting it
+still gives `normal`. The export responds 200 as an attachment, carries a
+key per module with the seeded row counts, and contains no `password_hash`,
+`token_hash` or `refresh_token`. The empty account exports valid JSON with
+empty collections rather than nulls.
+
+**The deload rule driven from real data, 11 checks, all passing**
+(`scratchpad/verify-deload.sh`). Four seeded flat sessions raise the card
+with the right numbers. Flagging one set as a PR removes it; clearing the
+flag brings it back. Inserting a light deload week does not change the
+finding, which is the self-perpetuation guard working. A sub-5% dip raises
+nothing. "Not now" hides it, survives a reload, and lapses after eight days.
+The primary button opens a session already typed `deload` and the player
+shows Deload selected.
+
+**Browser pass.** The prompt is stable across two reloads, shuffle advances
+and announces through `aria-live`, clicking or pressing Enter on the question
+focuses the textarea, typing keeps it visible, dismissal survives a reload,
+yesterday's dismissal does not silence today, and the edit route shows none.
+Controls measured at 40x40 with real accessible names. All four screens
+render in dark mode at 1280px and 360px with no horizontal scroll and nothing
+overflowing the viewport. The export downloads from the button with a 200 and
+no console errors.
+
+`go build ./...` and `go vet ./...` clean, `npm run check:css` at 0 undefined
+variables, production bundle 386.97 kB initial / 109.25 kB transfer, inside
+budget.
+
+### Three defects found and fixed during verification
+
+- **The export wrote to the database.** It read the meal plan through the
+  getter that upserts the week it returns, so downloading your own data
+  created a plan row for a week you never touched. Added a read-only list
+  method; the export now carries every planned week instead of only the
+  current one.
+- **The export silently truncated.** Sessions capped at 50 and body weights
+  at 365, so a long history would have been quietly lost by a feature whose
+  whole promise is completeness. The cap is now a parameter: list screens
+  keep 50 and 365, the export takes everything. `LIMIT NULL` as no limit was
+  checked against Postgres rather than assumed.
+- **The deload card fired on noise.** The rule as written triggered on any
+  decline at all, including a 0.3% drift. Added a 5% floor, so ordinary
+  week-to-week variation does not raise a card the user learns to ignore.
+
+Also corrected the Settings copy, which still described the export as holding
+"this week's meal plan" after the change above made that false.
+
+### Deliberately not done
+
+**No test object was written to or deleted from Cloudflare R2.** Storage here
+points at a live bucket, not a local stub, so the re-upload path that deletes
+the previous object was reviewed by reading rather than fired at real files
+unattended. The key derivation matches the recipe precedent exactly, and a
+URL that does not match the public base degrades to a no-op delete rather
+than removing something unintended. Worth one manual upload when you are at
+the keyboard.
+
+`journal-collection.ts` still draws its icons as inline SVG, six of them
+predating this change, where the rest of the app now uses `jiro-icon`. The
+two new controls follow that file's local convention rather than mixing two
+icon styles in one header. Migrating the page wholesale is a tidy-up, not
+part of this feature.
+
+Ranks 5 to 7 on the roadmap (global search, dashboard widgets, Echo) are
+untouched on purpose: too large to start unattended.
+
+### Note on the environment
+
+Docker Desktop stopped partway through verification, taking Postgres, the API
+and the dev server with it. I restarted the stack and re-ran everything
+affected; no result above predates that restart.
