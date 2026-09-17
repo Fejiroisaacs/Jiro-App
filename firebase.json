@@ -6,6 +6,55 @@
       "**/.*",
       "**/node_modules/**"
     ],
+    "headers": [
+      {
+        "//": "The shell, the service worker and the manifest must never be held. Firebase's default of max-age=3600 on index.html meant a deploy took up to an hour to reach a returning visitor.",
+        "source": "/index.html",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      },
+      {
+        "source": "/sw.js",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      },
+      {
+        "source": "/manifest.webmanifest",
+        "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      },
+      {
+        "//": "Crawler files change when the public route list changes, which is a deploy, so they follow the shell rather than being cached for a year.",
+        "source": "/@(robots.txt|sitemap.xml)",
+        "headers": [{ "key": "Cache-Control", "value": "public, max-age=3600" }]
+      },
+      {
+        "//": "Safe to mark immutable only because the production build sets outputHashing: all, so a changed file always has a changed name.",
+        "source": "**/*.@(js|css)",
+        "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+      },
+      {
+        "//": "Long, but not immutable: these filenames are not content-hashed, so a re-shot screenshot keeps its name and must be able to win eventually.",
+        "source": "**/*.@(webp|png|jpg|jpeg|svg|ico|woff2)",
+        "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800" }]
+      },
+      {
+        "//": "Firebase sets none of these by default. HSTS is deliberately absent because the host already sends it, with preload.",
+        "source": "**",
+        "headers": [
+          { "key": "X-Content-Type-Options", "value": "nosniff" },
+          { "key": "X-Frame-Options", "value": "DENY" },
+          { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+          {
+            "//": "REPORT-ONLY ON PURPOSE. A wrong CSP breaks a live site silently, and this one cannot be verified until it is deployed, because Firebase applies these headers and a local static server does not. Deploy, open the app, read the console: if no violations are reported, rename this key to Content-Security-Policy to start enforcing. The sha256 is the inline theme script in index.html, which prevents a flash of the wrong theme and must keep working; recompute it if that script ever changes. style-src needs unsafe-inline because Angular injects component styles into the document at runtime and the build inlines critical CSS: there is no nonce to attach to those, so this is a genuine limitation rather than laziness. The two Cloudflare hosts are different on purpose: pub-*.r2.dev serves uploaded images back, and *.r2.cloudflarestorage.com is where the browser PUTs a new upload through a presigned URL.",
+            "key": "Content-Security-Policy-Report-Only",
+            "value": "default-src 'self'; script-src 'self' 'sha256-x3tc3058sV6T4VxnSd3Q5qMusg4RZFVvH3TPYHeQR/U='; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://pub-8ebb48ef567344b5b7dcd55f9a4baf9a.r2.dev; media-src 'self' https://pub-8ebb48ef567344b5b7dcd55f9a4baf9a.r2.dev; connect-src 'self' https://jiro-app-401631848579.us-east4.run.app https://b846c40639aabbb97810b43b02979ff0.r2.cloudflarestorage.com https://pub-8ebb48ef567344b5b7dcd55f9a4baf9a.r2.dev; base-uri 'self'; form-action 'self'; object-src 'none'; frame-ancestors 'none'"
+          }
+        ]
+      },
+      {
+        "//": "Second line of defence behind the meta tag, in case a crawler reaches the admin shell before JavaScript runs.",
+        "source": "/admin/**",
+        "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
+      }
+    ],
     "rewrites": [
       {
         "source": "**",
