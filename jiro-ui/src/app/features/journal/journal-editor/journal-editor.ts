@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, HostListener } from '@angular/core';
+import { Component, OnInit, signal, computed, viewChild, ElementRef, HostListener } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -10,12 +10,17 @@ import {
   MOODS,
 } from '../../../core/services/journal.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { UploadService } from '../../../core/services/upload.service';
+import { promptForDay, localDateKey } from '../writing-prompts';
+
+/** Dismissing the prompt lasts the calendar day; the value is that day's date. */
+const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
 
 @Component({
   selector: 'app-journal-editor',
   standalone: true,
-  imports: [FormsModule, JiroButtonComponent],
+  imports: [FormsModule, JiroButtonComponent, JiroIconComponent],
   template: `
     <div class="editor-page" [class.immersive]="immersive()">
 
@@ -70,8 +75,38 @@ import { UploadService } from '../../../core/services/upload.service';
           maxlength="255"
           (focus)="immersive.set(true)" />
 
+        <!-- ── Writing prompt (new entries only) ─────────────────────── -->
+        @if (promptVisible()) {
+        <section class="prompt-strip" aria-label="Writing prompt">
+          <div class="prompt-copy" aria-live="polite">
+            <span class="toolbar-label">Today's prompt</span>
+            <button
+              type="button"
+              class="prompt-question"
+              (click)="focusBody()">{{ prompt() }}</button>
+          </div>
+          <div class="prompt-actions">
+            <button
+              type="button"
+              class="prompt-btn"
+              aria-label="Show me another prompt"
+              (click)="shufflePrompt()">
+              <jiro-icon name="arrow-right" [size]="18" />
+            </button>
+            <button
+              type="button"
+              class="prompt-btn"
+              aria-label="Hide the prompt for today"
+              (click)="dismissPrompt()">
+              <jiro-icon name="x" [size]="18" />
+            </button>
+          </div>
+        </section>
+        }
+
         <!-- Body -->
         <textarea
+          #bodyTextarea
           class="body-textarea"
           placeholder="What's on your mind today?"
           [(ngModel)]="body"
@@ -289,6 +324,58 @@ import { UploadService } from '../../../core/services/upload.service';
     .title-input:focus { border-bottom-color: var(--color-primary); }
     .title-input::placeholder { color: var(--text-secondary); font-weight: 400; }
 
+    /* Writing prompt */
+    .prompt-strip {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-md);
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      padding: var(--space-sm) var(--space-md);
+    }
+    .prompt-copy {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      align-items: flex-start;
+    }
+    .prompt-question {
+      font-family: var(--font-family-display);
+      font-size: var(--font-size-md);
+      line-height: 1.45;
+      color: var(--text-primary);
+      background: none;
+      border: none;
+      border-radius: var(--border-radius-sm);
+      text-align: left;
+      padding: var(--space-xs) 0;
+      min-height: 40px;
+      cursor: pointer;
+      transition: color 0.15s;
+    }
+    .prompt-question:hover { color: var(--color-primary); }
+    .prompt-actions { display: flex; gap: var(--space-xs); flex-shrink: 0; }
+    .prompt-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      background: none;
+      border: none;
+      border-radius: var(--border-radius);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: color 0.15s, background 0.15s;
+    }
+    .prompt-btn:hover {
+      color: var(--text-primary);
+      background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+    }
+
     /* Body textarea */
     .body-textarea {
       font-family: 'Georgia', serif;
@@ -487,6 +574,16 @@ import { UploadService } from '../../../core/services/upload.service';
       border-radius: var(--border-radius);
     }
 
+    /* Narrow: the prompt takes its own line, the controls drop below it. */
+    @media (max-width: 600px) {
+      .prompt-strip {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--space-xs);
+      }
+      .prompt-actions { justify-content: flex-end; }
+    }
+
     /* Mobile immersive */
     @media (max-width: 768px) {
       .editor-page.immersive .editor-toolbar {
@@ -537,6 +634,13 @@ export class JournalEditorComponent implements OnInit {
 
   lightboxUrl = signal<string | null>(null);
 
+  /** Read once, so the prompt and its dismissal agree on which day this is. */
+  private readonly today = new Date();
+  private readonly bodyTextarea = viewChild<ElementRef<HTMLTextAreaElement>>('bodyTextarea');
+  readonly promptVisible = signal(false);
+  readonly promptOffset = signal(0);
+  readonly prompt = computed(() => promptForDay(this.today, this.promptOffset()));
+
   constructor(
     private svc: JournalService,
     private route: ActivatedRoute,
@@ -548,6 +652,8 @@ export class JournalEditorComponent implements OnInit {
     this.editId = this.route.snapshot.paramMap.get('id');
     this.forDate = this.route.snapshot.queryParamMap.get('date');
     this.groupId = this.route.snapshot.queryParamMap.get('group');
+    // A prompt is only useful on a blank page, never when revising an old entry.
+    this.promptVisible.set(!this.editId && !promptDismissedOn(this.today));
     this.svc.listCollections().subscribe(c => this.collections.set(c));
 
     if (this.editId) {
@@ -566,6 +672,17 @@ export class JournalEditorComponent implements OnInit {
       });
     }
   }
+
+  /** Next prompt in the list. The aria-live copy announces the change. */
+  shufflePrompt() { this.promptOffset.update(o => o + 1); }
+
+  dismissPrompt() {
+    try { localStorage.setItem(PROMPT_DISMISSED_KEY, localDateKey(this.today)); } catch { /* storage unavailable */ }
+    this.promptVisible.set(false);
+  }
+
+  /** Tapping the question drops the caret straight into the entry. */
+  focusBody() { this.bodyTextarea()?.nativeElement.focus(); }
 
   addTag(e: Event) {
     e.preventDefault();
@@ -708,4 +825,13 @@ export class JournalEditorComponent implements OnInit {
     const d = new Date(this.forDate + 'T12:00:00');
     return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
   }
+}
+
+/**
+ * True only when the prompt was dismissed on this same local day, so yesterday's
+ * dismissal does not silence today's prompt. Storage throws in private windows,
+ * where the prompt simply shows again.
+ */
+function promptDismissedOn(today: Date): boolean {
+  try { return localStorage.getItem(PROMPT_DISMISSED_KEY) === localDateKey(today); } catch { return false; }
 }
