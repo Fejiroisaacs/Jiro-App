@@ -7,6 +7,7 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
+    "build:sitemap": "node scripts/build-sitemap.mjs",
     "check:css": "node scripts/check-css-vars.mjs",
     "icons": "node scripts/build-icons.mjs"
   },
