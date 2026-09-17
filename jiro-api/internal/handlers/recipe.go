@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/rs/zerolog/log"
 )
 
 type RecipeHandler struct {
@@ -290,6 +291,7 @@ func (h *RecipeHandler) CookStreak(c *gin.Context) {
 
 	streak, err := h.recipeService.GetCookStreak(c.Request.Context(), userID)
 	if err != nil {
+		log.Error().Err(err).Msg("Failed to compute cook streak")
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to compute cook streak"},
 		})
