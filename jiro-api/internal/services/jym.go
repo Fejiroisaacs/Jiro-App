@@ -627,6 +627,14 @@ func (s *JymService) ReplaceRoutineItems(ctx context.Context, userID, routineID 
 		return nil, err
 	}
 
+	for _, item := range items {
+		if owned, err := s.ownsExercise(ctx, item.ExerciseID, userID); err != nil {
+			return nil, err
+		} else if !owned {
+			return nil, ErrExerciseNotFound
+		}
+	}
+
 	for i, item := range items {
 		sets := item.TargetSets
 		if sets == 0 {
@@ -684,6 +692,39 @@ func (s *JymService) ReplaceRoutineItems(ctx context.Context, userID, routineID 
 
 // ─── Sessions ─────────────────────────────────────────────────────────────────
 
+// ownsExercise reports whether the exercise belongs to the caller. Exercise,
+// routine and series ids arrive in request bodies and are attacker-chosen; the
+// reads that follow join these tables without an owner predicate, so an
+// unchecked id reflects another user's exercise or routine name back.
+func (s *JymService) ownsExercise(ctx context.Context, exerciseID, userID uuid.UUID) (bool, error) {
+	var ok bool
+	err := s.db.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM exercises WHERE id = $1 AND user_id = $2)`,
+		exerciseID, userID,
+	).Scan(&ok)
+	return ok, err
+}
+
+// ownsRoutine reports whether the routine belongs to the caller. routines.user_id
+// is NOT NULL and covers standalone templates as well as split-owned routines.
+func (s *JymService) ownsRoutine(ctx context.Context, routineID, userID uuid.UUID) (bool, error) {
+	var ok bool
+	err := s.db.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM routines WHERE id = $1 AND user_id = $2)`,
+		routineID, userID,
+	).Scan(&ok)
+	return ok, err
+}
+
+func (s *JymService) ownsSeries(ctx context.Context, seriesID, userID uuid.UUID) (bool, error) {
+	var ok bool
+	err := s.db.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM split_series WHERE id = $1 AND user_id = $2)`,
+		seriesID, userID,
+	).Scan(&ok)
+	return ok, err
+}
+
 func (s *JymService) StartSession(ctx context.Context, userID uuid.UUID, req *models.CreateSessionRequest) (*models.StartSessionResponse, error) {
 	// A caller that sends no session_type gets "normal", the column default,
 	// exactly as before.
@@ -693,6 +734,21 @@ func (s *JymService) StartSession(ctx context.Context, userID uuid.UUID, req *mo
 	}
 	if !validSessionTypes[sessionType] {
 		return nil, ErrInvalidSessionType
+	}
+
+	if req.RoutineID != nil {
+		if owned, err := s.ownsRoutine(ctx, *req.RoutineID, userID); err != nil {
+			return nil, err
+		} else if !owned {
+			return nil, ErrRoutineNotFound
+		}
+	}
+	if req.SeriesID != nil {
+		if owned, err := s.ownsSeries(ctx, *req.SeriesID, userID); err != nil {
+			return nil, err
+		} else if !owned {
+			return nil, ErrSeriesNotFound
+		}
 	}
 
 	sess := &models.StartSessionResponse{}
@@ -1041,6 +1097,12 @@ func (s *JymService) LogSet(ctx context.Context, userID, sessionID uuid.UUID, re
 	).Scan(&bestWeight, &bestReps)
 	isPR = req.Weight > bestWeight ||
 		(req.Weight == bestWeight && req.RepsPerformed > bestReps)
+
+	if owned, err := s.ownsExercise(ctx, req.ExerciseID, userID); err != nil {
+		return nil, err
+	} else if !owned {
+		return nil, ErrExerciseNotFound
+	}
 
 	set := &models.SessionSet{}
 	err := s.db.QueryRow(ctx,
@@ -1466,6 +1528,26 @@ func (s *JymService) DeleteSeries(ctx context.Context, userID, seriesID uuid.UUI
 
 // StreamSessionsCSV writes a CSV of all session sets for the user directly to w.
 // Optional from/to filter by session start date (inclusive). Optional exerciseID narrows to one exercise.
+// csvSafe neutralises spreadsheet formula injection. Excel, LibreOffice and
+// Sheets treat a cell beginning with =, +, -, @, tab or CR as a formula, and
+// encoding/csv only quotes on comma, quote and newline — so a crafted name is
+// written bare and executes (DDE, cmd|) or exfiltrates via WEBSERVICE() when
+// the victim opens their own export.
+//
+// This is reachable across accounts: ImportShare and ImportPublicSplit copy the
+// source user's routine and exercise names into the importer's rows, so a
+// weaponised public split lands in someone else's CSV.
+func csvSafe(v string) string {
+	if v == "" {
+		return v
+	}
+	switch v[0] {
+	case '=', '+', '-', '@', '	', '':
+		return "'" + v
+	}
+	return v
+}
+
 func (s *JymService) StreamSessionsCSV(ctx context.Context, userID uuid.UUID, from, to *time.Time, exerciseID *uuid.UUID, w io.Writer) error {
 	args := []interface{}{userID}
 	where := "WHERE s.user_id = $1"
@@ -1539,9 +1621,9 @@ func (s *JymService) StreamSessionsCSV(ctx context.Context, userID uuid.UUID, fr
 		_ = cw.Write([]string{
 			date.Format("2006-01-02"),
 			sessionID.String(),
-			routine,
-			exercise,
-			muscleGroup,
+			csvSafe(routine),
+			csvSafe(exercise),
+			csvSafe(muscleGroup),
 			strconv.Itoa(setNum),
 			fmt.Sprintf("%.2f", weight),
 			strconv.Itoa(reps),

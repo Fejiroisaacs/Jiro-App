@@ -168,6 +168,20 @@ func (s *MealPlanService) AddEntry(ctx context.Context, userID uuid.UUID, planID
 			return nil, errors.New("invalid recipe_id")
 		}
 		recipeID = &id
+
+		// The recipe id comes from the request body; without this check a
+		// caller can pin another user's recipe into their plan and read its
+		// title back from the listing.
+		var owned bool
+		if err := s.db.QueryRow(ctx,
+			`SELECT EXISTS(SELECT 1 FROM recipes WHERE id = $1 AND user_id = $2)`,
+			id, userID,
+		).Scan(&owned); err != nil {
+			return nil, err
+		}
+		if !owned {
+			return nil, ErrNotOwner
+		}
 	}
 
 	// Determine position (append after existing entries in same day+slot)
@@ -193,7 +207,7 @@ func (s *MealPlanService) AddEntry(ctx context.Context, userID uuid.UUID, planID
 	// Fetch recipe title if linked
 	if entry.RecipeID != nil {
 		var title string
-		_ = s.db.QueryRow(ctx, "SELECT title FROM recipes WHERE id = $1", *entry.RecipeID).Scan(&title)
+		_ = s.db.QueryRow(ctx, "SELECT title FROM recipes WHERE id = $1 AND user_id = $2", *entry.RecipeID, userID).Scan(&title)
 		entry.RecipeTitle = &title
 	}
 

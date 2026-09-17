@@ -291,13 +291,41 @@ func (s *AuthService) ConsumePasswordReset(ctx context.Context, rawToken, newPas
 		return ErrTokenExpired
 	}
 
-	// Mark token as used
-	s.db.Exec(ctx, "UPDATE password_resets SET used_at = NOW() WHERE token_hash = $1", tokenHash)
+	// One transaction, so a token cannot be consumed twice and a password
+	// cannot change without the matching session revocation.
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
 
-	// Update password
-	_, err = s.db.Exec(ctx,
+	// Claim the token atomically: the used_at IS NULL predicate is what makes
+	// this single-use. The earlier read is only for the expiry check, and two
+	// concurrent requests would both pass it.
+	claim, err := tx.Exec(ctx,
+		"UPDATE password_resets SET used_at = NOW() WHERE token_hash = $1 AND used_at IS NULL",
+		tokenHash,
+	)
+	if err != nil {
+		return err
+	}
+	if claim.RowsAffected() == 0 {
+		return ErrInvalidToken
+	}
+
+	if _, err = tx.Exec(ctx,
 		"UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2",
 		newPasswordHash, userID,
-	)
-	return err
+	); err != nil {
+		return err
+	}
+
+	// Someone resetting their password after a compromise expects it to end the
+	// attacker's session. Without this the stolen refresh token stays live for
+	// its full 7 days and keeps minting access tokens.
+	if _, err = tx.Exec(ctx, "DELETE FROM refresh_tokens WHERE user_id = $1", userID); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
 }

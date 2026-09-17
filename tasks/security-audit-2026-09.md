@@ -98,44 +98,44 @@ runs in debug mode dumping the route table at boot.
       short-lived signed GETs.
 
 ### Remaining ownership gaps
-- [ ] **2.3** `handlers/recipe.go:457-483` — `GetCollectionRecipeIDs` never reads `user_id` from context.
+- [x] **2.3** `handlers/recipe.go:457-483` — `GetCollectionRecipeIDs` never reads `user_id` from context.
       The only handler in the codebase that does no ownership check at all.
-- [ ] **2.4** `handlers/upload.go:580-648` and `handlers/journal.go:243-270` — the *confirm* steps check
+- [x] **2.4** `handlers/upload.go:580-648` and `handlers/journal.go:243-270` — the *confirm* steps check
       only the key prefix (which contains the caller's own ID, so it is trivially satisfiable) while the
       *presign* steps correctly verify ownership. Re-verify session/entry ownership in both confirms.
-- [ ] **2.5** Nested writes trust a foreign key from the body without checking its owner:
+- [x] **2.5** Nested writes trust a foreign key from the body without checking its owner:
       `services/jym.go:687-739` (`routine_id`, `series_id`), `jym.go:1046-1050` (`exercise_id`),
       `jym.go:639-643`, `services/meal_plan.go:150-198` (`recipe_id`),
       `services/ledger.go:344-353` (`account_id`, `category_id`), `ledger.go:759-767`.
       Copy the pattern already used correctly in `ledger.go:389-398` (`createTransfer`).
-- [ ] **2.6** `handlers/journal.go:405-445` — `InviteMember` allows any *member* to invite, but the UI
+- [x] **2.6** `handlers/journal.go:405-445` — `InviteMember` allows any *member* to invite, but the UI
       gates invites on ownership (`journal-group.ts:218-237`). Align the two: add the owner check server-side.
 
 ### Output encoding
-- [ ] **2.7** `services/jym.go:1539-1544` — CSV formula injection. `routine`, `exercise`, `muscleGroup`
+- [x] **2.7** `services/jym.go:1539-1544` — CSV formula injection. `routine`, `exercise`, `muscleGroup`
       are free text written unescaped. **Cross-user**: `jym.go:1723-1733` copies foreign `r.name` / `e.name`
       on import, so a weaponised public split reaches a victim's export. Prefix any cell starting with
       `= + - @` tab or CR with `'`.
-- [ ] **2.8** `handlers/journal.go:453-455` — `group.Name` is interpolated into invite-email HTML unescaped,
+- [x] **2.8** `handlers/journal.go:453-455` — `group.Name` is interpolated into invite-email HTML unescaped,
       and the email goes to any address the inviter types. That is branded phishing from your own sending
       domain. `html.EscapeString` it, and make `buildEmailHTML` (`auth.go:403`) escape too.
-- [ ] **2.9** 12 handler sites return raw `err.Error()` (unwrapped pgx errors) to clients — 3 on 500 paths
+- [x] **2.9** 12 handler sites return raw `err.Error()` (unwrapped pgx errors) to clients — 3 on 500 paths
       (`meal_plan.go:36,64,90`), 9 on 4xx catch-alls (`ledger.go` ×5, `journal.go:479,482`, `auth.go:85`,
       `user.go:108`). Add a `respondInternal(c, err)` helper that logs server-side and returns a fixed message.
 
 ### Platform
-- [ ] **2.10** `firebase.json` — no `headers` block at all. The origin that holds the access token in
+- [x] **2.10** *(already done by you in `aa62610`, during the audit — finding was stale.)* `firebase.json` — no `headers` block at all. The origin that holds the access token in
       `localStorage` has no CSP, no `X-Frame-Options`, no `nosniff`, no `Referrer-Policy`.
       (The API sets all of these correctly; the frontend never got its policy.)
-- [ ] **2.11** Create `jiro-api/.dockerignore` with `.env`, `*.exe`, `.git`. `COPY . .` currently bakes the
+- [x] **2.11** Create `jiro-api/.dockerignore` with `.env`, `*.exe`, `.git`. `COPY . .` currently bakes the
       live `.env` — R2 keys, Resend key, JWT secret — into the builder layer. Final image is clean
       (multi-stage), but the builder layer persists in BuildKit/registry cache.
-- [ ] **2.12** `jiro-api/Dockerfile` — add `RUN adduser -D -u 10001 app` + `USER app`; the container runs as root.
-- [ ] **2.13** `services/auth.go:294-302` — password reset never revokes sessions. `RevokeAllUserTokens`
+- [x] **2.12** `jiro-api/Dockerfile` — add `RUN adduser -D -u 10001 app` + `USER app`; the container runs as root.
+- [x] **2.13** `services/auth.go:294-302` — password reset never revokes sessions. `RevokeAllUserTokens`
       exists at `auth.go:186` and is **never called**. A user resetting after a compromise leaves the
       attacker's 7-day refresh token live. Also wrap the three `Exec`s in one transaction — the
       read-then-write on `used_at` (auth.go:286) is a TOCTOU that lets two requests consume one token.
-- [ ] **2.14** `handlers/recipe.go:582-586` — unauthenticated `/culinara/discover` honours `?limit=10000000`.
+- [x] **2.14** `handlers/recipe.go:582-586` — unauthenticated `/culinara/discover` honours `?limit=10000000`.
       Clamp to 100. The pool is 10 connections and the route allows 60 req/min/IP.
 - [ ] **2.15** `npm audit` — 39 vulnerabilities (1 critical, 22 high). Most are dev-only, but
       `@angular/core`, `@angular/common` and `@angular/compiler` are **runtime** deps with open XSS
@@ -228,7 +228,53 @@ not the documented fifteen minutes. `.env` also sets `JWT_REFRESH_TTL_MINUTES`, 
 
 ---
 
-## Review
+## Review — P2
+
+**P2 landed 2026-09-17.** 12 of 15 items done (2.10 turned out to be already done by
+you). 2.1 and 2.2 remain open because both are decisions, not patches. 2.15 is a
+dependency upgrade, handled separately.
+
+Verified by an 11-case smoke test (`scratchpad/p2-smoke.ps1`), plus the P1 suite re-run
+clean as a regression check — 21 assertions green in total. `go vet` clean.
+
+| Check | Before | After |
+|---|---|---|
+| read another user's collection recipe-ids | full contents | empty set |
+| transaction against another user's account | silently no-opped the balance | 404 |
+| transaction / budget with another user's category | accepted | 404 |
+| log a set against another user's exercise | reflected their exercise name | 404 |
+| start a session on another user's routine | returned their exercise list | 404 |
+| pin another user's recipe into a plan | accepted, leaked title | 403 |
+| confirm-attach to another user's session | accepted | 404 |
+| unauthenticated `discover?limit=10000000` | honoured | capped at 100 |
+| own-resource equivalents of all the above | worked | still work |
+
+Container: builds clean, runs as uid 10001, and neither `.env` nor `*.exe` appears in
+the builder stage or the final image (both verified by inspecting the built images).
+Alpine went 3.19 → 3.22; 3.19 is past its supported window.
+
+**Notes on what changed beyond the listed items:**
+
+- Several handlers had no mapping for the errors these checks now return, so the first
+  test run produced 500s and 400s where 404 was right. `StartSession`, `LogSet` and
+  `ReplaceRoutineItems` now map the ownership sentinels explicitly. Worth noting that
+  the *security* behaviour was correct on the first run — the requests were rejected —
+  but a 500 on a foreign id is itself a signal, so the mapping matters.
+- 2.9 was scoped down deliberately. The ~57 `err.Error()` sites after `ShouldBindJSON`
+  are validator output naming the offending request field; they are useful to a real
+  client and leak nothing. Only the service-layer catch-alls, which return unwrapped
+  pgx errors carrying table and constraint names, were routed through the new
+  `respondInternal` helper in `handlers/errors.go`.
+- 2.13 grew a transaction. The three separate `Exec`s meant a password could change
+  without its session revocation landing, and the read-then-write on `used_at` let two
+  concurrent requests consume one token. Single-use is now enforced by
+  `WHERE used_at IS NULL` and `RowsAffected`, not by the earlier read.
+
+**Still open:** 2.1 and 2.2 (both need your decision), 2.15 (dependency upgrade).
+
+---
+
+## Review — P1
 
 **P1 landed 2026-09-17.** 12 of 13 items done; 1.7 deferred. Verified by a 10-case
 smoke test (`scratchpad/p1-smoke.ps1`), all passing, plus `go vet` clean and a clean

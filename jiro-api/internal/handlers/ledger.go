@@ -173,9 +173,19 @@ func (h *LedgerHandler) CreateTransaction(c *gin.Context) {
 	tx, err := h.svc.CreateTransaction(c.Request.Context(), userID, &req)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to create ledger transaction")
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "BAD_REQUEST", Message: err.Error()},
-		})
+		if errors.Is(err, services.ErrAccountNotFound) {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{
+				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Account not found"},
+			})
+			return
+		}
+		if errors.Is(err, services.ErrCategoryNotFound) {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{
+				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Category not found"},
+			})
+			return
+		}
+		respondInternal(c, err, "ledger request failed")
 		return
 	}
 	c.JSON(http.StatusCreated, tx)
@@ -271,9 +281,19 @@ func (h *LedgerHandler) UpdateTransaction(c *gin.Context) {
 			return
 		}
 		log.Error().Err(err).Msg("Failed to update ledger transaction")
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "BAD_REQUEST", Message: err.Error()},
-		})
+		if errors.Is(err, services.ErrAccountNotFound) {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{
+				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Account not found"},
+			})
+			return
+		}
+		if errors.Is(err, services.ErrCategoryNotFound) {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{
+				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Category not found"},
+			})
+			return
+		}
+		respondInternal(c, err, "ledger request failed")
 		return
 	}
 	c.JSON(http.StatusOK, tx)
@@ -425,9 +445,19 @@ func (h *LedgerHandler) CreateBudget(c *gin.Context) {
 	budget, err := h.svc.CreateBudget(c.Request.Context(), userID, &req)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to create ledger budget")
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "BAD_REQUEST", Message: err.Error()},
-		})
+		if errors.Is(err, services.ErrAccountNotFound) {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{
+				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Account not found"},
+			})
+			return
+		}
+		if errors.Is(err, services.ErrCategoryNotFound) {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{
+				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Category not found"},
+			})
+			return
+		}
+		respondInternal(c, err, "ledger request failed")
 		return
 	}
 	c.JSON(http.StatusCreated, budget)
@@ -491,9 +521,19 @@ func (h *LedgerHandler) GetSummary(c *gin.Context) {
 	summary, err := h.svc.GetSummary(c.Request.Context(), userID, month)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to get ledger summary")
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "BAD_REQUEST", Message: err.Error()},
-		})
+		if errors.Is(err, services.ErrAccountNotFound) {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{
+				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Account not found"},
+			})
+			return
+		}
+		if errors.Is(err, services.ErrCategoryNotFound) {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{
+				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Category not found"},
+			})
+			return
+		}
+		respondInternal(c, err, "ledger request failed")
 		return
 	}
 	c.JSON(http.StatusOK, summary)
@@ -527,9 +567,19 @@ func (h *LedgerHandler) CreateSnapshot(c *gin.Context) {
 	snap, err := h.svc.CreateSnapshot(c.Request.Context(), userID, &req)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to create net worth snapshot")
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "BAD_REQUEST", Message: err.Error()},
-		})
+		if errors.Is(err, services.ErrAccountNotFound) {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{
+				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Account not found"},
+			})
+			return
+		}
+		if errors.Is(err, services.ErrCategoryNotFound) {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{
+				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Category not found"},
+			})
+			return
+		}
+		respondInternal(c, err, "ledger request failed")
 		return
 	}
 	c.JSON(http.StatusCreated, snap)

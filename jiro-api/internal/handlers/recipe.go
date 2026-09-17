@@ -455,6 +455,7 @@ func (h *RecipeHandler) RemoveFromCollection(c *gin.Context) {
 }
 
 func (h *RecipeHandler) GetCollectionRecipeIDs(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
 	collectionID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
@@ -463,7 +464,7 @@ func (h *RecipeHandler) GetCollectionRecipeIDs(c *gin.Context) {
 		return
 	}
 
-	ids, err := h.recipeService.GetCollectionRecipeIDs(c.Request.Context(), collectionID)
+	ids, err := h.recipeService.GetCollectionRecipeIDs(c.Request.Context(), userID, collectionID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to get recipe IDs"},
@@ -580,7 +581,9 @@ func (h *RecipeHandler) ListPublicRecipes(c *gin.Context) {
 	limit := 20
 	offset := 0
 	if l := c.Query("limit"); l != "" {
-		if v, err := strconv.Atoi(l); err == nil && v > 0 {
+		// Unauthenticated endpoint on a 10-connection pool: cap the ceiling,
+		// not just the floor.
+		if v, err := strconv.Atoi(l); err == nil && v > 0 && v <= 100 {
 			limit = v
 		}
 	}

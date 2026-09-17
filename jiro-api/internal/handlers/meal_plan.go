@@ -33,7 +33,7 @@ func (h *MealPlanHandler) GetOrCreate(c *gin.Context) {
 
 	plan, err := h.service.GetOrCreatePlan(c.Request.Context(), userID, weekStart)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternal(c, err, "meal plan request failed")
 		return
 	}
 	c.JSON(http.StatusOK, plan)
@@ -61,7 +61,7 @@ func (h *MealPlanHandler) AddEntry(c *gin.Context) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternal(c, err, "meal plan request failed")
 		return
 	}
 	c.JSON(http.StatusCreated, entry)
@@ -87,7 +87,7 @@ func (h *MealPlanHandler) RemoveEntry(c *gin.Context) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondInternal(c, err, "meal plan request failed")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "deleted"})

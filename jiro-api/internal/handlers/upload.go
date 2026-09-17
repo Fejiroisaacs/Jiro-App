@@ -600,6 +600,16 @@ func (h *UploadHandler) ConfirmSessionAttachment(c *gin.Context) {
 		return
 	}
 
+	// The prefix embeds the caller's own id, so it proves nothing about the
+	// session. Re-verify ownership here as the presign step does — otherwise
+	// confirm can be called directly to attach content to another user's session.
+	if _, err := h.jymService.GetSession(c.Request.Context(), userID, sessionID); err != nil {
+		c.JSON(http.StatusNotFound, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Session not found"},
+		})
+		return
+	}
+
 	// Validate key prefix
 	expectedPrefix := "sessions/" + userID.String() + "/" + sessionID.String() + "/"
 	if !strings.HasPrefix(req.ObjectKey, expectedPrefix) {

@@ -574,10 +574,12 @@ func (s *RecipeService) RemoveFromCollection(ctx context.Context, userID, collec
 	return err
 }
 
-func (s *RecipeService) GetCollectionRecipeIDs(ctx context.Context, collectionID uuid.UUID) ([]uuid.UUID, error) {
+func (s *RecipeService) GetCollectionRecipeIDs(ctx context.Context, userID, collectionID uuid.UUID) ([]uuid.UUID, error) {
 	rows, err := s.db.Query(ctx,
-		"SELECT recipe_id FROM recipe_collection_items WHERE collection_id = $1",
-		collectionID,
+		`SELECT ci.recipe_id FROM recipe_collection_items ci
+		 JOIN recipe_collections c ON c.id = ci.collection_id
+		 WHERE ci.collection_id = $1 AND c.user_id = $2`,
+		collectionID, userID,
 	)
 	if err != nil {
 		return nil, err

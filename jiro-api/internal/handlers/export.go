@@ -702,7 +702,7 @@ func (h *ExportHandler) gatherCulinara(ctx context.Context, userID uuid.UUID) (e
 		return out, err
 	}
 	for _, col := range collections {
-		ids, err := h.recipeService.GetCollectionRecipeIDs(ctx, col.ID)
+		ids, err := h.recipeService.GetCollectionRecipeIDs(ctx, userID, col.ID)
 		if err != nil {
 			return out, err
 		}
