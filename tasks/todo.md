@@ -384,19 +384,27 @@ build clean.
       Slack, iMessage, LinkedIn or Facebook, which do not — so shared links
       still preview bare. A working `app.config.server.ts` is parked in the
       session scratchpad under `parked-prerender/`.
-- [ ] **robots.txt, sitemap.xml, the Open Graph image, `firebase.json` caching
-      and security headers, service-worker versioning.** Not started. Note
-      `index.html` currently returns `Cache-Control: max-age=3600`, so a deploy
-      takes up to an hour to reach returning visitors. `index.html` references
-      `/images/og/jiro-og.png`, which **does not exist yet**.
-- [ ] **API `no-store` on authenticated responses, and a CSP.** Not started.
-      The API still sets no caching directive on anything, including endpoints
-      returning full financial and journal history.
+- [x] **robots.txt, sitemap.xml and the Open Graph image.** `b1700bc`. The
+      first two used to return HTML; static files beat the SPA rewrite, so
+      adding them is the whole fix. The sitemap is generated and prefers the
+      prerender output, so it cannot advertise a URL the build did not make.
+      The card is 1200x630, 91 kB, composed from the real dashboard.
+- [x] **API `no-store` on authenticated responses, plus a policy and HSTS
+      preload.** `990f44c`. Verified against live responses.
+- [x] **Firebase caching and security headers, and the service worker.**
+      `aa62610`. `index.html` is no-cache, hashed bundles immutable, images a
+      week. The CSP is **Report-Only on purpose**: it cannot be verified
+      without deploying, so deploy, read the console, and rename the key to
+      enforce if nothing is reported. The worker now splits assets by whether
+      their filename can go stale, so nothing needs a version bump.
 - [ ] **Remaining accessibility sweep**: the three Jym container pages, the
       session player and the share-preview error branch still render no `h1`;
       two icon-only controls still have no accessible name; the wrong-tab links
       still land on Splits; `jiro-card` with `routerLink` is still
       keyboard-unreachable on the recipe grids.
+
+One thing to do on the next deploy: the CSP above is Report-Only and wants
+one look at the browser console before it is switched to enforcing.
 
 Nine agents were launched for this; two finished, one finished its files before
 dying, and six were killed mid-task by a monthly spend limit. Everything above
