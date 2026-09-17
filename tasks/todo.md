@@ -314,3 +314,93 @@ untouched on purpose: too large to start unattended.
 Docker Desktop stopped partway through verification, taking Postgres, the API
 and the dev server with it. I restarted the stack and re-ran everything
 affected; no result above predates that restart.
+
+## SEO and web quality (in progress)
+
+Plan: `~/.claude/plans/jaunty-rolling-dream.md`. Audited first, because several
+of the eighteen requested items turned out to be already done, already true, or
+impossible as stated.
+
+**The audit's headline findings.** The app is live on Firebase Hosting at
+`jiro-app-3e88c.web.app`. It is a pure client-rendered SPA, so every URL
+returned the same 8.8 kB shell whose head held a bare `<title>Jiro</title>` and
+nothing else. `/robots.txt` and `/sitemap.xml` returned HTML, because the SPA
+catch-all rewrite served them. Two findings sat outside the brief: the `/admin`
+tree had **no route guard at all**, and the two pages the API already serves
+anonymously (`culinara/discover`, `jym/public-splits`) were behind the auth
+guard, which made the chosen indexing policy impossible.
+
+### Done and verified
+
+- [x] **Admin routes guarded.** `7286b44`. Signed out, `/admin/users` now
+      redirects instead of rendering the shell.
+- [x] **Bootstrap safe without a browser, auth off the critical path.**
+      `699d174`. Also closed a double-refresh race that would have logged real
+      users out.
+- [x] **Per-route titles, descriptions, canonicals, Open Graph, Twitter,
+      JSON-LD, and a noindex policy.** `ecae20b`. Indexing is opt-in: five
+      routes are indexable, fifty-two are not. Share links stay out.
+- [x] **The two discover pages opened to visitors**, with the shell offering a
+      signup rather than an empty account menu.
+- [x] **Slug fixes with redirects**: `/ledger/net-worth`, `/culinara/grocery-list`.
+- [x] **Canonicals on the two duplicate URLs.**
+- [x] **Image weight**: `143b7d6`. `public/images` from 24,637,044 to 340,472
+      bytes, a 98.6% cut. Seven orphaned PNGs that shipped in every build are
+      gone. Every guide image now declares its dimensions.
+- [x] **`@angular/animations` removed entirely**, replaced with CSS keyframes.
+      Both providers for that API are deprecated as of 20.2 with removal in v23.
+      Initial bundle 386.97 kB to 330.67 kB raw, 109.25 kB to 94.25 kB transfer.
+- [x] **Landing page**: hero CTA is a real keyboard-reachable link, pillars no
+      longer skip a heading level, decorative icons no longer announce the
+      heading twice. `41f40d7`.
+- [x] **Journal photos and the editor**: real alt text, one `h1`, dimensions.
+      `41f40d7`, `be06477`.
+
+Verification: 17 anonymous-crawl checks passing (`scratchpad/verify-routes.sh`),
+production build inside budget, `check:css` at zero undefined variables, Go
+build clean.
+
+### Already true before this work, no change needed
+
+- **Enforce HTTPS.** Measured live: `http://` 301s to `https://`, and HSTS comes
+  back as `max-age=31556926; includeSubDomains; preload`. Firebase does it.
+- **Only one `h1` per page.** No page had more than one. The opposite problem
+  existed and is partly fixed above.
+- **Mobile responsiveness.** Rebuilt in phases 0 to 4. The real remaining
+  mobile defect was the unsized images, now fixed.
+- **Alt text present.** All 38 images had an `alt`; the work was correcting
+  wrong values, not adding missing ones.
+
+### Not done — blocked or not started
+
+- [ ] **Prerendering the public routes.** Blocked, and worth your attention.
+      `@angular/platform-server` pins exact peer versions, while `package.json`
+      uses caret ranges, so npm resolves `@angular/router` to 21.2.23 and
+      conflicts with the 21.2.4 tree on disk. Installing it therefore means
+      bumping the whole Angular tree, which is a framework upgrade to do with
+      you present. The two options are to pin every `@angular/*` to the 21.2.4
+      already installed, or to take the patch bump deliberately. Until this
+      lands, the head tags above help Google, which runs JavaScript, but **not**
+      Slack, iMessage, LinkedIn or Facebook, which do not — so shared links
+      still preview bare. A working `app.config.server.ts` is parked in the
+      session scratchpad under `parked-prerender/`.
+- [ ] **robots.txt, sitemap.xml, the Open Graph image, `firebase.json` caching
+      and security headers, service-worker versioning.** Not started. Note
+      `index.html` currently returns `Cache-Control: max-age=3600`, so a deploy
+      takes up to an hour to reach returning visitors. `index.html` references
+      `/images/og/jiro-og.png`, which **does not exist yet**.
+- [ ] **API `no-store` on authenticated responses, and a CSP.** Not started.
+      The API still sets no caching directive on anything, including endpoints
+      returning full financial and journal history.
+- [ ] **Remaining accessibility sweep**: the three Jym container pages, the
+      session player and the share-preview error branch still render no `h1`;
+      two icon-only controls still have no accessible name; the wrong-tab links
+      still land on Splits; `jiro-card` with `routerLink` is still
+      keyboard-unreachable on the recipe grids.
+
+Nine agents were launched for this; two finished, one finished its files before
+dying, and six were killed mid-task by a monthly spend limit. Everything above
+marked done was either theirs, verified by me, or finished by me afterwards.
+One agent left a template referencing methods it never wrote, which the type
+checker missed and only the Angular template compiler caught — worth
+remembering that `tsc --noEmit` does not check templates.
