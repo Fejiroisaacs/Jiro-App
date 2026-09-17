@@ -738,7 +738,23 @@ func (s *JymService) StartSession(ctx context.Context, userID uuid.UUID, req *mo
 	return sess, nil
 }
 
+// ListSessions returns the 50 most recent sessions, which is what every list
+// screen shows.
 func (s *JymService) ListSessions(ctx context.Context, userID uuid.UUID) ([]models.SessionSummary, error) {
+	limit := 50
+	return s.listSessions(ctx, userID, &limit)
+}
+
+// ListAllSessions returns every session the user has, for the account export.
+// An export that silently stopped at 50 would quietly lose history.
+func (s *JymService) ListAllSessions(ctx context.Context, userID uuid.UUID) ([]models.SessionSummary, error) {
+	return s.listSessions(ctx, userID, nil)
+}
+
+// listSessions is shared by both. A nil limit means no limit: Postgres treats
+// LIMIT NULL as LIMIT ALL, so the cap is a parameter rather than two copies of
+// the query or a string built at runtime.
+func (s *JymService) listSessions(ctx context.Context, userID uuid.UUID, limit *int) ([]models.SessionSummary, error) {
 	rows, err := s.db.Query(ctx,
 		`SELECT s.id, s.user_id, s.routine_id, s.series_id, s.session_type, s.started_at, s.ended_at, s.notes,
 		        r.name as routine_name,
@@ -753,8 +769,8 @@ func (s *JymService) ListSessions(ctx context.Context, userID uuid.UUID) ([]mode
 		 WHERE s.user_id = $1
 		 GROUP BY s.id, r.name
 		 ORDER BY s.started_at DESC
-		 LIMIT 50`,
-		userID,
+		 LIMIT $2`,
+		userID, limit,
 	)
 	if err != nil {
 		return nil, err
@@ -1171,13 +1187,25 @@ func (s *JymService) LogBodyWeight(ctx context.Context, userID uuid.UUID, req *m
 	return bw, nil
 }
 
+// ListBodyWeights returns the last year of entries, which is what the chart
+// plots.
 func (s *JymService) ListBodyWeights(ctx context.Context, userID uuid.UUID) ([]models.BodyWeight, error) {
+	limit := 365
+	return s.listBodyWeights(ctx, userID, &limit)
+}
+
+// ListAllBodyWeights returns every entry, for the account export.
+func (s *JymService) ListAllBodyWeights(ctx context.Context, userID uuid.UUID) ([]models.BodyWeight, error) {
+	return s.listBodyWeights(ctx, userID, nil)
+}
+
+func (s *JymService) listBodyWeights(ctx context.Context, userID uuid.UUID, limit *int) ([]models.BodyWeight, error) {
 	rows, err := s.db.Query(ctx,
 		`SELECT id, user_id, recorded_at, weight_kg, created_at
 		 FROM body_weights WHERE user_id = $1
 		 ORDER BY recorded_at DESC
-		 LIMIT 365`,
-		userID,
+		 LIMIT $2`,
+		userID, limit,
 	)
 	if err != nil {
 		return nil, err

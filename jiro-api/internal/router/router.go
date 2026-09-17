@@ -51,6 +51,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	mealPlanHandler := handlers.NewMealPlanHandler(mealPlanService)
 	uploadHandler := handlers.NewUploadHandler(storageService, userService, recipeService, jymService, journalService)
 	journalHandler := handlers.NewJournalHandler(journalService, emailService, storageService, cfg.AppBaseURL)
+	exportHandler := handlers.NewExportHandler(userService, jymService, recipeService, mealPlanService, journalService, ledgerService, db)
 
 	// Routes
 	v1 := r.Group("/api/v1")
@@ -115,6 +116,9 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 
 			// Feedback
 			protected.POST("/feedback", feedbackHandler.Submit)
+
+			// Account data export (expensive — tighter limit: 5/min per user)
+			protected.GET("/export/account.json", middleware.RateLimitByUser(rl, 5), exportHandler.ExportAccount)
 
 			// Culinara (Recipe Module)
 			culinara := protected.Group("/culinara")
