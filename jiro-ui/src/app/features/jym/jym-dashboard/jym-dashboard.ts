@@ -1,20 +1,27 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
 
 import { Router, RouterLink } from '@angular/router';
 import { JymService, Split, SplitSeriesSummary, SessionSummary, Routine } from '../../../core/services/jym.service';
 import { ConfirmService } from '../../../core/services/confirm.service';
+import { SettingsService } from '../../../core/services/settings.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
+import { suggestDeload } from '../deload-rule';
+
+/** Snooze stamp for the deload suggestion: the epoch ms of the last "Not now". */
+const DELOAD_SNOOZED_KEY = 'jiro_jym_deload_snoozed';
+const DELOAD_SNOOZE_DAYS = 7;
 
 @Component({
   selector: 'app-jym-dashboard',
   standalone: true,
   imports: [
-    RouterLink, JiroButtonComponent, JiroModalComponent, JiroIconComponent,
+    RouterLink, DecimalPipe, JiroButtonComponent, JiroModalComponent, JiroIconComponent,
     JiroPageHeaderComponent, JiroEmptyStateComponent,
   ],
   template: `
@@ -25,6 +32,29 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
           Freestyle session
         </jiro-button>
       </jiro-page-header>
+
+      <!-- Deload suggestion -->
+      @if (deloadSuggestion(); as d) {
+        <section class="deload-card" aria-labelledby="deload-heading">
+          <div class="deload-info">
+            <h2 class="deload-heading" id="deload-heading">Time for a lighter week?</h2>
+            <p class="deload-note">
+              Volume is down {{ d.dropPercent | number:'1.0-1' }}% across your last {{ d.sessionCount }} sessions,
+              {{ settingsService.toDisplay(d.olderMeanVolume) | number:'1.0-0' }} to
+              {{ settingsService.toDisplay(d.newerMeanVolume) | number:'1.0-0' }} {{ settingsService.unitLabel() }} a session,
+              and none of them set a PR.
+            </p>
+          </div>
+          <div class="deload-actions">
+            <jiro-button variant="primary" type="button" [loading]="startingDeload()" (click)="startDeloadSession()">
+              Start next session as a deload
+            </jiro-button>
+            <jiro-button variant="secondary" type="button" (click)="snoozeDeload()">
+              Not now
+            </jiro-button>
+          </div>
+        </section>
+      }
 
       <!-- Activity Stats -->
       @if (hasCompletedSessions()) {
@@ -273,6 +303,32 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
     @media (max-width: 600px) {
     }
 
+    /* ── Deload suggestion ── */
+    .deload-card {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: var(--space-md); margin-bottom: var(--space-xl);
+      background: var(--bg-surface); border: 1px solid var(--border-color);
+      border-left: 3px solid var(--color-warning);
+      border-radius: var(--border-radius);
+      padding: var(--space-md) var(--space-lg);
+    }
+
+    .deload-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+
+    .deload-heading {
+      font-size: var(--font-size-md); font-weight: 600;
+      color: var(--text-primary); margin: 0;
+    }
+
+    .deload-note {
+      font-size: var(--font-size-sm); color: var(--text-secondary); margin: 0;
+    }
+
+    .deload-actions {
+      display: flex; align-items: center; gap: var(--space-sm);
+      flex-wrap: wrap; flex-shrink: 0;
+    }
+
     /* ── In Progress ── */
     .in-progress-section { margin-bottom: var(--space-xl); }
 
@@ -516,6 +572,14 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
 
       .asc-view-btn { padding: 0.3rem 0.6rem; font-size: 0.7rem; }
 
+      /* Stack the suggestion at phone width; the buttons go full width so the
+         long primary label never has to wrap or overflow at 360px. */
+      .deload-card {
+        flex-direction: column; align-items: stretch;
+        padding: var(--space-md);
+      }
+
+      .deload-actions { --jiro-btn-width: 100%; flex-direction: column; align-items: stretch; }
     }
   `]
 })
@@ -528,6 +592,18 @@ export class JymDashboardComponent implements OnInit {
   loading = signal(true);
 
   hasCompletedSessions = computed(() => this.allSessions().some(s => !!s.ended_at));
+
+  startingDeload = signal(false);
+  private readonly deloadSnoozed = signal(readDeloadSnoozed());
+
+  /**
+   * The deload suggestion, or null when the rule does not fire or the user
+   * said "Not now" inside the last week. The rule itself lives in
+   * ../deload-rule.ts; this only decides whether to show what it found.
+   */
+  readonly deloadSuggestion = computed(() =>
+    this.deloadSnoozed() ? null : suggestDeload(this.allSessions())
+  );
 
   heatmapDays = computed(() => {
     const sessions = this.allSessions();
@@ -590,6 +666,7 @@ export class JymDashboardComponent implements OnInit {
 
   private readonly confirmService = inject(ConfirmService);
   private readonly toast = inject(ToastService);
+  readonly settingsService = inject(SettingsService);
   showRoutinePicker = signal(false);
   loadingRoutines = signal(false);
   pickerRoutines = signal<{ id: string; name: string; day_order: number }[]>([]);
@@ -621,6 +698,27 @@ export class JymDashboardComponent implements OnInit {
     this.jymService.startSession({}).subscribe({
       next: s => this.router.navigate(['/jym/session', s.id]),
     });
+  }
+
+  /**
+   * Opens the next session already marked as a deload, so the player shows
+   * Deload selected without a second call.
+   */
+  startDeloadSession() {
+    this.startingDeload.set(true);
+    this.jymService.startSession({ session_type: 'deload' }).subscribe({
+      next: s => this.router.navigate(['/jym/session', s.id]),
+      error: () => {
+        this.startingDeload.set(false);
+        this.toast.error('Could not start the session.');
+      },
+    });
+  }
+
+  /** Quiets the suggestion for a week. A suggestion you cannot quiet is nagging. */
+  snoozeDeload() {
+    try { localStorage.setItem(DELOAD_SNOOZED_KEY, String(Date.now())); } catch { /* storage unavailable */ }
+    this.deloadSnoozed.set(true);
   }
 
   startFromTemplate(t: Routine) {
@@ -695,4 +793,16 @@ export class JymDashboardComponent implements OnInit {
     const days = Math.floor((Date.now() - new Date(sr.started_at).getTime()) / 86400000);
     return Math.floor(days / 7);
   }
+}
+
+/**
+ * True while a "Not now" from the last week still stands. Storage throws in a
+ * private window, and a missing or junk stamp reads as NaN, so both fall
+ * through to false: the suggestion shows rather than being silently lost.
+ */
+function readDeloadSnoozed(): boolean {
+  try {
+    const stamp = Number(localStorage.getItem(DELOAD_SNOOZED_KEY));
+    return stamp > 0 && Date.now() - stamp < DELOAD_SNOOZE_DAYS * 86400000;
+  } catch { return false; }
 }

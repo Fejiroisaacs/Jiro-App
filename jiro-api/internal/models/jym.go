@@ -293,6 +293,7 @@ type SessionSummary struct {
 	Session
 	RoutineName  *string  `json:"routine_name"`
 	SetCount     int      `json:"set_count"`
+	PRCount      int      `json:"pr_count"`
 	TotalVolume  float64  `json:"total_volume"`
 	MuscleGroups []string `json:"muscle_groups"`
 }
@@ -310,9 +311,13 @@ type SessionWithSets struct {
 	Attachments []SessionAttachment      `json:"attachments"`
 }
 
+// CreateSessionRequest optionally names the session type up front, so a
+// deliberate deload can be opened in one call instead of starting normal and
+// then patching it. Omitted means "normal", exactly as before.
 type CreateSessionRequest struct {
-	RoutineID *uuid.UUID `json:"routine_id"`
-	SeriesID  *uuid.UUID `json:"series_id"`
+	RoutineID   *uuid.UUID `json:"routine_id"`
+	SeriesID    *uuid.UUID `json:"series_id"`
+	SessionType *string    `json:"session_type" binding:"omitempty,oneof=normal deload test"`
 }
 
 type UpdateSessionRequest struct {

@@ -171,6 +171,8 @@ export interface Session {
 export interface SessionSummary extends Session {
   routine_name: string | null;
   set_count: number;
+  /** Sets flagged as a personal record in this session. */
+  pr_count: number;
   total_volume: number;
   muscle_groups: string[];
 }
@@ -226,7 +228,7 @@ export interface UpdateSplitRequest { name?: string; description?: string; visib
 export interface CreateRoutineRequest { name: string; day_order?: number; }
 export interface UpdateRoutineRequest { name?: string; day_order?: number; }
 export interface ReplaceItemEntry { exercise_id: string; target_sets: number; target_reps: number; }
-export interface CreateSessionRequest { routine_id?: string; series_id?: string; }
+export interface CreateSessionRequest { routine_id?: string; series_id?: string; session_type?: 'normal' | 'deload' | 'test'; }
 export interface UpdateSessionRequest { ended_at?: string; notes?: string; session_type?: string; }
 export interface CreateSetRequest { exercise_id: string; set_number: number; weight: number; reps_performed: number; rpe?: number; is_warmup?: boolean; exercise_note?: string; }
 export interface UpdateSetRequest { weight?: number; reps_performed?: number; rpe?: number; is_warmup?: boolean; exercise_note?: string; }

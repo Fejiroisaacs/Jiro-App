@@ -27,7 +27,18 @@ var (
 	ErrShareNotFound      = errors.New("share not found")
 	ErrShareExpired       = errors.New("share link has expired")
 	ErrShareForbidden     = errors.New("not your share link")
+
+	ErrInvalidSessionType = errors.New("session type must be normal, deload or test")
 )
+
+// validSessionTypes mirrors the sessions.session_type CHECK constraint
+// (migration 000007); rejecting here gives a clear error instead of a
+// constraint violation from the driver.
+var validSessionTypes = map[string]bool{
+	"normal": true,
+	"deload": true,
+	"test":   true,
+}
 
 type JymService struct {
 	db *pgxpool.Pool
@@ -674,12 +685,22 @@ func (s *JymService) ReplaceRoutineItems(ctx context.Context, userID, routineID 
 // ─── Sessions ─────────────────────────────────────────────────────────────────
 
 func (s *JymService) StartSession(ctx context.Context, userID uuid.UUID, req *models.CreateSessionRequest) (*models.StartSessionResponse, error) {
+	// A caller that sends no session_type gets "normal", the column default,
+	// exactly as before.
+	sessionType := "normal"
+	if req.SessionType != nil {
+		sessionType = *req.SessionType
+	}
+	if !validSessionTypes[sessionType] {
+		return nil, ErrInvalidSessionType
+	}
+
 	sess := &models.StartSessionResponse{}
 	err := s.db.QueryRow(ctx,
-		`INSERT INTO sessions (user_id, routine_id, series_id)
-		 VALUES ($1, $2, $3)
+		`INSERT INTO sessions (user_id, routine_id, series_id, session_type)
+		 VALUES ($1, $2, $3, $4)
 		 RETURNING id, user_id, routine_id, series_id, session_type, started_at, ended_at, notes`,
-		userID, req.RoutineID, req.SeriesID,
+		userID, req.RoutineID, req.SeriesID, sessionType,
 	).Scan(&sess.ID, &sess.UserID, &sess.RoutineID, &sess.SeriesID, &sess.SessionType, &sess.StartedAt, &sess.EndedAt, &sess.Notes)
 	if err != nil {
 		return nil, err
@@ -722,6 +743,7 @@ func (s *JymService) ListSessions(ctx context.Context, userID uuid.UUID) ([]mode
 		`SELECT s.id, s.user_id, s.routine_id, s.series_id, s.session_type, s.started_at, s.ended_at, s.notes,
 		        r.name as routine_name,
 		        COUNT(ss.id) as set_count,
+		        COUNT(ss.id) FILTER (WHERE ss.is_pr) AS pr_count,
 		        COALESCE(SUM(ss.weight * ss.reps_performed), 0) as total_volume,
 		        COALESCE(array_agg(DISTINCT e.muscle_group) FILTER (WHERE e.muscle_group IS NOT NULL), '{}'::text[]) as muscle_groups
 		 FROM sessions s
@@ -745,7 +767,7 @@ func (s *JymService) ListSessions(ctx context.Context, userID uuid.UUID) ([]mode
 		if err := rows.Scan(
 			&sess.ID, &sess.UserID, &sess.RoutineID, &sess.SeriesID, &sess.SessionType,
 			&sess.StartedAt, &sess.EndedAt, &sess.Notes,
-			&sess.RoutineName, &sess.SetCount, &sess.TotalVolume, &sess.MuscleGroups,
+			&sess.RoutineName, &sess.SetCount, &sess.PRCount, &sess.TotalVolume, &sess.MuscleGroups,
 		); err != nil {
 			return nil, err
 		}
