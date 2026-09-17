@@ -15,12 +15,12 @@ import (
 )
 
 var (
-	ErrAccountNotFound      = errors.New("account not found")
+	ErrAccountNotFound        = errors.New("account not found")
 	ErrAccountHasTransactions = errors.New("account has transactions and cannot be deleted")
-	ErrCategoryNotFound     = errors.New("category not found")
-	ErrBudgetNotFound       = errors.New("budget not found")
-	ErrTransactionNotFound  = errors.New("transaction not found")
-	ErrLedgerNotOwner       = errors.New("you do not own this resource")
+	ErrCategoryNotFound       = errors.New("category not found")
+	ErrBudgetNotFound         = errors.New("budget not found")
+	ErrTransactionNotFound    = errors.New("transaction not found")
+	ErrLedgerNotOwner         = errors.New("you do not own this resource")
 )
 
 type LedgerService struct {
@@ -1012,8 +1012,8 @@ func (s *LedgerService) GetComparison(ctx context.Context, userID uuid.UUID, aFr
 	}
 
 	return &models.ComparisonResponse{
-		PeriodA:    models.ComparisonPeriod{From: aFrom, To: aTo},
-		PeriodB:    models.ComparisonPeriod{From: bFrom, To: bTo},
+		PeriodA: models.ComparisonPeriod{From: aFrom, To: aTo},
+		PeriodB: models.ComparisonPeriod{From: bFrom, To: bTo},
 		Summary: models.ComparisonSummary{
 			Income:   mkVal(aIncome, bIncome),
 			Expenses: mkVal(aExpenses, bExpenses),

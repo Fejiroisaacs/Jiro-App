@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	ErrFeedbackNotFound  = errors.New("feedback not found")
+	ErrFeedbackNotFound    = errors.New("feedback not found")
 	ErrInvalidFeedbackType = errors.New("invalid feedback type")
 )
 
