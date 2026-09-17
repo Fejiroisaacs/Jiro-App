@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/models"
@@ -24,6 +25,7 @@ var (
 	ErrAlreadyGroupMember        = errors.New("already a member of this group")
 	ErrInvalidMood               = errors.New("invalid mood value")
 	ErrImageLimitReached         = errors.New("entry already has 3 images")
+	ErrInviteEmailMismatch       = errors.New("invite was sent to a different address")
 )
 
 var validMoods = map[string]bool{
@@ -82,6 +84,23 @@ func (s *JournalService) CreateEntry(ctx context.Context, userID uuid.UUID, grou
 	}
 	entry.Images = []models.JournalImage{}
 	return entry, nil
+}
+
+// CreateGroupEntry writes an entry into a shared group after confirming the
+// author may post there. The read paths already gate on membership; this is the
+// matching gate for the write path.
+func (s *JournalService) CreateGroupEntry(ctx context.Context, userID, groupID uuid.UUID, req *models.CreateJournalEntryRequest) (*models.JournalEntry, error) {
+	var ownerID uuid.UUID
+	if err := s.db.QueryRow(ctx, `SELECT owner_id FROM journal_groups WHERE id = $1`, groupID).Scan(&ownerID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotGroupMember
+		}
+		return nil, err
+	}
+	if ownerID != userID && !s.isActiveMember(ctx, groupID, userID) {
+		return nil, ErrNotGroupMember
+	}
+	return s.CreateEntry(ctx, userID, &groupID, req)
 }
 
 func (s *JournalService) GetEntry(ctx context.Context, userID, entryID uuid.UUID) (*models.JournalEntry, error) {
@@ -655,15 +674,20 @@ func (s *JournalService) IsMember(ctx context.Context, groupID, userID uuid.UUID
 	return exists, err
 }
 
-func (s *JournalService) AcceptInvite(ctx context.Context, rawToken string) (*models.JoinGroupResponse, error) {
+// AcceptInvite redeems an invite token on behalf of userID. The invite is bound
+// to the address it was sent to, and only the redeeming user's membership is
+// activated — an invite is not a key that opens the group for everyone holding
+// a pending row.
+func (s *JournalService) AcceptInvite(ctx context.Context, rawToken string, userID uuid.UUID) (*models.JoinGroupResponse, error) {
 	hash := sha256.Sum256([]byte(rawToken))
 	tokenHash := hex.EncodeToString(hash[:])
 
 	var inviteID, groupID uuid.UUID
+	var inviteEmail string
 	var expiresAt time.Time
 	err := s.db.QueryRow(ctx,
-		`SELECT id, group_id, expires_at FROM journal_group_invites WHERE token_hash = $1`, tokenHash,
-	).Scan(&inviteID, &groupID, &expiresAt)
+		`SELECT id, group_id, email, expires_at FROM journal_group_invites WHERE token_hash = $1`, tokenHash,
+	).Scan(&inviteID, &groupID, &inviteEmail, &expiresAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrInvalidToken
@@ -674,10 +698,32 @@ func (s *JournalService) AcceptInvite(ctx context.Context, rawToken string) (*mo
 		return nil, ErrInvalidToken
 	}
 
-	// Activate membership
+	// The redeeming account must own the invited address, or a forwarded link
+	// would let any logged-in user walk into a private group.
+	var userEmail string
+	if err := s.db.QueryRow(ctx, `SELECT email FROM users WHERE id = $1`, userID).Scan(&userEmail); err != nil {
+		return nil, err
+	}
+	if !strings.EqualFold(strings.TrimSpace(userEmail), strings.TrimSpace(inviteEmail)) {
+		return nil, ErrInviteEmailMismatch
+	}
+
+	// invited_by is NOT NULL; attribute a first-time join to the group owner.
+	var ownerID uuid.UUID
+	if err := s.db.QueryRow(ctx, `SELECT owner_id FROM journal_groups WHERE id = $1`, groupID).Scan(&ownerID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrInvalidToken
+		}
+		return nil, err
+	}
+
+	// Activate exactly one membership: this user's.
 	_, err = s.db.Exec(ctx,
-		`UPDATE journal_group_members SET status = 'active', joined_at = NOW()
-		 WHERE group_id = $1 AND status = 'pending'`, groupID)
+		`INSERT INTO journal_group_members (group_id, user_id, invited_by, status, joined_at)
+		 VALUES ($1, $2, $3, 'active', NOW())
+		 ON CONFLICT (group_id, user_id)
+		 DO UPDATE SET status = 'active', joined_at = NOW()`,
+		groupID, userID, ownerID)
 	if err != nil {
 		return nil, err
 	}
@@ -781,9 +827,9 @@ func (s *JournalService) GetCollection(ctx context.Context, userID, collectionID
 		SELECT e.id, e.user_id, e.group_id, e.title, e.body, e.mood, e.tags, e.created_at, e.updated_at
 		FROM journal_entries e
 		JOIN journal_collection_entries ce ON ce.entry_id = e.id
-		WHERE ce.collection_id = $1
+		WHERE ce.collection_id = $1 AND e.user_id = $2
 		ORDER BY ce.added_at DESC
-	`, collectionID)
+	`, collectionID, userID)
 	if err != nil {
 		return col, nil, err
 	}
@@ -872,6 +918,19 @@ func (s *JournalService) AddEntryToCollection(ctx context.Context, userID, colle
 	}
 	if ownerID != userID {
 		return ErrJournalCollectionNotFound
+	}
+	// The entry must also belong to the caller. Verifying only the collection
+	// would let anyone holding a leaked entry UUID file it into their own
+	// collection and read it back through GetCollection.
+	var entryOwned bool
+	if err := s.db.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM journal_entries WHERE id = $1 AND user_id = $2)`,
+		entryID, userID,
+	).Scan(&entryOwned); err != nil {
+		return err
+	}
+	if !entryOwned {
+		return ErrJournalEntryNotFound
 	}
 	_, err := s.db.Exec(ctx,
 		`INSERT INTO journal_collection_entries (collection_id, entry_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,

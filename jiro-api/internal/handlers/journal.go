@@ -230,7 +230,7 @@ func (h *JournalHandler) PresignImage(c *gin.Context) {
 	}
 
 	objectKey := services.JournalImageObjectKey(userID, entryID, ext)
-	uploadURL, _, err := h.storage.PresignPutObject(c.Request.Context(), objectKey)
+	uploadURL, _, err := h.storage.PresignPutObject(c.Request.Context(), objectKey, strings.ToLower(req.ContentType), req.ContentLength)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "STORAGE_ERROR", Message: "Failed to generate upload URL"}})
 		return
@@ -487,16 +487,21 @@ func (h *JournalHandler) RemoveMember(c *gin.Context) {
 
 // POST /journal/groups/join?token=xxx  (public route)
 func (h *JournalHandler) JoinGroup(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
 	rawToken := c.Query("token")
 	if rawToken == "" {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "MISSING_TOKEN", Message: "Token is required"}})
 		return
 	}
 
-	resp, err := h.journalService.AcceptInvite(c.Request.Context(), rawToken)
+	resp, err := h.journalService.AcceptInvite(c.Request.Context(), rawToken, userID)
 	if err != nil {
 		if err == services.ErrInvalidToken {
 			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_TOKEN", Message: "Invite link is invalid or has expired"}})
+			return
+		}
+		if err == services.ErrInviteEmailMismatch {
+			c.JSON(http.StatusForbidden, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVITE_EMAIL_MISMATCH", Message: "This invite was sent to a different email address"}})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to accept invite"}})
@@ -524,8 +529,12 @@ func (h *JournalHandler) CreateGroupEntry(c *gin.Context) {
 		return
 	}
 
-	entry, err := h.journalService.CreateEntry(c.Request.Context(), userID, &groupID, &req)
+	entry, err := h.journalService.CreateGroupEntry(c.Request.Context(), userID, groupID, &req)
 	if err != nil {
+		if err == services.ErrNotGroupMember {
+			c.JSON(http.StatusForbidden, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_GROUP_MEMBER", Message: "You are not a member of this group"}})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to create entry"}})
 		return
 	}
@@ -690,6 +699,10 @@ func (h *JournalHandler) AddEntryToCollection(c *gin.Context) {
 	if err := h.journalService.AddEntryToCollection(c.Request.Context(), userID, colID, req.EntryID); err != nil {
 		if err == services.ErrJournalCollectionNotFound {
 			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Collection not found"}})
+			return
+		}
+		if err == services.ErrJournalEntryNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Entry not found"}})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to add entry"}})

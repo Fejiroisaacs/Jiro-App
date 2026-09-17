@@ -9,11 +9,15 @@ import (
 )
 
 // AdminRequired checks the X-Admin-Secret header against the configured secret.
-// If ADMIN_SECRET is empty the server is in dev mode and all admin requests pass.
+// It fails closed: an unconfigured secret refuses every admin request rather than
+// admitting all of them. config.Load already refuses to boot without ADMIN_SECRET,
+// so this branch is defence in depth against a future config regression.
 func AdminRequired(secret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if secret == "" {
-			c.Next()
+			c.AbortWithStatusJSON(http.StatusServiceUnavailable, models.ErrorResponse{
+				Error: models.ErrorDetail{Code: "ADMIN_DISABLED", Message: "Admin API is not configured"},
+			})
 			return
 		}
 		provided := c.GetHeader("X-Admin-Secret")

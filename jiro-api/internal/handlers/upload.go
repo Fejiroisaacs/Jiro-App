@@ -63,7 +63,7 @@ func (h *UploadHandler) PresignAvatar(c *gin.Context) {
 		return
 	}
 
-	uploadURL, objectKey, err := h.storage.PresignAvatarUpload(c.Request.Context(), userID, ext)
+	uploadURL, objectKey, err := h.storage.PresignAvatarUpload(c.Request.Context(), userID, ext, strings.ToLower(req.ContentType), req.ContentLength)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error: models.ErrorDetail{Code: "STORAGE_ERROR", Message: "Failed to generate upload URL"},
@@ -214,7 +214,7 @@ func (h *UploadHandler) PresignRecipeImage(c *gin.Context) {
 		return
 	}
 
-	uploadURL, objectKey, err := h.storage.PresignRecipeUpload(c.Request.Context(), userID, recipeID, ext)
+	uploadURL, objectKey, err := h.storage.PresignRecipeUpload(c.Request.Context(), userID, recipeID, ext, strings.ToLower(req.ContentType), req.ContentLength)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error: models.ErrorDetail{Code: "STORAGE_ERROR", Message: "Failed to generate upload URL"},
@@ -380,7 +380,7 @@ func (h *UploadHandler) PresignCollectionCover(c *gin.Context) {
 	}
 
 	objectKey := services.JournalCollectionCoverObjectKey(userID, collectionID, ext)
-	uploadURL, _, err := h.storage.PresignPutObject(c.Request.Context(), objectKey)
+	uploadURL, _, err := h.storage.PresignPutObject(c.Request.Context(), objectKey, strings.ToLower(req.ContentType), req.ContentLength)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error: models.ErrorDetail{Code: "STORAGE_ERROR", Message: "Failed to generate upload URL"},
@@ -560,7 +560,7 @@ func (h *UploadHandler) PresignSessionAttachment(c *gin.Context) {
 		return
 	}
 
-	uploadURL, objectKey, err := h.storage.PresignSessionUpload(c.Request.Context(), userID, sessionID, ext)
+	uploadURL, objectKey, err := h.storage.PresignSessionUpload(c.Request.Context(), userID, sessionID, ext, strings.ToLower(req.ContentType), req.ContentLength)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error: models.ErrorDetail{Code: "STORAGE_ERROR", Message: "Failed to generate upload URL"},

@@ -287,6 +287,9 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			journal.DELETE("/images/:image_id", journalHandler.DeleteImage)
 
 			// Groups
+			// Invite acceptance requires auth: the invite is bound to the
+			// redeeming user, so an anonymous caller has nobody to activate.
+			journal.POST("/groups/join", journalHandler.JoinGroup)
 			journal.POST("/groups", journalHandler.CreateGroup)
 			journal.GET("/groups", journalHandler.ListGroups)
 			journal.GET("/groups/:id", journalHandler.GetGroup)
@@ -308,11 +311,14 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			journal.DELETE("/collections/:id/entries/:entry_id", journalHandler.RemoveEntryFromCollection)
 		}
 
-		// Public journal invite acceptance (no auth required)
-		public.POST("/journal/groups/join", journalHandler.JoinGroup)
-
-		// Admin routes (protected by X-Admin-Secret header)
+		// Admin routes. AuthRequired runs first so the caller is an identified,
+		// logged-in user before the shared secret is checked — otherwise no user
+		// is bound to the request and admin actions are unattributable in logs.
+		// Rate limited because X-Admin-Secret is a single guessable credential.
 		admin := v1.Group("/admin")
+		admin.Use(middleware.AuthRequired(authService))
+		admin.Use(middleware.RateLimitByIP(rl, 10))
+		admin.Use(middleware.NoStore())
 		admin.Use(middleware.AdminRequired(cfg.AdminSecret))
 		{
 			admin.GET("/stats", adminHandler.GetStats)
