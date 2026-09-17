@@ -62,6 +62,13 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 		// Public routes (rate limited by IP: 60/min)
 		public := v1.Group("")
 		public.Use(middleware.RateLimitByIP(rl, 60))
+		// Opted-in public content, plus share links reached by token. The
+		// token ones are unlisted rather than public, so a shared cache
+		// holding a copy would be a leak. There is no SEO cost to no-store
+		// here: crawlers read the prerendered HTML from the frontend host,
+		// not this JSON, so the only thing a cache would save is a little
+		// origin traffic on an app this size.
+		public.Use(middleware.NoStore())
 		{
 			public.GET("/profiles/:username", userHandler.GetPublicProfile)
 			public.GET("/jym/shares/:share_id", jymHandler.GetSharePreview)
@@ -75,6 +82,8 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 		// Auth routes (rate limited by IP: 5/min)
 		auth := v1.Group("/auth")
 		auth.Use(middleware.RateLimitByIP(rl, 5))
+		// These responses carry access tokens and single-use reset material.
+		auth.Use(middleware.NoStore())
 		{
 			auth.POST("/register", authHandler.Register)
 			auth.POST("/login", authHandler.Login)
@@ -89,6 +98,8 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 		protected := v1.Group("")
 		protected.Use(middleware.AuthRequired(authService))
 		protected.Use(middleware.RateLimitByUser(rl, 300))
+		// Everything behind here is one person's own data.
+		protected.Use(middleware.NoStore())
 		{
 			protected.GET("/user/me", userHandler.GetMe)
 			protected.PATCH("/user/me", userHandler.UpdateMe)
