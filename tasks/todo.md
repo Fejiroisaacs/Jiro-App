@@ -167,9 +167,39 @@ On the mobile question that came up during planning: **exiting is a visible 44px
 
 ## Phase 4: the landing page (in progress, plan in `~/.claude/plans/jaunty-rolling-dream.md`)
 
-- [ ] 4.0 Seed a plausible handful more Culinara recipes and Ledger transactions, so the shots neither overstate nor understate the app
-- [ ] 4.1 Shoot five dark-mode WebP screenshots into `jiro-ui/public/images/landing/`: dashboard hero (1800x1125), Culinara list (1400x700 wide), Journaly on a phone (720x1160 portrait), Jym session rows (900x700), Ledger summary (900x700). Under 400 kB total, hero under 180 kB
-- [ ] 4.2 Put them on the page: hero div tree -> one `<img>` with explicit dimensions, `fetchpriority="high"`, descriptive alt; mouse-tilt handler deleted, fixed angle with the hard shadow; bento cards get text above and a full-width screenshot beneath (the 200px mockup slot cannot hold one); Echo stays text
-- [ ] 4.3 Close the rest of audit finding D: one name (`Get started`) for every route to /register, eyebrow labels dropped, Why Jiro stops being three equal columns, 14 colour literals to tokens, decorative orbs and pillar icons `aria-hidden`
-- [ ] Verification: build, five images sized and budgeted, no tilt on mouse move, 360px stacking, reduced-motion, alt text, screenshots match the shipped UI
-- [ ] Commit per step, push at the end, review section below
+- [x] 4.0 Seed a plausible handful more Culinara recipes and Ledger transactions, so the shots neither overstate nor understate the app
+- [x] 4.1 Shoot five dark-mode WebP screenshots into `jiro-ui/public/images/landing/`: dashboard hero (1800x1125), Culinara list (1400x700 wide), Journaly on a phone (720x1160 portrait), Jym session rows (900x700), Ledger summary (900x700). Under 400 kB total, hero under 180 kB
+- [x] 4.2 Put them on the page: hero div tree -> one `<img>` with explicit dimensions, `fetchpriority="high"`, descriptive alt; mouse-tilt handler deleted, fixed angle with the hard shadow; bento cards get text above and a full-width screenshot beneath (the 200px mockup slot cannot hold one); Echo stays text
+- [x] 4.3 Close the rest of audit finding D: one name (`Get started`) for every route to /register, eyebrow labels dropped, Why Jiro stops being three equal columns, 14 colour literals to tokens, decorative orbs and pillar icons `aria-hidden`
+- [x] Verification: build, five images sized and budgeted, no tilt on mouse move, 360px stacking, reduced-motion, alt text, screenshots match the shipped UI
+- [x] Commit per step, push at the end, review section below
+
+## Review (Phase 4) — the redesign is complete
+
+**The landing page now shows the product.** The hero was a dashboard assembled from grey placeholder divs and each bento card had its own hand-drawn mockup. The audit called it the strongest templated tell on the page; after the redesign it was also showing a product that no longer existed. Five dark-mode screenshots of the real app replace all of it, 84 kB of WebP against a 400 kB budget.
+
+**Each card got the crop its shape asks for**, rather than one landscape shot repeated four times: two recipe cards across the wide card, a session's set rows with PR badges in one small cell, the month's figures and a budget bar in the other, and Journaly as a phone filling the one double-height card. That last one fits the shape honestly and shows the app works on a phone without a section claiming it does. Echo stays text, because there is no Echo module to photograph and inventing one is the problem being fixed.
+
+**Three rounds of looking fixed things the numbers did not.** The first pass put whole pages into 276px cards, so nothing was legible; the crops tightened to show a detail instead. The second left the Culinara card as an old side-by-side row, squeezing its description into one word per line. The third cropped the sides off the Journaly phone, cutting the app's own header, so that shot became a contained device on the card rather than a cover crop. On mobile the wide recipe crop collapsed to a 76px sliver and now crops to a single card instead.
+
+**A real bug surfaced from taking the hero shot.** The dashboard's Kitchen tile read "Culinara is not available right now". The cook-streak query casts to `::date` and scans into a Go string, which pgx will not convert, so the endpoint failed for **every user who had ever logged a trial**, not only where `date_cooked` was null as the audit assumed. Cast to `::text`, skip null dates, and log the error the handler was silently swallowing. That one had been on the follow-up list all session and turned out to be worse than described.
+
+**The rest of audit finding D is closed.** One name, `Get started`, on every route to `/register` where there were four. The eyebrow labels that just restated the heading below them are gone. Why Jiro stops being three equal columns so privacy, the actual differentiator, leads at a wider measure. The mouse-tracked hero tilt and its animation-frame plumbing are gone in favour of a fixed angle with the brand's hard shadow, and about 90 dead mockup rules left the stylesheet.
+
+**Verified**: all five images load with explicit dimensions so nothing shifts, the hero is eager and the four below are lazy, the hero does not move when the cursor does, no horizontal scroll at 360px, and under `prefers-reduced-motion` there is no animation and no glare.
+
+**Numbers.** Raw hex app-wide 112 to 101, none in the landing page. Build 386.97 kB initial. The landing component is 779 lines, down from 1091.
+
+**Re-shooting.** The capture script lives in the session scratchpad, not the repo, but the plan file records the screen list, crops and budgets, so a re-shoot after a UI change does not need reverse engineering. The screenshots are marketing assets taken on a throwaway local account with seeded demo data; they are not anyone's real figures.
+
+---
+
+# The redesign is done
+
+Phases 0 through 4 are on `New-Features`: bugs and tokens, the shell, all four module pages, and the landing page.
+
+**Still open, none of it blocking:**
+- `GET /jym/exercises` has no `last_performed_at`, so the exercise library shows the PR date instead. Small backend addition.
+- Cook mode's checklist does not survive a refresh. Known and stated rather than hidden.
+- The feature roadmap in `docs/UPCOMING-FEATURES.md` is untouched apart from the mood trend chart, which shipped in Phase 3c.
+
