@@ -738,8 +738,6 @@ const bentoAnimation = trigger('bentoEntrance', [
       .l-card--jym,
       .l-card--ledger,
       .l-card--echo { grid-column: 1; grid-row: auto; flex-direction: column; }
-      .l-card--culinara .l-mockup-culinara,
-      .l-card--jym .l-mockup-jym { width: 100%; }
     }
   `]
 })
