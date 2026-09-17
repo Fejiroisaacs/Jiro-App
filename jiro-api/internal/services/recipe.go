@@ -386,10 +386,14 @@ func applyModifications(base, mods json.RawMessage) json.RawMessage {
 
 func (s *RecipeService) GetCookStreak(ctx context.Context, userID uuid.UUID) (*models.CookStreakResponse, error) {
 	rows, err := s.db.Query(ctx,
-		`SELECT DISTINCT (date_cooked AT TIME ZONE 'UTC')::date AS cook_date
+		// ::text because the rows are scanned into a string below and pgx will
+		// not convert a date column to one; without the cast this endpoint
+		// returned 500 for every user who had ever logged a trial.
+		// date_cooked is nullable, and a trial with no date has no day to count.
+		`SELECT DISTINCT (date_cooked AT TIME ZONE 'UTC')::date::text AS cook_date
 		 FROM recipe_trials rt
 		 JOIN recipes r ON rt.recipe_id = r.id
-		 WHERE r.user_id = $1
+		 WHERE r.user_id = $1 AND rt.date_cooked IS NOT NULL
 		 ORDER BY cook_date DESC`,
 		userID,
 	)

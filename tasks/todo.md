@@ -164,3 +164,12 @@ On the mobile question that came up during planning: **exiting is a visible 44px
 
 **Still open.** Phase 4, the landing page, which the audit deferred until real screenshots existed; they exist now. Two backend follow-ups: `GET /culinara/cook-streak` returns 500 when a trial has a null `date_cooked`, and `GET /jym/exercises` has no `last_performed_at`, which is why the exercise library shows the PR date instead. The cook checklist does not survive a refresh, which is stated rather than hidden.
 
+
+## Phase 4: the landing page (in progress, plan in `~/.claude/plans/jaunty-rolling-dream.md`)
+
+- [ ] 4.0 Seed a plausible handful more Culinara recipes and Ledger transactions, so the shots neither overstate nor understate the app
+- [ ] 4.1 Shoot five dark-mode WebP screenshots into `jiro-ui/public/images/landing/`: dashboard hero (1800x1125), Culinara list (1400x700 wide), Journaly on a phone (720x1160 portrait), Jym session rows (900x700), Ledger summary (900x700). Under 400 kB total, hero under 180 kB
+- [ ] 4.2 Put them on the page: hero div tree -> one `<img>` with explicit dimensions, `fetchpriority="high"`, descriptive alt; mouse-tilt handler deleted, fixed angle with the hard shadow; bento cards get text above and a full-width screenshot beneath (the 200px mockup slot cannot hold one); Echo stays text
+- [ ] 4.3 Close the rest of audit finding D: one name (`Get started`) for every route to /register, eyebrow labels dropped, Why Jiro stops being three equal columns, 14 colour literals to tokens, decorative orbs and pillar icons `aria-hidden`
+- [ ] Verification: build, five images sized and budgeted, no tilt on mouse move, 360px stacking, reduced-motion, alt text, screenshots match the shipped UI
+- [ ] Commit per step, push at the end, review section below
