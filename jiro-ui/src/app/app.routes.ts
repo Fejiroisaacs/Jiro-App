@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, guestGuard } from './core/guards/auth.guard';
+import { adminGuard, authGuard, guestGuard } from './core/guards/auth.guard';
 
 // `title` feeds the document title ("Transactions · Jiro") and the mobile top
 // bar on drill-down pages. `data.moduleNav: false` hides the module tab row on
@@ -261,8 +261,11 @@ export const routes: Routes = [
     title: 'Admin',
     loadComponent: () => import('./features/admin/admin-login').then(m => m.AdminLoginComponent),
   },
+  // Until now this tree had no canActivate at all, so an anonymous visitor
+  // could load and render the admin shell; only the data fetch failed.
   {
     path: 'admin',
+    canActivate: [adminGuard],
     loadComponent: () => import('./features/admin/admin-layout').then(m => m.AdminLayoutComponent),
     children: [
       {

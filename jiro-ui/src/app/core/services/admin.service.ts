@@ -1,7 +1,8 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, computed, signal } from '@angular/core';
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { readSession, removeSession, writeSession } from '../storage';
 
 export interface AdminStats {
   total_users: number;
@@ -49,22 +50,31 @@ const SESSION_KEY = 'jiro_admin_secret';
 export class AdminService {
   private readonly base = `${environment.apiUrl}/admin`;
 
-  secret = signal<string>(sessionStorage.getItem(SESSION_KEY) ?? '');
+  /** The admin credential, restored from sessionStorage so a refresh inside the
+   *  panel does not ask again. `null` means "no admin login in this tab" and is
+   *  meaningfully different from `''`: a blank secret is a *valid* credential in
+   *  local dev (see admin-login's placeholder), so emptiness cannot stand in for
+   *  absence. Guarded storage access — there is none under `platform-server`,
+   *  where this stays null and the panel is never rendered statically. */
+  secret = signal<string | null>(readSession(SESSION_KEY));
+
+  /** Whether this tab has been through the admin login. What `adminGuard` asks. */
+  isAuthenticated = computed(() => this.secret() !== null);
 
   constructor(private http: HttpClient) {}
 
   setSecret(s: string) {
     this.secret.set(s);
-    sessionStorage.setItem(SESSION_KEY, s);
+    writeSession(SESSION_KEY, s);
   }
 
   clearSecret() {
-    this.secret.set('');
-    sessionStorage.removeItem(SESSION_KEY);
+    this.secret.set(null);
+    removeSession(SESSION_KEY);
   }
 
   private headers(): HttpHeaders {
-    return new HttpHeaders({ 'X-Admin-Secret': this.secret() });
+    return new HttpHeaders({ 'X-Admin-Secret': this.secret() ?? '' });
   }
 
   getStats(): Observable<AdminStats> {
