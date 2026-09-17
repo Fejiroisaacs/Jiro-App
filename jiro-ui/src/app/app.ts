@@ -1,4 +1,5 @@
-import { Component, effect, inject } from '@angular/core';
+import { Component, PLATFORM_ID, effect, inject } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { SettingsService, THEMES } from './core/services/settings.service';
@@ -11,6 +12,18 @@ import { SettingsService, THEMES } from './core/services/settings.service';
 })
 export class App {
   constructor() {
+    // Everything this constructor does is a browser-only side effect: scroll
+    // position and classes/meta on the live document. Under `platform-server`
+    // (prerender) there is nothing to scroll and no browser chrome to colour.
+    //
+    // `isPlatformBrowser` rather than `typeof document === 'undefined'`: the
+    // server render ships a DOM shim, so `document` *does* exist there while
+    // `window.scrollTo` and `getComputedStyle` do not — a typeof check on
+    // `document` would pass and then throw on the first real call. A
+    // prerendered page also has no session, so the theme resolves to the
+    // default and there would be no classes to apply anyway.
+    if (!isPlatformBrowser(inject(PLATFORM_ID))) return;
+
     const router = inject(Router);
     router.events.pipe(
       filter(event => event instanceof NavigationEnd)
