@@ -893,10 +893,52 @@ func (s *JournalService) RemoveEntryFromCollection(ctx context.Context, userID, 
 	return err
 }
 
+func (s *JournalService) SetCollectionCoverURL(ctx context.Context, userID, collectionID uuid.UUID, url string) error {
+	var ownerID uuid.UUID
+	err := s.db.QueryRow(ctx, `SELECT user_id FROM journal_collections WHERE id = $1`, collectionID).Scan(&ownerID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrJournalCollectionNotFound
+		}
+		return err
+	}
+	if ownerID != userID {
+		return ErrJournalCollectionNotFound
+	}
+	_, err = s.db.Exec(ctx,
+		`UPDATE journal_collections SET cover_image_url = $1, updated_at = NOW() WHERE id = $2`,
+		url, collectionID)
+	return err
+}
+
+func (s *JournalService) ClearCollectionCoverURL(ctx context.Context, userID, collectionID uuid.UUID) error {
+	var ownerID uuid.UUID
+	err := s.db.QueryRow(ctx, `SELECT user_id FROM journal_collections WHERE id = $1`, collectionID).Scan(&ownerID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrJournalCollectionNotFound
+		}
+		return err
+	}
+	if ownerID != userID {
+		return ErrJournalCollectionNotFound
+	}
+	_, err = s.db.Exec(ctx,
+		`UPDATE journal_collections SET cover_image_url = NULL, updated_at = NOW() WHERE id = $1`,
+		collectionID)
+	return err
+}
+
 // ─── Presign helpers ───────────────────────────────────────────────────────
 
 func JournalImageObjectKey(userID, entryID uuid.UUID, ext string) string {
 	raw := make([]byte, 8)
 	rand.Read(raw)
 	return fmt.Sprintf("journal/%s/%s/%s%s", userID, entryID, hex.EncodeToString(raw), ext)
+}
+
+func JournalCollectionCoverObjectKey(userID, collectionID uuid.UUID, ext string) string {
+	raw := make([]byte, 8)
+	rand.Read(raw)
+	return fmt.Sprintf("journal-collections/%s/%s/%s%s", userID, collectionID, hex.EncodeToString(raw), ext)
 }

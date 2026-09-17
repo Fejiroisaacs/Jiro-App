@@ -49,7 +49,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	adminHandler := handlers.NewAdminHandler(adminService, authService, userService, emailService, cfg.AppBaseURL)
 	feedbackHandler := handlers.NewFeedbackHandler(feedbackService)
 	mealPlanHandler := handlers.NewMealPlanHandler(mealPlanService)
-	uploadHandler := handlers.NewUploadHandler(storageService, userService, recipeService, jymService)
+	uploadHandler := handlers.NewUploadHandler(storageService, userService, recipeService, jymService, journalService)
 	journalHandler := handlers.NewJournalHandler(journalService, emailService, storageService, cfg.AppBaseURL)
 
 	// Routes
@@ -107,6 +107,11 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			protected.POST("/upload/session/:session_id/presign", middleware.RateLimitByUser(rl, 20), uploadHandler.PresignSessionAttachment)
 			protected.PATCH("/upload/session/:session_id/confirm", uploadHandler.ConfirmSessionAttachment)
 			protected.DELETE("/upload/session/attachments/:attachment_id", uploadHandler.DeleteSessionAttachment)
+
+			// Upload — journal collection cover (presign tighter: 20/min per user)
+			protected.POST("/upload/journal-collection/:collection_id/presign", middleware.RateLimitByUser(rl, 20), uploadHandler.PresignCollectionCover)
+			protected.PATCH("/upload/journal-collection/:collection_id/confirm", uploadHandler.ConfirmCollectionCover)
+			protected.DELETE("/upload/journal-collection/:collection_id/cover", uploadHandler.DeleteCollectionCover)
 
 			// Feedback
 			protected.POST("/feedback", feedbackHandler.Submit)

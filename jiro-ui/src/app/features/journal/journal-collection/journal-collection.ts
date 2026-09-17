@@ -13,6 +13,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { UploadService } from '../../../core/services/upload.service';
 
 @Component({
   selector: 'app-journal-collection',
@@ -32,11 +33,45 @@ import { ToastService } from '../../../core/services/toast.service';
           </a>
           @if (collection()) {
 <div class="coll-header-info">
-            <div class="coll-cover" [style.background-image]="collection()!.cover_image_url ? 'url(' + collection()!.cover_image_url + ')' : ''">
-              @if (!collection()!.cover_image_url) {
+            <div class="coll-cover-wrap">
+              <div class="coll-cover" [style.background-image]="collection()!.cover_image_url ? 'url(' + collection()!.cover_image_url + ')' : ''">
+                @if (!collection()!.cover_image_url) {
 <img src="/icons/folder-icon.svg" width="48" height="48" alt="" class="coll-cover-icon" />
 }
+              </div>
+              <label class="cover-change">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>
+                </svg>
+                <input
+                  type="file"
+                  class="cover-file"
+                  accept="image/jpeg,image/png,image/webp"
+                  [disabled]="coverBusy()"
+                  [attr.aria-label]="collection()!.cover_image_url ? 'Change cover image' : 'Add cover image'"
+                  (change)="onCoverFileChange($event)" />
+              </label>
+              @if (coverBusy()) {
+<div class="cover-pending" role="status">
+                <span class="spinner spinner--sm"></span>
+                <span class="cover-sr">Uploading cover image, {{ coverProgress() }} percent</span>
+              </div>
+}
             </div>
+            @if (collection()!.cover_image_url) {
+<div class="cover-actions">
+              <button
+                type="button"
+                class="cover-remove"
+                [disabled]="coverBusy()"
+                aria-label="Remove cover image"
+                (click)="removeCover()">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+                </svg>
+              </button>
+            </div>
+}
             <div>
               <h1>{{ collection()!.name }}</h1>
               @if (collection()!.description) {
@@ -192,6 +227,61 @@ import { ToastService } from '../../../core/services/toast.service';
     .coll-header-info h1 { margin: 0 0 2px; }
     .header-actions { flex-shrink: 0; }
 
+    /* Cover image controls */
+    .coll-cover-wrap { position: relative; width: 60px; height: 60px; flex-shrink: 0; }
+    .cover-change {
+      position: absolute; inset: 0;
+      min-width: 40px; min-height: 40px;
+      display: flex; align-items: flex-end; justify-content: flex-end;
+      padding: var(--space-xs);
+      border-radius: var(--border-radius);
+      cursor: pointer;
+    }
+    .cover-change svg {
+      display: block; padding: 3px; box-sizing: content-box;
+      color: var(--text-secondary);
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius-sm);
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .coll-cover-wrap:hover .cover-change svg,
+    .cover-change:focus-within svg { color: var(--text-primary); border-color: var(--text-secondary); }
+    .cover-change:focus-within { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+    .cover-file {
+      position: absolute; width: 1px; height: 1px;
+      padding: 0; margin: -1px; border: 0;
+      overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+    }
+    .cover-pending {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: var(--border-radius);
+      background: color-mix(in srgb, var(--bg-canvas) 78%, transparent);
+    }
+    .cover-sr {
+      position: absolute; width: 1px; height: 1px;
+      padding: 0; margin: -1px; border: 0;
+      overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+    }
+    .cover-actions { display: flex; align-items: center; flex-shrink: 0; }
+    .cover-remove {
+      width: 40px; height: 40px;
+      display: flex; align-items: center; justify-content: center;
+      background: none;
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: color 0.12s, border-color 0.12s, background 0.12s;
+    }
+    .cover-remove:hover:not(:disabled) {
+      color: var(--color-danger);
+      border-color: var(--color-danger);
+      background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+    }
+    .cover-remove:disabled { opacity: 0.5; cursor: not-allowed; }
+
     /* State */
     .state-center { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--space-sm); padding: var(--space-xl) 0; }
 
@@ -247,8 +337,12 @@ export class JournalCollectionComponent implements OnInit {
 
   deleting = signal(false);
 
+  coverBusy = signal(false);
+  coverProgress = signal(0);
+
   private readonly confirmService = inject(ConfirmService);
   private readonly toast = inject(ToastService);
+  private readonly uploadService = inject(UploadService);
 
   constructor(
     private svc: JournalService,
@@ -286,6 +380,63 @@ export class JournalCollectionComponent implements OnInit {
         this.saving.set(false);
       },
       error: () => this.saving.set(false),
+    });
+  }
+
+  onCoverFileChange(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!input) return;
+    input.value = '';
+    if (!file || !this.collId) return;
+
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowed.includes(file.type)) {
+      this.toast.error('Please choose a JPEG, PNG, or WebP image.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      this.toast.error('Image must be under 5 MB.');
+      return;
+    }
+
+    this.coverBusy.set(true);
+    this.coverProgress.set(0);
+    this.uploadService.uploadCollectionCover(this.collId, file, pct => this.coverProgress.set(pct)).subscribe({
+      next: url => {
+        this.collection.update(c => c ? { ...c, cover_image_url: url } : c);
+        this.coverBusy.set(false);
+        this.toast.success('Cover image updated');
+      },
+      error: () => {
+        this.coverBusy.set(false);
+        this.toast.error('Could not upload the cover image.');
+      },
+    });
+  }
+
+  async removeCover() {
+    if (!this.collection()?.cover_image_url) return;
+    const ok = await this.confirmService.confirm({
+      title: 'Remove cover image?',
+      message: 'The collection keeps its name and entries; only the cover image goes.',
+      confirmLabel: 'Remove image',
+      cancelLabel: 'Keep it',
+      danger: true,
+    });
+    if (!ok) return;
+
+    this.coverBusy.set(true);
+    this.uploadService.deleteCollectionCover(this.collId).subscribe({
+      next: () => {
+        this.collection.update(c => c ? { ...c, cover_image_url: null } : c);
+        this.coverBusy.set(false);
+        this.toast.success('Cover image removed');
+      },
+      error: () => {
+        this.coverBusy.set(false);
+        this.toast.error('Could not remove the cover image.');
+      },
     });
   }
 

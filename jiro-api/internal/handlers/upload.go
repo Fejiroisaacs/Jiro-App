@@ -12,14 +12,15 @@ import (
 )
 
 type UploadHandler struct {
-	storage       *services.StorageService
-	userService   *services.UserService
-	recipeService *services.RecipeService
-	jymService    *services.JymService
+	storage        *services.StorageService
+	userService    *services.UserService
+	recipeService  *services.RecipeService
+	jymService     *services.JymService
+	journalService *services.JournalService
 }
 
-func NewUploadHandler(storage *services.StorageService, userService *services.UserService, recipeService *services.RecipeService, jymService *services.JymService) *UploadHandler {
-	return &UploadHandler{storage: storage, userService: userService, recipeService: recipeService, jymService: jymService}
+func NewUploadHandler(storage *services.StorageService, userService *services.UserService, recipeService *services.RecipeService, jymService *services.JymService, journalService *services.JournalService) *UploadHandler {
+	return &UploadHandler{storage: storage, userService: userService, recipeService: recipeService, jymService: jymService, journalService: journalService}
 }
 
 var allowedAvatarTypes = map[string]string{
@@ -317,6 +318,180 @@ func (h *UploadHandler) DeleteRecipeImage(c *gin.Context) {
 	}
 
 	if err := h.recipeService.ClearCoverImageURL(c.Request.Context(), recipeID); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to clear cover image"},
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "cover image deleted"})
+}
+
+// ─── Journal collection cover upload ───────────────────────────────────────
+
+const maxCollectionCoverBytes = 5 * 1024 * 1024 // 5 MB
+
+// POST /upload/journal-collection/:collection_id/presign
+// Body: { "content_type": "image/jpeg", "content_length": 12345 }
+// Returns: { "upload_url": "...", "object_key": "..." }
+func (h *UploadHandler) PresignCollectionCover(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+
+	collectionID, err := uuid.Parse(c.Param("collection_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid collection ID"},
+		})
+		return
+	}
+
+	var req struct {
+		ContentType   string `json:"content_type" binding:"required"`
+		ContentLength int64  `json:"content_length" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()},
+		})
+		return
+	}
+
+	ext, ok := allowedAvatarTypes[strings.ToLower(req.ContentType)]
+	if !ok {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INVALID_TYPE", Message: "content_type must be image/jpeg, image/png, or image/webp"},
+		})
+		return
+	}
+
+	if req.ContentLength <= 0 || req.ContentLength > maxCollectionCoverBytes {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INVALID_SIZE", Message: "file must be between 1 byte and 5 MB"},
+		})
+		return
+	}
+
+	// Verify ownership
+	if _, _, err := h.journalService.GetCollection(c.Request.Context(), userID, collectionID); err != nil {
+		c.JSON(http.StatusNotFound, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Collection not found"},
+		})
+		return
+	}
+
+	objectKey := services.JournalCollectionCoverObjectKey(userID, collectionID, ext)
+	uploadURL, _, err := h.storage.PresignPutObject(c.Request.Context(), objectKey)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "STORAGE_ERROR", Message: "Failed to generate upload URL"},
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"upload_url": uploadURL,
+		"object_key": objectKey,
+	})
+}
+
+// PATCH /upload/journal-collection/:collection_id/confirm
+// Body: { "object_key": "journal-collections/..." }
+// Saves cover_image_url on the collection record after a successful upload.
+func (h *UploadHandler) ConfirmCollectionCover(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+
+	collectionID, err := uuid.Parse(c.Param("collection_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid collection ID"},
+		})
+		return
+	}
+
+	var req struct {
+		ObjectKey string `json:"object_key" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()},
+		})
+		return
+	}
+
+	// Validate key belongs to this user + collection
+	expectedPrefix := "journal-collections/" + userID.String() + "/" + collectionID.String() + "/"
+	if !strings.HasPrefix(req.ObjectKey, expectedPrefix) {
+		c.JSON(http.StatusForbidden, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "FORBIDDEN", Message: "Invalid object key"},
+		})
+		return
+	}
+
+	ext := strings.ToLower(filepath.Ext(req.ObjectKey))
+	if ext != ".jpg" && ext != ".png" && ext != ".webp" {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INVALID_TYPE", Message: "Invalid file extension"},
+		})
+		return
+	}
+
+	// Verify ownership
+	collection, _, err := h.journalService.GetCollection(c.Request.Context(), userID, collectionID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Collection not found"},
+		})
+		return
+	}
+
+	// Delete old cover image if one exists
+	if collection.CoverImageURL != nil && *collection.CoverImageURL != "" {
+		publicBase := h.storage.PublicURL("")
+		oldKey := strings.TrimPrefix(*collection.CoverImageURL, publicBase)
+		oldKey = strings.TrimPrefix(oldKey, "/")
+		h.storage.DeleteObject(c.Request.Context(), oldKey)
+	}
+
+	coverURL := h.storage.PublicURL(req.ObjectKey)
+	if err := h.journalService.SetCollectionCoverURL(c.Request.Context(), userID, collectionID, coverURL); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to update collection"},
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"cover_image_url": coverURL})
+}
+
+// DELETE /upload/journal-collection/:collection_id/cover
+// Deletes the collection's cover image from storage and clears cover_image_url.
+func (h *UploadHandler) DeleteCollectionCover(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+
+	collectionID, err := uuid.Parse(c.Param("collection_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid collection ID"},
+		})
+		return
+	}
+
+	collection, _, err := h.journalService.GetCollection(c.Request.Context(), userID, collectionID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Collection not found"},
+		})
+		return
+	}
+
+	if collection.CoverImageURL != nil && *collection.CoverImageURL != "" {
+		publicBase := h.storage.PublicURL("")
+		objectKey := strings.TrimPrefix(*collection.CoverImageURL, publicBase)
+		objectKey = strings.TrimPrefix(objectKey, "/")
+		h.storage.DeleteObject(c.Request.Context(), objectKey)
+	}
+
+	if err := h.journalService.ClearCollectionCoverURL(c.Request.Context(), userID, collectionID); err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to clear cover image"},
 		})
