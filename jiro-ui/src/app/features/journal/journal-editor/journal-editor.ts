@@ -34,17 +34,12 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
 <span>Back</span>
 }
         </button>
-        <div class="editor-topbar-title">
-          @if (!editId) {
-<span>New Entry</span>
-}
-          @if (editId) {
-<span>Edit Entry</span>
-}
+        <h1 class="editor-topbar-title">
+          {{ editId ? 'Edit entry' : 'New entry' }}
           @if (forDate && !editId) {
 <span class="for-date-badge">for {{ formatForDate() }}</span>
 }
-        </div>
+        </h1>
         <div class="editor-topbar-actions">
           <jiro-button
             variant="primary"
@@ -178,7 +173,12 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
 <div class="img-previews">
               @for (img of images(); track img) {
 <div class="img-thumb">
-                <img [src]="img.file_url" [alt]="'Attached image'" (click)="lightboxUrl.set(img.file_url)" />
+                <img
+                  [src]="img.file_url"
+                  [alt]="imageAlt($index)"
+                  width="80"
+                  height="80"
+                  (click)="openLightbox(img.file_url, imageAlt($index))" />
                 <button class="img-remove" (click)="deleteImage(img)" [disabled]="deletingImgId() === img.id" type="button" aria-label="Remove image">
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
                     <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -250,7 +250,7 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
     <!-- Lightbox -->
     @if (lightboxUrl()) {
 <div class="lightbox" (click)="lightboxUrl.set(null)">
-      <img [src]="lightboxUrl()!" alt="Full size image" />
+      <img [src]="lightboxUrl()!" [alt]="lightboxAlt()" />
     </div>
 }
   `,
@@ -288,10 +288,14 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
       transition: border-color 0.15s, color 0.15s;
     }
     .back-btn:hover { color: var(--text-primary); border-color: var(--text-secondary); }
+    /* The page's h1, deliberately kept at toolbar scale: this is a writing
+       surface, so the chrome should not compete with the entry itself. */
     .editor-topbar-title {
       flex: 1;
+      font-family: var(--font-family);
       font-weight: 600;
       font-size: var(--font-size-md);
+      letter-spacing: normal;
       display: flex;
       align-items: center;
       gap: var(--space-sm);
@@ -633,6 +637,7 @@ export class JournalEditorComponent implements OnInit {
   selectedCollections = new Set<string>();
 
   lightboxUrl = signal<string | null>(null);
+  lightboxAlt = signal('');
 
   /** Read once, so the prompt and its dismissal agree on which day this is. */
   private readonly today = new Date();
@@ -800,6 +805,23 @@ export class JournalEditorComponent implements OnInit {
 
     // Reset input
     (event.target as HTMLInputElement).value = '';
+  }
+
+  /**
+   * Uploads carry no caption, so name each one by its position and the entry it
+   * belongs to — otherwise a screen reader announces three identical images.
+   */
+  imageAlt(index: number): string {
+    const subject = this.title.trim() || 'this entry';
+    const total = this.images().length;
+    return total > 1
+      ? `Attachment ${index + 1} of ${total} on ${subject}`
+      : `Attachment on ${subject}`;
+  }
+
+  openLightbox(url: string, alt: string) {
+    this.lightboxUrl.set(url);
+    this.lightboxAlt.set(alt);
   }
 
   deleteImage(img: JournalImage) {
