@@ -137,7 +137,7 @@ runs in debug mode dumping the route table at boot.
       read-then-write on `used_at` (auth.go:286) is a TOCTOU that lets two requests consume one token.
 - [x] **2.14** `handlers/recipe.go:582-586` — unauthenticated `/culinara/discover` honours `?limit=10000000`.
       Clamp to 100. The pool is 10 connections and the route allows 60 req/min/IP.
-- [ ] **2.15** `npm audit` — 39 vulnerabilities (1 critical, 22 high). Most are dev-only, but
+- [x] **2.15** `npm audit` — 39 vulnerabilities (1 critical, 22 high). Most are dev-only, but
       `@angular/core`, `@angular/common` and `@angular/compiler` are **runtime** deps with open XSS
       sanitizer-bypass advisories affecting ≤21.2.19. Upgrade past 21.2.19.
 
@@ -270,7 +270,15 @@ Alpine went 3.19 → 3.22; 3.19 is past its supported window.
   concurrent requests consume one token. Single-use is now enforced by
   `WHERE used_at IS NULL` and `RowsAffected`, not by the earlier read.
 
-**Still open:** 2.1 and 2.2 (both need your decision), 2.15 (dependency upgrade).
+**2.15 done separately** (`36e1b1a`, `a34ca7d`): audit 39 -> 9, and no runtime
+dependency is flagged any more. Angular needed an explicit bump to 21.2.23 because
+`npm audit fix` leaves it at 21.2.4 while the sanitizer-bypass advisories cover
+everything through 21.2.19. The remaining 9 are build-toolchain only (vite, esbuild,
+picomatch) and never reach the deployed bundle; they could not be applied because a
+running `ng serve` holds `esbuild.exe`, so they need one `npm audit fix` with the dev
+server stopped.
+
+**Still open:** 2.1 and 2.2 — both are decisions, not patches.
 
 ---
 
