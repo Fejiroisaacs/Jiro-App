@@ -73,3 +73,32 @@ file, scripting out one build's block with an asserted count, committing, and
 restoring — then building each commit in a throwaway `git worktree` to prove it
 compiles on its own. Cheaper to assign shared files to one agent and have the
 others state the lines to add.
+
+**Do the work; a blocker is not a deliverable.** `npm audit fix` failed with
+EBUSY because the user's `ng serve` held `esbuild.exe`. I stopped, left nine
+advisories unfixed, and reported the blocker as if it were a result. The user's
+answer: restart the server and test, and ask if there's an issue. Reporting an
+obstacle I had the tools to clear is not finishing the task — and "verified" on
+a dependency upgrade means the app actually ran, not that the build exited 0.
+**How to apply:** when a dev server or lock blocks a step, stop it, complete the
+step, restart it, and verify the running app. If stopping something genuinely
+might cost the user (unsaved state, a long job), ask — do not silently downgrade
+the task to a status report. Applies to the whole class: a locked file, a held
+port, a container that needs a restart.
+
+**Findings from parallel subagents go stale while they run.** Seven of the user's
+own commits landed during a six-agent audit; one added the exact `firebase.json`
+security headers that two agents had just reported missing, so I nearly "fixed"
+finished work and did tell him a gap existed that he had closed.
+**How to apply:** re-read the specific lines before editing anything a subagent
+flagged, and run `git log --oneline <start-sha>..HEAD` before writing the report.
+Correct stale claims explicitly rather than letting them stand.
+
+**Verify the SQL, not just the compile.** A helper I added queried a `series`
+table that does not exist — the real name is `split_series`. Go compiles string
+SQL happily, so `go build` and `go vet` both passed and only a smoke test would
+have caught it. Two other new checks returned 500/400 instead of 404 because the
+handlers had no mapping for the sentinels the service now returns.
+**How to apply:** after adding any query, check the table and column names
+against `\d <table>` and run the path. When a service starts returning a new
+sentinel error, grep its handler for the mapping in the same change.
