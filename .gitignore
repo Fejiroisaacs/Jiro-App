@@ -13,3 +13,6 @@ jiro-api/.env
 .gemini/
 # Playwright CLI output (may contain credentials)
 .playwright-cli/
+
+# Working notes — local only
+tasks/
