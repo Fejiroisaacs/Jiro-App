@@ -13,11 +13,13 @@ import (
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/models"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var (
 	ErrExerciseNotFound   = errors.New("exercise not found")
+	ErrExerciseNameTaken  = errors.New("exercise name already used")
 	ErrSplitNotFound      = errors.New("split not found")
 	ErrRoutineNotFound    = errors.New("routine not found")
 	ErrSessionNotFound    = errors.New("session not found")
@@ -57,6 +59,12 @@ func epley1RM(weight float64, reps int) float64 {
 
 // ─── Exercises ───────────────────────────────────────────────────────────────
 
+// 23505 is unique_violation; exercises are UNIQUE (user_id, name).
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
+
 func (s *JymService) CreateExercise(ctx context.Context, userID uuid.UUID, req *models.CreateExerciseRequest) (*models.Exercise, error) {
 	ex := &models.Exercise{}
 	err := s.db.QueryRow(ctx,
@@ -66,6 +74,9 @@ func (s *JymService) CreateExercise(ctx context.Context, userID uuid.UUID, req *
 		userID, req.Name, req.MuscleGroup, req.Notes,
 	).Scan(&ex.ID, &ex.UserID, &ex.Name, &ex.MuscleGroup, &ex.Notes, &ex.CreatedAt, &ex.UpdatedAt)
 	if err != nil {
+		if isUniqueViolation(err) {
+			return nil, ErrExerciseNameTaken
+		}
 		return nil, err
 	}
 	return ex, nil
@@ -172,6 +183,9 @@ func (s *JymService) UpdateExercise(ctx context.Context, userID, exerciseID uuid
 		exerciseID, userID, req.Name, req.MuscleGroup, req.Notes,
 	).Scan(&ex.ID, &ex.UserID, &ex.Name, &ex.MuscleGroup, &ex.Notes, &ex.CreatedAt, &ex.UpdatedAt)
 	if err != nil {
+		if isUniqueViolation(err) {
+			return nil, ErrExerciseNameTaken
+		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrExerciseNotFound
 		}
