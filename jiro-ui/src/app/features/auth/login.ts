@@ -123,7 +123,10 @@ export class LoginComponent {
     private router: Router,
     private route: ActivatedRoute,
   ) {
-    this.returnUrl = this.route.snapshot.queryParamMap.get('returnUrl') || '/dashboard';
+    // Only same-origin paths: a value like '//evil.tld' or 'https://evil.tld'
+    // must not become a post-login redirect target.
+    const requested = this.route.snapshot.queryParamMap.get('returnUrl') ?? '';
+    this.returnUrl = requested.startsWith('/') && !requested.startsWith('//') ? requested : '/dashboard';
   }
 
   onSubmit() {

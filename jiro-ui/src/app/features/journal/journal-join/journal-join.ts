@@ -210,7 +210,8 @@ export class JournalJoinComponent implements OnInit {
   }
 
   goToLogin() {
+    // Key must match what login reads, or the invite is lost on sign-in.
     const returnPath = `/journal/join?token=${this.token}`;
-    this.router.navigate(['/login'], { queryParams: { redirect: returnPath } });
+    this.router.navigate(['/login'], { queryParams: { returnUrl: returnPath } });
   }
 }

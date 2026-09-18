@@ -45,6 +45,78 @@ func (s *MealPlanService) GetOrCreatePlan(ctx context.Context, userID uuid.UUID,
 	return plan, nil
 }
 
+// ListPlans returns every meal plan the user has, oldest week first, each with
+// its entries.
+//
+// Read-only on purpose. GetOrCreatePlan upserts the row it returns, which is
+// right for the planner page but wrong for the data export: fetching your own
+// data should never create a plan for a week you never touched. Two queries
+// rather than one per plan, so an account with years of plans still costs a
+// fixed number of round trips.
+func (s *MealPlanService) ListPlans(ctx context.Context, userID uuid.UUID) ([]models.MealPlan, error) {
+	rows, err := s.db.Query(ctx,
+		`SELECT id, user_id, week_start, created_at, updated_at
+		 FROM meal_plans
+		 WHERE user_id = $1
+		 ORDER BY week_start`,
+		userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	plans := []models.MealPlan{}
+	for rows.Next() {
+		var p models.MealPlan
+		if err := rows.Scan(&p.ID, &p.UserID, &p.WeekStart, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			return nil, err
+		}
+		p.Entries = []models.MealPlanEntry{}
+		plans = append(plans, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(plans) == 0 {
+		return plans, nil
+	}
+
+	entryRows, err := s.db.Query(ctx,
+		`SELECT e.id, e.meal_plan_id, e.recipe_id, r.title, e.day_of_week, e.meal_slot, e.custom_label, e.position, e.created_at
+		 FROM meal_plan_entries e
+		 JOIN meal_plans p ON p.id = e.meal_plan_id
+		 LEFT JOIN recipes r ON r.id = e.recipe_id
+		 WHERE p.user_id = $1
+		 ORDER BY e.day_of_week, e.meal_slot, e.position`,
+		userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer entryRows.Close()
+
+	byPlan := map[uuid.UUID][]models.MealPlanEntry{}
+	for entryRows.Next() {
+		var e models.MealPlanEntry
+		if err := entryRows.Scan(&e.ID, &e.MealPlanID, &e.RecipeID, &e.RecipeTitle,
+			&e.DayOfWeek, &e.MealSlot, &e.CustomLabel, &e.Position, &e.CreatedAt); err != nil {
+			return nil, err
+		}
+		byPlan[e.MealPlanID] = append(byPlan[e.MealPlanID], e)
+	}
+	if err := entryRows.Err(); err != nil {
+		return nil, err
+	}
+
+	for i := range plans {
+		if entries, ok := byPlan[plans[i].ID]; ok {
+			plans[i].Entries = entries
+		}
+	}
+	return plans, nil
+}
+
 func (s *MealPlanService) listEntries(ctx context.Context, planID uuid.UUID) ([]models.MealPlanEntry, error) {
 	rows, err := s.db.Query(ctx,
 		`SELECT e.id, e.meal_plan_id, e.recipe_id, r.title, e.day_of_week, e.meal_slot, e.custom_label, e.position, e.created_at
@@ -96,6 +168,20 @@ func (s *MealPlanService) AddEntry(ctx context.Context, userID uuid.UUID, planID
 			return nil, errors.New("invalid recipe_id")
 		}
 		recipeID = &id
+
+		// The recipe id comes from the request body; without this check a
+		// caller can pin another user's recipe into their plan and read its
+		// title back from the listing.
+		var owned bool
+		if err := s.db.QueryRow(ctx,
+			`SELECT EXISTS(SELECT 1 FROM recipes WHERE id = $1 AND user_id = $2)`,
+			id, userID,
+		).Scan(&owned); err != nil {
+			return nil, err
+		}
+		if !owned {
+			return nil, ErrNotOwner
+		}
 	}
 
 	// Determine position (append after existing entries in same day+slot)
@@ -121,7 +207,7 @@ func (s *MealPlanService) AddEntry(ctx context.Context, userID uuid.UUID, planID
 	// Fetch recipe title if linked
 	if entry.RecipeID != nil {
 		var title string
-		_ = s.db.QueryRow(ctx, "SELECT title FROM recipes WHERE id = $1", *entry.RecipeID).Scan(&title)
+		_ = s.db.QueryRow(ctx, "SELECT title FROM recipes WHERE id = $1 AND user_id = $2", *entry.RecipeID, userID).Scan(&title)
 		entry.RecipeTitle = &title
 	}
 

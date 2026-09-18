@@ -49,8 +49,9 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	adminHandler := handlers.NewAdminHandler(adminService, authService, userService, emailService, cfg.AppBaseURL)
 	feedbackHandler := handlers.NewFeedbackHandler(feedbackService)
 	mealPlanHandler := handlers.NewMealPlanHandler(mealPlanService)
-	uploadHandler := handlers.NewUploadHandler(storageService, userService, recipeService, jymService)
+	uploadHandler := handlers.NewUploadHandler(storageService, userService, recipeService, jymService, journalService)
 	journalHandler := handlers.NewJournalHandler(journalService, emailService, storageService, cfg.AppBaseURL)
+	exportHandler := handlers.NewExportHandler(userService, jymService, recipeService, mealPlanService, journalService, ledgerService, db)
 
 	// Routes
 	v1 := r.Group("/api/v1")
@@ -61,6 +62,13 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 		// Public routes (rate limited by IP: 60/min)
 		public := v1.Group("")
 		public.Use(middleware.RateLimitByIP(rl, 60))
+		// Opted-in public content, plus share links reached by token. The
+		// token ones are unlisted rather than public, so a shared cache
+		// holding a copy would be a leak. There is no SEO cost to no-store
+		// here: crawlers read the prerendered HTML from the frontend host,
+		// not this JSON, so the only thing a cache would save is a little
+		// origin traffic on an app this size.
+		public.Use(middleware.NoStore())
 		{
 			public.GET("/profiles/:username", userHandler.GetPublicProfile)
 			public.GET("/jym/shares/:share_id", jymHandler.GetSharePreview)
@@ -74,6 +82,8 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 		// Auth routes (rate limited by IP: 5/min)
 		auth := v1.Group("/auth")
 		auth.Use(middleware.RateLimitByIP(rl, 5))
+		// These responses carry access tokens and single-use reset material.
+		auth.Use(middleware.NoStore())
 		{
 			auth.POST("/register", authHandler.Register)
 			auth.POST("/login", authHandler.Login)
@@ -88,6 +98,8 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 		protected := v1.Group("")
 		protected.Use(middleware.AuthRequired(authService))
 		protected.Use(middleware.RateLimitByUser(rl, 300))
+		// Everything behind here is one person's own data.
+		protected.Use(middleware.NoStore())
 		{
 			protected.GET("/user/me", userHandler.GetMe)
 			protected.PATCH("/user/me", userHandler.UpdateMe)
@@ -108,8 +120,16 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			protected.PATCH("/upload/session/:session_id/confirm", uploadHandler.ConfirmSessionAttachment)
 			protected.DELETE("/upload/session/attachments/:attachment_id", uploadHandler.DeleteSessionAttachment)
 
+			// Upload — journal collection cover (presign tighter: 20/min per user)
+			protected.POST("/upload/journal-collection/:collection_id/presign", middleware.RateLimitByUser(rl, 20), uploadHandler.PresignCollectionCover)
+			protected.PATCH("/upload/journal-collection/:collection_id/confirm", uploadHandler.ConfirmCollectionCover)
+			protected.DELETE("/upload/journal-collection/:collection_id/cover", uploadHandler.DeleteCollectionCover)
+
 			// Feedback
 			protected.POST("/feedback", feedbackHandler.Submit)
+
+			// Account data export (expensive — tighter limit: 5/min per user)
+			protected.GET("/export/account.json", middleware.RateLimitByUser(rl, 5), exportHandler.ExportAccount)
 
 			// Culinara (Recipe Module)
 			culinara := protected.Group("/culinara")
@@ -267,6 +287,9 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			journal.DELETE("/images/:image_id", journalHandler.DeleteImage)
 
 			// Groups
+			// Invite acceptance requires auth: the invite is bound to the
+			// redeeming user, so an anonymous caller has nobody to activate.
+			journal.POST("/groups/join", journalHandler.JoinGroup)
 			journal.POST("/groups", journalHandler.CreateGroup)
 			journal.GET("/groups", journalHandler.ListGroups)
 			journal.GET("/groups/:id", journalHandler.GetGroup)
@@ -288,11 +311,14 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			journal.DELETE("/collections/:id/entries/:entry_id", journalHandler.RemoveEntryFromCollection)
 		}
 
-		// Public journal invite acceptance (no auth required)
-		public.POST("/journal/groups/join", journalHandler.JoinGroup)
-
-		// Admin routes (protected by X-Admin-Secret header)
+		// Admin routes. AuthRequired runs first so the caller is an identified,
+		// logged-in user before the shared secret is checked — otherwise no user
+		// is bound to the request and admin actions are unattributable in logs.
+		// Rate limited because X-Admin-Secret is a single guessable credential.
 		admin := v1.Group("/admin")
+		admin.Use(middleware.AuthRequired(authService))
+		admin.Use(middleware.RateLimitByIP(rl, 10))
+		admin.Use(middleware.NoStore())
 		admin.Use(middleware.AdminRequired(cfg.AdminSecret))
 		{
 			admin.GET("/stats", adminHandler.GetStats)

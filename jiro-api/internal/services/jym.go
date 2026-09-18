@@ -27,7 +27,18 @@ var (
 	ErrShareNotFound      = errors.New("share not found")
 	ErrShareExpired       = errors.New("share link has expired")
 	ErrShareForbidden     = errors.New("not your share link")
+
+	ErrInvalidSessionType = errors.New("session type must be normal, deload or test")
 )
+
+// validSessionTypes mirrors the sessions.session_type CHECK constraint
+// (migration 000007); rejecting here gives a clear error instead of a
+// constraint violation from the driver.
+var validSessionTypes = map[string]bool{
+	"normal": true,
+	"deload": true,
+	"test":   true,
+}
 
 type JymService struct {
 	db *pgxpool.Pool
@@ -616,6 +627,14 @@ func (s *JymService) ReplaceRoutineItems(ctx context.Context, userID, routineID 
 		return nil, err
 	}
 
+	for _, item := range items {
+		if owned, err := s.ownsExercise(ctx, item.ExerciseID, userID); err != nil {
+			return nil, err
+		} else if !owned {
+			return nil, ErrExerciseNotFound
+		}
+	}
+
 	for i, item := range items {
 		sets := item.TargetSets
 		if sets == 0 {
@@ -673,13 +692,71 @@ func (s *JymService) ReplaceRoutineItems(ctx context.Context, userID, routineID 
 
 // ─── Sessions ─────────────────────────────────────────────────────────────────
 
+// ownsExercise reports whether the exercise belongs to the caller. Exercise,
+// routine and series ids arrive in request bodies and are attacker-chosen; the
+// reads that follow join these tables without an owner predicate, so an
+// unchecked id reflects another user's exercise or routine name back.
+func (s *JymService) ownsExercise(ctx context.Context, exerciseID, userID uuid.UUID) (bool, error) {
+	var ok bool
+	err := s.db.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM exercises WHERE id = $1 AND user_id = $2)`,
+		exerciseID, userID,
+	).Scan(&ok)
+	return ok, err
+}
+
+// ownsRoutine reports whether the routine belongs to the caller. routines.user_id
+// is NOT NULL and covers standalone templates as well as split-owned routines.
+func (s *JymService) ownsRoutine(ctx context.Context, routineID, userID uuid.UUID) (bool, error) {
+	var ok bool
+	err := s.db.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM routines WHERE id = $1 AND user_id = $2)`,
+		routineID, userID,
+	).Scan(&ok)
+	return ok, err
+}
+
+func (s *JymService) ownsSeries(ctx context.Context, seriesID, userID uuid.UUID) (bool, error) {
+	var ok bool
+	err := s.db.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM split_series WHERE id = $1 AND user_id = $2)`,
+		seriesID, userID,
+	).Scan(&ok)
+	return ok, err
+}
+
 func (s *JymService) StartSession(ctx context.Context, userID uuid.UUID, req *models.CreateSessionRequest) (*models.StartSessionResponse, error) {
+	// A caller that sends no session_type gets "normal", the column default,
+	// exactly as before.
+	sessionType := "normal"
+	if req.SessionType != nil {
+		sessionType = *req.SessionType
+	}
+	if !validSessionTypes[sessionType] {
+		return nil, ErrInvalidSessionType
+	}
+
+	if req.RoutineID != nil {
+		if owned, err := s.ownsRoutine(ctx, *req.RoutineID, userID); err != nil {
+			return nil, err
+		} else if !owned {
+			return nil, ErrRoutineNotFound
+		}
+	}
+	if req.SeriesID != nil {
+		if owned, err := s.ownsSeries(ctx, *req.SeriesID, userID); err != nil {
+			return nil, err
+		} else if !owned {
+			return nil, ErrSeriesNotFound
+		}
+	}
+
 	sess := &models.StartSessionResponse{}
 	err := s.db.QueryRow(ctx,
-		`INSERT INTO sessions (user_id, routine_id, series_id)
-		 VALUES ($1, $2, $3)
+		`INSERT INTO sessions (user_id, routine_id, series_id, session_type)
+		 VALUES ($1, $2, $3, $4)
 		 RETURNING id, user_id, routine_id, series_id, session_type, started_at, ended_at, notes`,
-		userID, req.RoutineID, req.SeriesID,
+		userID, req.RoutineID, req.SeriesID, sessionType,
 	).Scan(&sess.ID, &sess.UserID, &sess.RoutineID, &sess.SeriesID, &sess.SessionType, &sess.StartedAt, &sess.EndedAt, &sess.Notes)
 	if err != nil {
 		return nil, err
@@ -717,11 +794,28 @@ func (s *JymService) StartSession(ctx context.Context, userID uuid.UUID, req *mo
 	return sess, nil
 }
 
+// ListSessions returns the 50 most recent sessions, which is what every list
+// screen shows.
 func (s *JymService) ListSessions(ctx context.Context, userID uuid.UUID) ([]models.SessionSummary, error) {
+	limit := 50
+	return s.listSessions(ctx, userID, &limit)
+}
+
+// ListAllSessions returns every session the user has, for the account export.
+// An export that silently stopped at 50 would quietly lose history.
+func (s *JymService) ListAllSessions(ctx context.Context, userID uuid.UUID) ([]models.SessionSummary, error) {
+	return s.listSessions(ctx, userID, nil)
+}
+
+// listSessions is shared by both. A nil limit means no limit: Postgres treats
+// LIMIT NULL as LIMIT ALL, so the cap is a parameter rather than two copies of
+// the query or a string built at runtime.
+func (s *JymService) listSessions(ctx context.Context, userID uuid.UUID, limit *int) ([]models.SessionSummary, error) {
 	rows, err := s.db.Query(ctx,
 		`SELECT s.id, s.user_id, s.routine_id, s.series_id, s.session_type, s.started_at, s.ended_at, s.notes,
 		        r.name as routine_name,
 		        COUNT(ss.id) as set_count,
+		        COUNT(ss.id) FILTER (WHERE ss.is_pr) AS pr_count,
 		        COALESCE(SUM(ss.weight * ss.reps_performed), 0) as total_volume,
 		        COALESCE(array_agg(DISTINCT e.muscle_group) FILTER (WHERE e.muscle_group IS NOT NULL), '{}'::text[]) as muscle_groups
 		 FROM sessions s
@@ -731,8 +825,8 @@ func (s *JymService) ListSessions(ctx context.Context, userID uuid.UUID) ([]mode
 		 WHERE s.user_id = $1
 		 GROUP BY s.id, r.name
 		 ORDER BY s.started_at DESC
-		 LIMIT 50`,
-		userID,
+		 LIMIT $2`,
+		userID, limit,
 	)
 	if err != nil {
 		return nil, err
@@ -745,7 +839,7 @@ func (s *JymService) ListSessions(ctx context.Context, userID uuid.UUID) ([]mode
 		if err := rows.Scan(
 			&sess.ID, &sess.UserID, &sess.RoutineID, &sess.SeriesID, &sess.SessionType,
 			&sess.StartedAt, &sess.EndedAt, &sess.Notes,
-			&sess.RoutineName, &sess.SetCount, &sess.TotalVolume, &sess.MuscleGroups,
+			&sess.RoutineName, &sess.SetCount, &sess.PRCount, &sess.TotalVolume, &sess.MuscleGroups,
 		); err != nil {
 			return nil, err
 		}
@@ -1004,6 +1098,12 @@ func (s *JymService) LogSet(ctx context.Context, userID, sessionID uuid.UUID, re
 	isPR = req.Weight > bestWeight ||
 		(req.Weight == bestWeight && req.RepsPerformed > bestReps)
 
+	if owned, err := s.ownsExercise(ctx, req.ExerciseID, userID); err != nil {
+		return nil, err
+	} else if !owned {
+		return nil, ErrExerciseNotFound
+	}
+
 	set := &models.SessionSet{}
 	err := s.db.QueryRow(ctx,
 		`INSERT INTO session_sets (session_id, exercise_id, set_number, weight, reps_performed, rpe, is_pr, is_warmup, exercise_note)
@@ -1149,13 +1249,25 @@ func (s *JymService) LogBodyWeight(ctx context.Context, userID uuid.UUID, req *m
 	return bw, nil
 }
 
+// ListBodyWeights returns the last year of entries, which is what the chart
+// plots.
 func (s *JymService) ListBodyWeights(ctx context.Context, userID uuid.UUID) ([]models.BodyWeight, error) {
+	limit := 365
+	return s.listBodyWeights(ctx, userID, &limit)
+}
+
+// ListAllBodyWeights returns every entry, for the account export.
+func (s *JymService) ListAllBodyWeights(ctx context.Context, userID uuid.UUID) ([]models.BodyWeight, error) {
+	return s.listBodyWeights(ctx, userID, nil)
+}
+
+func (s *JymService) listBodyWeights(ctx context.Context, userID uuid.UUID, limit *int) ([]models.BodyWeight, error) {
 	rows, err := s.db.Query(ctx,
 		`SELECT id, user_id, recorded_at, weight_kg, created_at
 		 FROM body_weights WHERE user_id = $1
 		 ORDER BY recorded_at DESC
-		 LIMIT 365`,
-		userID,
+		 LIMIT $2`,
+		userID, limit,
 	)
 	if err != nil {
 		return nil, err
@@ -1416,6 +1528,26 @@ func (s *JymService) DeleteSeries(ctx context.Context, userID, seriesID uuid.UUI
 
 // StreamSessionsCSV writes a CSV of all session sets for the user directly to w.
 // Optional from/to filter by session start date (inclusive). Optional exerciseID narrows to one exercise.
+// csvSafe neutralises spreadsheet formula injection. Excel, LibreOffice and
+// Sheets treat a cell beginning with =, +, -, @, tab or CR as a formula, and
+// encoding/csv only quotes on comma, quote and newline — so a crafted name is
+// written bare and executes (DDE, cmd|) or exfiltrates via WEBSERVICE() when
+// the victim opens their own export.
+//
+// This is reachable across accounts: ImportShare and ImportPublicSplit copy the
+// source user's routine and exercise names into the importer's rows, so a
+// weaponised public split lands in someone else's CSV.
+func csvSafe(v string) string {
+	if v == "" {
+		return v
+	}
+	switch v[0] {
+	case '=', '+', '-', '@', '	', '':
+		return "'" + v
+	}
+	return v
+}
+
 func (s *JymService) StreamSessionsCSV(ctx context.Context, userID uuid.UUID, from, to *time.Time, exerciseID *uuid.UUID, w io.Writer) error {
 	args := []interface{}{userID}
 	where := "WHERE s.user_id = $1"
@@ -1489,9 +1621,9 @@ func (s *JymService) StreamSessionsCSV(ctx context.Context, userID uuid.UUID, fr
 		_ = cw.Write([]string{
 			date.Format("2006-01-02"),
 			sessionID.String(),
-			routine,
-			exercise,
-			muscleGroup,
+			csvSafe(routine),
+			csvSafe(exercise),
+			csvSafe(muscleGroup),
 			strconv.Itoa(setNum),
 			fmt.Sprintf("%.2f", weight),
 			strconv.Itoa(reps),

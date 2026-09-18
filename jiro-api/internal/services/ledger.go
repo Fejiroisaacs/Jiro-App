@@ -15,12 +15,12 @@ import (
 )
 
 var (
-	ErrAccountNotFound      = errors.New("account not found")
+	ErrAccountNotFound        = errors.New("account not found")
 	ErrAccountHasTransactions = errors.New("account has transactions and cannot be deleted")
-	ErrCategoryNotFound     = errors.New("category not found")
-	ErrBudgetNotFound       = errors.New("budget not found")
-	ErrTransactionNotFound  = errors.New("transaction not found")
-	ErrLedgerNotOwner       = errors.New("you do not own this resource")
+	ErrCategoryNotFound       = errors.New("category not found")
+	ErrBudgetNotFound         = errors.New("budget not found")
+	ErrTransactionNotFound    = errors.New("transaction not found")
+	ErrLedgerNotOwner         = errors.New("you do not own this resource")
 )
 
 type LedgerService struct {
@@ -321,6 +321,33 @@ func signedAmount(txType string, absAmount float64) float64 {
 	return absAmount
 }
 
+// ownsAccount reports whether the account belongs to the caller. Foreign-key
+// fields arriving in a request body are attacker-chosen and must be checked
+// before use; the balance UPDATEs are user-scoped, so an unchecked account id
+// silently no-ops instead of failing loudly.
+func (s *LedgerService) ownsAccount(ctx context.Context, accountID, userID uuid.UUID) (bool, error) {
+	var ok bool
+	err := s.db.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM ledger_accounts WHERE id = $1 AND user_id = $2)`,
+		accountID, userID,
+	).Scan(&ok)
+	return ok, err
+}
+
+// ownsCategory reports whether the category belongs to the caller. A nil id is
+// valid (uncategorised) and passes.
+func (s *LedgerService) ownsCategory(ctx context.Context, categoryID *uuid.UUID, userID uuid.UUID) (bool, error) {
+	if categoryID == nil {
+		return true, nil
+	}
+	var ok bool
+	err := s.db.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM ledger_categories WHERE id = $1 AND user_id = $2)`,
+		*categoryID, userID,
+	).Scan(&ok)
+	return ok, err
+}
+
 func (s *LedgerService) CreateTransaction(ctx context.Context, userID uuid.UUID, req *models.CreateTransactionRequest) (*models.LedgerTransaction, error) {
 	txDate, err := time.Parse("2006-01-02", req.Date)
 	if err != nil {
@@ -329,6 +356,17 @@ func (s *LedgerService) CreateTransaction(ctx context.Context, userID uuid.UUID,
 
 	absAmount := math.Abs(req.Amount)
 	signedAmt := signedAmount(req.Type, absAmount)
+
+	if owned, err := s.ownsAccount(ctx, req.AccountID, userID); err != nil {
+		return nil, err
+	} else if !owned {
+		return nil, ErrAccountNotFound
+	}
+	if owned, err := s.ownsCategory(ctx, req.CategoryID, userID); err != nil {
+		return nil, err
+	} else if !owned {
+		return nil, ErrCategoryNotFound
+	}
 
 	if req.Type == "transfer" {
 		return s.createTransfer(ctx, userID, req, txDate, absAmount)
@@ -758,6 +796,12 @@ func (s *LedgerService) CreateBudget(ctx context.Context, userID uuid.UUID, req 
 		return nil, fmt.Errorf("invalid start_date format")
 	}
 
+	if owned, err := s.ownsCategory(ctx, &req.CategoryID, userID); err != nil {
+		return nil, err
+	} else if !owned {
+		return nil, ErrCategoryNotFound
+	}
+
 	budget := &models.LedgerBudget{}
 	err = s.db.QueryRow(ctx,
 		`INSERT INTO ledger_budgets (user_id, category_id, amount, period, start_date)
@@ -1012,8 +1056,8 @@ func (s *LedgerService) GetComparison(ctx context.Context, userID uuid.UUID, aFr
 	}
 
 	return &models.ComparisonResponse{
-		PeriodA:    models.ComparisonPeriod{From: aFrom, To: aTo},
-		PeriodB:    models.ComparisonPeriod{From: bFrom, To: bTo},
+		PeriodA: models.ComparisonPeriod{From: aFrom, To: aTo},
+		PeriodB: models.ComparisonPeriod{From: bFrom, To: bTo},
 		Summary: models.ComparisonSummary{
 			Income:   mkVal(aIncome, bIncome),
 			Expenses: mkVal(aExpenses, bExpenses),

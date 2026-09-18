@@ -1,28 +1,11 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { trigger, transition, style, animate, query, stagger } from '@angular/animations';
 import { AuthService } from '../../core/services/auth.service';
-
-const bentoAnimation = trigger('bentoEntrance', [
-  transition(':enter', [
-    query('.l-card', [
-      style({ opacity: 0, transform: 'translateY(40px) scale(0.98)' })
-    ], { optional: true }),
-    query('.l-card', [
-      stagger('120ms', [
-        animate('600ms cubic-bezier(0.16, 1, 0.3, 1)',
-          style({ opacity: 1, transform: 'translateY(0) scale(1)' })
-        )
-      ])
-    ], { optional: true })
-  ])
-]);
 
 @Component({
   selector: 'app-landing',
   standalone: true,
   imports: [RouterLink],
-  animations: [bentoAnimation],
   template: `
     <div class="landing">
 
@@ -50,7 +33,10 @@ const bentoAnimation = trigger('bentoEntrance', [
           </p>
           <div class="l-hero-actions">
             <a routerLink="/register" class="l-btn l-btn--primary">Get started</a>
-            <a class="l-btn l-btn--ghost" (click)="scrollToModules()">Explore modules</a>
+            <!-- A real href, so this works without JavaScript and is reachable
+                 by keyboard. The handler only upgrades the jump to a smooth
+                 scroll; preventDefault is conditional on that. -->
+            <a href="#modules" class="l-btn l-btn--ghost" (click)="scrollToModules($event)">Explore modules</a>
           </div>
         </div>
 
@@ -76,13 +62,13 @@ const bentoAnimation = trigger('bentoEntrance', [
         <div class="l-section-inner">
           <h2 class="l-section-title">Every corner of your life, covered.</h2>
 
-          <div class="l-bento" [@.disabled]="reducedMotion" [@bentoEntrance]>
+          <div class="l-bento">
 
             <!-- Culinara — large -->
             <div class="l-card l-card--culinara" (mousemove)="onCardHover($event)" (mouseleave)="onCardLeave($event)">
               <div class="l-card-content">
                 <div class="l-card-icon">
-                  <img src="/icons/culinara-icon.svg" width="24" height="24" alt="Culinara" />
+                  <img src="/icons/culinara-icon.svg" width="24" height="24" alt="" />
                 </div>
                 <h3 class="l-card-name">Culinara</h3>
                 <p class="l-card-desc">Perfect your recipes. Log every trial, promote the winner to your permanent cookbook.</p>
@@ -102,7 +88,7 @@ const bentoAnimation = trigger('bentoEntrance', [
             <div class="l-card l-card--journaly" (mousemove)="onCardHover($event)" (mouseleave)="onCardLeave($event)">
               <div class="l-card-content">
                 <div class="l-card-icon">
-                  <img src="/icons/journaly-icon.svg" width="24" height="24" alt="Journaly" />
+                  <img src="/icons/journaly-icon.svg" width="24" height="24" alt="" />
                 </div>
                 <h3 class="l-card-name">Journaly</h3>
                 <p class="l-card-desc">Private reflections or shared journals. Track your mood, write daily, watch your streak grow.</p>
@@ -122,7 +108,7 @@ const bentoAnimation = trigger('bentoEntrance', [
             <div class="l-card l-card--jym" (mousemove)="onCardHover($event)" (mouseleave)="onCardLeave($event)">
               <div class="l-card-content">
                 <div class="l-card-icon">
-                  <img src="/icons/jym-icon.svg" width="24" height="24" alt="Jym" />
+                  <img src="/icons/jym-icon.svg" width="24" height="24" alt="" />
                 </div>
                 <h3 class="l-card-name">Jym</h3>
                 <p class="l-card-desc">Log sets, track volume, and visualise your strength journey with PR detection and progress charts.</p>
@@ -142,7 +128,7 @@ const bentoAnimation = trigger('bentoEntrance', [
             <div class="l-card l-card--ledger" (mousemove)="onCardHover($event)" (mouseleave)="onCardLeave($event)">
               <div class="l-card-content">
                 <div class="l-card-icon">
-                  <img src="/icons/ledger-icon.svg" width="24" height="24" alt="Ledger" />
+                  <img src="/icons/ledger-icon.svg" width="24" height="24" alt="" />
                 </div>
                 <h3 class="l-card-name">Ledger</h3>
                 <p class="l-card-desc">Track spending, set budgets, and watch your net worth grow over time.</p>
@@ -162,7 +148,7 @@ const bentoAnimation = trigger('bentoEntrance', [
             <div class="l-card l-card--echo" (mousemove)="onCardHover($event)" (mouseleave)="onCardLeave($event)">
               <div class="l-card-content">
                 <div class="l-card-icon">
-                  <img src="/icons/echo-icon.svg" width="24" height="24" alt="Echo" />
+                  <img src="/icons/echo-icon.svg" width="24" height="24" alt="" />
                 </div>
                 <h3 class="l-card-name">Echo</h3>
                 <p class="l-card-desc">Smart reminders that fit your rhythm. Recurring schedules, multi-channel delivery. Coming soon.</p>
@@ -185,7 +171,7 @@ const bentoAnimation = trigger('bentoEntrance', [
                   <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                 </svg>
               </div>
-              <h4>Private by default</h4>
+              <h3>Private by default</h3>
               <p>Your data is yours. No tracking, no third-party analytics, nothing sold on, no ads. Self-host it if you would rather not take our word for it.</p>
             </div>
             <div class="l-pillar">
@@ -194,7 +180,7 @@ const bentoAnimation = trigger('bentoEntrance', [
                   <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 1 0 21 12"/><path d="M21 12V2h-10"/>
                 </svg>
               </div>
-              <h4>One coherent system</h4>
+              <h3>One coherent system</h3>
               <p>All modules share the same design language, data layer, and account — no juggling five separate apps.</p>
             </div>
             <div class="l-pillar">
@@ -203,7 +189,7 @@ const bentoAnimation = trigger('bentoEntrance', [
                   <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
                 </svg>
               </div>
-              <h4>Modular by design</h4>
+              <h3>Modular by design</h3>
               <p>Use only what you need. Each module is independent but lives in the same elegant workspace.</p>
             </div>
           </div>
@@ -509,7 +495,20 @@ const bentoAnimation = trigger('bentoEntrance', [
     }
 
     /* Card base */
+    /* The module cards rise in on load, staggered. This was an
+       @angular/animations trigger; both providers for that API are deprecated
+       as of 20.2, and the effect is a one-shot entrance on a static grid, so
+       CSS does it with no package and no provider. The "both" fill mode holds
+       the start state through each card's delay, which is what produces the
+       stagger, and the reduced-motion query removes the animation entirely so
+       the base styles below (fully visible, untransformed) apply as-is. */
+    @keyframes l-bento-in {
+      from { opacity: 0; transform: translateY(40px) scale(0.98); }
+      to   { opacity: 1; transform: none; }
+    }
+
     .l-card {
+      animation: l-bento-in 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
       --mouse-x: 50%;
       --mouse-y: 50%;
       background: var(--bg-canvas);
@@ -539,6 +538,16 @@ const bentoAnimation = trigger('bentoEntrance', [
       z-index: 1;
     }
     .l-card:hover::after { opacity: 1; }
+    .l-card:nth-child(1) { animation-delay: 0ms; }
+    .l-card:nth-child(2) { animation-delay: 120ms; }
+    .l-card:nth-child(3) { animation-delay: 240ms; }
+    .l-card:nth-child(4) { animation-delay: 360ms; }
+    .l-card:nth-child(5) { animation-delay: 480ms; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .l-card { animation: none; }
+    }
+
     .l-card:hover {
       border-color: var(--color-primary);
       box-shadow: 0 8px 32px rgba(0,0,0,0.08);
@@ -654,7 +663,7 @@ const bentoAnimation = trigger('bentoEntrance', [
       align-items: start;
     }
     .l-pillar { display: flex; flex-direction: column; gap: var(--space-sm); }
-    .l-pillar:first-child h4 { font-size: var(--font-size-xl); }
+    .l-pillar:first-child h3 { font-size: var(--font-size-xl); }
     .l-pillar:first-child p { font-size: var(--font-size-md); }
     .l-pillar-icon {
       width: 44px; height: 44px;
@@ -664,7 +673,9 @@ const bentoAnimation = trigger('bentoEntrance', [
       color: var(--color-primary);
       margin-bottom: var(--space-xs);
     }
-    .l-pillar h4 { font-size: var(--font-size-md); font-weight: 700; margin: 0; }
+    /* h3, not h4: the level follows the outline under the section's h2, and
+       the size that motivated h4 lives here instead. */
+    .l-pillar h3 { font-size: var(--font-size-md); font-weight: 700; margin: 0; }
     .l-pillar p { font-size: var(--font-size-sm); color: var(--text-secondary); margin: 0; line-height: 1.6; }
 
     /* ── Final CTA ─────────────────────────────────────────────────────────── */
@@ -749,7 +760,12 @@ export class LandingComponent implements OnInit {
   readonly reducedMotion =
     typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  ngOnInit() {
+  async ngOnInit() {
+    // Wait for the startup token refresh to settle before deciding. The stored
+    // user is restored synchronously, so a visitor arriving with a stale
+    // session would otherwise be sent to /dashboard, bounced back to /login by
+    // the guard, and never see the page they actually asked for.
+    await this.auth.whenInitialized();
     if (this.auth.isAuthenticated()) {
       this.router.navigate(['/dashboard'], { replaceUrl: true });
     }
@@ -771,7 +787,17 @@ export class LandingComponent implements OnInit {
     card.style.setProperty('--mouse-y', '50%');
   }
 
-  scrollToModules() {
-    document.getElementById('modules')?.scrollIntoView({ behavior: this.reducedMotion ? 'auto' : 'smooth' });
+  /**
+   * The link already works on its own: `href="#modules"` jumps there with no
+   * JavaScript at all. This only upgrades the jump to a smooth scroll, so it
+   * takes over the event solely when it is actually going to do something
+   * different from the browser's default.
+   */
+  scrollToModules(event: Event) {
+    if (this.reducedMotion) return;
+    const target = document.getElementById('modules');
+    if (!target) return;
+    event.preventDefault();
+    target.scrollIntoView({ behavior: 'smooth' });
   }
 }

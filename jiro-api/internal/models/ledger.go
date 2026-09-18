@@ -131,14 +131,14 @@ type TransactionFilters struct {
 // ── Budgets ───────────────────────────────────────────────────────────────────
 
 type LedgerBudget struct {
-	ID           uuid.UUID `json:"id"`
-	UserID       uuid.UUID `json:"user_id"`
-	CategoryID   uuid.UUID `json:"category_id"`
-	Amount       float64   `json:"amount"`
-	Period       string    `json:"period"`
-	StartDate    time.Time `json:"start_date"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID         uuid.UUID `json:"id"`
+	UserID     uuid.UUID `json:"user_id"`
+	CategoryID uuid.UUID `json:"category_id"`
+	Amount     float64   `json:"amount"`
+	Period     string    `json:"period"`
+	StartDate  time.Time `json:"start_date"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
 }
 
 type BudgetWithSpend struct {

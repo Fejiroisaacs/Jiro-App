@@ -49,7 +49,7 @@ func NewStorageService(endpoint, bucket, accessKey, secretKey, publicURL string)
 // PresignAvatarUpload returns a presigned PUT URL and the object key for an avatar upload.
 // contentType must be image/jpeg, image/png, or image/webp.
 // contentLength must be ≤ 5 MB.
-func (s *StorageService) PresignAvatarUpload(ctx context.Context, userID uuid.UUID, ext string) (uploadURL, objectKey string, err error) {
+func (s *StorageService) PresignAvatarUpload(ctx context.Context, userID uuid.UUID, ext, contentType string, contentLength int64) (uploadURL, objectKey string, err error) {
 	if s.client == nil {
 		return "", "", fmt.Errorf("storage not configured")
 	}
@@ -57,9 +57,11 @@ func (s *StorageService) PresignAvatarUpload(ctx context.Context, userID uuid.UU
 	objectKey = fmt.Sprintf("avatars/%s/%s%s", userID, uuid.New().String(), ext)
 
 	req, err := s.presign.PresignPutObject(ctx, &s3.PutObjectInput{
-		Bucket:       aws.String(s.bucket),
-		Key:          aws.String(objectKey),
-		CacheControl: aws.String("public, max-age=31536000, immutable"),
+		Bucket:        aws.String(s.bucket),
+		Key:           aws.String(objectKey),
+		CacheControl:  aws.String("public, max-age=31536000, immutable"),
+		ContentType:   aws.String(contentType),
+		ContentLength: aws.Int64(contentLength),
 	}, s3.WithPresignExpires(5*time.Minute))
 	if err != nil {
 		return "", "", err
@@ -69,7 +71,7 @@ func (s *StorageService) PresignAvatarUpload(ctx context.Context, userID uuid.UU
 }
 
 // PresignRecipeUpload returns a presigned PUT URL and the object key for a recipe cover image upload.
-func (s *StorageService) PresignRecipeUpload(ctx context.Context, userID, recipeID uuid.UUID, ext string) (uploadURL, objectKey string, err error) {
+func (s *StorageService) PresignRecipeUpload(ctx context.Context, userID, recipeID uuid.UUID, ext, contentType string, contentLength int64) (uploadURL, objectKey string, err error) {
 	if s.client == nil {
 		return "", "", fmt.Errorf("storage not configured")
 	}
@@ -77,9 +79,11 @@ func (s *StorageService) PresignRecipeUpload(ctx context.Context, userID, recipe
 	objectKey = fmt.Sprintf("recipes/%s/%s/%s%s", userID, recipeID, uuid.New().String(), ext)
 
 	req, err := s.presign.PresignPutObject(ctx, &s3.PutObjectInput{
-		Bucket:       aws.String(s.bucket),
-		Key:          aws.String(objectKey),
-		CacheControl: aws.String("public, max-age=31536000, immutable"),
+		Bucket:        aws.String(s.bucket),
+		Key:           aws.String(objectKey),
+		CacheControl:  aws.String("public, max-age=31536000, immutable"),
+		ContentType:   aws.String(contentType),
+		ContentLength: aws.Int64(contentLength),
 	}, s3.WithPresignExpires(5*time.Minute))
 	if err != nil {
 		return "", "", err
@@ -89,7 +93,7 @@ func (s *StorageService) PresignRecipeUpload(ctx context.Context, userID, recipe
 }
 
 // PresignSessionUpload returns a presigned PUT URL and the object key for a session attachment upload.
-func (s *StorageService) PresignSessionUpload(ctx context.Context, userID, sessionID uuid.UUID, ext string) (uploadURL, objectKey string, err error) {
+func (s *StorageService) PresignSessionUpload(ctx context.Context, userID, sessionID uuid.UUID, ext, contentType string, contentLength int64) (uploadURL, objectKey string, err error) {
 	if s.client == nil {
 		return "", "", fmt.Errorf("storage not configured")
 	}
@@ -97,9 +101,11 @@ func (s *StorageService) PresignSessionUpload(ctx context.Context, userID, sessi
 	objectKey = fmt.Sprintf("sessions/%s/%s/%s%s", userID, sessionID, uuid.New().String(), ext)
 
 	req, err := s.presign.PresignPutObject(ctx, &s3.PutObjectInput{
-		Bucket:       aws.String(s.bucket),
-		Key:          aws.String(objectKey),
-		CacheControl: aws.String("public, max-age=31536000, immutable"),
+		Bucket:        aws.String(s.bucket),
+		Key:           aws.String(objectKey),
+		CacheControl:  aws.String("public, max-age=31536000, immutable"),
+		ContentType:   aws.String(contentType),
+		ContentLength: aws.Int64(contentLength),
 	}, s3.WithPresignExpires(5*time.Minute))
 	if err != nil {
 		return "", "", err
@@ -109,14 +115,16 @@ func (s *StorageService) PresignSessionUpload(ctx context.Context, userID, sessi
 }
 
 // PresignPutObject returns a presigned PUT URL for an arbitrary pre-built object key.
-func (s *StorageService) PresignPutObject(ctx context.Context, objectKey string) (uploadURL string, key string, err error) {
+func (s *StorageService) PresignPutObject(ctx context.Context, objectKey, contentType string, contentLength int64) (uploadURL string, key string, err error) {
 	if s.client == nil {
 		return "", "", fmt.Errorf("storage not configured")
 	}
 	req, err := s.presign.PresignPutObject(ctx, &s3.PutObjectInput{
-		Bucket:       aws.String(s.bucket),
-		Key:          aws.String(objectKey),
-		CacheControl: aws.String("public, max-age=31536000, immutable"),
+		Bucket:        aws.String(s.bucket),
+		Key:           aws.String(objectKey),
+		CacheControl:  aws.String("public, max-age=31536000, immutable"),
+		ContentType:   aws.String(contentType),
+		ContentLength: aws.Int64(contentLength),
 	}, s3.WithPresignExpires(5*time.Minute))
 	if err != nil {
 		return "", "", err

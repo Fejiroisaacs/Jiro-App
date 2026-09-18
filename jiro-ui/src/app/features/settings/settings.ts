@@ -1,6 +1,8 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 
 import { FormsModule } from '@angular/forms';
+import { environment } from '../../../environments/environment';
 import { AuthService, UserSettings } from '../../core/services/auth.service';
 import { SettingsService, Theme } from '../../core/services/settings.service';
 import { UploadService } from '../../core/services/upload.service';
@@ -177,6 +179,32 @@ import { ToastService } from '../../core/services/toast.service';
         </div>
       </jiro-card>
 
+      <!-- Your data -->
+      <jiro-card class="settings-section">
+        <h2>Your data</h2>
+
+        <div class="setting-row data-row">
+          <div class="data-copy">
+            <span class="setting-label">Download everything</span>
+            <p class="text-secondary setting-desc">
+              One JSON file holding your whole account: your profile and preferences;
+              every Jym exercise, split, routine, series, session with its sets, and body-weight log;
+              every Culinara recipe with its trials, your collections and every week you have planned;
+              every Journaly entry with its images, your collections and shared groups;
+              and every Ledger account, category, transaction, budget and net-worth snapshot.
+              Passwords and sign-in tokens are never included. Large accounts take a few seconds to prepare.
+            </p>
+          </div>
+          <jiro-button
+            variant="secondary"
+            [loading]="exporting()"
+            [disabled]="exporting()"
+            (click)="downloadMyData()">
+            {{ exporting() ? 'Preparing your file...' : 'Download my data' }}
+          </jiro-button>
+        </div>
+      </jiro-card>
+
     </div>
   `,
   styles: [`
@@ -251,6 +279,25 @@ import { ToastService } from '../../core/services/toast.service';
     .setting-desc {
       font-size: var(--font-size-sm);
       margin-top: 2px;
+    }
+
+    /* Your data — the copy is long, so this row wraps instead of squeezing the button */
+    .data-row {
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: var(--space-md);
+    }
+
+    .data-copy {
+      max-width: 52ch;
+    }
+
+    .data-copy .setting-label {
+      display: block;
+    }
+
+    .data-copy .setting-desc {
+      line-height: 1.6;
     }
 
     .verified-badge {
@@ -464,6 +511,10 @@ export class SettingsComponent implements OnInit {
   avatarProgress = signal(0);
   avatarError = signal<string | null>(null);
 
+  // Data export
+  private readonly http = inject(HttpClient);
+  exporting = signal(false);
+
   // Swatches show each theme's primary colour.
   themes: { value: Theme; label: string; color: string }[] = [
     { value: 'earth', label: 'Earth', color: '#6E3128' },
@@ -558,6 +609,41 @@ export class SettingsComponent implements OnInit {
     this.uploadService.deleteAvatar().subscribe({
       next: () => this.authService.clearAvatar(),
       error: () => this.avatarError.set('Failed to remove avatar.'),
+    });
+  }
+
+  /**
+   * Downloads the full account export.
+   *
+   * The request goes through HttpClient, not a plain <a href>, because the
+   * endpoint is behind the JWT and only HttpClient runs the auth interceptor
+   * that attaches the bearer token. Same blob-to-anchor shape as the Jym CSV
+   * export in session-history.
+   */
+  downloadMyData() {
+    this.exporting.set(true);
+    this.http.get(`${environment.apiUrl}/export/account.json`, { responseType: 'blob' }).subscribe({
+      next: (blob) => {
+        const date = new Date().toISOString().slice(0, 10);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `jiro-export-${date}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        this.exporting.set(false);
+        this.toast.success('Your data file has been downloaded');
+      },
+      error: (err) => {
+        this.exporting.set(false);
+        // The body of a failed blob response cannot be read as text here, so
+        // say what actually went wrong from the status instead of "Oops".
+        this.toast.error(
+          err?.status === 0
+            ? 'Could not reach the server, so nothing was downloaded. Check your connection and try again.'
+            : `The export failed on the server${err?.status ? ` (error ${err.status})` : ''} and nothing was downloaded. Please try again.`
+        );
+      },
     });
   }
 

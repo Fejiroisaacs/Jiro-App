@@ -380,6 +380,10 @@ func (h *JymHandler) ReplaceRoutineItems(c *gin.Context) {
 			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Routine not found"}})
 			return
 		}
+		if err == services.ErrExerciseNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Exercise not found"}})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to update routine items"}})
 		return
 	}
@@ -437,6 +441,18 @@ func (h *JymHandler) StartSession(c *gin.Context) {
 	}
 	sess, err := h.jymService.StartSession(c.Request.Context(), userID, &req)
 	if err != nil {
+		if err == services.ErrRoutineNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Routine not found"}})
+			return
+		}
+		if err == services.ErrSeriesNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Series not found"}})
+			return
+		}
+		if err == services.ErrInvalidSessionType {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_SESSION_TYPE", Message: "Invalid session type"}})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to start session"}})
 		return
 	}
@@ -684,6 +700,10 @@ func (h *JymHandler) LogSet(c *gin.Context) {
 	}
 	set, err := h.jymService.LogSet(c.Request.Context(), userID, sessionID, &req)
 	if err != nil {
+		if err == services.ErrExerciseNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Exercise not found"}})
+			return
+		}
 		if err == services.ErrSessionNotFound || err == services.ErrNotOwner {
 			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Session not found"}})
 			return

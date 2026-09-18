@@ -1,0 +1,19 @@
+# The Dockerfile does `COPY . .` into the builder stage. Without this file that
+# pulls jiro-api/.env — live R2 keys, the Resend key, JWT_SECRET, ADMIN_SECRET —
+# into an intermediate layer. The final image is a separate stage and stays
+# clean, but the builder layer is what BuildKit and Artifact Registry cache.
+.env
+.env.*
+!.env.example
+
+# Local build output; the image builds its own binary.
+*.exe
+jiro-api
+
+# Never needed at build time.
+.git
+.gitignore
+.dockerignore
+Dockerfile
+README.md
+*.ps1

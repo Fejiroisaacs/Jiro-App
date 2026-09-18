@@ -13,7 +13,7 @@ import { Component } from '@angular/core';
         </header>
 
         <div class="table-of-contents">
-          <h3>Quick Links</h3>
+          <h2>Quick Links</h2>
           <nav>
             <a href="#dashboard" (click)="scrollTo('dashboard', $event)">1. The Dashboard (Home)</a>
             <a href="#managing-splits" (click)="scrollTo('managing-splits', $event)">2. Managing Your Splits</a>
@@ -34,7 +34,7 @@ import { Component } from '@angular/core';
             <li><strong>Quick Stats & Recents:</strong> A summary of your recent workouts and any personal records broken.</li>
             <li><strong>Bottom Navigation:</strong> Use the bottom tab bar to quickly jump to Home, Culinara, Jym, or Settings. Within Jym, use the textured file folder tabs at the top to navigate sub-views.</li>
           </ul>
-          <img src="/images/jym-guide/jym_dashboard_view_1771964994121.png" alt="Jym Dashboard" class="guide-img" loading="lazy" />
+          <img src="/images/jym-guide/jym_dashboard_view_1771964994121.webp" alt="Jym Dashboard" class="guide-img" width="1600" height="773" loading="lazy" />
         </section>
 
         <hr class="divider" />
@@ -47,7 +47,7 @@ import { Component } from '@angular/core';
             <li><strong>Creating a Split:</strong> Click the <code>+ New Split</code> button. Give it a name, description, and some descriptive tags.</li>
             <li><strong>Public Sharing:</strong> You can choose to make any split <strong>Public</strong>. Public splits will be visible and available for the entire Jiro community to import from the <strong>Discover</strong> page.</li>
           </ul>
-          <img src="/images/jym-guide/jym_splits_view_1771965001478.png" alt="Jym Splits List" class="guide-img" loading="lazy" />
+          <img src="/images/jym-guide/jym_splits_view_1771965001478.webp" alt="Jym Splits List" class="guide-img" width="1600" height="773" loading="lazy" />
 
           <div class="sub-section">
             <h3>Building a Routine</h3>
@@ -57,7 +57,7 @@ import { Component } from '@angular/core';
               <li><strong>Adding Exercises:</strong> For each day, click <code>+ Add Exercise</code>. You can select from your Library and assign specific target sets and reps.</li>
               <li><strong>Reordering:</strong> Use the drag handles to reorder the exercises within a day to perfectly structure your workout flow.</li>
             </ul>
-            <img src="/images/jym-guide/jym_split_detail_view_1771985352516.png" alt="Jym Split Detail / Builder" class="guide-img" loading="lazy" />
+            <img src="/images/jym-guide/jym_split_detail_view_1771985352516.webp" alt="Jym Split Detail / Builder" class="guide-img" width="1600" height="773" loading="lazy" />
           </div>
 
           <div class="sub-section">
@@ -69,7 +69,7 @@ import { Component } from '@angular/core';
               <li><strong>Micro-logging:</strong> You can quickly log your Body Weight or add session notes directly within the active player without losing your workout context.</li>
               <li><strong>Completion Summary:</strong> Once finished, conclude the session to record the data. The Session Summary provides a breakdown of your total duration, volume lifted, muscle focus, and automatically highlights any newly broken PRs.</li>
             </ul>
-            <img src="/images/jym-guide/jym_session_player_view_1771988024345.png" alt="Jym Session Player View" class="guide-img" loading="lazy" />
+            <img src="/images/jym-guide/jym_session_player_view_1771988024345.webp" alt="Jym Session Player View" class="guide-img" width="1600" height="773" loading="lazy" />
           </div>
 
           <div class="sub-section">
@@ -84,7 +84,7 @@ import { Component } from '@angular/core';
                 </ol>
               </li>
             </ul>
-            <img src="/images/jym-guide/jym_series_create_modal_1771987968120.png" alt="Jym Series Create Modal" class="guide-img" loading="lazy" />
+            <img src="/images/jym-guide/jym_series_create_modal_1771987968120.webp" alt="Jym Series Create Modal" class="guide-img" width="1600" height="773" loading="lazy" />
 
             <ul>
               <li><strong>Active Series View:</strong> Once created, you can access your active series from the Dashboard. The Series Detail page provides macro analytics for the block:
@@ -94,7 +94,7 @@ import { Component } from '@angular/core';
                 </ul>
               </li>
             </ul>
-            <img src="/images/jym-guide/jym_series_detail_view_1771987996447.png" alt="Jym Series Detail View" class="guide-img" loading="lazy" />
+            <img src="/images/jym-guide/jym_series_detail_view_1771987996447.webp" alt="Jym Series Detail View" class="guide-img" width="1600" height="773" loading="lazy" />
           </div>
         </section>
 
@@ -113,9 +113,9 @@ import { Component } from '@angular/core';
               </ul>
             </li>
           </ul>
-          <img src="/images/jym-guide/jym_exercises_view_1771985334002.png" alt="Jym Exercise Library" class="guide-img" loading="lazy" />
-          <h4 style="margin-top: 10px;">Exercise Detail View</h4>
-          <img src="/images/jym-guide/jym_exercise_detail_view_1771987947621.png" alt="Jym Exercise Detail View" class="guide-img" loading="lazy" />
+          <img src="/images/jym-guide/jym_exercises_view_1771985334002.webp" alt="Jym Exercise Library" class="guide-img" width="1600" height="773" loading="lazy" />
+          <h3 class="guide-subheading">Exercise Detail View</h3>
+          <img src="/images/jym-guide/jym_exercise_detail_view_1771987947621.webp" alt="Jym Exercise Detail View" class="guide-img" width="1600" height="773" loading="lazy" />
         </section>
 
         <hr class="divider" />
@@ -127,7 +127,7 @@ import { Component } from '@angular/core';
             <li>Navigate to the <code>Body Wt.</code> tab to view your historical weigh-ins mapped out on a progressive line chart.</li>
             <li>Tap the <code>+ Add Weight</code> button to log a new entry. Consistent logging here helps contextualize your <code>Est. 1RM</code> gains in the exercise library.</li>
           </ul>
-          <img src="/images/jym-guide/jym_body_weight_view_1771985339595.png" alt="Jym Body Weight Tracker" class="guide-img" loading="lazy" />
+          <img src="/images/jym-guide/jym_body_weight_view_1771985339595.webp" alt="Jym Body Weight Tracker" class="guide-img" width="1600" height="773" loading="lazy" />
         </section>
 
         <hr class="divider" />
@@ -140,7 +140,7 @@ import { Component } from '@angular/core';
             <li>You can <strong>Import</strong> the split directly into your account. The app will automatically clone the required exercises into your library if you don't already have them.</li>
             <li>To share your own routine, go to your Splits, find the routine, and use the Share icon to generate a unique public link or post it to the Discover wall.</li>
           </ul>
-          <img src="/images/jym-guide/jym_discover_view_1771985365660.png" alt="Jym Discover Community" class="guide-img" loading="lazy" />
+          <img src="/images/jym-guide/jym_discover_view_1771985365660.webp" alt="Jym Discover Community" class="guide-img" width="1600" height="773" loading="lazy" />
         </section>
 
         <hr class="divider" />
@@ -200,7 +200,7 @@ import { Component } from '@angular/core';
       margin-bottom: var(--space-2xl);
     }
 
-    .table-of-contents h3 {
+    .table-of-contents h2 {
       font-family: var(--font-family-display);
       font-size: var(--font-size-lg);
       margin-bottom: var(--space-sm);
@@ -246,6 +246,15 @@ import { Component } from '@angular/core';
     .sub-section h3 {
       font-size: var(--font-size-lg);
       color: var(--text-primary);
+      margin-bottom: var(--space-sm);
+    }
+
+    /* Sub-heading that labels a screenshot directly inside a .guide-section.
+       Keeps the heading order h2 -> h3 rather than jumping to h4 for size. */
+    .guide-subheading {
+      font-size: var(--font-size-lg);
+      color: var(--text-primary);
+      margin-top: var(--space-sm);
       margin-bottom: var(--space-sm);
     }
 

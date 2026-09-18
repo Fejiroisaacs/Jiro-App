@@ -20,14 +20,14 @@ type Exercise struct {
 
 // SetHistory is one logged set from history, enriched with computed 1RM.
 type SetHistory struct {
-	SessionID   uuid.UUID `json:"session_id"`
-	Date        time.Time `json:"date"`
-	Weight      float64   `json:"weight"`
-	Reps        int       `json:"reps"`
-	Est1RM      float64   `json:"est_1rm"`
-	IsPR        bool      `json:"is_pr"`
-	SessionType  string  `json:"session_type"`
-	ExerciseNote *string `json:"exercise_note"`
+	SessionID    uuid.UUID `json:"session_id"`
+	Date         time.Time `json:"date"`
+	Weight       float64   `json:"weight"`
+	Reps         int       `json:"reps"`
+	Est1RM       float64   `json:"est_1rm"`
+	IsPR         bool      `json:"is_pr"`
+	SessionType  string    `json:"session_type"`
+	ExerciseNote *string   `json:"exercise_note"`
 }
 
 type ExerciseWithHistory struct {
@@ -131,12 +131,12 @@ type RoutineWithItems struct {
 }
 
 type RoutineItem struct {
-	ID          uuid.UUID `json:"id"`
-	RoutineID   uuid.UUID `json:"routine_id"`
-	ExerciseID  uuid.UUID `json:"exercise_id"`
-	TargetSets  int       `json:"target_sets"`
-	TargetReps  int       `json:"target_reps"`
-	OrderIndex  int       `json:"order_index"`
+	ID         uuid.UUID `json:"id"`
+	RoutineID  uuid.UUID `json:"routine_id"`
+	ExerciseID uuid.UUID `json:"exercise_id"`
+	TargetSets int       `json:"target_sets"`
+	TargetReps int       `json:"target_reps"`
+	OrderIndex int       `json:"order_index"`
 }
 
 type RoutineItemWithExercise struct {
@@ -293,6 +293,7 @@ type SessionSummary struct {
 	Session
 	RoutineName  *string  `json:"routine_name"`
 	SetCount     int      `json:"set_count"`
+	PRCount      int      `json:"pr_count"`
 	TotalVolume  float64  `json:"total_volume"`
 	MuscleGroups []string `json:"muscle_groups"`
 }
@@ -310,9 +311,13 @@ type SessionWithSets struct {
 	Attachments []SessionAttachment      `json:"attachments"`
 }
 
+// CreateSessionRequest optionally names the session type up front, so a
+// deliberate deload can be opened in one call instead of starting normal and
+// then patching it. Omitted means "normal", exactly as before.
 type CreateSessionRequest struct {
-	RoutineID *uuid.UUID `json:"routine_id"`
-	SeriesID  *uuid.UUID `json:"series_id"`
+	RoutineID   *uuid.UUID `json:"routine_id"`
+	SeriesID    *uuid.UUID `json:"series_id"`
+	SessionType *string    `json:"session_type" binding:"omitempty,oneof=normal deload test"`
 }
 
 type UpdateSessionRequest struct {

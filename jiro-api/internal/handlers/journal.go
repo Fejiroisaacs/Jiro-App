@@ -3,7 +3,10 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"html"
 	"net/http"
+	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -230,7 +233,7 @@ func (h *JournalHandler) PresignImage(c *gin.Context) {
 	}
 
 	objectKey := services.JournalImageObjectKey(userID, entryID, ext)
-	uploadURL, _, err := h.storage.PresignPutObject(c.Request.Context(), objectKey)
+	uploadURL, _, err := h.storage.PresignPutObject(c.Request.Context(), objectKey, strings.ToLower(req.ContentType), req.ContentLength)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "STORAGE_ERROR", Message: "Failed to generate upload URL"}})
 		return
@@ -254,9 +257,28 @@ func (h *JournalHandler) ConfirmImage(c *gin.Context) {
 		return
 	}
 
+	// The prefix contains the caller's own id, so it is trivially satisfiable.
+	// Re-verify entry ownership the way the presign step does.
+	entry, err := h.journalService.GetEntry(c.Request.Context(), userID, entryID)
+	if err != nil || entry.UserID != userID {
+		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Entry not found"}})
+		return
+	}
+
 	expectedPrefix := fmt.Sprintf("journal/%s/%s/", userID, entryID)
 	if !strings.HasPrefix(req.ObjectKey, expectedPrefix) {
 		c.JSON(http.StatusForbidden, models.ErrorResponse{Error: models.ErrorDetail{Code: "FORBIDDEN", Message: "Invalid object key"}})
+		return
+	}
+	// Reject a key that normalises to somewhere else on the storage origin.
+	if path.Clean(req.ObjectKey) != req.ObjectKey {
+		c.JSON(http.StatusForbidden, models.ErrorResponse{Error: models.ErrorDetail{Code: "FORBIDDEN", Message: "Invalid object key"}})
+		return
+	}
+	switch strings.ToLower(filepath.Ext(req.ObjectKey)) {
+	case ".jpg", ".png", ".webp":
+	default:
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_TYPE", Message: "Invalid file extension"}})
 		return
 	}
 
@@ -416,10 +438,16 @@ func (h *JournalHandler) InviteMember(c *gin.Context) {
 		return
 	}
 
-	// Verify inviter is a member
+	// Verify inviter is a member, then that they own the group. The UI only
+	// offers the invite control to the owner; the server must agree, or any
+	// member can add arbitrary accounts to a private group.
 	group, err := h.journalService.GetGroup(c.Request.Context(), userID, groupID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Group not found"}})
+		return
+	}
+	if group.OwnerID != userID {
+		c.JSON(http.StatusForbidden, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_OWNER", Message: "Only the group owner can invite members"}})
 		return
 	}
 
@@ -451,7 +479,10 @@ func (h *JournalHandler) InviteMember(c *gin.Context) {
 	// Send emails asynchronously
 	go func() {
 		inviteLink := fmt.Sprintf("%s/journal/join?token=%s", h.appBaseURL, rawToken)
-		inviteBody := fmt.Sprintf(`<p>You've been invited to join <strong>%s</strong> on Journaly.</p><p><a href="%s">Accept Invite</a></p>`, group.Name, inviteLink)
+		// group.Name is user-supplied and goes to an address the inviter chose, so
+		// unescaped markup here is branded phishing sent from our own domain.
+		safeName := html.EscapeString(group.Name)
+		inviteBody := fmt.Sprintf(`<p>You've been invited to join <strong>%s</strong> on Journaly.</p><p><a href="%s">Accept Invite</a></p>`, safeName, inviteLink)
 		if err := h.emailService.Send(req.Email, fmt.Sprintf("Join %s on Journaly", group.Name), inviteBody); err != nil {
 			log.Error().Err(err).Msg("Failed to send group invite email")
 		}
@@ -476,10 +507,10 @@ func (h *JournalHandler) RemoveMember(c *gin.Context) {
 
 	if err := h.journalService.RemoveMember(c.Request.Context(), requesterID, groupID, targetID); err != nil {
 		if err == services.ErrNotOwner {
-			c.JSON(http.StatusForbidden, models.ErrorResponse{Error: models.ErrorDetail{Code: "FORBIDDEN", Message: err.Error()}})
+			c.JSON(http.StatusForbidden, models.ErrorResponse{Error: models.ErrorDetail{Code: "FORBIDDEN", Message: "Not permitted"}})
 			return
 		}
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "BAD_REQUEST", Message: err.Error()}})
+		respondInternal(c, err, "journal request failed")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Member removed"})
@@ -487,16 +518,21 @@ func (h *JournalHandler) RemoveMember(c *gin.Context) {
 
 // POST /journal/groups/join?token=xxx  (public route)
 func (h *JournalHandler) JoinGroup(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
 	rawToken := c.Query("token")
 	if rawToken == "" {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "MISSING_TOKEN", Message: "Token is required"}})
 		return
 	}
 
-	resp, err := h.journalService.AcceptInvite(c.Request.Context(), rawToken)
+	resp, err := h.journalService.AcceptInvite(c.Request.Context(), rawToken, userID)
 	if err != nil {
 		if err == services.ErrInvalidToken {
 			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_TOKEN", Message: "Invite link is invalid or has expired"}})
+			return
+		}
+		if err == services.ErrInviteEmailMismatch {
+			c.JSON(http.StatusForbidden, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVITE_EMAIL_MISMATCH", Message: "This invite was sent to a different email address"}})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to accept invite"}})
@@ -524,8 +560,12 @@ func (h *JournalHandler) CreateGroupEntry(c *gin.Context) {
 		return
 	}
 
-	entry, err := h.journalService.CreateEntry(c.Request.Context(), userID, &groupID, &req)
+	entry, err := h.journalService.CreateGroupEntry(c.Request.Context(), userID, groupID, &req)
 	if err != nil {
+		if err == services.ErrNotGroupMember {
+			c.JSON(http.StatusForbidden, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_GROUP_MEMBER", Message: "You are not a member of this group"}})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to create entry"}})
 		return
 	}
@@ -690,6 +730,10 @@ func (h *JournalHandler) AddEntryToCollection(c *gin.Context) {
 	if err := h.journalService.AddEntryToCollection(c.Request.Context(), userID, colID, req.EntryID); err != nil {
 		if err == services.ErrJournalCollectionNotFound {
 			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Collection not found"}})
+			return
+		}
+		if err == services.ErrJournalEntryNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Entry not found"}})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to add entry"}})

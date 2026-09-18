@@ -7,6 +7,7 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
+    "build:sitemap": "node scripts/build-sitemap.mjs",
     "check:css": "node scripts/check-css-vars.mjs",
     "icons": "node scripts/build-icons.mjs"
   },
@@ -25,14 +26,14 @@
   "private": true,
   "packageManager": "npm@10.9.2",
   "dependencies": {
-    "@angular/animations": "^21.2.4",
-    "@angular/cdk": "^21.1.4",
-    "@angular/common": "^21.2.4",
-    "@angular/compiler": "^21.2.4",
-    "@angular/core": "^21.2.4",
-    "@angular/forms": "^21.2.4",
-    "@angular/platform-browser": "^21.2.4",
-    "@angular/router": "^21.2.4",
+    "@angular/animations": "^21.2.23",
+    "@angular/cdk": "^21.2.14",
+    "@angular/common": "^21.2.23",
+    "@angular/compiler": "^21.2.23",
+    "@angular/core": "^21.2.23",
+    "@angular/forms": "^21.2.23",
+    "@angular/platform-browser": "^21.2.23",
+    "@angular/router": "^21.2.23",
     "chart.js": "^4.5.1",
     "html-to-image": "^1.11.13",
     "rxjs": "~7.8.0",
@@ -41,7 +42,7 @@
   "devDependencies": {
     "@angular/build": "^21.2.2",
     "@angular/cli": "^21.2.2",
-    "@angular/compiler-cli": "^21.2.4",
+    "@angular/compiler-cli": "^21.2.23",
     "@phosphor-icons/core": "^2.1.1",
     "typescript": "~5.9.2"
   }

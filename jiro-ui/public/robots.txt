@@ -1,0 +1,46 @@
+# Jiro is mostly private records, so this file is an allowlist in spirit:
+# five pages are public and everything else is someone's own data.
+#
+# Kept in step with PUBLIC_ROUTES in src/app/core/site.config.ts and with the
+# per-route `index` flag in app.routes.ts. If you add a public page, it needs a
+# line here, an entry in PUBLIC_ROUTES, and `index: true` on its route.
+
+User-agent: *
+
+# The marketing page and the two entry points.
+Allow: /$
+Allow: /login
+Allow: /register
+
+# Opt-in public content. These two must appear before the module Disallow
+# lines below, because a crawler applies the most specific matching rule and
+# `Disallow: /culinara` would otherwise take the discover page with it.
+Allow: /culinara/discover
+Allow: /jym/discover
+
+# Someone's own records.
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /guide
+Disallow: /culinara
+Disallow: /jym
+Disallow: /ledger
+Disallow: /journal
+
+# Unlisted, not public. A share link is something a person sent to one other
+# person; indexing it would put private recipes, workouts and journals into
+# search results for anyone.
+Disallow: /culinara/share/
+Disallow: /jym/share/
+Disallow: /journal/join
+
+# Account plumbing. Nothing here is useful in search, and these URLs carry
+# single-use tokens.
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /verify-email
+
+# Staff only.
+Disallow: /admin
+
+Sitemap: https://jiro-app-3e88c.web.app/sitemap.xml
