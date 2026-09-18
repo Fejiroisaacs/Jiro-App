@@ -82,7 +82,7 @@ runs in debug mode dumping the route table at boot.
 ## P2 — Medium. Next sprint.
 
 ### Needs a decision, not a patch
-- [ ] **2.1** **Cross-site cookie topology.** API is on `run.app`, frontend on Firebase — both are on
+- [x] **2.1** **Cross-site cookie topology.** *(fixed 2026-09-18 — see below)* API is on `run.app`, frontend on Firebase — both are on
       the Public Suffix List, so they are *different sites*, and the refresh cookie is `SameSite=Strict`
       (`handlers/auth.go:253-258`). The browser will not attach it to the frontend's refresh call:
       **every user gets logged out when their access token expires.** This is a production outage as
@@ -225,6 +225,49 @@ not the documented fifteen minutes. `.env` also sets `JWT_REFRESH_TTL_MINUTES`, 
 | 34 | APIs + user input | ⚠️ CSV + email HTML injection — P2.7, P2.8 |
 | 35 | Exposed logs | ✅ No file logging; analytics read path is admin-gated |
 | 36 | Exposed source maps | ✅ None built, committed or deployed — safe by default, pin it in P3 |
+
+---
+
+## Review — 2.1, the cross-site cookie
+
+**Confirmed live, not theoretical.** `ENVIRONMENT=production` *is* set on Cloud Run
+(the API returns HSTS, which `security.go` only sends in production) — so the P1
+config finding was a latent risk, never an active breach. But the refresh cookie was
+genuinely dead in production, and the access TTL had been raised to
+`JWT_ACCESS_TTL_MINUTES=10080` to compensate: a **7-day bearer token in localStorage
+that logout could not revoke**. That is a worse exposure than the 15-minute window the
+audit originally described.
+
+It survived because it is invisible in dev: `localhost:4200` and `localhost:8080` are
+same-site (SameSite ignores the port), so the cookie flows perfectly on a dev machine
+and only dies once the halves are on `web.app` and `run.app`.
+
+**The same-origin fix was attempted and abandoned.** Firebase Hosting's `run` rewrite
+takes only `serviceId` and `region` and resolves the service *inside the Firebase
+project*. Firebase `jiro-app-3e88c` is project **1088033840673**; the Cloud Run URL
+carries **401631848579**. Different projects, so the rewrite could never resolve —
+deploying it would have 500'd every API call. Caught with `firebase serve --only
+hosting` before any deploy. A custom domain or migrating the service remain the
+options if same-origin is wanted later.
+
+**What shipped instead:** `SameSite=None; Secure` in production only (dev keeps
+`Strict`, since localhost is same-site anyway), plus `RequireTrustedOrigin` on
+`/auth/refresh` and `/auth/logout` — the only two routes that authenticate with the
+cookie rather than a bearer token. Origin is required, not optional: browsers always
+send it on POST, so absent means a non-browser caller with no ambient cookie to abuse.
+
+| Check | Result |
+|---|---|
+| refresh, no Origin | 403 |
+| refresh, `Origin: https://evil.tld` | 403 |
+| refresh, trusted Origin, no cookie | 401 — passed the gate, failed on the cookie |
+| logout, attacker Origin | 403 |
+| login, no Origin | 401 — unaffected, not cookie-authenticated |
+| real browser: expired token + cookie, reload | refresh fired, new valid token returned, session survived |
+
+**Required follow-up, in this order.** Deploy this first and confirm refresh works in
+production, *then* set `JWT_ACCESS_TTL_MINUTES=15` on Cloud Run. Doing it the other way
+round logs every user out every 15 minutes.
 
 ---
 

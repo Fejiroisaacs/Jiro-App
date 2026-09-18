@@ -237,10 +237,23 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 		}
 	}
 
-	secure := h.cfg.Environment == "production"
-	c.SetSameSite(http.SameSiteStrictMode)
+	sameSite, secure := h.refreshCookiePolicy()
+	c.SetSameSite(sameSite)
 	c.SetCookie("refresh_token", "", -1, "/api/v1/auth", "", secure, true)
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
+}
+
+// refreshCookiePolicy returns the SameSite mode and Secure flag for the refresh
+// cookie. In production the app (web.app) and API (run.app) are separate sites,
+// so a Strict cookie would never be sent and refresh would silently never work.
+// None requires Secure, and CSRF is covered by RequireTrustedOrigin on the two
+// endpoints that read this cookie. Locally both halves are localhost, which is
+// same-site already, so dev keeps the stronger setting.
+func (h *AuthHandler) refreshCookiePolicy() (http.SameSite, bool) {
+	if h.cfg.Environment == "production" {
+		return http.SameSiteNoneMode, true
+	}
+	return http.SameSiteStrictMode, false
 }
 
 func (h *AuthHandler) setRefreshCookie(c *gin.Context, userID uuid.UUID) {
@@ -252,8 +265,8 @@ func (h *AuthHandler) setRefreshCookie(c *gin.Context, userID uuid.UUID) {
 	h.authService.StoreRefreshToken(c.Request.Context(), userID, tokenHash)
 
 	maxAge := int(h.cfg.RefreshTokenTTL.Seconds())
-	secure := h.cfg.Environment == "production"
-	c.SetSameSite(http.SameSiteStrictMode)
+	sameSite, secure := h.refreshCookiePolicy()
+	c.SetSameSite(sameSite)
 	c.SetCookie("refresh_token", rawToken, maxAge, "/api/v1/auth", "", secure, true)
 }
 

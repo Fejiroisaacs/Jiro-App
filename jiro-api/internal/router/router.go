@@ -87,8 +87,10 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 		{
 			auth.POST("/register", authHandler.Register)
 			auth.POST("/login", authHandler.Login)
-			auth.POST("/refresh", authHandler.Refresh)
-			auth.POST("/logout", authHandler.Logout)
+			// These two authenticate with the refresh cookie, which the browser
+			// attaches automatically, so they are the only CSRF-reachable routes.
+			auth.POST("/refresh", middleware.RequireTrustedOrigin(cfg.CORSOrigins), authHandler.Refresh)
+			auth.POST("/logout", middleware.RequireTrustedOrigin(cfg.CORSOrigins), authHandler.Logout)
 			auth.POST("/verify-email", authHandler.VerifyEmail)
 			auth.POST("/forgot-password", authHandler.ForgotPassword)
 			auth.POST("/reset-password", authHandler.ResetPassword)
