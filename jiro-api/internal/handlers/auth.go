@@ -151,6 +151,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	user, err := h.userService.GetByEmail(c.Request.Context(), req.Email)
 	if err != nil {
+		// Match the cost of a real check.
+		h.authService.VerifyPasswordDummy(req.Password)
 		h.failTracker.RecordFail(ip)
 		c.JSON(http.StatusUnauthorized, models.ErrorResponse{
 			Error: models.ErrorDetail{Code: "INVALID_CREDENTIALS", Message: "Invalid email or password"},

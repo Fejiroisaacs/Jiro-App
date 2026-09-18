@@ -243,7 +243,8 @@ func (h *JymHandler) ListPublicSplits(c *gin.Context) {
 	limit := 20
 	offset := 0
 	if p := c.Query("page"); p != "" {
-		if n, err := strconv.Atoi(p); err == nil && n > 1 {
+		// Cap before multiplying: overflow yields a negative OFFSET.
+		if n, err := strconv.Atoi(p); err == nil && n > 1 && n <= 10000 {
 			offset = (n - 1) * limit
 		}
 	}

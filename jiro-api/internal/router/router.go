@@ -312,10 +312,8 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			journal.DELETE("/collections/:id/entries/:entry_id", journalHandler.RemoveEntryFromCollection)
 		}
 
-		// Admin routes: an authenticated user whose is_admin is set. Limited per
-		// user rather than per IP — the old 10/min IP cap existed to slow guessing
-		// of a shared header secret, which no longer exists, and it was tight
-		// enough to trip on one panel load.
+		// Authenticated user with is_admin. Per-user limit: there is no shared
+		// secret left to guess, and 10/min per IP tripped on one panel load.
 		admin := v1.Group("/admin")
 		admin.Use(middleware.AuthRequired(authService))
 		admin.Use(middleware.RateLimitByUser(rl, "admin", 120))

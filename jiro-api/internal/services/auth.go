@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/config"
@@ -51,6 +52,24 @@ func (s *AuthService) HashPassword(password string) (string, error) {
 
 	// Store as: salt$hash (both hex-encoded)
 	return fmt.Sprintf("%s$%s", hex.EncodeToString(salt), hex.EncodeToString(hash)), nil
+}
+
+// Verified against when the email is unknown, so timing does not leak
+// account existence.
+var dummyHash struct {
+	once sync.Once
+	val  string
+}
+
+func (s *AuthService) VerifyPasswordDummy(password string) {
+	dummyHash.once.Do(func() {
+		if h, err := s.HashPassword("unused-placeholder"); err == nil {
+			dummyHash.val = h
+		}
+	})
+	if dummyHash.val != "" {
+		s.VerifyPassword(dummyHash.val, password)
+	}
 }
 
 func (s *AuthService) VerifyPassword(encoded, password string) bool {

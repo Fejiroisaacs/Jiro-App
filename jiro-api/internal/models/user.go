@@ -40,7 +40,7 @@ type RefreshToken struct {
 
 type RegisterRequest struct {
 	Email       string  `json:"email" binding:"required,email"`
-	Password    string  `json:"password" binding:"required,min=8"`
+	Password    string  `json:"password" binding:"required,min=8,max=128"`
 	DisplayName string  `json:"display_name" binding:"required"`
 	Username    *string `json:"username,omitempty"`
 }
@@ -83,7 +83,7 @@ type ForgotPasswordRequest struct {
 
 type ResetPasswordRequest struct {
 	Token    string `json:"token" binding:"required"`
-	Password string `json:"password" binding:"required,min=8"`
+	Password string `json:"password" binding:"required,min=8,max=128"`
 }
 
 type ErrorResponse struct {

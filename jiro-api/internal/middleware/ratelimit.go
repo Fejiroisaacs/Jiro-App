@@ -17,6 +17,7 @@ const (
 
 type failEntry struct {
 	count        int
+	lastSeen     time.Time
 	blockedUntil time.Time
 }
 
@@ -32,8 +33,9 @@ func NewLoginFailTracker() *LoginFailTracker {
 			time.Sleep(10 * time.Minute)
 			lft.mu.Lock()
 			now := time.Now()
+			// Idleness alone: a blocked entry never satisfied the old count check.
 			for ip, e := range lft.entries {
-				if now.After(e.blockedUntil) && e.count < maxLoginFails {
+				if now.After(e.blockedUntil) && now.Sub(e.lastSeen) > loginBlockDuration {
 					delete(lft.entries, ip)
 				}
 			}
@@ -52,6 +54,7 @@ func (lft *LoginFailTracker) RecordFail(ip string) {
 		lft.entries[ip] = e
 	}
 	e.count++
+	e.lastSeen = time.Now()
 	if e.count >= maxLoginFails {
 		e.blockedUntil = time.Now().Add(loginBlockDuration)
 	}
@@ -131,8 +134,7 @@ func (rl *RateLimiter) allow(key string, capacity float64, ratePerSec float64) b
 		return true
 	}
 
-	// A bucket outlives the call that created it, so re-apply the caller's
-	// limits rather than trusting whatever the first caller happened to set.
+	// Re-apply, rather than trust whatever the first caller set.
 	if b.capacity != capacity || b.ratePerSec != ratePerSec {
 		b.capacity, b.ratePerSec = capacity, ratePerSec
 		if b.tokens > capacity {

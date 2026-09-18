@@ -66,8 +66,15 @@ func (h *JournalHandler) CreateEntry(c *gin.Context) {
 func (h *JournalHandler) ListEntries(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
-	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	// A discarded error here let ?offset=-1 reach Postgres as a 500.
+	limit, err := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	if err != nil || limit < 1 || limit > 50 {
+		limit = 20
+	}
+	offset, err := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	if err != nil || offset < 0 {
+		offset = 0
+	}
 
 	entries, err := h.journalService.ListEntries(c.Request.Context(), userID,
 		c.Query("mood"), c.Query("tag"), c.Query("q"),
@@ -181,8 +188,14 @@ func (h *JournalHandler) GetStreak(c *gin.Context) {
 func (h *JournalHandler) GetCalendar(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 	now := time.Now()
-	year, _ := strconv.Atoi(c.DefaultQuery("year", strconv.Itoa(now.Year())))
-	month, _ := strconv.Atoi(c.DefaultQuery("month", strconv.Itoa(int(now.Month()))))
+	year, err := strconv.Atoi(c.DefaultQuery("year", strconv.Itoa(now.Year())))
+	if err != nil || year < 1970 || year > 9999 {
+		year = now.Year()
+	}
+	month, err := strconv.Atoi(c.DefaultQuery("month", strconv.Itoa(int(now.Month()))))
+	if err != nil || month < 1 || month > 12 {
+		month = int(now.Month())
+	}
 
 	resp, err := h.journalService.GetCalendar(c.Request.Context(), userID, year, month, nil)
 	if err != nil {
@@ -601,8 +614,14 @@ func (h *JournalHandler) GetGroupCalendar(c *gin.Context) {
 		return
 	}
 	now := time.Now()
-	year, _ := strconv.Atoi(c.DefaultQuery("year", strconv.Itoa(now.Year())))
-	month, _ := strconv.Atoi(c.DefaultQuery("month", strconv.Itoa(int(now.Month()))))
+	year, err := strconv.Atoi(c.DefaultQuery("year", strconv.Itoa(now.Year())))
+	if err != nil || year < 1970 || year > 9999 {
+		year = now.Year()
+	}
+	month, err := strconv.Atoi(c.DefaultQuery("month", strconv.Itoa(int(now.Month()))))
+	if err != nil || month < 1 || month > 12 {
+		month = int(now.Month())
+	}
 
 	resp, err := h.journalService.GetCalendar(c.Request.Context(), userID, year, month, &groupID)
 	if err != nil {
