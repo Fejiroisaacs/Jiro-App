@@ -692,10 +692,9 @@ func (s *JymService) ReplaceRoutineItems(ctx context.Context, userID, routineID 
 
 // ─── Sessions ─────────────────────────────────────────────────────────────────
 
-// ownsExercise reports whether the exercise belongs to the caller. Exercise,
-// routine and series ids arrive in request bodies and are attacker-chosen; the
-// reads that follow join these tables without an owner predicate, so an
-// unchecked id reflects another user's exercise or routine name back.
+// Exercise, routine and series ids arrive in request bodies and the reads that
+// follow join without an owner predicate, so an unchecked id leaks another
+// user's name back. Check before use.
 func (s *JymService) ownsExercise(ctx context.Context, exerciseID, userID uuid.UUID) (bool, error) {
 	var ok bool
 	err := s.db.QueryRow(ctx,
@@ -705,8 +704,7 @@ func (s *JymService) ownsExercise(ctx context.Context, exerciseID, userID uuid.U
 	return ok, err
 }
 
-// ownsRoutine reports whether the routine belongs to the caller. routines.user_id
-// is NOT NULL and covers standalone templates as well as split-owned routines.
+// routines.user_id is NOT NULL, so this covers standalone templates too.
 func (s *JymService) ownsRoutine(ctx context.Context, routineID, userID uuid.UUID) (bool, error) {
 	var ok bool
 	err := s.db.QueryRow(ctx,
@@ -1528,21 +1526,15 @@ func (s *JymService) DeleteSeries(ctx context.Context, userID, seriesID uuid.UUI
 
 // StreamSessionsCSV writes a CSV of all session sets for the user directly to w.
 // Optional from/to filter by session start date (inclusive). Optional exerciseID narrows to one exercise.
-// csvSafe neutralises spreadsheet formula injection. Excel, LibreOffice and
-// Sheets treat a cell beginning with =, +, -, @, tab or CR as a formula, and
-// encoding/csv only quotes on comma, quote and newline — so a crafted name is
-// written bare and executes (DDE, cmd|) or exfiltrates via WEBSERVICE() when
-// the victim opens their own export.
-//
-// This is reachable across accounts: ImportShare and ImportPublicSplit copy the
-// source user's routine and exercise names into the importer's rows, so a
-// weaponised public split lands in someone else's CSV.
+// csvSafe blocks spreadsheet formula injection: a cell starting with = + - @ tab
+// or CR executes on open, and encoding/csv does not quote those. Reachable across
+// accounts, since importing a public split copies its names into your rows.
 func csvSafe(v string) string {
 	if v == "" {
 		return v
 	}
 	switch v[0] {
-	case '=', '+', '-', '@', '	', '':
+	case '=', '+', '-', '@', 0x09, 0x0D:
 		return "'" + v
 	}
 	return v

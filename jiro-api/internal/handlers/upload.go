@@ -600,9 +600,8 @@ func (h *UploadHandler) ConfirmSessionAttachment(c *gin.Context) {
 		return
 	}
 
-	// The prefix embeds the caller's own id, so it proves nothing about the
-	// session. Re-verify ownership here as the presign step does — otherwise
-	// confirm can be called directly to attach content to another user's session.
+	// The key prefix embeds the caller's own id, so it proves nothing about the
+	// session. Re-verify ownership as the presign step does.
 	if _, err := h.jymService.GetSession(c.Request.Context(), userID, sessionID); err != nil {
 		c.JSON(http.StatusNotFound, models.ErrorResponse{
 			Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Session not found"},

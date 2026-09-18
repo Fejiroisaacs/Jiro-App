@@ -321,10 +321,8 @@ func signedAmount(txType string, absAmount float64) float64 {
 	return absAmount
 }
 
-// ownsAccount reports whether the account belongs to the caller. Foreign-key
-// fields arriving in a request body are attacker-chosen and must be checked
-// before use; the balance UPDATEs are user-scoped, so an unchecked account id
-// silently no-ops instead of failing loudly.
+// The balance UPDATEs are user-scoped, so an unchecked account id from the body
+// silently no-ops instead of failing. Check it first.
 func (s *LedgerService) ownsAccount(ctx context.Context, accountID, userID uuid.UUID) (bool, error) {
 	var ok bool
 	err := s.db.QueryRow(ctx,
@@ -334,8 +332,7 @@ func (s *LedgerService) ownsAccount(ctx context.Context, accountID, userID uuid.
 	return ok, err
 }
 
-// ownsCategory reports whether the category belongs to the caller. A nil id is
-// valid (uncategorised) and passes.
+// A nil id is valid (uncategorised) and passes.
 func (s *LedgerService) ownsCategory(ctx context.Context, categoryID *uuid.UUID, userID uuid.UUID) (bool, error) {
 	if categoryID == nil {
 		return true, nil

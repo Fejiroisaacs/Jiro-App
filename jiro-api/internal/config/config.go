@@ -34,14 +34,11 @@ func Load() *Config {
 		log.Warn().Msg("No .env file found, using environment variables")
 	}
 
-	// Fail closed: an unset or misspelled ENVIRONMENT must not silently disable
-	// hardening. Local development opts out explicitly via .env.
+	// Fail closed: an unset ENVIRONMENT must not disable hardening.
 	env := getEnv("ENVIRONMENT", "production")
 	isProd := env == "production"
 
-	// No fallbacks. A missing secret must stop the server, not default to a
-	// guessable value — these are read with os.Getenv rather than getEnv so
-	// there is no placeholder to accidentally ship.
+	// os.Getenv, not getEnv: no placeholder to accidentally ship.
 	jwtSecret := os.Getenv("JWT_SECRET")
 	databaseURL := os.Getenv("DATABASE_URL")
 	adminSecret := os.Getenv("ADMIN_SECRET")
@@ -103,8 +100,7 @@ func Load() *Config {
 	}
 }
 
-// parseCORSOrigins splits a comma-separated allowlist, trimming whitespace and
-// dropping empty entries so a stray trailing comma cannot insert "" into the set.
+// Drops empty entries so a trailing comma cannot insert "" into the allowlist.
 func parseCORSOrigins(raw string) []string {
 	var origins []string
 	for _, part := range strings.Split(raw, ",") {
@@ -115,9 +111,8 @@ func parseCORSOrigins(raw string) []string {
 	return origins
 }
 
-// hasSecureSSLMode reports whether the connection string requests a TLS mode
-// that actually verifies the connection. "disable", "allow" and "prefer" all
-// permit an unencrypted session, and an absent sslmode defaults to "prefer".
+// "disable", "allow" and "prefer" all permit an unencrypted session, and an
+// absent sslmode defaults to "prefer".
 func hasSecureSSLMode(databaseURL string) bool {
 	for _, mode := range []string{"sslmode=require", "sslmode=verify-ca", "sslmode=verify-full"} {
 		if strings.Contains(databaseURL, mode) {

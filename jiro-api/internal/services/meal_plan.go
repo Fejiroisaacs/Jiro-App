@@ -169,9 +169,8 @@ func (s *MealPlanService) AddEntry(ctx context.Context, userID uuid.UUID, planID
 		}
 		recipeID = &id
 
-		// The recipe id comes from the request body; without this check a
-		// caller can pin another user's recipe into their plan and read its
-		// title back from the listing.
+		// Without this, another user's recipe can be pinned in and its title
+		// read back from the listing.
 		var owned bool
 		if err := s.db.QueryRow(ctx,
 			`SELECT EXISTS(SELECT 1 FROM recipes WHERE id = $1 AND user_id = $2)`,

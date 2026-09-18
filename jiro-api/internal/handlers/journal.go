@@ -257,8 +257,7 @@ func (h *JournalHandler) ConfirmImage(c *gin.Context) {
 		return
 	}
 
-	// The prefix contains the caller's own id, so it is trivially satisfiable.
-	// Re-verify entry ownership the way the presign step does.
+	// Prefix contains the caller's own id, so re-verify ownership like presign does.
 	entry, err := h.journalService.GetEntry(c.Request.Context(), userID, entryID)
 	if err != nil || entry.UserID != userID {
 		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Entry not found"}})
@@ -479,8 +478,8 @@ func (h *JournalHandler) InviteMember(c *gin.Context) {
 	// Send emails asynchronously
 	go func() {
 		inviteLink := fmt.Sprintf("%s/journal/join?token=%s", h.appBaseURL, rawToken)
-		// group.Name is user-supplied and goes to an address the inviter chose, so
-		// unescaped markup here is branded phishing sent from our own domain.
+		// User-supplied, sent to an address the inviter chose: unescaped markup
+		// here is phishing from our own domain.
 		safeName := html.EscapeString(group.Name)
 		inviteBody := fmt.Sprintf(`<p>You've been invited to join <strong>%s</strong> on Journaly.</p><p><a href="%s">Accept Invite</a></p>`, safeName, inviteLink)
 		if err := h.emailService.Send(req.Email, fmt.Sprintf("Join %s on Journaly", group.Name), inviteBody); err != nil {

@@ -8,10 +8,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// AdminRequired checks the X-Admin-Secret header against the configured secret.
-// It fails closed: an unconfigured secret refuses every admin request rather than
-// admitting all of them. config.Load already refuses to boot without ADMIN_SECRET,
-// so this branch is defence in depth against a future config regression.
+// AdminRequired checks X-Admin-Secret. Fails closed: an unconfigured secret
+// refuses every request rather than admitting all of them.
 func AdminRequired(secret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if secret == "" {

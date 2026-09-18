@@ -243,12 +243,8 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
 }
 
-// refreshCookiePolicy returns the SameSite mode and Secure flag for the refresh
-// cookie. In production the app (web.app) and API (run.app) are separate sites,
-// so a Strict cookie would never be sent and refresh would silently never work.
-// None requires Secure, and CSRF is covered by RequireTrustedOrigin on the two
-// endpoints that read this cookie. Locally both halves are localhost, which is
-// same-site already, so dev keeps the stronger setting.
+// Prod serves app and API from different sites, so a Strict cookie is never
+// sent. None requires Secure; RequireTrustedOrigin covers CSRF. Dev is same-site.
 func (h *AuthHandler) refreshCookiePolicy() (http.SameSite, bool) {
 	if h.cfg.Environment == "production" {
 		return http.SameSiteNoneMode, true
