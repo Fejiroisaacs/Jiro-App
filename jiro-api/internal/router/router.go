@@ -61,14 +61,14 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 
 		// Public routes (rate limited by IP: 60/min)
 		public := v1.Group("")
-		public.Use(middleware.RateLimitByIP(rl, "public", 60))
 		// Opted-in public content, plus share links reached by token. The
 		// token ones are unlisted rather than public, so a shared cache
 		// holding a copy would be a leak. There is no SEO cost to no-store
-		// here: crawlers read the prerendered HTML from the frontend host,
-		// not this JSON, so the only thing a cache would save is a little
-		// origin traffic on an app this size.
+		// here: crawlers read HTML from the frontend host, not this JSON, so
+		// the only thing a cache would save is a little origin traffic on an
+		// app this size. Registered before the limiter so a 429 carries it too.
 		public.Use(middleware.NoStore())
+		public.Use(middleware.RateLimitByIP(rl, "public", 60))
 		{
 			public.GET("/profiles/:username", userHandler.GetPublicProfile)
 			public.GET("/jym/shares/:share_id", jymHandler.GetSharePreview)
@@ -81,9 +81,10 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 
 		// Auth routes (rate limited by IP: 5/min)
 		auth := v1.Group("/auth")
-		auth.Use(middleware.RateLimitByIP(rl, "auth", 5))
-		// These responses carry access tokens and single-use reset material.
+		// Before the limiter, so a rejected 429 is covered too. These responses
+		// carry access tokens and single-use reset material.
 		auth.Use(middleware.NoStore())
+		auth.Use(middleware.RateLimitByIP(rl, "auth", 5))
 		{
 			auth.POST("/register", authHandler.Register)
 			auth.POST("/login", authHandler.Login)
@@ -97,10 +98,11 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 
 		// Protected routes (require JWT, rate limited by user: 300/min)
 		protected := v1.Group("")
+		// First in the chain on purpose: AuthRequired aborts on a 401, so a
+		// NoStore registered after it never runs on a rejected request.
+		protected.Use(middleware.NoStore())
 		protected.Use(middleware.AuthRequired(authService))
 		protected.Use(middleware.RateLimitByUser(rl, "protected", 300))
-		// Everything behind here is one person's own data.
-		protected.Use(middleware.NoStore())
 		{
 			protected.GET("/user/me", userHandler.GetMe)
 			protected.PATCH("/user/me", userHandler.UpdateMe)
