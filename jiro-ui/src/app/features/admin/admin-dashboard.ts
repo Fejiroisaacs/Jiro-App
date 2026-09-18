@@ -94,9 +94,8 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
       },
       error: err => {
         this.loading.set(false);
-        if (err.status === 401) {
-          this.adminService.clearSecret();
-          this.router.navigate(['/admin']);
+        if (err.status === 401 || err.status === 404) {
+          this.router.navigate(['/dashboard']);
         } else {
           this.error.set('Failed to load stats');
         }

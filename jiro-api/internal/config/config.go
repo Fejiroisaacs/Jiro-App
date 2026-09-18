@@ -21,7 +21,6 @@ type Config struct {
 	ResendAPIKey     string
 	EmailFrom        string
 	AppBaseURL       string
-	AdminSecret      string
 	StorageEndpoint  string
 	StorageBucket    string
 	StorageAccessKey string
@@ -41,7 +40,6 @@ func Load() *Config {
 	// os.Getenv, not getEnv: no placeholder to accidentally ship.
 	jwtSecret := os.Getenv("JWT_SECRET")
 	databaseURL := os.Getenv("DATABASE_URL")
-	adminSecret := os.Getenv("ADMIN_SECRET")
 	resendAPIKey := os.Getenv("RESEND_API_KEY")
 	corsOrigins := parseCORSOrigins(os.Getenv("CORS_ORIGINS"))
 
@@ -54,9 +52,6 @@ func Load() *Config {
 	}
 	if databaseURL == "" {
 		log.Fatal().Msg("DATABASE_URL must be set")
-	}
-	if adminSecret == "" {
-		log.Fatal().Msg("ADMIN_SECRET must be set — admin routes refuse to serve without it")
 	}
 	if len(corsOrigins) == 0 {
 		log.Fatal().Msg("CORS_ORIGINS must be set (comma-separated list of allowed origins)")
@@ -91,7 +86,6 @@ func Load() *Config {
 		ResendAPIKey:     resendAPIKey,
 		EmailFrom:        getEnv("EMAIL_FROM", "noreply@jiro.app"),
 		AppBaseURL:       getEnv("APP_BASE_URL", "http://localhost:4200"),
-		AdminSecret:      adminSecret,
 		StorageEndpoint:  getEnv("STORAGE_ENDPOINT", ""),
 		StorageBucket:    getEnv("STORAGE_BUCKET", ""),
 		StorageAccessKey: getEnv("STORAGE_ACCESS_KEY", ""),

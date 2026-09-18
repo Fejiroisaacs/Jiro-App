@@ -11,6 +11,7 @@ export interface User {
   username?: string;
   display_name?: string;
   email_verified: boolean;
+  is_admin: boolean;
   bio?: string;
   avatar_url?: string;
   settings: UserSettings;

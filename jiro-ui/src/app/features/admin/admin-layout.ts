@@ -1,6 +1,5 @@
 import { Component } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive, Router } from '@angular/router';
-import { AdminService } from '../../core/services/admin.service';
 import { JiroToasterComponent } from '../../shared/components/jiro-toaster/jiro-toaster';
 import { JiroConfirmComponent } from '../../shared/components/jiro-confirm/jiro-confirm';
 
@@ -20,7 +19,7 @@ import { JiroConfirmComponent } from '../../shared/components/jiro-confirm/jiro-
           <a class="nav-link" routerLink="/admin/events" routerLinkActive="active">Events</a>
           <a class="nav-link" routerLink="/admin/feedback" routerLinkActive="active">Feedback</a>
         </div>
-        <button class="logout-btn" (click)="logout()">Log out</button>
+        <button class="logout-btn" (click)="exit()">Exit admin</button>
       </nav>
       <main class="admin-content">
         <router-outlet />
@@ -72,10 +71,9 @@ import { JiroConfirmComponent } from '../../shared/components/jiro-confirm/jiro-
   `]
 })
 export class AdminLayoutComponent {
-  constructor(private adminService: AdminService, private router: Router) {}
+  constructor(private router: Router) {}
 
-  logout() {
-    this.adminService.clearSecret();
-    this.router.navigate(['/admin']);
+  exit() {
+    this.router.navigate(['/dashboard']);
   }
 }

@@ -1,27 +1,38 @@
 package middleware
 
 import (
-	"crypto/subtle"
 	"net/http"
 
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/models"
+	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/services"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
-// AdminRequired checks X-Admin-Secret. Fails closed: an unconfigured secret
-// refuses every request rather than admitting all of them.
-func AdminRequired(secret string) gin.HandlerFunc {
+// AdminRequired allows only users flagged is_admin. Must run after AuthRequired,
+// which is what puts user_id in the context.
+func AdminRequired(userService *services.UserService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if secret == "" {
-			c.AbortWithStatusJSON(http.StatusServiceUnavailable, models.ErrorResponse{
-				Error: models.ErrorDetail{Code: "ADMIN_DISABLED", Message: "Admin API is not configured"},
+		raw, ok := c.Get("user_id")
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, models.ErrorResponse{
+				Error: models.ErrorDetail{Code: "UNAUTHORIZED", Message: "Authentication required"},
 			})
 			return
 		}
-		provided := c.GetHeader("X-Admin-Secret")
-		if subtle.ConstantTimeCompare([]byte(provided), []byte(secret)) != 1 {
+		userID, ok := raw.(uuid.UUID)
+		if !ok {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, models.ErrorResponse{
-				Error: models.ErrorDetail{Code: "UNAUTHORIZED", Message: "Invalid admin secret"},
+				Error: models.ErrorDetail{Code: "UNAUTHORIZED", Message: "Authentication required"},
+			})
+			return
+		}
+
+		isAdmin, err := userService.IsAdmin(c.Request.Context(), userID)
+		if err != nil || !isAdmin {
+			// 404 rather than 403: don't confirm the admin surface exists.
+			c.AbortWithStatusJSON(http.StatusNotFound, models.ErrorResponse{
+				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Not found"},
 			})
 			return
 		}
