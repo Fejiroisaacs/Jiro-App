@@ -56,10 +56,10 @@ func (s *UserService) CreateUser(ctx context.Context, email, passwordHash, displ
 func (s *UserService) GetByEmail(ctx context.Context, email string) (*models.User, error) {
 	user := &models.User{}
 	err := s.db.QueryRow(ctx,
-		`SELECT id, email, password_hash, username, display_name, email_verified, bio, avatar_url, settings, created_at, updated_at
+		`SELECT id, email, password_hash, username, display_name, email_verified, is_admin, bio, avatar_url, settings, created_at, updated_at
 		 FROM users WHERE email = $1`,
 		email,
-	).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Username, &user.DisplayName, &user.EmailVerified, &user.Bio, &user.AvatarUrl, &user.Settings, &user.CreatedAt, &user.UpdatedAt)
+	).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Username, &user.DisplayName, &user.EmailVerified, &user.IsAdmin, &user.Bio, &user.AvatarUrl, &user.Settings, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -70,13 +70,27 @@ func (s *UserService) GetByEmail(ctx context.Context, email string) (*models.Use
 	return user, nil
 }
 
+// IsAdmin is read per request rather than carried in the JWT, so revoking
+// admin takes effect immediately instead of at the next token refresh.
+func (s *UserService) IsAdmin(ctx context.Context, id uuid.UUID) (bool, error) {
+	var isAdmin bool
+	err := s.db.QueryRow(ctx, `SELECT is_admin FROM users WHERE id = $1`, id).Scan(&isAdmin)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, ErrUserNotFound
+		}
+		return false, err
+	}
+	return isAdmin, nil
+}
+
 func (s *UserService) GetByID(ctx context.Context, id uuid.UUID) (*models.User, error) {
 	user := &models.User{}
 	err := s.db.QueryRow(ctx,
-		`SELECT id, email, username, display_name, email_verified, bio, avatar_url, settings, created_at, updated_at
+		`SELECT id, email, username, display_name, email_verified, is_admin, bio, avatar_url, settings, created_at, updated_at
 		 FROM users WHERE id = $1`,
 		id,
-	).Scan(&user.ID, &user.Email, &user.Username, &user.DisplayName, &user.EmailVerified, &user.Bio, &user.AvatarUrl, &user.Settings, &user.CreatedAt, &user.UpdatedAt)
+	).Scan(&user.ID, &user.Email, &user.Username, &user.DisplayName, &user.EmailVerified, &user.IsAdmin, &user.Bio, &user.AvatarUrl, &user.Settings, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

@@ -86,9 +86,7 @@ func (s *JournalService) CreateEntry(ctx context.Context, userID uuid.UUID, grou
 	return entry, nil
 }
 
-// CreateGroupEntry writes an entry into a shared group after confirming the
-// author may post there. The read paths already gate on membership; this is the
-// matching gate for the write path.
+// The read paths gate on membership; this is the matching gate for writes.
 func (s *JournalService) CreateGroupEntry(ctx context.Context, userID, groupID uuid.UUID, req *models.CreateJournalEntryRequest) (*models.JournalEntry, error) {
 	var ownerID uuid.UUID
 	if err := s.db.QueryRow(ctx, `SELECT owner_id FROM journal_groups WHERE id = $1`, groupID).Scan(&ownerID); err != nil {
@@ -674,10 +672,8 @@ func (s *JournalService) IsMember(ctx context.Context, groupID, userID uuid.UUID
 	return exists, err
 }
 
-// AcceptInvite redeems an invite token on behalf of userID. The invite is bound
-// to the address it was sent to, and only the redeeming user's membership is
-// activated — an invite is not a key that opens the group for everyone holding
-// a pending row.
+// AcceptInvite redeems an invite for userID only. The invite is bound to the
+// address it was sent to; it is not a key that admits every pending member.
 func (s *JournalService) AcceptInvite(ctx context.Context, rawToken string, userID uuid.UUID) (*models.JoinGroupResponse, error) {
 	hash := sha256.Sum256([]byte(rawToken))
 	tokenHash := hex.EncodeToString(hash[:])
@@ -919,9 +915,8 @@ func (s *JournalService) AddEntryToCollection(ctx context.Context, userID, colle
 	if ownerID != userID {
 		return ErrJournalCollectionNotFound
 	}
-	// The entry must also belong to the caller. Verifying only the collection
-	// would let anyone holding a leaked entry UUID file it into their own
-	// collection and read it back through GetCollection.
+	// Without this, a leaked entry UUID can be filed into your own collection
+	// and read back through GetCollection.
 	var entryOwned bool
 	if err := s.db.QueryRow(ctx,
 		`SELECT EXISTS(SELECT 1 FROM journal_entries WHERE id = $1 AND user_id = $2)`,

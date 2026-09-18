@@ -355,14 +355,7 @@ export const routes: Routes = [
     data: { ...PRIVATE_PAGE, description: 'Confirm your email address for your Jiro account.' },
     loadComponent: () => import('./features/auth/verify-email').then(m => m.VerifyEmailComponent),
   },
-  // Admin panel — login at exact /admin, layout handles /admin/*
-  {
-    path: 'admin',
-    pathMatch: 'full',
-    title: 'Admin',
-    data: { ...PRIVATE_PAGE },
-    loadComponent: () => import('./features/admin/admin-login').then(m => m.AdminLoginComponent),
-  },
+  // Admin panel — gated on the user's is_admin flag.
   // Until now this tree had no canActivate at all, so an anonymous visitor
   // could load and render the admin shell; only the data fetch failed.
   {

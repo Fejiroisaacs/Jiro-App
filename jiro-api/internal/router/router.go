@@ -61,7 +61,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 
 		// Public routes (rate limited by IP: 60/min)
 		public := v1.Group("")
-		public.Use(middleware.RateLimitByIP(rl, 60))
+		public.Use(middleware.RateLimitByIP(rl, "public", 60))
 		// Opted-in public content, plus share links reached by token. The
 		// token ones are unlisted rather than public, so a shared cache
 		// holding a copy would be a leak. There is no SEO cost to no-store
@@ -81,14 +81,15 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 
 		// Auth routes (rate limited by IP: 5/min)
 		auth := v1.Group("/auth")
-		auth.Use(middleware.RateLimitByIP(rl, 5))
+		auth.Use(middleware.RateLimitByIP(rl, "auth", 5))
 		// These responses carry access tokens and single-use reset material.
 		auth.Use(middleware.NoStore())
 		{
 			auth.POST("/register", authHandler.Register)
 			auth.POST("/login", authHandler.Login)
-			auth.POST("/refresh", authHandler.Refresh)
-			auth.POST("/logout", authHandler.Logout)
+			// Cookie-authenticated, so the only CSRF-reachable routes.
+			auth.POST("/refresh", middleware.RequireTrustedOrigin(cfg.CORSOrigins), authHandler.Refresh)
+			auth.POST("/logout", middleware.RequireTrustedOrigin(cfg.CORSOrigins), authHandler.Logout)
 			auth.POST("/verify-email", authHandler.VerifyEmail)
 			auth.POST("/forgot-password", authHandler.ForgotPassword)
 			auth.POST("/reset-password", authHandler.ResetPassword)
@@ -97,7 +98,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 		// Protected routes (require JWT, rate limited by user: 300/min)
 		protected := v1.Group("")
 		protected.Use(middleware.AuthRequired(authService))
-		protected.Use(middleware.RateLimitByUser(rl, 300))
+		protected.Use(middleware.RateLimitByUser(rl, "protected", 300))
 		// Everything behind here is one person's own data.
 		protected.Use(middleware.NoStore())
 		{
@@ -106,22 +107,22 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			protected.POST("/auth/resend-verification", authHandler.ResendVerification)
 
 			// Upload — avatar (presign tighter: 20/min per user)
-			protected.POST("/upload/avatar/presign", middleware.RateLimitByUser(rl, 20), uploadHandler.PresignAvatar)
+			protected.POST("/upload/avatar/presign", middleware.RateLimitByUser(rl, "presign", 20), uploadHandler.PresignAvatar)
 			protected.PATCH("/upload/avatar/confirm", uploadHandler.ConfirmAvatar)
 			protected.DELETE("/upload/avatar", uploadHandler.DeleteAvatar)
 
 			// Upload — recipe cover image (presign tighter: 20/min per user)
-			protected.POST("/upload/recipe/:recipe_id/presign", middleware.RateLimitByUser(rl, 20), uploadHandler.PresignRecipeImage)
+			protected.POST("/upload/recipe/:recipe_id/presign", middleware.RateLimitByUser(rl, "presign", 20), uploadHandler.PresignRecipeImage)
 			protected.PATCH("/upload/recipe/:recipe_id/confirm", uploadHandler.ConfirmRecipeImage)
 			protected.DELETE("/upload/recipe/:recipe_id/image", uploadHandler.DeleteRecipeImage)
 
 			// Upload — session attachments (presign tighter: 20/min per user)
-			protected.POST("/upload/session/:session_id/presign", middleware.RateLimitByUser(rl, 20), uploadHandler.PresignSessionAttachment)
+			protected.POST("/upload/session/:session_id/presign", middleware.RateLimitByUser(rl, "presign", 20), uploadHandler.PresignSessionAttachment)
 			protected.PATCH("/upload/session/:session_id/confirm", uploadHandler.ConfirmSessionAttachment)
 			protected.DELETE("/upload/session/attachments/:attachment_id", uploadHandler.DeleteSessionAttachment)
 
 			// Upload — journal collection cover (presign tighter: 20/min per user)
-			protected.POST("/upload/journal-collection/:collection_id/presign", middleware.RateLimitByUser(rl, 20), uploadHandler.PresignCollectionCover)
+			protected.POST("/upload/journal-collection/:collection_id/presign", middleware.RateLimitByUser(rl, "presign", 20), uploadHandler.PresignCollectionCover)
 			protected.PATCH("/upload/journal-collection/:collection_id/confirm", uploadHandler.ConfirmCollectionCover)
 			protected.DELETE("/upload/journal-collection/:collection_id/cover", uploadHandler.DeleteCollectionCover)
 
@@ -129,7 +130,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			protected.POST("/feedback", feedbackHandler.Submit)
 
 			// Account data export (expensive — tighter limit: 5/min per user)
-			protected.GET("/export/account.json", middleware.RateLimitByUser(rl, 5), exportHandler.ExportAccount)
+			protected.GET("/export/account.json", middleware.RateLimitByUser(rl, "export", 5), exportHandler.ExportAccount)
 
 			// Culinara (Recipe Module)
 			culinara := protected.Group("/culinara")
@@ -282,7 +283,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			journal.GET("/calendar", journalHandler.GetCalendar)
 
 			// Images
-			journal.POST("/entries/:id/images/presign", middleware.RateLimitByUser(rl, 20), journalHandler.PresignImage)
+			journal.POST("/entries/:id/images/presign", middleware.RateLimitByUser(rl, "presign", 20), journalHandler.PresignImage)
 			journal.POST("/entries/:id/images/confirm", journalHandler.ConfirmImage)
 			journal.DELETE("/images/:image_id", journalHandler.DeleteImage)
 
@@ -311,15 +312,13 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			journal.DELETE("/collections/:id/entries/:entry_id", journalHandler.RemoveEntryFromCollection)
 		}
 
-		// Admin routes. AuthRequired runs first so the caller is an identified,
-		// logged-in user before the shared secret is checked — otherwise no user
-		// is bound to the request and admin actions are unattributable in logs.
-		// Rate limited because X-Admin-Secret is a single guessable credential.
+		// Authenticated user with is_admin. Per-user limit: there is no shared
+		// secret left to guess, and 10/min per IP tripped on one panel load.
 		admin := v1.Group("/admin")
 		admin.Use(middleware.AuthRequired(authService))
-		admin.Use(middleware.RateLimitByIP(rl, 10))
+		admin.Use(middleware.RateLimitByUser(rl, "admin", 120))
 		admin.Use(middleware.NoStore())
-		admin.Use(middleware.AdminRequired(cfg.AdminSecret))
+		admin.Use(middleware.AdminRequired(userService))
 		{
 			admin.GET("/stats", adminHandler.GetStats)
 			admin.GET("/users", adminHandler.ListUsers)

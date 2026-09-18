@@ -151,6 +151,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	user, err := h.userService.GetByEmail(c.Request.Context(), req.Email)
 	if err != nil {
+		// Match the cost of a real check.
+		h.authService.VerifyPasswordDummy(req.Password)
 		h.failTracker.RecordFail(ip)
 		c.JSON(http.StatusUnauthorized, models.ErrorResponse{
 			Error: models.ErrorDetail{Code: "INVALID_CREDENTIALS", Message: "Invalid email or password"},
@@ -237,10 +239,19 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 		}
 	}
 
-	secure := h.cfg.Environment == "production"
-	c.SetSameSite(http.SameSiteStrictMode)
+	sameSite, secure := h.refreshCookiePolicy()
+	c.SetSameSite(sameSite)
 	c.SetCookie("refresh_token", "", -1, "/api/v1/auth", "", secure, true)
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
+}
+
+// Prod serves app and API from different sites, so a Strict cookie is never
+// sent. None requires Secure; RequireTrustedOrigin covers CSRF. Dev is same-site.
+func (h *AuthHandler) refreshCookiePolicy() (http.SameSite, bool) {
+	if h.cfg.Environment == "production" {
+		return http.SameSiteNoneMode, true
+	}
+	return http.SameSiteStrictMode, false
 }
 
 func (h *AuthHandler) setRefreshCookie(c *gin.Context, userID uuid.UUID) {
@@ -252,8 +263,8 @@ func (h *AuthHandler) setRefreshCookie(c *gin.Context, userID uuid.UUID) {
 	h.authService.StoreRefreshToken(c.Request.Context(), userID, tokenHash)
 
 	maxAge := int(h.cfg.RefreshTokenTTL.Seconds())
-	secure := h.cfg.Environment == "production"
-	c.SetSameSite(http.SameSiteStrictMode)
+	sameSite, secure := h.refreshCookiePolicy()
+	c.SetSameSite(sameSite)
 	c.SetCookie("refresh_token", rawToken, maxAge, "/api/v1/auth", "", secure, true)
 }
 

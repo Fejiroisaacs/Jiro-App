@@ -27,7 +27,7 @@ type AccountWithTransactions struct {
 
 type CreateAccountRequest struct {
 	Name     string  `json:"name" binding:"required"`
-	Type     string  `json:"type" binding:"required"`
+	Type     string  `json:"type" binding:"required,oneof=checking savings credit investment cash"`
 	Currency string  `json:"currency"`
 	Balance  float64 `json:"balance"`
 }
@@ -57,7 +57,7 @@ type CategoryTree struct {
 
 type CreateCategoryRequest struct {
 	Name     string     `json:"name" binding:"required"`
-	Type     string     `json:"type" binding:"required"`
+	Type     string     `json:"type" binding:"required,oneof=income expense"`
 	Color    *string    `json:"color"`
 	ParentID *uuid.UUID `json:"parent_id"`
 }
@@ -94,7 +94,7 @@ type LedgerTransaction struct {
 type CreateTransactionRequest struct {
 	AccountID           uuid.UUID  `json:"account_id" binding:"required"`
 	CategoryID          *uuid.UUID `json:"category_id"`
-	Type                string     `json:"type" binding:"required"`
+	Type                string     `json:"type" binding:"required,oneof=income expense transfer"`
 	Amount              float64    `json:"amount" binding:"required"`
 	Description         string     `json:"description"`
 	Notes               *string    `json:"notes"`
@@ -153,7 +153,7 @@ type BudgetWithSpend struct {
 type CreateBudgetRequest struct {
 	CategoryID uuid.UUID `json:"category_id" binding:"required"`
 	Amount     float64   `json:"amount" binding:"required"`
-	Period     string    `json:"period" binding:"required"`
+	Period     string    `json:"period" binding:"required,oneof=monthly weekly yearly"`
 	StartDate  string    `json:"start_date" binding:"required"` // YYYY-MM-DD
 }
 

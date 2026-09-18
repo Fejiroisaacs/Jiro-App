@@ -8,17 +8,9 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// respondInternal logs the underlying error server-side and returns a fixed
-// message to the client.
-//
-// Service-layer failures in this codebase are unwrapped pgx errors, whose text
-// carries table, column and constraint names. Echoing them into an HTTP
-// response hands an attacker a free map of the schema, so the detail stays in
-// the log and the caller gets nothing back but the status.
-//
-// Binding errors are deliberately NOT routed through here: those come from the
-// validator, name only the offending request field, and are genuinely useful to
-// a legitimate client.
+// respondInternal logs the error and returns a fixed message. Service errors here
+// are raw pgx errors carrying table and constraint names. Binding errors are not
+// routed through this — those name a request field and are useful to the caller.
 func respondInternal(c *gin.Context, err error, action string) {
 	log.Error().Err(err).Msg(action)
 	c.JSON(http.StatusInternalServerError, models.ErrorResponse{

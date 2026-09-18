@@ -14,6 +14,7 @@ type User struct {
 	Username      *string         `json:"username"`
 	DisplayName   *string         `json:"display_name"`
 	EmailVerified bool            `json:"email_verified"`
+	IsAdmin       bool            `json:"is_admin"`
 	Bio           *string         `json:"bio"`
 	AvatarUrl     *string         `json:"avatar_url"`
 	Settings      json.RawMessage `json:"settings"`
@@ -39,7 +40,7 @@ type RefreshToken struct {
 
 type RegisterRequest struct {
 	Email       string  `json:"email" binding:"required,email"`
-	Password    string  `json:"password" binding:"required,min=8"`
+	Password    string  `json:"password" binding:"required,min=8,max=128"`
 	DisplayName string  `json:"display_name" binding:"required"`
 	Username    *string `json:"username,omitempty"`
 }
@@ -82,7 +83,7 @@ type ForgotPasswordRequest struct {
 
 type ResetPasswordRequest struct {
 	Token    string `json:"token" binding:"required"`
-	Password string `json:"password" binding:"required,min=8"`
+	Password string `json:"password" binding:"required,min=8,max=128"`
 }
 
 type ErrorResponse struct {

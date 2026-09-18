@@ -146,7 +146,8 @@ func paginate(c *gin.Context) (limit, offset int) {
 		}
 	}
 	if p := c.Query("page"); p != "" {
-		if n, err := strconv.Atoi(p); err == nil && n > 1 {
+		// Bounded so (page-1)*limit cannot overflow negative.
+		if n, err := strconv.Atoi(p); err == nil && n > 1 && n <= 10000 {
 			page = n
 		}
 	}

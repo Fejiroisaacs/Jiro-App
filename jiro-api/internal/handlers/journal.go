@@ -66,8 +66,15 @@ func (h *JournalHandler) CreateEntry(c *gin.Context) {
 func (h *JournalHandler) ListEntries(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
-	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	// A discarded error here let ?offset=-1 reach Postgres as a 500.
+	limit, err := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	if err != nil || limit < 1 || limit > 50 {
+		limit = 20
+	}
+	offset, err := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	if err != nil || offset < 0 {
+		offset = 0
+	}
 
 	entries, err := h.journalService.ListEntries(c.Request.Context(), userID,
 		c.Query("mood"), c.Query("tag"), c.Query("q"),
@@ -181,8 +188,14 @@ func (h *JournalHandler) GetStreak(c *gin.Context) {
 func (h *JournalHandler) GetCalendar(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 	now := time.Now()
-	year, _ := strconv.Atoi(c.DefaultQuery("year", strconv.Itoa(now.Year())))
-	month, _ := strconv.Atoi(c.DefaultQuery("month", strconv.Itoa(int(now.Month()))))
+	year, err := strconv.Atoi(c.DefaultQuery("year", strconv.Itoa(now.Year())))
+	if err != nil || year < 1970 || year > 9999 {
+		year = now.Year()
+	}
+	month, err := strconv.Atoi(c.DefaultQuery("month", strconv.Itoa(int(now.Month()))))
+	if err != nil || month < 1 || month > 12 {
+		month = int(now.Month())
+	}
 
 	resp, err := h.journalService.GetCalendar(c.Request.Context(), userID, year, month, nil)
 	if err != nil {
@@ -257,8 +270,7 @@ func (h *JournalHandler) ConfirmImage(c *gin.Context) {
 		return
 	}
 
-	// The prefix contains the caller's own id, so it is trivially satisfiable.
-	// Re-verify entry ownership the way the presign step does.
+	// Prefix contains the caller's own id, so re-verify ownership like presign does.
 	entry, err := h.journalService.GetEntry(c.Request.Context(), userID, entryID)
 	if err != nil || entry.UserID != userID {
 		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Entry not found"}})
@@ -479,8 +491,8 @@ func (h *JournalHandler) InviteMember(c *gin.Context) {
 	// Send emails asynchronously
 	go func() {
 		inviteLink := fmt.Sprintf("%s/journal/join?token=%s", h.appBaseURL, rawToken)
-		// group.Name is user-supplied and goes to an address the inviter chose, so
-		// unescaped markup here is branded phishing sent from our own domain.
+		// User-supplied, sent to an address the inviter chose: unescaped markup
+		// here is phishing from our own domain.
 		safeName := html.EscapeString(group.Name)
 		inviteBody := fmt.Sprintf(`<p>You've been invited to join <strong>%s</strong> on Journaly.</p><p><a href="%s">Accept Invite</a></p>`, safeName, inviteLink)
 		if err := h.emailService.Send(req.Email, fmt.Sprintf("Join %s on Journaly", group.Name), inviteBody); err != nil {
@@ -602,8 +614,14 @@ func (h *JournalHandler) GetGroupCalendar(c *gin.Context) {
 		return
 	}
 	now := time.Now()
-	year, _ := strconv.Atoi(c.DefaultQuery("year", strconv.Itoa(now.Year())))
-	month, _ := strconv.Atoi(c.DefaultQuery("month", strconv.Itoa(int(now.Month()))))
+	year, err := strconv.Atoi(c.DefaultQuery("year", strconv.Itoa(now.Year())))
+	if err != nil || year < 1970 || year > 9999 {
+		year = now.Year()
+	}
+	month, err := strconv.Atoi(c.DefaultQuery("month", strconv.Itoa(int(now.Month()))))
+	if err != nil || month < 1 || month > 12 {
+		month = int(now.Month())
+	}
 
 	resp, err := h.journalService.GetCalendar(c.Request.Context(), userID, year, month, &groupID)
 	if err != nil {

@@ -17,6 +17,7 @@ const (
 
 type failEntry struct {
 	count        int
+	lastSeen     time.Time
 	blockedUntil time.Time
 }
 
@@ -32,8 +33,9 @@ func NewLoginFailTracker() *LoginFailTracker {
 			time.Sleep(10 * time.Minute)
 			lft.mu.Lock()
 			now := time.Now()
+			// Idleness alone: a blocked entry never satisfied the old count check.
 			for ip, e := range lft.entries {
-				if now.After(e.blockedUntil) && e.count < maxLoginFails {
+				if now.After(e.blockedUntil) && now.Sub(e.lastSeen) > loginBlockDuration {
 					delete(lft.entries, ip)
 				}
 			}
@@ -52,6 +54,7 @@ func (lft *LoginFailTracker) RecordFail(ip string) {
 		lft.entries[ip] = e
 	}
 	e.count++
+	e.lastSeen = time.Now()
 	if e.count >= maxLoginFails {
 		e.blockedUntil = time.Now().Add(loginBlockDuration)
 	}
@@ -131,6 +134,14 @@ func (rl *RateLimiter) allow(key string, capacity float64, ratePerSec float64) b
 		return true
 	}
 
+	// Re-apply, rather than trust whatever the first caller set.
+	if b.capacity != capacity || b.ratePerSec != ratePerSec {
+		b.capacity, b.ratePerSec = capacity, ratePerSec
+		if b.tokens > capacity {
+			b.tokens = capacity
+		}
+	}
+
 	// Refill tokens based on elapsed time
 	elapsed := now.Sub(b.lastFill).Seconds()
 	b.tokens += elapsed * b.ratePerSec
@@ -148,10 +159,11 @@ func (rl *RateLimiter) allow(key string, capacity float64, ratePerSec float64) b
 }
 
 // RateLimitByIP applies rate limiting keyed by client IP.
+// scope namespaces the bucket so two different limits do not share one.
 // capacity equals the burst size; perMinute is the sustained refill rate.
-func RateLimitByIP(rl *RateLimiter, perMinute float64) gin.HandlerFunc {
+func RateLimitByIP(rl *RateLimiter, scope string, perMinute float64) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		key := "ip:" + c.ClientIP()
+		key := scope + ":ip:" + c.ClientIP()
 		if !rl.allow(key, perMinute, perMinute/60.0) {
 			c.AbortWithStatusJSON(http.StatusTooManyRequests, models.ErrorResponse{
 				Error: models.ErrorDetail{Code: "RATE_LIMITED", Message: "Too many requests, please try again later"},
@@ -163,19 +175,20 @@ func RateLimitByIP(rl *RateLimiter, perMinute float64) gin.HandlerFunc {
 }
 
 // RateLimitByUser applies rate limiting keyed by the authenticated user ID.
+// scope namespaces the bucket so a per-route limit is not swallowed by the group.
 // Falls back to client IP when no user ID is present in the context.
 // capacity equals the burst size; perMinute is the sustained refill rate.
-func RateLimitByUser(rl *RateLimiter, perMinute float64) gin.HandlerFunc {
+func RateLimitByUser(rl *RateLimiter, scope string, perMinute float64) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var key string
 		if uid, exists := c.Get("user_id"); exists {
 			if userID, ok := uid.(interface{ String() string }); ok {
-				key = "user:" + userID.String()
+				key = scope + ":user:" + userID.String()
 			} else {
-				key = "ip:" + c.ClientIP()
+				key = scope + ":ip:" + c.ClientIP()
 			}
 		} else {
-			key = "ip:" + c.ClientIP()
+			key = scope + ":ip:" + c.ClientIP()
 		}
 		if !rl.allow(key, perMinute, perMinute/60.0) {
 			c.AbortWithStatusJSON(http.StatusTooManyRequests, models.ErrorResponse{

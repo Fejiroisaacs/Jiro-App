@@ -88,7 +88,7 @@ type CreateSplitRequest struct {
 type UpdateSplitRequest struct {
 	Name        *string   `json:"name"`
 	Description *string   `json:"description"`
-	Visibility  *string   `json:"visibility"`
+	Visibility  *string   `json:"visibility" binding:"omitempty,oneof=private public"`
 	Tags        *[]string `json:"tags"`
 }
 
@@ -323,7 +323,7 @@ type CreateSessionRequest struct {
 type UpdateSessionRequest struct {
 	EndedAt     *time.Time `json:"ended_at"`
 	Notes       *string    `json:"notes"`
-	SessionType *string    `json:"session_type"`
+	SessionType *string    `json:"session_type" binding:"omitempty,oneof=normal deload test"`
 }
 
 // ─── SessionAttachment ───────────────────────────────────────────────────────
@@ -371,18 +371,18 @@ type SessionSetWithExercise struct {
 
 type CreateSetRequest struct {
 	ExerciseID    uuid.UUID `json:"exercise_id" binding:"required"`
-	SetNumber     int       `json:"set_number" binding:"required"`
-	Weight        float64   `json:"weight" binding:"required"`
-	RepsPerformed int       `json:"reps_performed" binding:"required"`
+	SetNumber     int       `json:"set_number" binding:"required,min=1,max=200"`
+	Weight        float64   `json:"weight" binding:"gte=0,lte=2000"`
+	RepsPerformed int       `json:"reps_performed" binding:"required,min=1,max=1000"`
 	RPE           *int      `json:"rpe" binding:"omitempty,min=1,max=10"`
 	IsWarmup      *bool     `json:"is_warmup"`
 	ExerciseNote  *string   `json:"exercise_note"`
 }
 
 type UpdateSetRequest struct {
-	Weight        *float64 `json:"weight"`
-	RepsPerformed *int     `json:"reps_performed"`
-	RPE           *int     `json:"rpe"`
+	Weight        *float64 `json:"weight" binding:"omitempty,gte=0,lte=2000"`
+	RepsPerformed *int     `json:"reps_performed" binding:"omitempty,min=1,max=1000"`
+	RPE           *int     `json:"rpe" binding:"omitempty,min=1,max=10"`
 	IsWarmup      *bool    `json:"is_warmup"`
 	ExerciseNote  *string  `json:"exercise_note"`
 }

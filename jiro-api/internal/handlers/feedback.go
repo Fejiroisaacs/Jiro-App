@@ -52,7 +52,7 @@ func (h *FeedbackHandler) List(c *gin.Context) {
 	limit := 20
 	offset := 0
 	if l := c.Query("limit"); l != "" {
-		if v, err := strconv.Atoi(l); err == nil && v > 0 {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 && v <= 200 {
 			limit = v
 		}
 	}

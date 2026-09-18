@@ -36,6 +36,10 @@ func (h *JymHandler) CreateExercise(c *gin.Context) {
 	}
 	ex, err := h.jymService.CreateExercise(c.Request.Context(), userID, &req)
 	if err != nil {
+		if err == services.ErrExerciseNameTaken {
+			c.JSON(http.StatusConflict, models.ErrorResponse{Error: models.ErrorDetail{Code: "NAME_TAKEN", Message: "You already have an exercise with that name"}})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to create exercise"}})
 		return
 	}
@@ -97,6 +101,10 @@ func (h *JymHandler) UpdateExercise(c *gin.Context) {
 	if err != nil {
 		if err == services.ErrExerciseNotFound {
 			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Exercise not found"}})
+			return
+		}
+		if err == services.ErrExerciseNameTaken {
+			c.JSON(http.StatusConflict, models.ErrorResponse{Error: models.ErrorDetail{Code: "NAME_TAKEN", Message: "You already have an exercise with that name"}})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to update exercise"}})
@@ -243,7 +251,8 @@ func (h *JymHandler) ListPublicSplits(c *gin.Context) {
 	limit := 20
 	offset := 0
 	if p := c.Query("page"); p != "" {
-		if n, err := strconv.Atoi(p); err == nil && n > 1 {
+		// Cap before multiplying: overflow yields a negative OFFSET.
+		if n, err := strconv.Atoi(p); err == nil && n > 1 && n <= 10000 {
 			offset = (n - 1) * limit
 		}
 	}

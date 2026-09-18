@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/config"
@@ -51,6 +52,24 @@ func (s *AuthService) HashPassword(password string) (string, error) {
 
 	// Store as: salt$hash (both hex-encoded)
 	return fmt.Sprintf("%s$%s", hex.EncodeToString(salt), hex.EncodeToString(hash)), nil
+}
+
+// Verified against when the email is unknown, so timing does not leak
+// account existence.
+var dummyHash struct {
+	once sync.Once
+	val  string
+}
+
+func (s *AuthService) VerifyPasswordDummy(password string) {
+	dummyHash.once.Do(func() {
+		if h, err := s.HashPassword("unused-placeholder"); err == nil {
+			dummyHash.val = h
+		}
+	})
+	if dummyHash.val != "" {
+		s.VerifyPassword(dummyHash.val, password)
+	}
 }
 
 func (s *AuthService) VerifyPassword(encoded, password string) bool {
@@ -291,17 +310,15 @@ func (s *AuthService) ConsumePasswordReset(ctx context.Context, rawToken, newPas
 		return ErrTokenExpired
 	}
 
-	// One transaction, so a token cannot be consumed twice and a password
-	// cannot change without the matching session revocation.
+	// One transaction: no double-consume, no password change without revocation.
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback(ctx)
 
-	// Claim the token atomically: the used_at IS NULL predicate is what makes
-	// this single-use. The earlier read is only for the expiry check, and two
-	// concurrent requests would both pass it.
+	// used_at IS NULL is what makes this single-use; the read above is only an
+	// expiry check, and two concurrent requests would both pass it.
 	claim, err := tx.Exec(ctx,
 		"UPDATE password_resets SET used_at = NOW() WHERE token_hash = $1 AND used_at IS NULL",
 		tokenHash,
@@ -320,9 +337,8 @@ func (s *AuthService) ConsumePasswordReset(ctx context.Context, rawToken, newPas
 		return err
 	}
 
-	// Someone resetting their password after a compromise expects it to end the
-	// attacker's session. Without this the stolen refresh token stays live for
-	// its full 7 days and keeps minting access tokens.
+	// A reset after a compromise must end the attacker's session, or their
+	// refresh token keeps minting access tokens for its full 7 days.
 	if _, err = tx.Exec(ctx, "DELETE FROM refresh_tokens WHERE user_id = $1", userID); err != nil {
 		return err
 	}
