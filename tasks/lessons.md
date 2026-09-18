@@ -102,3 +102,24 @@ handlers had no mapping for the sentinels the service now returns.
 **How to apply:** after adding any query, check the table and column names
 against `\d <table>` and run the path. When a service starts returning a new
 sentinel error, grep its handler for the mapping in the same change.
+
+**Comment length should match the change, not the investigation.** A two-line
+rewrite in `firebase.json` got a paragraph explaining PSL entries, cookie
+semantics and TTL history. The reasoning was real but it belonged in the commit
+message and the audit doc, not wedged into a config file.
+**How to apply:** one line on *why* at the edit site; the story goes in the
+commit. If the comment is longer than the thing it explains, move it.
+
+**Verify infrastructure assumptions before writing the code that depends on
+them.** I estimated the same-origin fix at "about four lines" and wrote it
+before checking that it could work. Firebase Hosting's `run` rewrite takes only
+`serviceId` and `region` — it looks the service up inside the Firebase project —
+and this Cloud Run service lives in a different GCP project (Firebase
+`jiro-app-3e88c` is 1088033840673; the service URL carries 401631848579). The
+rewrite could never have resolved, and deploying it would have 500'd every API
+call on the live site.
+**How to apply:** for anything crossing a service boundary, confirm the two
+sides are actually in the same project/region/account first — `firebase
+projects:list` against the host in the URL takes seconds. The local emulator
+(`firebase serve --only hosting`) exercises rewrites for real and caught this
+before deploy; use it whenever a hosting rule changes.
