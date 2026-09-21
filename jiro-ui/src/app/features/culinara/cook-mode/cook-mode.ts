@@ -2,6 +2,7 @@ import { Component, HostListener, OnDestroy, OnInit, ElementRef, inject, signal,
 import { ActivatedRoute, Router } from '@angular/router';
 import { RecipeService, RecipeWithTrials } from '../../../core/services/recipe.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { readLocal, writeLocal, removeLocal } from '../../../core/storage';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 
@@ -382,16 +383,17 @@ export class CookModeComponent implements OnInit, OnDestroy {
     this.recipeService.getRecipe(this.recipeId).subscribe({
       next: r => {
         this.recipe.set(r);
-        this.ingredients.set((r.base_ingredients ?? []).map(i => ({
+        const saved = this.loadChecklistState();
+        this.ingredients.set((r.base_ingredients ?? []).map((i, idx) => ({
           item: i.item,
           amount: i.amount,
-          checked: false,
+          checked: saved?.ingredients[idx] ?? false,
         })));
         this.steps.set((r.instructions ?? '')
           .split('\n')
           .map(s => s.trim())
           .filter(s => s.length > 0)
-          .map(text => ({ text, done: false })));
+          .map((text, idx) => ({ text, done: saved?.steps[idx] ?? false })));
         this.loading.set(false);
         setTimeout(() => this.heading()?.nativeElement.focus(), 0);
       },
@@ -451,12 +453,43 @@ export class CookModeComponent implements OnInit, OnDestroy {
     this.ingredients.update(list =>
       list.map((ing, i) => i === index ? { ...ing, checked: !ing.checked } : ing)
     );
+    this.saveChecklistState();
   }
 
   toggleStep(index: number) {
     this.steps.update(list =>
       list.map((s, i) => i === index ? { ...s, done: !s.done } : s)
     );
+    this.saveChecklistState();
+  }
+
+  private checklistKey(): string {
+    return `jiro_cook_checklist_${this.recipeId}`;
+  }
+
+  /** Indexed against the current recipe, not stored ingredient/step text: an
+   *  edited recipe simply gets a length mismatch below and starts unchecked. */
+  private loadChecklistState(): { ingredients: boolean[]; steps: boolean[] } | null {
+    const raw = readLocal(this.checklistKey());
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed?.ingredients) && Array.isArray(parsed?.steps)) return parsed;
+    } catch {
+      /* corrupt or stale — ignore */
+    }
+    return null;
+  }
+
+  private saveChecklistState() {
+    writeLocal(this.checklistKey(), JSON.stringify({
+      ingredients: this.ingredients().map(i => i.checked),
+      steps: this.steps().map(s => s.done),
+    }));
+  }
+
+  private clearChecklistState() {
+    removeLocal(this.checklistKey());
   }
 
   setRating(value: number) {
@@ -476,6 +509,7 @@ export class CookModeComponent implements OnInit, OnDestroy {
     }).subscribe({
       next: () => {
         this.saving.set(false);
+        this.clearChecklistState();
         this.toast.success('Cook logged');
         this.router.navigate(['/culinara', this.recipeId]);
       },
