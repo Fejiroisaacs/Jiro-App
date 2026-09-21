@@ -9,13 +9,13 @@ import (
 // ─── Exercise ────────────────────────────────────────────────────────────────
 
 type Exercise struct {
-	ID          uuid.UUID  `json:"id"`
-	UserID      uuid.UUID  `json:"user_id"`
-	Name        string     `json:"name"`
-	MuscleGroup *string    `json:"muscle_group"`
-	Notes       *string    `json:"notes"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	ID          uuid.UUID `json:"id"`
+	UserID      uuid.UUID `json:"user_id"`
+	Name        string    `json:"name"`
+	MuscleGroup *string   `json:"muscle_group"`
+	Notes       *string   `json:"notes"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 	// LastPerformedAt is only populated by ListExercises; nil on the other
 	// exercise endpoints, which never select it.
 	LastPerformedAt *time.Time `json:"last_performed_at"`

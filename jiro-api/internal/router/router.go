@@ -33,6 +33,16 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	adminService := services.NewAdminService(db)
 	mealPlanService := services.NewMealPlanService(db)
 	storageService := services.NewStorageService(cfg.StorageEndpoint, cfg.StorageBucket, cfg.StorageAccessKey, cfg.StorageSecretKey, cfg.StoragePublicURL)
+	// Journal images, collection covers and session attachments have no
+	// discover/share feature and should never be readable at a plain public
+	// URL. Until StoragePrivateBucket is provisioned and set, this is the
+	// same bucket as everything else — unchanged from today — so nothing
+	// breaks on missing config; it only stops being an alias once that
+	// bucket exists.
+	privateStorageService := storageService
+	if cfg.StoragePrivateBucket != "" {
+		privateStorageService = services.NewStorageService(cfg.StorageEndpoint, cfg.StoragePrivateBucket, cfg.StorageAccessKey, cfg.StorageSecretKey, "internal://"+cfg.StoragePrivateBucket)
+	}
 	ledgerService := services.NewLedgerService(db)
 
 	// Rate limiter + login fail tracker
@@ -45,12 +55,12 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	userHandler := handlers.NewUserHandler(userService)
 	healthHandler := handlers.NewHealthHandler(db)
 	recipeHandler := handlers.NewRecipeHandler(recipeService, db, cfg.AppBaseURL)
-	jymHandler := handlers.NewJymHandler(jymService, storageService, cfg.AppBaseURL, db)
+	jymHandler := handlers.NewJymHandler(jymService, privateStorageService, cfg.AppBaseURL, db)
 	adminHandler := handlers.NewAdminHandler(adminService, authService, userService, emailService, cfg.AppBaseURL)
 	feedbackHandler := handlers.NewFeedbackHandler(feedbackService)
 	mealPlanHandler := handlers.NewMealPlanHandler(mealPlanService)
-	uploadHandler := handlers.NewUploadHandler(storageService, userService, recipeService, jymService, journalService)
-	journalHandler := handlers.NewJournalHandler(journalService, emailService, storageService, cfg.AppBaseURL)
+	uploadHandler := handlers.NewUploadHandler(storageService, privateStorageService, userService, recipeService, jymService, journalService)
+	journalHandler := handlers.NewJournalHandler(journalService, emailService, privateStorageService, cfg.AppBaseURL)
 	exportHandler := handlers.NewExportHandler(userService, jymService, recipeService, mealPlanService, journalService, ledgerService, db)
 
 	// Routes

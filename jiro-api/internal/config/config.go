@@ -26,6 +26,12 @@ type Config struct {
 	StorageAccessKey string
 	StorageSecretKey string
 	StoragePublicURL string
+	// StoragePrivateBucket holds journal images, collection covers and session
+	// attachments — content with no discover/share feature, unlike recipe
+	// covers and avatars, which stay in StorageBucket and stay public. Empty
+	// until that bucket exists and this stays wired to StorageBucket, keeping
+	// today's behaviour rather than breaking on missing config.
+	StoragePrivateBucket string
 }
 
 func Load() *Config {
@@ -76,21 +82,22 @@ func Load() *Config {
 	}
 
 	return &Config{
-		Port:             getEnv("PORT", "8080"),
-		DatabaseURL:      databaseURL,
-		JWTSecret:        jwtSecret,
-		AccessTokenTTL:   getDuration("JWT_ACCESS_TTL_MINUTES", 15),
-		RefreshTokenTTL:  getDurationDays("JWT_REFRESH_TTL_DAYS", 7),
-		CORSOrigins:      corsOrigins,
-		Environment:      env,
-		ResendAPIKey:     resendAPIKey,
-		EmailFrom:        getEnv("EMAIL_FROM", "noreply@jiro.app"),
-		AppBaseURL:       getEnv("APP_BASE_URL", "http://localhost:4200"),
-		StorageEndpoint:  getEnv("STORAGE_ENDPOINT", ""),
-		StorageBucket:    getEnv("STORAGE_BUCKET", ""),
-		StorageAccessKey: getEnv("STORAGE_ACCESS_KEY", ""),
-		StorageSecretKey: getEnv("STORAGE_SECRET_KEY", ""),
-		StoragePublicURL: getEnv("STORAGE_PUBLIC_URL", ""),
+		Port:                 getEnv("PORT", "8080"),
+		DatabaseURL:          databaseURL,
+		JWTSecret:            jwtSecret,
+		AccessTokenTTL:       getDuration("JWT_ACCESS_TTL_MINUTES", 15),
+		RefreshTokenTTL:      getDurationDays("JWT_REFRESH_TTL_DAYS", 7),
+		CORSOrigins:          corsOrigins,
+		Environment:          env,
+		ResendAPIKey:         resendAPIKey,
+		EmailFrom:            getEnv("EMAIL_FROM", "noreply@jiro.app"),
+		AppBaseURL:           getEnv("APP_BASE_URL", "http://localhost:4200"),
+		StorageEndpoint:      getEnv("STORAGE_ENDPOINT", ""),
+		StorageBucket:        getEnv("STORAGE_BUCKET", ""),
+		StorageAccessKey:     getEnv("STORAGE_ACCESS_KEY", ""),
+		StorageSecretKey:     getEnv("STORAGE_SECRET_KEY", ""),
+		StoragePublicURL:     getEnv("STORAGE_PUBLIC_URL", ""),
+		StoragePrivateBucket: getEnv("STORAGE_BUCKET_PRIVATE", ""),
 	}
 }
 
