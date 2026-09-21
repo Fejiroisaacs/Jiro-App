@@ -89,7 +89,7 @@ const ROW_ACTIONS: JiroMenuItem[] = [
                 @if (prFor(ex.id); as pr) {
                   <span class="ex-best">
                     <span class="best-set">{{ weight(pr.weight) }} {{ unit() }} &times; {{ pr.reps }}</span>
-                    <span class="best-meta">est. 1RM {{ weight(pr.est_1rm) }} {{ unit() }} &middot; PR {{ ago(pr.date) }}</span>
+                    <span class="best-meta">est. 1RM {{ weight(pr.est_1rm) }} {{ unit() }} &middot; last trained {{ ago(ex.last_performed_at ?? pr.date) }}</span>
                   </span>
                 } @else {
                   <span class="ex-best ex-best--none">No sets logged yet</span>
