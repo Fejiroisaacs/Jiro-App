@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -10,6 +11,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/google/uuid"
 )
+
+const SignedReadTTL = time.Hour
 
 type StorageService struct {
 	client    *s3.Client
@@ -147,4 +150,27 @@ func (s *StorageService) DeleteObject(ctx context.Context, objectKey string) err
 // PublicURL returns the public URL for an object key.
 func (s *StorageService) PublicURL(objectKey string) string {
 	return fmt.Sprintf("%s/%s", s.publicURL, objectKey)
+}
+
+// ObjectKeyFromPublicURL recovers the key from a URL PublicURL built earlier.
+// Needed wherever only the built URL was persisted, not the key beside it
+// (journal collection covers).
+func (s *StorageService) ObjectKeyFromPublicURL(url string) string {
+	return strings.TrimPrefix(strings.TrimPrefix(url, s.publicURL), "/")
+}
+
+// PresignGetObject returns a short-lived signed GET URL for an object that is
+// not meant to be readable at its plain public URL.
+func (s *StorageService) PresignGetObject(ctx context.Context, objectKey string) (string, error) {
+	if s.client == nil {
+		return "", fmt.Errorf("storage not configured")
+	}
+	req, err := s.presign.PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(objectKey),
+	}, s3.WithPresignExpires(SignedReadTTL))
+	if err != nil {
+		return "", err
+	}
+	return req.URL, nil
 }

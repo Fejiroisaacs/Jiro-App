@@ -37,6 +37,24 @@ func NewJournalHandler(js *services.JournalService, es *services.EmailService, s
 	return &JournalHandler{journalService: js, emailService: es, storage: ss, appBaseURL: appBaseURL}
 }
 
+func (h *JournalHandler) signImages(ctx context.Context, images []models.JournalImage) {
+	for i := range images {
+		if url, err := h.storage.PresignGetObject(ctx, images[i].ObjectKey); err == nil {
+			images[i].FileURL = url
+		}
+	}
+}
+
+func (h *JournalHandler) signCollectionCover(ctx context.Context, col *models.JournalCollection) {
+	if col == nil || col.CoverImageURL == nil || *col.CoverImageURL == "" {
+		return
+	}
+	key := h.storage.ObjectKeyFromPublicURL(*col.CoverImageURL)
+	if url, err := h.storage.PresignGetObject(ctx, key); err == nil {
+		col.CoverImageURL = &url
+	}
+}
+
 // ─── Entries ───────────────────────────────────────────────────────────────
 
 // POST /journal/entries
@@ -106,6 +124,7 @@ func (h *JournalHandler) GetEntry(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to get entry"}})
 		return
 	}
+	h.signImages(c.Request.Context(), entry.Images)
 	c.JSON(http.StatusOK, entry)
 }
 
@@ -137,6 +156,7 @@ func (h *JournalHandler) UpdateEntry(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to update entry"}})
 		return
 	}
+	h.signImages(c.Request.Context(), entry.Images)
 	c.JSON(http.StatusOK, entry)
 }
 
@@ -299,6 +319,9 @@ func (h *JournalHandler) ConfirmImage(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to save image"}})
 		return
+	}
+	if url, err := h.storage.PresignGetObject(c.Request.Context(), img.ObjectKey); err == nil {
+		img.FileURL = url
 	}
 	c.JSON(http.StatusCreated, img)
 }
@@ -648,6 +671,7 @@ func (h *JournalHandler) CreateCollection(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to create collection"}})
 		return
 	}
+	h.signCollectionCover(c.Request.Context(), col)
 	c.JSON(http.StatusCreated, col)
 }
 
@@ -658,6 +682,9 @@ func (h *JournalHandler) ListCollections(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to list collections"}})
 		return
+	}
+	for i := range cols {
+		h.signCollectionCover(c.Request.Context(), &cols[i])
 	}
 	c.JSON(http.StatusOK, cols)
 }
@@ -680,6 +707,7 @@ func (h *JournalHandler) GetCollection(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to get collection"}})
 		return
 	}
+	h.signCollectionCover(c.Request.Context(), col)
 	c.JSON(http.StatusOK, gin.H{"collection": col, "entries": entries})
 }
 
@@ -707,6 +735,7 @@ func (h *JournalHandler) UpdateCollection(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to update collection"}})
 		return
 	}
+	h.signCollectionCover(c.Request.Context(), col)
 	c.JSON(http.StatusOK, col)
 }
 

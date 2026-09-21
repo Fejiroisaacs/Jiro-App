@@ -446,9 +446,7 @@ func (h *UploadHandler) ConfirmCollectionCover(c *gin.Context) {
 
 	// Delete old cover image if one exists
 	if collection.CoverImageURL != nil && *collection.CoverImageURL != "" {
-		publicBase := h.storage.PublicURL("")
-		oldKey := strings.TrimPrefix(*collection.CoverImageURL, publicBase)
-		oldKey = strings.TrimPrefix(oldKey, "/")
+		oldKey := h.storage.ObjectKeyFromPublicURL(*collection.CoverImageURL)
 		h.storage.DeleteObject(c.Request.Context(), oldKey)
 	}
 
@@ -460,7 +458,13 @@ func (h *UploadHandler) ConfirmCollectionCover(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"cover_image_url": coverURL})
+	// The stored value stays the plain URL (also what DeleteObject above
+	// derives the key from); only the response is signed.
+	responseURL := coverURL
+	if signed, err := h.storage.PresignGetObject(c.Request.Context(), req.ObjectKey); err == nil {
+		responseURL = signed
+	}
+	c.JSON(http.StatusOK, gin.H{"cover_image_url": responseURL})
 }
 
 // DELETE /upload/journal-collection/:collection_id/cover
@@ -485,9 +489,7 @@ func (h *UploadHandler) DeleteCollectionCover(c *gin.Context) {
 	}
 
 	if collection.CoverImageURL != nil && *collection.CoverImageURL != "" {
-		publicBase := h.storage.PublicURL("")
-		objectKey := strings.TrimPrefix(*collection.CoverImageURL, publicBase)
-		objectKey = strings.TrimPrefix(objectKey, "/")
+		objectKey := h.storage.ObjectKeyFromPublicURL(*collection.CoverImageURL)
 		h.storage.DeleteObject(c.Request.Context(), objectKey)
 	}
 
@@ -653,6 +655,9 @@ func (h *UploadHandler) ConfirmSessionAttachment(c *gin.Context) {
 		return
 	}
 
+	if url, err := h.storage.PresignGetObject(c.Request.Context(), attachment.ObjectKey); err == nil {
+		attachment.FileURL = url
+	}
 	c.JSON(http.StatusCreated, attachment)
 }
 
