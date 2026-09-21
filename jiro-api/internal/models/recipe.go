@@ -28,6 +28,24 @@ type Recipe struct {
 	LastCooked   *time.Time `json:"last_cooked,omitempty"`
 }
 
+// PublicRecipe is Recipe with the owner's identity stripped, for anonymous
+// discovery and share endpoints — mirrors PublicSplitSummary/Detail in jym.go.
+type PublicRecipe struct {
+	ID              uuid.UUID       `json:"id"`
+	Title           string          `json:"title"`
+	Description     *string         `json:"description"`
+	TargetImageURL  *string         `json:"target_image_url"`
+	CoverImageURL   *string         `json:"cover_image_url"`
+	BaseIngredients json.RawMessage `json:"base_ingredients"`
+	Instructions    *string         `json:"instructions"`
+	Tags            []string        `json:"tags"`
+	Nutrition       json.RawMessage `json:"nutrition"`
+	DietaryFlags    json.RawMessage `json:"dietary_flags"`
+	IsPublic        bool            `json:"is_public"`
+	CreatedAt       time.Time       `json:"created_at"`
+	UpdatedAt       time.Time       `json:"updated_at"`
+}
+
 type RecipeTrial struct {
 	ID             uuid.UUID       `json:"id"`
 	RecipeID       uuid.UUID       `json:"recipe_id"`

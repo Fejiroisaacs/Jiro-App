@@ -80,7 +80,7 @@ func Load() *Config {
 		DatabaseURL:      databaseURL,
 		JWTSecret:        jwtSecret,
 		AccessTokenTTL:   getDuration("JWT_ACCESS_TTL_MINUTES", 15),
-		RefreshTokenTTL:  getDuration("JWT_REFRESH_TTL_DAYS", 7*24*60), // 7 days in minutes
+		RefreshTokenTTL:  getDurationDays("JWT_REFRESH_TTL_DAYS", 7),
 		CORSOrigins:      corsOrigins,
 		Environment:      env,
 		ResendAPIKey:     resendAPIKey,
@@ -130,4 +130,17 @@ func getDuration(key string, fallbackMinutes int) time.Duration {
 		}
 	}
 	return time.Duration(fallbackMinutes) * time.Minute
+}
+
+// getDurationDays exists so a "_DAYS" env var actually means days: getDuration
+// silently reads any key as minutes regardless of its name, which previously
+// made JWT_REFRESH_TTL_DAYS=7 (the value the README tells you to set) produce
+// a 7-minute refresh token instead of 7 days.
+func getDurationDays(key string, fallbackDays int) time.Duration {
+	if val := os.Getenv(key); val != "" {
+		if days, err := strconv.Atoi(val); err == nil {
+			return time.Duration(days) * 24 * time.Hour
+		}
+	}
+	return time.Duration(fallbackDays) * 24 * time.Hour
 }

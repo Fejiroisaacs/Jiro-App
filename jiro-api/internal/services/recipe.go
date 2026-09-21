@@ -629,7 +629,22 @@ func (s *RecipeService) CreateRecipeShare(ctx context.Context, userID uuid.UUID,
 	}
 	token := hex.EncodeToString(b)
 
-	snapshot, err := json.Marshal(recipe)
+	// Snapshot omits owner identity: this JSON is served back to anyone with the link.
+	snapshot, err := json.Marshal(models.PublicRecipe{
+		ID:              recipe.ID,
+		Title:           recipe.Title,
+		Description:     recipe.Description,
+		TargetImageURL:  recipe.TargetImageURL,
+		CoverImageURL:   recipe.CoverImageURL,
+		BaseIngredients: recipe.BaseIngredients,
+		Instructions:    recipe.Instructions,
+		Tags:            recipe.Tags,
+		Nutrition:       recipe.Nutrition,
+		DietaryFlags:    recipe.DietaryFlags,
+		IsPublic:        recipe.IsPublic,
+		CreatedAt:       recipe.CreatedAt,
+		UpdatedAt:       recipe.UpdatedAt,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -691,13 +706,13 @@ func (s *RecipeService) SetPublicStatus(ctx context.Context, userID, recipeID uu
 }
 
 // ListPublicRecipes returns publicly shared recipes with optional full-text search.
-func (s *RecipeService) ListPublicRecipes(ctx context.Context, search string, limit, offset int) ([]models.Recipe, error) {
+func (s *RecipeService) ListPublicRecipes(ctx context.Context, search string, limit, offset int) ([]models.PublicRecipe, error) {
 	if limit <= 0 {
 		limit = 20
 	}
 
 	query := `
-		SELECT id, user_id, title, description, target_image_url, cover_image_url, base_ingredients, instructions, tags,
+		SELECT id, title, description, target_image_url, cover_image_url, base_ingredients, instructions, tags,
 		       nutrition, dietary_flags, is_public, created_at, updated_at
 		FROM recipes
 		WHERE is_public = TRUE`
@@ -720,10 +735,10 @@ func (s *RecipeService) ListPublicRecipes(ctx context.Context, search string, li
 	}
 	defer rows.Close()
 
-	var recipes []models.Recipe
+	var recipes []models.PublicRecipe
 	for rows.Next() {
-		var r models.Recipe
-		if err := rows.Scan(&r.ID, &r.UserID, &r.Title, &r.Description, &r.TargetImageURL, &r.CoverImageURL,
+		var r models.PublicRecipe
+		if err := rows.Scan(&r.ID, &r.Title, &r.Description, &r.TargetImageURL, &r.CoverImageURL,
 			&r.BaseIngredients, &r.Instructions, &r.Tags, &r.Nutrition, &r.DietaryFlags, &r.IsPublic,
 			&r.CreatedAt, &r.UpdatedAt); err != nil {
 			return nil, err
@@ -734,20 +749,20 @@ func (s *RecipeService) ListPublicRecipes(ctx context.Context, search string, li
 		recipes = append(recipes, r)
 	}
 	if recipes == nil {
-		recipes = []models.Recipe{}
+		recipes = []models.PublicRecipe{}
 	}
 	return recipes, nil
 }
 
 // GetPublicRecipe returns a single publicly shared recipe by ID.
-func (s *RecipeService) GetPublicRecipe(ctx context.Context, recipeID uuid.UUID) (*models.Recipe, error) {
-	recipe := &models.Recipe{}
+func (s *RecipeService) GetPublicRecipe(ctx context.Context, recipeID uuid.UUID) (*models.PublicRecipe, error) {
+	recipe := &models.PublicRecipe{}
 	err := s.db.QueryRow(ctx,
-		`SELECT id, user_id, title, description, target_image_url, cover_image_url, base_ingredients, instructions, tags,
+		`SELECT id, title, description, target_image_url, cover_image_url, base_ingredients, instructions, tags,
 		        nutrition, dietary_flags, is_public, created_at, updated_at
 		 FROM recipes WHERE id = $1 AND is_public = TRUE`,
 		recipeID,
-	).Scan(&recipe.ID, &recipe.UserID, &recipe.Title, &recipe.Description, &recipe.TargetImageURL, &recipe.CoverImageURL,
+	).Scan(&recipe.ID, &recipe.Title, &recipe.Description, &recipe.TargetImageURL, &recipe.CoverImageURL,
 		&recipe.BaseIngredients, &recipe.Instructions, &recipe.Tags, &recipe.Nutrition, &recipe.DietaryFlags, &recipe.IsPublic,
 		&recipe.CreatedAt, &recipe.UpdatedAt)
 	if err != nil {

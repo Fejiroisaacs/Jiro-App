@@ -144,7 +144,8 @@ export class ResetPasswordComponent implements OnInit {
   ) {}
 
   ngOnInit() {
-    this.token = this.route.snapshot.queryParams['token'] ?? '';
+    const fragment = this.route.snapshot.fragment ?? '';
+    this.token = new URLSearchParams(fragment).get('token') ?? this.route.snapshot.queryParams['token'] ?? '';
     if (!this.token) {
       this.invalidLink.set(true);
       this.errorMessage.set('Invalid reset link — no token provided.');

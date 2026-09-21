@@ -365,7 +365,8 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 		return
 	}
 
-	link := fmt.Sprintf("%s/reset-password?token=%s", h.appBaseURL, rawToken)
+	// Fragment, not a query param: browsers never send it to a server or put it in a Referer header.
+	link := fmt.Sprintf("%s/reset-password#token=%s", h.appBaseURL, rawToken)
 	body := buildEmailHTML(
 		"Reset Your Password",
 		"You requested a password reset for your Jiro account. Click the button below to set a new password.",
