@@ -199,6 +199,9 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 
 	userID, oldHash, err := h.authService.ValidateRefreshToken(c.Request.Context(), rawToken)
 	if err != nil {
+		if errors.Is(err, services.ErrTokenReused) {
+			log.Warn().Str("user_id", userID.String()).Msg("refresh token reused past its grace window; all sessions for this user were revoked")
+		}
 		c.JSON(http.StatusUnauthorized, models.ErrorResponse{
 			Error: models.ErrorDetail{Code: "INVALID_TOKEN", Message: "Invalid or expired refresh token"},
 		})

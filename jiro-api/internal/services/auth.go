@@ -21,7 +21,15 @@ var (
 	ErrInvalidCredentials = errors.New("invalid email or password")
 	ErrEmailTaken         = errors.New("email already registered")
 	ErrInvalidToken       = errors.New("invalid or expired token")
+	ErrTokenReused        = errors.New("refresh token reused after rotation")
 )
+
+// refreshReuseGrace tolerates a rotated refresh token being presented again
+// shortly after rotation — two browser tabs whose access tokens expire at
+// the same moment both refresh with the same cookie, and one necessarily
+// loses the race. A token reused well past this window can no longer be
+// explained by that, and is treated as a stolen token being replayed.
+const refreshReuseGrace = 30 * time.Second
 
 type AuthService struct {
 	db  *pgxpool.Pool
@@ -179,10 +187,11 @@ func (s *AuthService) ValidateRefreshToken(ctx context.Context, rawToken string)
 
 	var userID uuid.UUID
 	var expiresAt time.Time
+	var usedAt *time.Time
 	err := s.db.QueryRow(ctx,
-		"SELECT user_id, expires_at FROM refresh_tokens WHERE token_hash = $1",
+		"SELECT user_id, expires_at, used_at FROM refresh_tokens WHERE token_hash = $1",
 		tokenHash,
-	).Scan(&userID, &expiresAt)
+	).Scan(&userID, &expiresAt, &usedAt)
 
 	if err != nil {
 		return uuid.Nil, "", ErrInvalidToken
@@ -194,11 +203,28 @@ func (s *AuthService) ValidateRefreshToken(ctx context.Context, rawToken string)
 		return uuid.Nil, "", ErrInvalidToken
 	}
 
+	if usedAt != nil && time.Since(*usedAt) > refreshReuseGrace {
+		// Rotated away more than the grace window ago and presented again: not
+		// explainable by a concurrent-tab race, only by a copy of the token
+		// surviving past its legitimate single use. Kill every session,
+		// including whatever the thief rotated it into.
+		s.RevokeAllUserTokens(ctx, userID)
+		return userID, "", ErrTokenReused
+	}
+
 	return userID, tokenHash, nil
 }
 
+// RevokeRefreshToken retires a token by marking it used rather than deleting
+// it outright, so a reuse shortly after — the concurrent-tab race described
+// on refreshReuseGrace — can still be told apart from a token replayed long
+// after its legitimate rotation. The IS NULL guard keeps used_at pinned to
+// the first use: a second racing caller must not slide the grace window.
 func (s *AuthService) RevokeRefreshToken(ctx context.Context, tokenHash string) error {
-	_, err := s.db.Exec(ctx, "DELETE FROM refresh_tokens WHERE token_hash = $1", tokenHash)
+	_, err := s.db.Exec(ctx,
+		"UPDATE refresh_tokens SET used_at = NOW() WHERE token_hash = $1 AND used_at IS NULL",
+		tokenHash,
+	)
 	return err
 }
 
