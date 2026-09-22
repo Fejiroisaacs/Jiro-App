@@ -16,6 +16,7 @@ const TABS: TabOption<Tab>[] = [
   standalone: true,
   imports: [SessionHistoryComponent, BodyWeightComponent, JiroTabStripComponent],
   template: `
+    <h1 class="sr-only">Track</h1>
     <jiro-tab-strip [tabs]="tabs" [value]="tab()" label="Track sections" (valueChange)="setTab($event)" />
     <div class="tab-content">
       @if (tab() === 'sessions') {

@@ -19,6 +19,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
 import { ToastService } from '../../../core/services/toast.service';
+import { ConfirmService } from '../../../core/services/confirm.service';
 
 interface SetRow {
   setNumber: number;
@@ -49,6 +50,7 @@ interface ExerciseBlock {
   standalone: true,
   imports: [FormsModule, JiroButtonComponent, JiroModalComponent, JiroIconComponent, JiroSkeletonComponent, JiroEmptyStateComponent, JymPrBadgeComponent],
   template: `
+    <h1 class="sr-only">Active session</h1>
     <!-- Sticky header bar -->
     <div class="session-bar">
       <div class="session-bar-row">
@@ -185,9 +187,23 @@ interface ExerciseBlock {
 <span class="sets-done-tag">{{ savedCount(bi) }} sets</span>
 }
             </div>
-            <svg class="chevron" aria-hidden="true" [class.open]="!isCollapsed(bi)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="6,9 12,15 18,9"/>
-            </svg>
+            <div class="block-actions">
+              <button
+                type="button"
+                class="del-btn"
+                [attr.aria-label]="'Remove ' + block.exerciseName"
+                [disabled]="removingBlock() === bi"
+                (click)="$event.stopPropagation(); removeBlock(bi)">
+                @if (removingBlock() === bi) {
+                  <span class="spinner-sm"></span>
+                } @else {
+                  <jiro-icon name="trash" [size]="16" />
+                }
+              </button>
+              <svg class="chevron" aria-hidden="true" [class.open]="!isCollapsed(bi)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6,9 12,15 18,9"/>
+              </svg>
+            </div>
           </div>
 
           @if (!isCollapsed(bi)) {
@@ -696,6 +712,9 @@ interface ExerciseBlock {
 
     .block-header.block-open { border-bottom: 1px solid var(--border-color); }
 
+    .block-actions { display: flex; align-items: center; gap: var(--space-sm); flex-shrink: 0; }
+    .block-actions .del-btn { border: none; background: transparent; }
+
     .overload-hint {
       display: flex; align-items: center; gap: 6px;
       padding: 6px var(--space-lg);
@@ -1056,7 +1075,9 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   templateSaving = signal(false);
   templateSaveError = signal('');
   private readonly toast = inject(ToastService);
+  private readonly confirmService = inject(ConfirmService);
   templateName = '';
+  removingBlock = signal<number | null>(null);
 
   // Inline exercise creation
   creatingExercise = signal(false);
@@ -1460,6 +1481,33 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     });
   }
 
+  async removeBlock(blockIndex: number) {
+    const block = this.blocks()[blockIndex];
+    const ok = await this.confirmService.confirm({
+      title: `Remove ${block.exerciseName}?`,
+      message: this.savedCount(blockIndex) > 0
+        ? `This deletes ${this.savedCount(blockIndex)} logged ${this.savedCount(blockIndex) === 1 ? 'set' : 'sets'} for this exercise. It cannot be undone.`
+        : 'It has no logged sets yet.',
+      confirmLabel: 'Remove exercise',
+      danger: true,
+    });
+    if (!ok) return;
+
+    this.removingBlock.set(blockIndex);
+    this.jymService.deleteSessionExercise(this.sessionId, block.exerciseId).subscribe({
+      next: () => {
+        this.deleteStaleFormChecks(block.exerciseId);
+        this.blocks.update(bs => bs.filter((_, bi) => bi !== blockIndex));
+        this.removingBlock.set(null);
+        this.toast.success(`${block.exerciseName} removed`);
+      },
+      error: () => {
+        this.removingBlock.set(null);
+        this.toast.error('Could not remove the exercise.');
+      },
+    });
+  }
+
   private deleteStaleFormChecks(exerciseId: string) {
     const attachments = this.blockAttachments().get(exerciseId);
     if (!attachments || attachments.length === 0) return;
@@ -1524,11 +1572,13 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
         const durationSeconds = Math.floor((Date.now() - this.startedAt.getTime()) / 1000);
         this.router.navigate(['/jym/session-summary'], {
           state: {
+            sessionId: this.sessionId,
             durationSeconds,
             sessionType: this.sessionType(),
             weightUnit: this.settingsService.weightUnit(),
             routineName: null,
             blocks: this.blocks().map(b => ({
+              exerciseId: b.exerciseId,
               exerciseName: b.exerciseName,
               muscleGroup: b.muscleGroup,
               sets: b.sets.map(s => ({

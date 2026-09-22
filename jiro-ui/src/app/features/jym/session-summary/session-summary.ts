@@ -1,16 +1,20 @@
-import { Component, OnInit, ViewChild, ElementRef, signal } from '@angular/core';
+import { Component, OnInit, ViewChild, ElementRef, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
+import { JymService } from '../../../core/services/jym.service';
+import { SettingsService } from '../../../core/services/settings.service';
 
 // ─── Data types ────────────────────────────────────────────────────────────────
 
 interface SummaryState {
+  sessionId: string;
   durationSeconds: number;
   sessionType: string;
   weightUnit: string;
   routineName: string | null;
   blocks: {
+    exerciseId: string;
     exerciseName: string;
     muscleGroup: string | null;
     sets: {
@@ -24,11 +28,22 @@ interface SummaryState {
 }
 
 interface LiftHighlight {
+  exerciseId: string;
   exerciseName: string;
   muscleGroup: string | null;
   weight: number;
   reps: number;
+  est1RM: number;
   isPR: boolean;
+  previousBest?: { weight: number; reps: number; est1RM: number };
+}
+
+/** Mirrors the backend's epley1RM exactly (services/jym.go) — this side only
+ *  ever has to rate the just-finished session's own sets locally; the
+ *  previous session's number always comes pre-computed from the API. */
+function epley1RM(weight: number, reps: number): number {
+  if (reps === 1) return weight;
+  return Math.round(weight * (1 + reps / 30) * 10) / 10;
 }
 
 interface MuscleGroupData {
@@ -174,13 +189,25 @@ function capitalize(s: string): string {
 }
           </div>
           <div class="lift-aside">
-            @if (lift.isPR) {
+            <div class="lift-current">
+              @if (lift.isPR) {
 <jym-pr-badge />
 }
-            @if (!lift.isPR) {
+              @if (!lift.isPR) {
 <span class="best-tag">Best</span>
 }
-            <span class="lift-weight">{{ lift.weight | number:'1.0-1' }} × {{ lift.reps }}</span>
+              <span class="lift-weight">{{ lift.weight | number:'1.0-1' }} × {{ lift.reps }}</span>
+            </div>
+            @if (lift.previousBest; as prev) {
+<div class="lift-previous">
+              Last time {{ prev.weight | number:'1.0-1' }} × {{ prev.reps }}
+              @if (est1RMDelta(lift); as d) {
+<span class="delta" [class.delta-up]="d.direction === 'up'" [class.delta-down]="d.direction === 'down'">
+                {{ d.direction === 'up' ? '↑' : d.direction === 'down' ? '↓' : '' }}{{ d.pct > 0 ? d.pct + '%' : '' }}
+              </span>
+}
+            </div>
+}
           </div>
         </div>
 }
@@ -600,10 +627,29 @@ function capitalize(s: string): string {
 
     .lift-aside {
       display: flex;
-      align-items: center;
-      gap: 8px;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
       flex-shrink: 0;
     }
+
+    .lift-current {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .lift-previous {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .delta-up { color: var(--color-success); font-weight: 600; }
+    .delta-down { color: var(--color-danger); font-weight: 600; }
 
     jym-pr-badge { flex-shrink: 0; }
 
@@ -922,6 +968,9 @@ export class SessionSummaryComponent implements OnInit {
 
   @ViewChild('shareCard') shareCardEl!: ElementRef<HTMLDivElement>;
 
+  private readonly jymService = inject(JymService);
+  private readonly settings = inject(SettingsService);
+
   constructor(private router: Router) {}
 
   ngOnInit(): void {
@@ -931,10 +980,48 @@ export class SessionSummaryComponent implements OnInit {
       return;
     }
     this.computeStats(state);
+    this.loadPreviousBests(state);
+  }
+
+  /** Fills in each highlight's previousBest once the API responds; the page
+   *  renders immediately without it and updates in place, rather than
+   *  blocking "Workout Complete!" on a network round trip. */
+  private loadPreviousBests(state: SummaryState): void {
+    if (!state.sessionId) return;
+    const exerciseIds = state.blocks.map(b => b.exerciseId).filter(Boolean);
+    this.jymService.getPreviousBests(state.sessionId, exerciseIds).subscribe({
+      next: bests => {
+        const byExercise = new Map(bests.map(b => [b.exercise_id, b]));
+        this.liftHighlights.update(highlights => highlights.map(h => {
+          const prev = byExercise.get(h.exerciseId);
+          if (!prev) return h;
+          // The API returns kg; lift.weight is already in the user's display
+          // unit (session-player converts before it ever reaches this page),
+          // so both sides must be compared in the same unit or the delta
+          // below is meaningless — recomputed from the converted weight
+          // rather than trusting the API's kg-based est_1rm.
+          const weight = this.settings.toDisplay(prev.weight);
+          return { ...h, previousBest: { weight, reps: prev.reps_performed, est1RM: epley1RM(weight, prev.reps_performed) } };
+        }));
+      },
+      // No previous-workout comparison is a normal outcome (first time doing
+      // an exercise, or the lookup failing) — the rest of the summary already
+      // rendered, so this fails silently rather than showing an error toast.
+      error: () => {},
+    });
   }
 
   liftColor(lift: LiftHighlight): string {
     return muscleColor(lift.muscleGroup ?? 'other');
+  }
+
+  /** Under half a kilo of estimated 1RM is noise, not progress either way. */
+  est1RMDelta(lift: LiftHighlight): { pct: number; direction: 'up' | 'down' | 'same' } | null {
+    const prev = lift.previousBest;
+    if (!prev || prev.est1RM <= 0) return null;
+    const diff = lift.est1RM - prev.est1RM;
+    if (Math.abs(diff) < 0.5) return { pct: 0, direction: 'same' };
+    return { pct: Math.abs(Math.round((diff / prev.est1RM) * 100)), direction: diff > 0 ? 'up' : 'down' };
   }
 
   private computeStats(state: SummaryState): void {
@@ -992,10 +1079,12 @@ export class SessionSummaryComponent implements OnInit {
       const pool   = prSets.length ? prSets : ws;
       const best   = pool.reduce((top, s) => (s.weight > top.weight ? s : top), pool[0]);
       highlights.push({
+        exerciseId: block.exerciseId,
         exerciseName: block.exerciseName,
         muscleGroup: block.muscleGroup,
         weight: best.weight,
         reps: best.reps,
+        est1RM: epley1RM(best.weight, best.reps),
         isPR: prSets.length > 0,
       });
     }

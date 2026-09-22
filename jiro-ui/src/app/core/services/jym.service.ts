@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, of } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
 const API_URL = `${environment.apiUrl}/jym`;
@@ -42,6 +42,14 @@ export interface ExercisePR {
   muscle_group: string | null;
   weight: number;
   reps: number;
+  est_1rm: number;
+  date: string;
+}
+
+export interface PreviousBest {
+  exercise_id: string;
+  weight: number;
+  reps_performed: number;
   est_1rm: number;
   date: string;
 }
@@ -362,6 +370,18 @@ export class JymService {
 
   deleteSet(id: string): Observable<void> {
     return this.http.delete<void>(`${API_URL}/sets/${id}`);
+  }
+
+  /** Removes an entire exercise block from a session — every logged set for it, in one call. */
+  deleteSessionExercise(sessionId: string, exerciseId: string): Observable<void> {
+    return this.http.delete<void>(`${API_URL}/sessions/${sessionId}/exercises/${exerciseId}`);
+  }
+
+  /** Best set for each exercise from the most recent session before this one — for "last time" on the summary. */
+  getPreviousBests(sessionId: string, exerciseIds: string[]): Observable<PreviousBest[]> {
+    if (!exerciseIds.length) return of([]);
+    const params = new HttpParams().set('exercise_ids', exerciseIds.join(','));
+    return this.http.get<PreviousBest[]>(`${API_URL}/sessions/${sessionId}/previous-bests`, { params });
   }
 
   // Body weights

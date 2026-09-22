@@ -18,6 +18,7 @@ const TABS: TabOption<Tab>[] = [
   standalone: true,
   imports: [SplitListComponent, SeriesListComponent, JymTemplatesComponent, JiroTabStripComponent],
   template: `
+    <h1 class="sr-only">Plan</h1>
     <jiro-tab-strip [tabs]="tabs" [value]="tab()" label="Plan sections" (valueChange)="setTab($event)" />
     <div class="tab-content">
       @if (tab() === 'splits') {

@@ -184,12 +184,12 @@ export const routes: Routes = [
       },
       // ── Jym legacy redirects (old flat routes → new container routes) ────────
       { path: 'jym/train', redirectTo: 'jym/exercises', pathMatch: 'full' },
-      { path: 'jym/prs', redirectTo: 'jym/exercises', pathMatch: 'full' },
+      { path: 'jym/prs', redirectTo: () => '/jym/exercises?tab=prs', pathMatch: 'full' },
       { path: 'jym/splits', redirectTo: 'jym/plan', pathMatch: 'full' },
-      { path: 'jym/series', redirectTo: 'jym/plan', pathMatch: 'full' },
-      { path: 'jym/templates', redirectTo: 'jym/plan', pathMatch: 'full' },
+      { path: 'jym/series', redirectTo: () => '/jym/plan?tab=series', pathMatch: 'full' },
+      { path: 'jym/templates', redirectTo: () => '/jym/plan?tab=templates', pathMatch: 'full' },
       { path: 'jym/sessions', redirectTo: 'jym/track', pathMatch: 'full' },
-      { path: 'jym/bodyweight', redirectTo: 'jym/track', pathMatch: 'full' },
+      { path: 'jym/bodyweight', redirectTo: () => '/jym/track?tab=bodyweight', pathMatch: 'full' },
       // ── Jym drill-down pages (push navigation, bottom nav stays visible) ────
       {
         path: 'jym/splits/:id',

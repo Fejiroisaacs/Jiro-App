@@ -1,6 +1,5 @@
 import { Component, OnInit, computed, signal, effect } from '@angular/core';
 
-import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { RecipeService, Recipe, CookStreak, Collection } from '../../../core/services/recipe.service';
 import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-card';
@@ -17,7 +16,6 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
   selector: 'app-recipe-list',
   standalone: true,
   imports: [
-    RouterLink,
     FormsModule,
     JiroCardComponent,
     JiroButtonComponent,
@@ -167,9 +165,7 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
 <div class="recipe-grid">
         @for (recipe of displayedRecipes(); track recipe) {
 <jiro-card
-         
-          [clickable]="true"
-          [routerLink]="['/culinara', recipe.id]"
+          [link]="['/culinara', recipe.id]"
           class="recipe-card">
           <div class="recipe-card-inner">
             @if (recipe.cover_image_url) {

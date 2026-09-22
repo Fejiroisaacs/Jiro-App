@@ -201,9 +201,10 @@ import { ToastService } from '../../../core/services/toast.service';
           <!-- Remove: owner can remove others, any member can leave -->
           @if (canRemove(m)) {
 <button
-           
+            type="button"
             class="icon-btn danger"
             (click)="removeMember(m)"
+            [attr.aria-label]="removeLabel(m)"
             [disabled]="removingMemberId() === m.user_id">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -535,6 +536,12 @@ export class JournalGroupComponent implements OnInit {
 
   isOwnEntry(e: JournalEntry): boolean {
     return e.user_id === this.auth.user()?.id;
+  }
+
+  /** Same wording removeMember()'s confirm dialog uses, for the icon-only button beside it. */
+  removeLabel(m: JournalGroupMember): string {
+    if (m.user_id === this.auth.user()?.id) return 'Leave group';
+    return `Remove ${m.username ?? m.email ?? 'this member'}`;
   }
 
   canRemove(m: JournalGroupMember): boolean {

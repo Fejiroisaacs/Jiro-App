@@ -1047,6 +1047,31 @@ func (s *JymService) DeleteSession(ctx context.Context, userID, sessionID uuid.U
 	return nil
 }
 
+// DeleteSessionExercise removes every logged set for one exercise within a
+// session - "remove this exercise from today's workout" rather than deleting
+// sets one at a time. Zero sets logged yet is the normal, successful case
+// for a block nobody has touched, not an error; only an unowned or missing
+// session is, so ownership is checked separately from the delete itself.
+func (s *JymService) DeleteSessionExercise(ctx context.Context, userID, sessionID, exerciseID uuid.UUID) error {
+	var exists bool
+	err := s.db.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM sessions WHERE id = $1 AND user_id = $2)`,
+		sessionID, userID,
+	).Scan(&exists)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return ErrSessionNotFound
+	}
+
+	_, err = s.db.Exec(ctx,
+		`DELETE FROM session_sets WHERE session_id = $1 AND exercise_id = $2`,
+		sessionID, exerciseID,
+	)
+	return err
+}
+
 // GetSessionAttachmentKeys returns the R2 object_key for every attachment
 // belonging to the given session and user. Used by DeleteSession to clean up
 // storage before the DB row is removed.
@@ -1214,6 +1239,57 @@ func (s *JymService) GetLastSessionSets(ctx context.Context, userID uuid.UUID, e
 		result[set.ExerciseID] = append(result[set.ExerciseID], set)
 	}
 	return result, nil
+}
+
+// GetPreviousBests returns, for each exercise, the best set (by weight, then
+// reps) from the most recent session before excludeSessionID — "last time
+// you did this" for the post-workout summary. excludeSessionID need not
+// belong to the caller: it is only ever used to exclude a row, never to
+// grant access, since every row is already scoped to user_id = $1.
+func (s *JymService) GetPreviousBests(ctx context.Context, userID, excludeSessionID uuid.UUID, exerciseIDs []uuid.UUID) ([]models.PreviousBest, error) {
+	if len(exerciseIDs) == 0 {
+		return []models.PreviousBest{}, nil
+	}
+
+	args := []interface{}{userID, excludeSessionID}
+	placeholders := ""
+	for i, id := range exerciseIDs {
+		args = append(args, id)
+		if i > 0 {
+			placeholders += ","
+		}
+		placeholders += "$" + intStr(i+3)
+	}
+
+	rows, err := s.db.Query(ctx, `
+		WITH prev_session AS (
+			SELECT DISTINCT ON (ss.exercise_id) ss.exercise_id, ss.session_id, s.started_at
+			FROM session_sets ss
+			JOIN sessions s ON s.id = ss.session_id
+			WHERE s.user_id = $1 AND s.id != $2 AND ss.exercise_id IN (`+placeholders+`)
+			ORDER BY ss.exercise_id, s.started_at DESC
+		)
+		SELECT DISTINCT ON (ps.exercise_id) ps.exercise_id, ss.weight, ss.reps_performed, ps.started_at
+		FROM prev_session ps
+		JOIN session_sets ss ON ss.session_id = ps.session_id AND ss.exercise_id = ps.exercise_id
+		ORDER BY ps.exercise_id, ss.weight DESC, ss.reps_performed DESC`,
+		args...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	bests := []models.PreviousBest{}
+	for rows.Next() {
+		var b models.PreviousBest
+		if err := rows.Scan(&b.ExerciseID, &b.Weight, &b.Reps, &b.Date); err != nil {
+			return nil, err
+		}
+		b.Est1RM = epley1RM(b.Weight, b.Reps)
+		bests = append(bests, b)
+	}
+	return bests, nil
 }
 
 // GetPRs returns the best personal record set (by weight) for each exercise the user has logged.
