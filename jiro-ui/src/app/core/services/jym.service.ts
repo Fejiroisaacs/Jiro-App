@@ -364,6 +364,11 @@ export class JymService {
     return this.http.delete<void>(`${API_URL}/sets/${id}`);
   }
 
+  /** Removes an entire exercise block from a session — every logged set for it, in one call. */
+  deleteSessionExercise(sessionId: string, exerciseId: string): Observable<void> {
+    return this.http.delete<void>(`${API_URL}/sessions/${sessionId}/exercises/${exerciseId}`);
+  }
+
   // Body weights
   logBodyWeight(req: { recorded_at: string; weight_kg: number }): Observable<BodyWeight> {
     return this.http.post<BodyWeight>(`${API_URL}/bodyweights`, req);

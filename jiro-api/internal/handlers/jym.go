@@ -787,6 +787,31 @@ func (h *JymHandler) DeleteSet(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Set deleted"})
 }
 
+// DeleteSessionExercise removes an entire exercise block (every logged set
+// for it) from an in-progress session.
+func (h *JymHandler) DeleteSessionExercise(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	sessionID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid session ID"}})
+		return
+	}
+	exerciseID, err := uuid.Parse(c.Param("exercise_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid exercise ID"}})
+		return
+	}
+	if err := h.jymService.DeleteSessionExercise(c.Request.Context(), userID, sessionID, exerciseID); err != nil {
+		if err == services.ErrSessionNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Session not found"}})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to remove exercise"}})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Exercise removed"})
+}
+
 // ─── CSV Export ───────────────────────────────────────────────────────────────
 
 func (h *JymHandler) ExportSessions(c *gin.Context) {

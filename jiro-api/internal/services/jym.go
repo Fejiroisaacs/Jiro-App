@@ -1047,6 +1047,31 @@ func (s *JymService) DeleteSession(ctx context.Context, userID, sessionID uuid.U
 	return nil
 }
 
+// DeleteSessionExercise removes every logged set for one exercise within a
+// session - "remove this exercise from today's workout" rather than deleting
+// sets one at a time. Zero sets logged yet is the normal, successful case
+// for a block nobody has touched, not an error; only an unowned or missing
+// session is, so ownership is checked separately from the delete itself.
+func (s *JymService) DeleteSessionExercise(ctx context.Context, userID, sessionID, exerciseID uuid.UUID) error {
+	var exists bool
+	err := s.db.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM sessions WHERE id = $1 AND user_id = $2)`,
+		sessionID, userID,
+	).Scan(&exists)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return ErrSessionNotFound
+	}
+
+	_, err = s.db.Exec(ctx,
+		`DELETE FROM session_sets WHERE session_id = $1 AND exercise_id = $2`,
+		sessionID, exerciseID,
+	)
+	return err
+}
+
 // GetSessionAttachmentKeys returns the R2 object_key for every attachment
 // belonging to the given session and user. Used by DeleteSession to clean up
 // storage before the DB row is removed.
