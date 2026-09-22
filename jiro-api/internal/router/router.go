@@ -46,8 +46,8 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	ledgerService := services.NewLedgerService(db)
 
 	// Rate limiter + login fail tracker
-	rl := middleware.NewRateLimiter()
-	loginFailTracker := middleware.NewLoginFailTracker()
+	rl := middleware.NewRateLimiter(db)
+	loginFailTracker := middleware.NewLoginFailTracker(db)
 
 	// Handlers
 	authHandler := handlers.NewAuthHandler(authService, userService, emailService, ledgerService, loginFailTracker, cfg, db)

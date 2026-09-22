@@ -1,160 +1,142 @@
 package middleware
 
 import (
+	"context"
+	"errors"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/models"
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/rs/zerolog/log"
 )
 
-// LoginFailTracker blocks IPs after too many failed login attempts.
+// LoginFailTracker blocks IPs after too many failed login attempts. Backed by
+// Postgres (see migration 000031) rather than an in-process map, so the
+// block is enforced consistently across every Cloud Run instance instead of
+// one attempt budget per instance.
 const (
 	maxLoginFails      = 10
 	loginBlockDuration = 15 * time.Minute
+	staleEntryTTL      = 24 * time.Hour
 )
 
-type failEntry struct {
-	count        int
-	lastSeen     time.Time
-	blockedUntil time.Time
-}
-
 type LoginFailTracker struct {
-	mu      sync.Mutex
-	entries map[string]*failEntry
+	db *pgxpool.Pool
 }
 
-func NewLoginFailTracker() *LoginFailTracker {
-	lft := &LoginFailTracker{entries: make(map[string]*failEntry)}
+func NewLoginFailTracker(db *pgxpool.Pool) *LoginFailTracker {
+	lft := &LoginFailTracker{db: db}
 	go func() {
 		for {
 			time.Sleep(10 * time.Minute)
-			lft.mu.Lock()
-			now := time.Now()
-			// Idleness alone: a blocked entry never satisfied the old count check.
-			for ip, e := range lft.entries {
-				if now.After(e.blockedUntil) && now.Sub(e.lastSeen) > loginBlockDuration {
-					delete(lft.entries, ip)
-				}
+			cutoff := time.Now().Add(-staleEntryTTL)
+			if _, err := db.Exec(context.Background(),
+				`DELETE FROM login_fail_entries WHERE last_seen < $1`, cutoff); err != nil {
+				log.Error().Err(err).Msg("login fail tracker cleanup failed")
 			}
-			lft.mu.Unlock()
 		}
 	}()
 	return lft
 }
 
-func (lft *LoginFailTracker) RecordFail(ip string) {
-	lft.mu.Lock()
-	defer lft.mu.Unlock()
-	e, ok := lft.entries[ip]
-	if !ok {
-		e = &failEntry{}
-		lft.entries[ip] = e
-	}
-	e.count++
-	e.lastSeen = time.Now()
-	if e.count >= maxLoginFails {
-		e.blockedUntil = time.Now().Add(loginBlockDuration)
+func (lft *LoginFailTracker) RecordFail(ctx context.Context, ip string) {
+	blockedUntil := time.Now().Add(loginBlockDuration)
+	const q = `
+		INSERT INTO login_fail_entries (ip, fail_count, last_seen, blocked_until)
+		VALUES ($1, 1, now(), NULL)
+		ON CONFLICT (ip) DO UPDATE SET
+			fail_count = login_fail_entries.fail_count + 1,
+			last_seen = now(),
+			blocked_until = CASE
+				WHEN login_fail_entries.fail_count + 1 >= $2 THEN $3
+				ELSE login_fail_entries.blocked_until
+			END`
+	if _, err := lft.db.Exec(ctx, q, ip, maxLoginFails, blockedUntil); err != nil {
+		log.Error().Err(err).Msg("login fail tracker: record fail")
 	}
 }
 
-func (lft *LoginFailTracker) RecordSuccess(ip string) {
-	lft.mu.Lock()
-	defer lft.mu.Unlock()
-	delete(lft.entries, ip)
+func (lft *LoginFailTracker) RecordSuccess(ctx context.Context, ip string) {
+	if _, err := lft.db.Exec(ctx, `DELETE FROM login_fail_entries WHERE ip = $1`, ip); err != nil {
+		log.Error().Err(err).Msg("login fail tracker: record success")
+	}
 }
 
-func (lft *LoginFailTracker) IsBlocked(ip string) bool {
-	lft.mu.Lock()
-	defer lft.mu.Unlock()
-	e, ok := lft.entries[ip]
-	if !ok {
+// IsBlocked fails open (returns false) on a DB error — a lockout check that
+// cannot reach the database should not itself take login down.
+func (lft *LoginFailTracker) IsBlocked(ctx context.Context, ip string) bool {
+	var blockedUntil *time.Time
+	err := lft.db.QueryRow(ctx, `SELECT blocked_until FROM login_fail_entries WHERE ip = $1`, ip).Scan(&blockedUntil)
+	if err != nil {
+		if !errors.Is(err, pgx.ErrNoRows) {
+			log.Error().Err(err).Msg("login fail tracker: is blocked")
+		}
 		return false
 	}
-	if e.blockedUntil.IsZero() {
+	if blockedUntil == nil {
 		return false
 	}
-	if time.Now().After(e.blockedUntil) {
-		delete(lft.entries, ip)
+	if time.Now().After(*blockedUntil) {
+		if _, err := lft.db.Exec(ctx, `DELETE FROM login_fail_entries WHERE ip = $1`, ip); err != nil {
+			log.Error().Err(err).Msg("login fail tracker: expire block")
+		}
 		return false
 	}
 	return true
 }
 
-type bucket struct {
-	tokens     float64
-	lastFill   time.Time
-	capacity   float64
-	ratePerSec float64
-}
-
+// RateLimiter implements a token bucket per key, persisted in Postgres so
+// every Cloud Run instance enforces the same shared budget. The refill and
+// spend happen in one atomic UPDATE (guarded by Postgres's row lock), so
+// concurrent requests for the same key — whether on one instance or several
+// — cannot both read the same token count and both be let through.
 type RateLimiter struct {
-	mu      sync.Mutex
-	buckets map[string]*bucket
+	db *pgxpool.Pool
 }
 
-func NewRateLimiter() *RateLimiter {
-	rl := &RateLimiter{
-		buckets: make(map[string]*bucket),
-	}
-
-	// Background cleanup of stale buckets every 5 minutes
+func NewRateLimiter(db *pgxpool.Pool) *RateLimiter {
+	rl := &RateLimiter{db: db}
 	go func() {
 		for {
-			time.Sleep(5 * time.Minute)
-			rl.mu.Lock()
-			cutoff := time.Now().Add(-10 * time.Minute)
-			for key, b := range rl.buckets {
-				if b.lastFill.Before(cutoff) {
-					delete(rl.buckets, key)
-				}
+			time.Sleep(30 * time.Minute)
+			cutoff := time.Now().Add(-staleEntryTTL)
+			if _, err := db.Exec(context.Background(),
+				`DELETE FROM rate_limit_buckets WHERE last_fill < $1`, cutoff); err != nil {
+				log.Error().Err(err).Msg("rate limiter cleanup failed")
 			}
-			rl.mu.Unlock()
 		}
 	}()
-
 	return rl
 }
 
-func (rl *RateLimiter) allow(key string, capacity float64, ratePerSec float64) bool {
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
+// allow fails open (returns true) on a DB error — a rate limiter that cannot
+// reach the database should not itself take the API down.
+func (rl *RateLimiter) allow(ctx context.Context, key string, capacity float64, ratePerSec float64) bool {
+	const q = `
+		INSERT INTO rate_limit_buckets (key, tokens, capacity, rate_per_sec, last_fill)
+		VALUES ($1, $2 - 1, $2, $3, now())
+		ON CONFLICT (key) DO UPDATE SET
+			tokens = LEAST($2, rate_limit_buckets.tokens
+				+ EXTRACT(EPOCH FROM (now() - rate_limit_buckets.last_fill)) * $3) - 1,
+			capacity = $2,
+			rate_per_sec = $3,
+			last_fill = now()
+		WHERE LEAST($2, rate_limit_buckets.tokens
+			+ EXTRACT(EPOCH FROM (now() - rate_limit_buckets.last_fill)) * $3) >= 1
+		RETURNING tokens`
 
-	now := time.Now()
-	b, exists := rl.buckets[key]
-	if !exists {
-		rl.buckets[key] = &bucket{
-			tokens:     capacity - 1,
-			lastFill:   now,
-			capacity:   capacity,
-			ratePerSec: ratePerSec,
+	var tokens float64
+	err := rl.db.QueryRow(ctx, q, key, capacity, ratePerSec).Scan(&tokens)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false
 		}
+		log.Error().Err(err).Str("key", key).Msg("rate limiter check failed")
 		return true
 	}
-
-	// Re-apply, rather than trust whatever the first caller set.
-	if b.capacity != capacity || b.ratePerSec != ratePerSec {
-		b.capacity, b.ratePerSec = capacity, ratePerSec
-		if b.tokens > capacity {
-			b.tokens = capacity
-		}
-	}
-
-	// Refill tokens based on elapsed time
-	elapsed := now.Sub(b.lastFill).Seconds()
-	b.tokens += elapsed * b.ratePerSec
-	if b.tokens > b.capacity {
-		b.tokens = b.capacity
-	}
-	b.lastFill = now
-
-	if b.tokens < 1 {
-		return false
-	}
-
-	b.tokens--
 	return true
 }
 
@@ -164,7 +146,7 @@ func (rl *RateLimiter) allow(key string, capacity float64, ratePerSec float64) b
 func RateLimitByIP(rl *RateLimiter, scope string, perMinute float64) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		key := scope + ":ip:" + c.ClientIP()
-		if !rl.allow(key, perMinute, perMinute/60.0) {
+		if !rl.allow(c.Request.Context(), key, perMinute, perMinute/60.0) {
 			c.AbortWithStatusJSON(http.StatusTooManyRequests, models.ErrorResponse{
 				Error: models.ErrorDetail{Code: "RATE_LIMITED", Message: "Too many requests, please try again later"},
 			})
@@ -190,7 +172,7 @@ func RateLimitByUser(rl *RateLimiter, scope string, perMinute float64) gin.Handl
 		} else {
 			key = scope + ":ip:" + c.ClientIP()
 		}
-		if !rl.allow(key, perMinute, perMinute/60.0) {
+		if !rl.allow(c.Request.Context(), key, perMinute, perMinute/60.0) {
 			c.AbortWithStatusJSON(http.StatusTooManyRequests, models.ErrorResponse{
 				Error: models.ErrorDetail{Code: "RATE_LIMITED", Message: "Too many requests, please try again later"},
 			})
