@@ -14,15 +14,9 @@ import { RouterLink } from '@angular/router';
   standalone: true,
   imports: [RouterLink],
   template: `
-    @if (link) {
-      <a class="jiro-card clickable" [routerLink]="link">
-        <ng-content></ng-content>
-      </a>
-    } @else {
-      <div class="jiro-card" [class.clickable]="clickable">
-        <ng-content></ng-content>
-      </div>
-    }
+    <a class="jiro-card" [class.clickable]="clickable || !!link" [routerLink]="link ?? null">
+      <ng-content></ng-content>
+    </a>
   `,
   styles: [`
     .jiro-card {

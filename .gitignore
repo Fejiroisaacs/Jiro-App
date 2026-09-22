@@ -6,6 +6,7 @@ desktop.ini
 
 # Firebase
 .firebase/
+firebase-debug.log
 
 # Environment
 jiro-api/.env

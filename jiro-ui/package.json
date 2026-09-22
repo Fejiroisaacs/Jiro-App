@@ -9,7 +9,8 @@
     "test": "ng test",
     "build:sitemap": "node scripts/build-sitemap.mjs",
     "check:css": "node scripts/check-css-vars.mjs",
-    "icons": "node scripts/build-icons.mjs"
+    "icons": "node scripts/build-icons.mjs",
+    "serve:ssr:jiro-ui": "node dist/jiro-ui/server/server.mjs"
   },
   "prettier": {
     "printWidth": 100,
@@ -33,8 +34,11 @@
     "@angular/core": "^21.2.23",
     "@angular/forms": "^21.2.23",
     "@angular/platform-browser": "^21.2.23",
+    "@angular/platform-server": "^21.2.23",
     "@angular/router": "^21.2.23",
+    "@angular/ssr": "^21.2.24",
     "chart.js": "^4.5.1",
+    "express": "^5.1.0",
     "html-to-image": "^1.11.13",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"
@@ -44,6 +48,8 @@
     "@angular/cli": "^21.2.2",
     "@angular/compiler-cli": "^21.2.23",
     "@phosphor-icons/core": "^2.1.1",
+    "@types/express": "^5.0.1",
+    "@types/node": "^20.17.19",
     "typescript": "~5.9.2"
   }
 }

@@ -1,5 +1,4 @@
-import { Component, computed, inject, input } from '@angular/core';
-import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { Component, ElementRef, afterRenderEffect, input, viewChild } from '@angular/core';
 
 export type MarkName =
   | 'jiro'
@@ -78,6 +77,7 @@ const MARKS: Record<MarkName, string> = {
   standalone: true,
   template: `
     <svg
+      #svgEl
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 100 100"
       fill="currentColor"
@@ -85,8 +85,7 @@ const MARKS: Record<MarkName, string> = {
       [attr.height]="size()"
       [attr.aria-hidden]="label() ? null : 'true'"
       [attr.role]="label() ? 'img' : null"
-      [attr.aria-label]="label() || null"
-      [innerHTML]="markup()"></svg>
+      [attr.aria-label]="label() || null"></svg>
   `,
   styles: [`
     :host {
@@ -110,6 +109,11 @@ export class JiroMarkComponent {
   /** Draw the tile background. Off for the landing-page hero where the mark sits on its own. */
   tile = input(true);
 
-  private readonly sanitizer = inject(DomSanitizer);
-  readonly markup = computed<SafeHtml>(() => this.sanitizer.bypassSecurityTrustHtml(MARKS[this.name()]));
+  private readonly svgEl = viewChild.required<ElementRef<SVGSVGElement>>('svgEl');
+
+  constructor() {
+    afterRenderEffect(() => {
+      this.svgEl().nativeElement.innerHTML = MARKS[this.name()];
+    });
+  }
 }

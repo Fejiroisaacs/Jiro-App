@@ -1,5 +1,4 @@
-import { Component, computed, inject, input } from '@angular/core';
-import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { Component, ElementRef, afterRenderEffect, input, viewChild } from '@angular/core';
 import { ICONS, IconName } from '../../icons/icons.generated';
 
 /**
@@ -15,6 +14,7 @@ import { ICONS, IconName } from '../../icons/icons.generated';
   standalone: true,
   template: `
     <svg
+      #svgEl
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 256 256"
       fill="currentColor"
@@ -22,8 +22,7 @@ import { ICONS, IconName } from '../../icons/icons.generated';
       [attr.height]="size()"
       [attr.aria-hidden]="label() ? null : 'true'"
       [attr.role]="label() ? 'img' : null"
-      [attr.aria-label]="label() || null"
-      [innerHTML]="markup()"></svg>
+      [attr.aria-label]="label() || null"></svg>
   `,
   styles: [`
     :host {
@@ -42,9 +41,11 @@ export class JiroIconComponent {
   size = input<number | string>(18);
   label = input<string>('');
 
-  private readonly sanitizer = inject(DomSanitizer);
+  private readonly svgEl = viewChild.required<ElementRef<SVGSVGElement>>('svgEl');
 
-  readonly markup = computed<SafeHtml>(() =>
-    this.sanitizer.bypassSecurityTrustHtml(ICONS[this.name()] ?? ''),
-  );
+  constructor() {
+    afterRenderEffect(() => {
+      this.svgEl().nativeElement.innerHTML = ICONS[this.name()] ?? '';
+    });
+  }
 }
