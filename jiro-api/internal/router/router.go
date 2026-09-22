@@ -112,6 +112,10 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 		// NoStore registered after it never runs on a rejected request.
 		protected.Use(middleware.NoStore())
 		protected.Use(middleware.AuthRequired(authService))
+		// Blocks writes from unverified accounts; admin is exempt (see its
+		// own group below) since email verification shouldn't gate the
+		// site owner's own operator tooling.
+		protected.Use(middleware.RequireVerifiedEmail(userService))
 		protected.Use(middleware.RateLimitByUser(rl, "protected", 300))
 		{
 			protected.GET("/user/me", userHandler.GetMe)
