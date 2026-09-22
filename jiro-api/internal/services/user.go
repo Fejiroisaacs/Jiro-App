@@ -84,6 +84,20 @@ func (s *UserService) IsAdmin(ctx context.Context, id uuid.UUID) (bool, error) {
 	return isAdmin, nil
 }
 
+// IsEmailVerified is read per request rather than carried in the JWT, so
+// verifying takes effect immediately instead of at the next token refresh.
+func (s *UserService) IsEmailVerified(ctx context.Context, id uuid.UUID) (bool, error) {
+	var verified bool
+	err := s.db.QueryRow(ctx, `SELECT email_verified FROM users WHERE id = $1`, id).Scan(&verified)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, ErrUserNotFound
+		}
+		return false, err
+	}
+	return verified, nil
+}
+
 func (s *UserService) GetByID(ctx context.Context, id uuid.UUID) (*models.User, error) {
 	user := &models.User{}
 	err := s.db.QueryRow(ctx,

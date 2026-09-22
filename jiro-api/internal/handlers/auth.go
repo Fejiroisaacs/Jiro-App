@@ -134,7 +134,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 func (h *AuthHandler) Login(c *gin.Context) {
 	ip := c.ClientIP()
-	if h.failTracker.IsBlocked(ip) {
+	if h.failTracker.IsBlocked(c.Request.Context(), ip) {
 		c.JSON(http.StatusTooManyRequests, models.ErrorResponse{
 			Error: models.ErrorDetail{Code: "RATE_LIMITED", Message: "Too many failed attempts. Try again in 15 minutes."},
 		})
@@ -153,7 +153,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	if err != nil {
 		// Match the cost of a real check.
 		h.authService.VerifyPasswordDummy(req.Password)
-		h.failTracker.RecordFail(ip)
+		h.failTracker.RecordFail(c.Request.Context(), ip)
 		c.JSON(http.StatusUnauthorized, models.ErrorResponse{
 			Error: models.ErrorDetail{Code: "INVALID_CREDENTIALS", Message: "Invalid email or password"},
 		})
@@ -161,14 +161,14 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	if !h.authService.VerifyPassword(user.PasswordHash, req.Password) {
-		h.failTracker.RecordFail(ip)
+		h.failTracker.RecordFail(c.Request.Context(), ip)
 		c.JSON(http.StatusUnauthorized, models.ErrorResponse{
 			Error: models.ErrorDetail{Code: "INVALID_CREDENTIALS", Message: "Invalid email or password"},
 		})
 		return
 	}
 
-	h.failTracker.RecordSuccess(ip)
+	h.failTracker.RecordSuccess(c.Request.Context(), ip)
 
 	accessToken, err := h.authService.GenerateAccessToken(user.ID)
 	if err != nil {

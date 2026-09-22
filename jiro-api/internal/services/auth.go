@@ -31,6 +31,11 @@ var (
 // explained by that, and is treated as a stolen token being replayed.
 const refreshReuseGrace = 30 * time.Second
 
+const (
+	jwtIssuer   = "jiro-api"
+	jwtAudience = "jiro-app"
+)
+
 type AuthService struct {
 	db  *pgxpool.Pool
 	cfg *config.Config
@@ -122,10 +127,15 @@ func (s *AuthService) VerifyPassword(encoded, password string) bool {
 // JWT access token
 
 func (s *AuthService) GenerateAccessToken(userID uuid.UUID) (string, error) {
+	now := time.Now()
 	claims := jwt.MapClaims{
 		"sub": userID.String(),
-		"exp": time.Now().Add(s.cfg.AccessTokenTTL).Unix(),
-		"iat": time.Now().Unix(),
+		"iss": jwtIssuer,
+		"aud": jwtAudience,
+		"typ": "access",
+		"jti": uuid.New().String(),
+		"iat": now.Unix(),
+		"exp": now.Add(s.cfg.AccessTokenTTL).Unix(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -138,7 +148,7 @@ func (s *AuthService) ValidateAccessToken(tokenStr string) (uuid.UUID, error) {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 		return []byte(s.cfg.JWTSecret), nil
-	})
+	}, jwt.WithIssuer(jwtIssuer), jwt.WithAudience(jwtAudience))
 
 	if err != nil || !token.Valid {
 		return uuid.Nil, ErrInvalidToken

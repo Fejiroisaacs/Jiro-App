@@ -5,13 +5,14 @@ import { Router } from '@angular/router';
 import { JymService, PublicSplitSummary } from '../../../core/services/jym.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-card';
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 
 @Component({
   selector: 'app-discover',
   standalone: true,
-  imports: [FormsModule, JiroButtonComponent, JiroIconComponent, JiroPageHeaderComponent, JiroEmptyStateComponent],
+  imports: [FormsModule, JiroButtonComponent, JiroIconComponent, JiroCardComponent, JiroPageHeaderComponent, JiroEmptyStateComponent],
   template: `
     <div class="discover">
       <jiro-page-header heading="Discover" subtitle="Browse public training splits from the community">
@@ -68,28 +69,27 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
       @if (!loading() && splits().length > 0) {
 <div class="splits-grid">
         @for (split of splits(); track split) {
-<div
-         
-          class="split-card"
-          (click)="router.navigate(['/jym/discover', split.id])">
-          <div class="card-header">
-            <h3 class="split-name">{{ split.name }}</h3>
-            <span class="routine-badge">{{ split.routine_count }} {{ split.routine_count === 1 ? 'day' : 'days' }}</span>
-          </div>
-          @if (split.description) {
+<jiro-card [link]="['/jym/discover', split.id]">
+          <div class="split-card-inner">
+            <div class="card-header">
+              <h3 class="split-name">{{ split.name }}</h3>
+              <span class="routine-badge">{{ split.routine_count }} {{ split.routine_count === 1 ? 'day' : 'days' }}</span>
+            </div>
+            @if (split.description) {
 <p class="split-desc text-secondary">{{ split.description }}</p>
 }
-          @if (split.tags.length) {
+            @if (split.tags.length) {
 <div class="tag-row">
-            @for (tag of split.tags; track tag) {
+              @for (tag of split.tags; track tag) {
 <span class="tag-chip">{{ tag }}</span>
 }
-          </div>
+            </div>
 }
-          <div class="card-footer text-secondary">
-            Added {{ formatDate(split.created_at) }}
+            <div class="card-footer text-secondary">
+              Added {{ formatDate(split.created_at) }}
+            </div>
           </div>
-        </div>
+        </jiro-card>
 }
       </div>
 }
@@ -155,19 +155,8 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
       gap: var(--space-lg);
     }
 
-    .split-card {
-      background: var(--bg-surface); border: 1px solid var(--border-color);
-      border-radius: var(--border-radius); padding: var(--space-lg);
+    .split-card-inner {
       display: flex; flex-direction: column; gap: var(--space-sm);
-      cursor: pointer; transition: all 0.15s;
-      position: relative;
-      top: 0;
-    }
-
-    .split-card:hover {
-      border-color: var(--color-primary);
-      box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.08);
-      top: -1px;
     }
 
     .card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-sm); }

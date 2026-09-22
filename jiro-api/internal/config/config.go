@@ -59,6 +59,11 @@ func Load() *Config {
 	if databaseURL == "" {
 		log.Fatal().Msg("DATABASE_URL must be set")
 	}
+
+	if appDatabaseURL := os.Getenv("APP_DATABASE_URL"); appDatabaseURL != "" {
+		databaseURL = appDatabaseURL
+	}
+
 	if len(corsOrigins) == 0 {
 		log.Fatal().Msg("CORS_ORIGINS must be set (comma-separated list of allowed origins)")
 	}

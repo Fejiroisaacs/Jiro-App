@@ -54,19 +54,20 @@ export class AuthService {
   isInitialized = this.initialized.asReadonly();
 
   constructor(private http: HttpClient, private router: Router) {
-    // Restore from storage on init. Guarded: there is no localStorage under
-    // `platform-server`, and it throws outright in some private windows.
+    // The access token itself is never persisted (see handleAuth) — only
+    // this non-sensitive profile object is, purely as the cheap signal
+    // "this browser was logged in" that init() uses to decide whether a
+    // reload is worth a refresh call at all. Guarded: there is no
+    // localStorage under `platform-server`, and it throws outright in some
+    // private windows.
     const stored = readLocal('jiro_user');
-    const token = readLocal('jiro_token');
-    if (stored && token) {
+    if (stored) {
       try {
         this.currentUser.set(JSON.parse(stored));
-        this.accessToken.set(token);
       } catch {
-        // Corrupt `jiro_user` JSON — drop it rather than breaking construction
-        // of a root service, which would take the whole app down.
+        // Corrupt JSON — drop it rather than breaking construction of a
+        // root service, which would take the whole app down.
         removeLocal('jiro_user');
-        removeLocal('jiro_token');
       }
     }
   }
@@ -95,15 +96,22 @@ export class AuthService {
    *  including the public landing page, against an endpoint rate-limited to
    *  5 req/min/IP.
    *
-   *  Three cases:
-   *   1. No browser storage at all (prerender/SSR): there is no stored session
-   *      and no refresh cookie to present, so this is a pure no-op. Firing HTTP
-   *      here would also stall server-side rendering waiting for the response.
-   *   2. No stored token, or a token that is still valid: settle synchronously.
-   *      Skipping unnecessary refreshes is what prevents sign-out on
-   *      close/reopen while the token is still good.
-   *   3. Stored token already expired: start the refresh in the background and
-   *      return at once. `initialized` stays false until that request settles.
+   *  The access token is never persisted (see handleAuth), so on every fresh
+   *  boot there is no in-memory token regardless of whether the session is
+   *  actually still live — only the httpOnly refresh cookie knows that. Three
+   *  cases:
+   *   1. No browser storage at all (prerender/SSR): there is no cached user
+   *      and no refresh cookie to present, so this is a pure no-op. Firing
+   *      HTTP here would also stall server-side rendering waiting on it.
+   *   2. No cached `jiro_user`: this browser was never logged in (or logged
+   *      out). Settle synchronously with no network call — the landing page
+   *      and the discover routes are public, prerendered and crawled, so
+   *      this path must not fire a refresh on every anonymous pageview.
+   *   3. A cached user exists: start the refresh in the background and
+   *      return at once. `initialized` stays false until that request
+   *      settles, so a real returning session gets exactly one refresh per
+   *      reload instead of the old "skip while the cached token still looks
+   *      valid" shortcut, which no longer has a token to check.
    *
    *  How this interleaves with `authGuard` — and why it cannot log anyone out:
    *  the guard awaits `whenInitialized()` *before* it looks at
@@ -121,12 +129,7 @@ export class AuthService {
    *  guard redirects to login. Non-401 errors (e.g. offline) keep cached
    *  state so the interceptor can retry lazily once connectivity is restored. */
   init(): Promise<void> {
-    if (!hasLocalStorage()) {
-      this.markInitialized();
-      return Promise.resolve();
-    }
-    const token = this.accessToken();
-    if (!token || !this.isTokenExpired(token)) {
+    if (!hasLocalStorage() || !this.currentUser()) {
       this.markInitialized();
       return Promise.resolve();
     }
@@ -140,15 +143,6 @@ export class AuthService {
       .pipe(finalize(() => this.markInitialized()))
       .subscribe();
     return Promise.resolve();
-  }
-
-  private isTokenExpired(token: string): boolean {
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      return payload.exp * 1000 < Date.now();
-    } catch {
-      return true;
-    }
   }
 
   register(email: string, password: string, displayName: string, username?: string) {
@@ -257,16 +251,18 @@ export class AuthService {
   }
 
   private handleAuth(res: AuthResponse) {
+    // The access token lives in this signal only — never persisted, so an
+    // attacker with script execution can't read it out of localStorage; it
+    // dies with the tab/reload and init() re-derives a fresh one from the
+    // httpOnly refresh cookie, which JS can never read at all.
     this.accessToken.set(res.access_token);
     this.currentUser.set(res.user);
-    writeLocal('jiro_token', res.access_token);
     writeLocal('jiro_user', JSON.stringify(res.user));
   }
 
   private clearAuth() {
     this.accessToken.set(null);
     this.currentUser.set(null);
-    removeLocal('jiro_token');
     removeLocal('jiro_user');
   }
 }
