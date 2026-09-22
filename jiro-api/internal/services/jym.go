@@ -83,19 +83,23 @@ func (s *JymService) CreateExercise(ctx context.Context, userID uuid.UUID, req *
 }
 
 func (s *JymService) ListExercises(ctx context.Context, userID uuid.UUID, search, muscleGroup string) ([]models.Exercise, error) {
-	query := `SELECT id, user_id, name, muscle_group, notes, created_at, updated_at
-	          FROM exercises WHERE user_id = $1`
+	query := `
+		SELECT e.id, e.user_id, e.name, e.muscle_group, e.notes, e.created_at, e.updated_at,
+		       (SELECT MAX(s.started_at) FROM session_sets ss
+		        JOIN sessions s ON s.id = ss.session_id
+		        WHERE ss.exercise_id = e.id AND s.user_id = e.user_id) AS last_performed_at
+		FROM exercises e WHERE e.user_id = $1`
 	args := []interface{}{userID}
 
 	if search != "" {
 		args = append(args, "%"+search+"%")
-		query += ` AND name ILIKE $` + intStr(len(args))
+		query += ` AND e.name ILIKE $` + intStr(len(args))
 	}
 	if muscleGroup != "" {
 		args = append(args, muscleGroup)
-		query += ` AND muscle_group = $` + intStr(len(args))
+		query += ` AND e.muscle_group = $` + intStr(len(args))
 	}
-	query += ` ORDER BY name ASC`
+	query += ` ORDER BY e.name ASC`
 
 	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
@@ -106,7 +110,7 @@ func (s *JymService) ListExercises(ctx context.Context, userID uuid.UUID, search
 	var exercises []models.Exercise
 	for rows.Next() {
 		var ex models.Exercise
-		if err := rows.Scan(&ex.ID, &ex.UserID, &ex.Name, &ex.MuscleGroup, &ex.Notes, &ex.CreatedAt, &ex.UpdatedAt); err != nil {
+		if err := rows.Scan(&ex.ID, &ex.UserID, &ex.Name, &ex.MuscleGroup, &ex.Notes, &ex.CreatedAt, &ex.UpdatedAt, &ex.LastPerformedAt); err != nil {
 			return nil, err
 		}
 		exercises = append(exercises, ex)

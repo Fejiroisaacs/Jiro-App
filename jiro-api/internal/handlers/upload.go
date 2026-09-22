@@ -12,15 +12,16 @@ import (
 )
 
 type UploadHandler struct {
-	storage        *services.StorageService
+	storage        *services.StorageService // avatars, recipe covers: public, for discover/share
+	privateStorage *services.StorageService // collection covers, session attachments: no public reason to exist
 	userService    *services.UserService
 	recipeService  *services.RecipeService
 	jymService     *services.JymService
 	journalService *services.JournalService
 }
 
-func NewUploadHandler(storage *services.StorageService, userService *services.UserService, recipeService *services.RecipeService, jymService *services.JymService, journalService *services.JournalService) *UploadHandler {
-	return &UploadHandler{storage: storage, userService: userService, recipeService: recipeService, jymService: jymService, journalService: journalService}
+func NewUploadHandler(storage, privateStorage *services.StorageService, userService *services.UserService, recipeService *services.RecipeService, jymService *services.JymService, journalService *services.JournalService) *UploadHandler {
+	return &UploadHandler{storage: storage, privateStorage: privateStorage, userService: userService, recipeService: recipeService, jymService: jymService, journalService: journalService}
 }
 
 var allowedAvatarTypes = map[string]string{
@@ -380,7 +381,7 @@ func (h *UploadHandler) PresignCollectionCover(c *gin.Context) {
 	}
 
 	objectKey := services.JournalCollectionCoverObjectKey(userID, collectionID, ext)
-	uploadURL, _, err := h.storage.PresignPutObject(c.Request.Context(), objectKey, strings.ToLower(req.ContentType), req.ContentLength)
+	uploadURL, _, err := h.privateStorage.PresignPutObject(c.Request.Context(), objectKey, strings.ToLower(req.ContentType), req.ContentLength)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error: models.ErrorDetail{Code: "STORAGE_ERROR", Message: "Failed to generate upload URL"},
@@ -446,13 +447,11 @@ func (h *UploadHandler) ConfirmCollectionCover(c *gin.Context) {
 
 	// Delete old cover image if one exists
 	if collection.CoverImageURL != nil && *collection.CoverImageURL != "" {
-		publicBase := h.storage.PublicURL("")
-		oldKey := strings.TrimPrefix(*collection.CoverImageURL, publicBase)
-		oldKey = strings.TrimPrefix(oldKey, "/")
-		h.storage.DeleteObject(c.Request.Context(), oldKey)
+		oldKey := h.privateStorage.ObjectKeyFromPublicURL(*collection.CoverImageURL)
+		h.privateStorage.DeleteObject(c.Request.Context(), oldKey)
 	}
 
-	coverURL := h.storage.PublicURL(req.ObjectKey)
+	coverURL := h.privateStorage.PublicURL(req.ObjectKey)
 	if err := h.journalService.SetCollectionCoverURL(c.Request.Context(), userID, collectionID, coverURL); err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to update collection"},
@@ -460,7 +459,13 @@ func (h *UploadHandler) ConfirmCollectionCover(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"cover_image_url": coverURL})
+	// The stored value stays the plain (non-public) URL (also what DeleteObject
+	// above derives the key from); only the response is signed.
+	responseURL := coverURL
+	if signed, err := h.privateStorage.PresignGetObject(c.Request.Context(), req.ObjectKey); err == nil {
+		responseURL = signed
+	}
+	c.JSON(http.StatusOK, gin.H{"cover_image_url": responseURL})
 }
 
 // DELETE /upload/journal-collection/:collection_id/cover
@@ -485,10 +490,8 @@ func (h *UploadHandler) DeleteCollectionCover(c *gin.Context) {
 	}
 
 	if collection.CoverImageURL != nil && *collection.CoverImageURL != "" {
-		publicBase := h.storage.PublicURL("")
-		objectKey := strings.TrimPrefix(*collection.CoverImageURL, publicBase)
-		objectKey = strings.TrimPrefix(objectKey, "/")
-		h.storage.DeleteObject(c.Request.Context(), objectKey)
+		objectKey := h.privateStorage.ObjectKeyFromPublicURL(*collection.CoverImageURL)
+		h.privateStorage.DeleteObject(c.Request.Context(), objectKey)
 	}
 
 	if err := h.journalService.ClearCollectionCoverURL(c.Request.Context(), userID, collectionID); err != nil {
@@ -560,7 +563,7 @@ func (h *UploadHandler) PresignSessionAttachment(c *gin.Context) {
 		return
 	}
 
-	uploadURL, objectKey, err := h.storage.PresignSessionUpload(c.Request.Context(), userID, sessionID, ext, strings.ToLower(req.ContentType), req.ContentLength)
+	uploadURL, objectKey, err := h.privateStorage.PresignSessionUpload(c.Request.Context(), userID, sessionID, ext, strings.ToLower(req.ContentType), req.ContentLength)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error: models.ErrorDetail{Code: "STORAGE_ERROR", Message: "Failed to generate upload URL"},
@@ -644,7 +647,7 @@ func (h *UploadHandler) ConfirmSessionAttachment(c *gin.Context) {
 		exerciseID = &parsed
 	}
 
-	fileURL := h.storage.PublicURL(req.ObjectKey)
+	fileURL := h.privateStorage.PublicURL(req.ObjectKey)
 	attachment, err := h.jymService.CreateAttachment(c.Request.Context(), userID, sessionID, exerciseID, req.ObjectKey, fileURL, fileType, req.Label)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
@@ -653,6 +656,9 @@ func (h *UploadHandler) ConfirmSessionAttachment(c *gin.Context) {
 		return
 	}
 
+	if url, err := h.privateStorage.PresignGetObject(c.Request.Context(), attachment.ObjectKey); err == nil {
+		attachment.FileURL = url
+	}
 	c.JSON(http.StatusCreated, attachment)
 }
 
@@ -677,7 +683,7 @@ func (h *UploadHandler) DeleteSessionAttachment(c *gin.Context) {
 		return
 	}
 
-	h.storage.DeleteObject(c.Request.Context(), attachment.ObjectKey)
+	h.privateStorage.DeleteObject(c.Request.Context(), attachment.ObjectKey)
 
 	c.JSON(http.StatusOK, gin.H{"message": "attachment deleted"})
 }

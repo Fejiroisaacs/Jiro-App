@@ -1,7 +1,5 @@
 # Jiro
 
-Just like FeJiro, get it? :)
-
 **Live App:** [jiro-app](https://jiro-app-3e88c.web.app)
 
 ## Modules

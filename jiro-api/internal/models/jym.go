@@ -16,6 +16,9 @@ type Exercise struct {
 	Notes       *string   `json:"notes"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
+	// LastPerformedAt is only populated by ListExercises; nil on the other
+	// exercise endpoints, which never select it.
+	LastPerformedAt *time.Time `json:"last_performed_at"`
 }
 
 // SetHistory is one logged set from history, enriched with computed 1RM.

@@ -15,6 +15,8 @@ export interface Exercise {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  /** Only populated by listExercises(); null elsewhere and when never performed. */
+  last_performed_at: string | null;
 }
 
 export interface SetHistory {

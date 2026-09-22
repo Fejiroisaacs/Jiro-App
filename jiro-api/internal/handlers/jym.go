@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"time"
@@ -23,6 +24,25 @@ type JymHandler struct {
 
 func NewJymHandler(jymService *services.JymService, storage *services.StorageService, appBaseURL string, db *pgxpool.Pool) *JymHandler {
 	return &JymHandler{jymService: jymService, storage: storage, appBaseURL: appBaseURL, db: db}
+}
+
+// signAttachments replaces each attachment's stored URL with a short-lived
+// signed one — the bucket is not meant to be publicly readable. Mirrors
+// JournalHandler.signImages.
+func (h *JymHandler) signAttachments(ctx context.Context, attachments []models.SessionAttachment) {
+	for i := range attachments {
+		if url, err := h.storage.PresignGetObject(ctx, attachments[i].ObjectKey); err == nil {
+			attachments[i].FileURL = url
+		}
+	}
+}
+
+func (h *JymHandler) signFormChecks(ctx context.Context, checks []models.ExerciseFormCheck) {
+	for i := range checks {
+		if url, err := h.storage.PresignGetObject(ctx, checks[i].ObjectKey); err == nil {
+			checks[i].FileURL = url
+		}
+	}
 }
 
 // ─── Exercises ────────────────────────────────────────────────────────────────
@@ -150,6 +170,7 @@ func (h *JymHandler) GetExerciseFormChecks(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to load form checks"}})
 		return
 	}
+	h.signFormChecks(c.Request.Context(), checks)
 	c.JSON(http.StatusOK, checks)
 }
 
@@ -495,6 +516,7 @@ func (h *JymHandler) GetSession(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to get session"}})
 		return
 	}
+	h.signAttachments(c.Request.Context(), sess.Attachments)
 	c.JSON(http.StatusOK, sess)
 }
 
