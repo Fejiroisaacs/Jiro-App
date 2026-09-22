@@ -1,6 +1,5 @@
 import { Component, OnInit, signal } from '@angular/core';
 
-import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { RecipeService, Recipe } from '../../../core/services/recipe.service';
 import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-card';
@@ -9,7 +8,7 @@ import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-he
 @Component({
   selector: 'app-discover',
   standalone: true,
-  imports: [RouterLink, FormsModule, JiroCardComponent, JiroPageHeaderComponent],
+  imports: [FormsModule, JiroCardComponent, JiroPageHeaderComponent],
   template: `
     <div class="discover-page">
       <jiro-page-header heading="Discover" subtitle="Recipes shared publicly by the community" />
@@ -40,9 +39,7 @@ import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-he
 <div class="recipe-grid">
         @for (recipe of recipes(); track recipe) {
 <jiro-card
-         
-          [clickable]="true"
-          [routerLink]="['/culinara/discover', recipe.id]"
+          [link]="['/culinara/discover', recipe.id]"
           class="recipe-card">
           <div class="recipe-card-inner">
             @if (recipe.cover_image_url) {

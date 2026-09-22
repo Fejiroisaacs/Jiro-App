@@ -1,22 +1,39 @@
 import { Component, Input } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
-
+/**
+ * `[routerLink]` applied straight to `<jiro-card>` still fires on click — the
+ * directive attaches to any host — but the host is a `<div>`, so the card was
+ * never focusable and had no way to fire on Enter/Space. It also silently
+ * broke ctrl/middle-click "open in new tab", since only a real `href` gets
+ * that from the browser. `link` renders a native `<a>` instead, which gets
+ * all of that for free.
+ */
 @Component({
   selector: 'jiro-card',
   standalone: true,
-  imports: [],
+  imports: [RouterLink],
   template: `
-    <div class="jiro-card" [class.clickable]="clickable">
-      <ng-content></ng-content>
-    </div>
+    @if (link) {
+      <a class="jiro-card clickable" [routerLink]="link">
+        <ng-content></ng-content>
+      </a>
+    } @else {
+      <div class="jiro-card" [class.clickable]="clickable">
+        <ng-content></ng-content>
+      </div>
+    }
   `,
   styles: [`
     .jiro-card {
+      display: block;
       background: var(--bg-surface);
       border: 1px solid var(--border-color);
       border-radius: var(--border-radius-lg);
       padding: var(--space-lg);
       box-shadow: var(--shadow-sm);
+      color: inherit;
+      text-decoration: none;
       transition: box-shadow 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     }
 
@@ -28,8 +45,14 @@ import { Component, Input } from '@angular/core';
       box-shadow: var(--shadow-md);
       transform: translate(-2px, -2px);
     }
+
+    a.jiro-card:focus-visible {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 2px;
+    }
   `]
 })
 export class JiroCardComponent {
   @Input() clickable = false;
+  @Input() link?: string | unknown[];
 }
