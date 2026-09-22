@@ -1241,6 +1241,57 @@ func (s *JymService) GetLastSessionSets(ctx context.Context, userID uuid.UUID, e
 	return result, nil
 }
 
+// GetPreviousBests returns, for each exercise, the best set (by weight, then
+// reps) from the most recent session before excludeSessionID — "last time
+// you did this" for the post-workout summary. excludeSessionID need not
+// belong to the caller: it is only ever used to exclude a row, never to
+// grant access, since every row is already scoped to user_id = $1.
+func (s *JymService) GetPreviousBests(ctx context.Context, userID, excludeSessionID uuid.UUID, exerciseIDs []uuid.UUID) ([]models.PreviousBest, error) {
+	if len(exerciseIDs) == 0 {
+		return []models.PreviousBest{}, nil
+	}
+
+	args := []interface{}{userID, excludeSessionID}
+	placeholders := ""
+	for i, id := range exerciseIDs {
+		args = append(args, id)
+		if i > 0 {
+			placeholders += ","
+		}
+		placeholders += "$" + intStr(i+3)
+	}
+
+	rows, err := s.db.Query(ctx, `
+		WITH prev_session AS (
+			SELECT DISTINCT ON (ss.exercise_id) ss.exercise_id, ss.session_id, s.started_at
+			FROM session_sets ss
+			JOIN sessions s ON s.id = ss.session_id
+			WHERE s.user_id = $1 AND s.id != $2 AND ss.exercise_id IN (`+placeholders+`)
+			ORDER BY ss.exercise_id, s.started_at DESC
+		)
+		SELECT DISTINCT ON (ps.exercise_id) ps.exercise_id, ss.weight, ss.reps_performed, ps.started_at
+		FROM prev_session ps
+		JOIN session_sets ss ON ss.session_id = ps.session_id AND ss.exercise_id = ps.exercise_id
+		ORDER BY ps.exercise_id, ss.weight DESC, ss.reps_performed DESC`,
+		args...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	bests := []models.PreviousBest{}
+	for rows.Next() {
+		var b models.PreviousBest
+		if err := rows.Scan(&b.ExerciseID, &b.Weight, &b.Reps, &b.Date); err != nil {
+			return nil, err
+		}
+		b.Est1RM = epley1RM(b.Weight, b.Reps)
+		bests = append(bests, b)
+	}
+	return bests, nil
+}
+
 // GetPRs returns the best personal record set (by weight) for each exercise the user has logged.
 func (s *JymService) GetPRs(ctx context.Context, userID uuid.UUID) ([]models.ExercisePR, error) {
 	rows, err := s.db.Query(ctx,

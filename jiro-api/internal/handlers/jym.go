@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/analytics"
@@ -810,6 +811,36 @@ func (h *JymHandler) DeleteSessionExercise(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Exercise removed"})
+}
+
+// GetPreviousBests returns, for each exercise_id in the query string, the
+// best set from the most recent session before :id — the "last time" line
+// on the post-workout summary.
+// GET /jym/sessions/:id/previous-bests?exercise_ids=uuid1,uuid2
+func (h *JymHandler) GetPreviousBests(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	sessionID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid session ID"}})
+		return
+	}
+
+	raw := strings.Split(c.Query("exercise_ids"), ",")
+	exerciseIDs := make([]uuid.UUID, 0, len(raw))
+	for _, r := range raw {
+		id, err := uuid.Parse(strings.TrimSpace(r))
+		if err != nil {
+			continue
+		}
+		exerciseIDs = append(exerciseIDs, id)
+	}
+
+	bests, err := h.jymService.GetPreviousBests(c.Request.Context(), userID, sessionID, exerciseIDs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to fetch previous bests"}})
+		return
+	}
+	c.JSON(http.StatusOK, bests)
 }
 
 // ─── CSV Export ───────────────────────────────────────────────────────────────

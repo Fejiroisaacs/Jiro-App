@@ -366,6 +366,16 @@ type SessionSet struct {
 	CreatedAt     time.Time `json:"created_at"`
 }
 
+// PreviousBest is the best set for one exercise from the most recent session
+// before a given one — used on the post-workout summary to show "last time".
+type PreviousBest struct {
+	ExerciseID uuid.UUID `json:"exercise_id"`
+	Weight     float64   `json:"weight"`
+	Reps       int       `json:"reps_performed"`
+	Est1RM     float64   `json:"est_1rm"`
+	Date       time.Time `json:"date"`
+}
+
 type SessionSetWithExercise struct {
 	SessionSet
 	ExerciseName string  `json:"exercise_name"`

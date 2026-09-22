@@ -1572,11 +1572,13 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
         const durationSeconds = Math.floor((Date.now() - this.startedAt.getTime()) / 1000);
         this.router.navigate(['/jym/session-summary'], {
           state: {
+            sessionId: this.sessionId,
             durationSeconds,
             sessionType: this.sessionType(),
             weightUnit: this.settingsService.weightUnit(),
             routineName: null,
             blocks: this.blocks().map(b => ({
+              exerciseId: b.exerciseId,
               exerciseName: b.exerciseName,
               muscleGroup: b.muscleGroup,
               sets: b.sets.map(s => ({
