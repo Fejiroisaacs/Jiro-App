@@ -1,6 +1,8 @@
 {
   "hosting": {
     "public": "jiro-ui/dist/jiro-ui/browser",
+    "//": "Without this, Firebase 301s a prerendered route (dist/.../login/index.html) from /login to /login/ before rewrites even run, since it resolves as a directory by default. Google follows redirects fine, but Slack/iMessage/LinkedIn/Facebook unfurlers are inconsistent about it - the whole reason prerendering exists is to make sharing the plain /login-shaped URL work, so it needs to serve directly.",
+    "trailingSlash": false,
     "ignore": [
       "firebase.json",
       "**/.*",
