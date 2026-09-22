@@ -21,7 +21,11 @@ const USERNAME_PATTERN = /^[a-z0-9_]{3,30}$/;
           <p class="auth-subtitle">Create an account</p>
         </div>
 
-        <jiro-card>
+        <!-- ngSkipHydration: NgForm (ngModel inside <form>) has a documented
+             hydration mismatch (NG0502) with no visible symptom - a normal
+             client render replaces it. Register has no content a crawler
+             reads through hydration anyway, so the fallback costs nothing. -->
+        <jiro-card ngSkipHydration>
           <form (ngSubmit)="onSubmit()" class="auth-form">
             <jiro-input
               label="Display Name"

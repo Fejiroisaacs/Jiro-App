@@ -19,7 +19,11 @@ import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-inpu
           <p class="auth-subtitle">Your life, in one place.</p>
         </div>
 
-        <jiro-card>
+        <!-- ngSkipHydration: NgForm (ngModel inside <form>) has a documented
+             hydration mismatch (NG0502) with no visible symptom - a normal
+             client render replaces it. Login has no content a crawler reads
+             through hydration anyway, so the fallback costs nothing here. -->
+        <jiro-card ngSkipHydration>
           <form (ngSubmit)="onSubmit()" class="auth-form">
             <jiro-input
               label="Email"
