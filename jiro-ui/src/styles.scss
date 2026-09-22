@@ -390,6 +390,21 @@ select:focus-visible {
   text-align: center;
 }
 
+// For a page whose visual design has no room for a title (a focus screen, a
+// tab-strip container whose tabs already state what's showing) but still
+// needs exactly one real heading for assistive tech.
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 // Loading spinner. Pages should use this instead of redefining .spinner-lg.
 .spinner {
   width: 40px;

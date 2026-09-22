@@ -16,6 +16,7 @@ const TABS: TabOption<Tab>[] = [
   standalone: true,
   imports: [ExerciseLibraryComponent, PrWallComponent, JiroTabStripComponent],
   template: `
+    <h1 class="sr-only">Exercises</h1>
     <jiro-tab-strip [tabs]="tabs" [value]="tab()" label="Exercises sections" (valueChange)="setTab($event)" />
     <div class="tab-content">
       @if (tab() === 'exercises') {

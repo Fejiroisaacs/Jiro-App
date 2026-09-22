@@ -49,6 +49,7 @@ interface ExerciseBlock {
   standalone: true,
   imports: [FormsModule, JiroButtonComponent, JiroModalComponent, JiroIconComponent, JiroSkeletonComponent, JiroEmptyStateComponent, JymPrBadgeComponent],
   template: `
+    <h1 class="sr-only">Active session</h1>
     <!-- Sticky header bar -->
     <div class="session-bar">
       <div class="session-bar-row">
