@@ -71,7 +71,7 @@ const USERNAME_PATTERN = /^[a-z0-9_]{3,30}$/;
               [error]="passwordMismatch() ? 'Passwords do not match' : ''">
             </jiro-input>
 
-            <jiro-button block type="submit" [loading]="loading()" [disabled]="!canSubmit()">
+            <jiro-button class="outline-when-disabled" block type="submit" [loading]="loading()" [disabled]="!canSubmit()">
               Create Account
             </jiro-button>
           </form>

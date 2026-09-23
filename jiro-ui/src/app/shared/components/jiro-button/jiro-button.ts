@@ -73,6 +73,16 @@ import { Component, booleanAttribute, input } from '@angular/core';
       box-shadow: none !important;
     }
 
+    /* Opt-in (class="outline-when-disabled" on <jiro-button>): a disabled
+       primary reads as an outline instead of a faded solid block, so it doesn't
+       dominate a form the user hasn't filled in yet. Used on the auth forms. */
+    :host(.outline-when-disabled) .jiro-btn--primary:disabled {
+      background: transparent;
+      color: var(--color-primary);
+      border-color: var(--color-primary);
+      opacity: 0.7;
+    }
+
     .jiro-btn:active:not(:disabled) {
       transform: translate(1px, 1px) !important;
       box-shadow: 0px 0px 0px transparent !important;
