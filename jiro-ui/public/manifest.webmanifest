@@ -1,7 +1,7 @@
 {
   "name": "Jiro",
   "short_name": "Jiro",
-  "description": "Your modular life OS — fitness, recipes, and more.",
+  "description": "Your life, in one place: recipes, workouts, journal and money.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",

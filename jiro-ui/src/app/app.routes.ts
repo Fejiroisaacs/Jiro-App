@@ -19,11 +19,11 @@ export const routes: Routes = [
   {
     path: '',
     pathMatch: 'full',
-    title: 'Your life, unified',
+    title: 'Your life, in one place',
     data: {
       index: true,
       description:
-        'One private, modular home for your recipes, workouts, journal and money. No ads, no tracking, nothing sold on.',
+        'Your life, in one place: recipes, workouts, journal and money. Private by default, with no ads and no third-party tracking.',
       ogType: 'website',
     },
     loadComponent: () => import('./features/landing/landing').then(m => m.LandingComponent),

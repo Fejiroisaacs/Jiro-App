@@ -12,14 +12,14 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PUB = os.path.join(HERE, "..", "public")
-SRC = os.path.join(PUB, "images", "landing", "dashboard.webp")
+SRC = os.path.join(PUB, "images", "landing", "dashboard-dark.webp")
 OUT = os.path.join(PUB, "images", "og", "jiro-og.png")
 
 W, H = 1200, 630
 # "Earth & Clay", the app's own palette.
 INK = (38, 29, 24)
 CREAM = (241, 233, 223)
-CLAY = (122, 59, 46)
+CLAY = (110, 49, 40)   # --jiro-maroon, the brand primary
 MUTED = (176, 162, 150)
 
 DISPLAY = "C:/Windows/Fonts/BOOKOSB.TTF"   # a serif, closest to Newsreader
@@ -57,9 +57,11 @@ def main():
     d.rectangle([(84, 210), (84 + 96, 210 + 7)], fill=CLAY)
 
     d.text((84, 264), "Jiro", font=font(DISPLAY, 132), fill=CREAM)
-    d.text((84, 416), "Recipes, workouts, journal and money.", font=font(BODY, 42), fill=CREAM)
-    d.text((84, 470), "One private home for all of it.", font=font(BODY, 42), fill=CREAM)
-    d.text((84, 536), "No ads.  No tracking.  Your data stays yours.", font=font(BODY, 30), fill=MUTED)
+    d.text((84, 416), "Your life, in one place.", font=font(BODY, 42), fill=CREAM)
+    d.text((84, 470), "Recipes, workouts, journal and money.", font=font(BODY, 42), fill=CREAM)
+    # Must stay literally true: the app keeps a first-party event log, so no
+    # plain "no tracking" here.
+    d.text((84, 536), "No ads.  No third-party tracking.  Never sold.", font=font(BODY, 30), fill=MUTED)
 
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     card.save(OUT, "PNG", optimize=True)

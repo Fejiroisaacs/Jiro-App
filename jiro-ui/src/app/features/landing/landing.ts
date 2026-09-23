@@ -1,4 +1,4 @@
-import { Component, DestroyRef, ElementRef, OnInit, PLATFORM_ID, afterNextRender, inject } from '@angular/core';
+import { Component, DestroyRef, ElementRef, OnInit, PLATFORM_ID, afterRenderEffect, inject, signal, untracked, viewChildren } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
@@ -9,6 +9,7 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
 @Component({
   selector: 'app-landing',
   standalone: true,
+  host: { '[class.reveal-ready]': 'revealReady()' },
   imports: [RouterLink, JiroIconComponent, JiroLogoComponent, JiroMarkComponent],
   template: `
     <div class="landing">
@@ -33,7 +34,7 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
       <section class="l-hero">
         <div class="l-hero-grid">
           <div class="l-hero-copy">
-            <h1 class="l-hero-title">Your Life,<br><em>Unified.</em></h1>
+            <h1 class="l-hero-title">Your life, in one place.</h1>
             <p class="l-hero-sub">
               One modular platform for your recipes, workouts, journal, and more.
               No ads. No clutter. Just your life, beautifully organised.
@@ -47,24 +48,21 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
             </div>
           </div>
 
-          <!-- The real dashboard, shot in dark mode. Re-shoot after UI changes.
-               Phones get a portrait phone shot: the desktop one is unreadable
-               at that width. -->
+          <!-- The real dashboard. Light and dark shots, shown to match the app's
+               own dark-mode setting (html.dark). Phones get a portrait phone
+               shot: the desktop one is unreadable at that width. The light
+               pair is the eager/high-priority one; the dark pair is lazy, so a
+               light-mode visitor never downloads it. -->
           <div class="l-hero-shot-wrap">
-            <picture>
-              <source
-                media="(max-width: 600px)"
-                srcset="/images/landing/dashboard-phone-dark.webp"
-                width="780"
-                height="1280" />
-              <img
-                class="l-hero-shot"
-                src="/images/landing/dashboard.webp"
-                width="1440"
-                height="900"
-                fetchpriority="high"
-                decoding="async"
-                alt="The Jiro dashboard in dark mode: a workout in progress, a journal streak, a cook streak, the month's income and spending, budget bars and a two-week activity strip." />
+            <picture class="shot-light">
+              <source media="(max-width: 600px)" srcset="/images/landing/dashboard-phone-light.webp" width="780" height="1280" />
+              <img class="l-hero-shot" width="2160" height="1350"
+                fetchpriority="high" decoding="async" alt="The Jiro dashboard: last workout, journal streak, cook streak, a body weight trend, recent recipes, the month's income and spending with budget bars, and a two-week activity strip." src="/images/landing/dashboard-light.webp" />
+            </picture>
+            <picture class="shot-dark">
+              <source media="(max-width: 600px)" srcset="/images/landing/dashboard-phone-dark.webp" width="780" height="1280" />
+              <img class="l-hero-shot" width="2160" height="1350"
+                loading="lazy" decoding="async" alt="The Jiro dashboard: last workout, journal streak, cook streak, a body weight trend, recent recipes, the month's income and spending with budget bars, and a two-week activity strip." src="/images/landing/dashboard-dark.webp" />
             </picture>
           </div>
         </div>
@@ -72,7 +70,7 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
 
       <!-- ── Module Bento ───────────────────────────────────────────────────── -->
       <section class="l-modules" id="modules">
-        <div class="l-section-inner l-reveal">
+        <div #reveal data-reveal="modules" class="l-section-inner l-reveal" [class.is-visible]="revealed().has('modules')">
           <h2 class="l-section-title l-section-title--with-lead">Every corner of your life, covered.</h2>
           <p class="l-section-lead">
             All modules share the same design language, data layer, and account. No juggling five separate apps.
@@ -82,7 +80,7 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
           <div class="l-bento">
 
             <!-- Culinara — large -->
-            <div class="l-card l-card--culinara" (mousemove)="onCardHover($event)" (mouseleave)="onCardLeave($event)">
+            <div class="l-card l-card--culinara">
               <div class="l-card-content">
                 <div class="l-card-icon">
                   <jiro-mark name="culinara" [size]="24" />
@@ -91,18 +89,15 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
                 <p class="l-card-desc">Perfect your recipes. Log every trial, promote the winner to your permanent cookbook.</p>
               </div>
               <div class="l-card-shot">
-                <img
-                  src="/images/landing/culinara.webp"
-                  width="728"
-                  height="232"
-                  loading="lazy"
-                  decoding="async"
-                  alt="The Culinara recipe list: six recipes with tags, ingredient chips, trial counts and star ratings." />
+                <img class="shot-light" width="1456" height="464" loading="lazy" decoding="async"
+                  alt="The Culinara recipe list: recipe cards with tags, a star rating, trial counts and the main ingredients." src="/images/landing/culinara-light.webp" />
+                <img class="shot-dark" width="1456" height="464" loading="lazy" decoding="async"
+                  alt="The Culinara recipe list: recipe cards with tags, a star rating, trial counts and the main ingredients." src="/images/landing/culinara-dark.webp" />
               </div>
             </div>
 
             <!-- Journaly — tall -->
-            <div class="l-card l-card--journaly" (mousemove)="onCardHover($event)" (mouseleave)="onCardLeave($event)">
+            <div class="l-card l-card--journaly">
               <div class="l-card-content">
                 <div class="l-card-icon">
                   <jiro-mark name="journaly" [size]="24" />
@@ -111,18 +106,15 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
                 <p class="l-card-desc">Private reflections or shared journals. Track your mood, write daily, watch your streak grow.</p>
               </div>
               <div class="l-card-shot">
-                <img
-                  src="/images/landing/journaly.webp"
-                  width="720"
-                  height="1240"
-                  loading="lazy"
-                  decoding="async"
-                  alt="Journaly on a phone: a writing streak, and a chart of how the last thirty days felt broken down by mood." />
+                <img class="shot-light" width="720" height="1440" loading="lazy" decoding="async"
+                  alt="Journaly on a phone: a writing streak, and a chart of how the last thirty days felt broken down by mood." src="/images/landing/journaly-light.webp" />
+                <img class="shot-dark" width="720" height="1440" loading="lazy" decoding="async"
+                  alt="Journaly on a phone: a writing streak, and a chart of how the last thirty days felt broken down by mood." src="/images/landing/journaly-dark.webp" />
               </div>
             </div>
 
             <!-- Jym — medium -->
-            <div class="l-card l-card--jym" (mousemove)="onCardHover($event)" (mouseleave)="onCardLeave($event)">
+            <div class="l-card l-card--jym">
               <div class="l-card-content">
                 <div class="l-card-icon">
                   <jiro-mark name="jym" [size]="24" />
@@ -131,18 +123,15 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
                 <p class="l-card-desc">Log sets, track volume, and visualise your strength journey with PR detection and progress charts.</p>
               </div>
               <div class="l-card-shot">
-                <img
-                  src="/images/landing/jym.webp"
-                  width="400"
-                  height="300"
-                  loading="lazy"
-                  decoding="async"
-                  alt="A Jym session in progress: two exercises with logged sets, weights in pounds, and personal-record badges." />
+                <img class="shot-light" width="800" height="600" loading="lazy" decoding="async"
+                  alt="A Jym session in progress: logged sets with weights and reps." src="/images/landing/jym-light.webp" />
+                <img class="shot-dark" width="800" height="600" loading="lazy" decoding="async"
+                  alt="A Jym session in progress: logged sets with weights and reps." src="/images/landing/jym-dark.webp" />
               </div>
             </div>
 
             <!-- Ledger — medium -->
-            <div class="l-card l-card--ledger" (mousemove)="onCardHover($event)" (mouseleave)="onCardLeave($event)">
+            <div class="l-card l-card--ledger">
               <div class="l-card-content">
                 <div class="l-card-icon">
                   <jiro-mark name="ledger" [size]="24" />
@@ -151,18 +140,15 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
                 <p class="l-card-desc">Track spending, set budgets, and watch your net worth grow over time.</p>
               </div>
               <div class="l-card-shot">
-                <img
-                  src="/images/landing/ledger.webp"
-                  width="498"
-                  height="375"
-                  loading="lazy"
-                  decoding="async"
-                  alt="The Ledger overview: the month's income, spending and savings rate, three budget bars and recent transactions." />
+                <img class="shot-light" width="996" height="750" loading="lazy" decoding="async"
+                  alt="The Ledger month card: net for the month, income, expenses and savings rate." src="/images/landing/ledger-light.webp" />
+                <img class="shot-dark" width="996" height="750" loading="lazy" decoding="async"
+                  alt="The Ledger month card: net for the month, income, expenses and savings rate." src="/images/landing/ledger-dark.webp" />
               </div>
             </div>
 
             <!-- Echo — small -->
-            <div class="l-card l-card--echo" (mousemove)="onCardHover($event)" (mouseleave)="onCardLeave($event)">
+            <div class="l-card l-card--echo">
               <div class="l-card-content">
                 <div class="l-card-icon">
                   <jiro-mark name="echo" [size]="24" />
@@ -181,22 +167,22 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
       <!-- Every line here must stay literally true. The product keeps a
            first-party event log, so "no analytics" or "no tracking" would not. -->
       <section class="l-privacy" aria-labelledby="l-privacy-title">
-        <div class="l-section-inner l-reveal">
+        <div #reveal data-reveal="privacy" class="l-section-inner l-reveal" [class.is-visible]="revealed().has('privacy')">
           <h2 class="l-section-title" id="l-privacy-title">Private by default</h2>
           <ul class="l-privacy-list">
             <li><jiro-icon name="check-circle" [size]="24" /><span>No ads</span></li>
             <li><jiro-icon name="check-circle" [size]="24" /><span>No third-party scripts</span></li>
             <li><jiro-icon name="check-circle" [size]="24" /><span>No third-party analytics</span></li>
             <li><jiro-icon name="check-circle" [size]="24" /><span>Your data exports in one click</span></li>
+            <li><jiro-icon name="check-circle" [size]="24" /><span>Your data is never sold</span></li>
           </ul>
-          <p class="l-privacy-note">Self-host it if you would rather not take our word for it.</p>
         </div>
       </section>
 
       <!-- ── Final CTA ──────────────────────────────────────────────────────── -->
       <section class="l-final">
-        <div class="l-final-inner l-reveal">
-          <h2>Ready to organise your chaos?</h2>
+        <div #reveal data-reveal="final" class="l-final-inner l-reveal" [class.is-visible]="revealed().has('final')">
+          <h2>Bring it into one place.</h2>
           <a routerLink="/register" class="l-btn l-btn--primary l-btn--lg">Get started</a>
         </div>
       </section>
@@ -352,10 +338,6 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
       color: var(--text-primary);
       animation: fadeUp 0.55s 0.05s ease both;
     }
-    .l-hero-title em {
-      font-style: normal;
-      color: var(--color-primary);
-    }
     .l-hero-sub {
       font-size: var(--font-size-lg);
       color: var(--text-secondary);
@@ -372,6 +354,14 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
     }
 
     /* ── Hero screenshot ───────────────────────────────────────────────────── */
+    /* Light/dark screenshot pairs follow the app's own dark-mode class. */
+    .l-hero-shot-wrap picture.shot-dark,
+    .l-card-shot img.shot-dark { display: none; }
+    :host-context(html.dark) .l-hero-shot-wrap picture.shot-light,
+    :host-context(html.dark) .l-card-shot img.shot-light { display: none; }
+    :host-context(html.dark) .l-hero-shot-wrap picture.shot-dark,
+    :host-context(html.dark) .l-card-shot img.shot-dark { display: block; }
+
     .l-hero-shot-wrap { min-width: 0; }
     .l-hero-shot-wrap picture { display: block; }
     .l-hero-shot {
@@ -436,9 +426,14 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
       background: none;
       overflow: visible;
     }
+    /* The frame hugs the picture: sized by the image, not stretched to the
+       card, so the border and shadow never wrap empty space below it. */
     .l-card--journaly .l-card-shot img {
-      object-fit: contain;
-      object-position: top center;
+      width: auto;
+      height: auto;
+      max-width: 100%;
+      max-height: 100%;
+      margin: 0 auto;
       border-radius: var(--border-radius);
       border: 1px solid var(--border-color);
       box-shadow: var(--shadow-md);
@@ -506,11 +501,9 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
       gap: 16px;
     }
 
-    /* Card base. Hard offset shadow like jiro-card: small at rest, medium
-       on hover, lifting toward the light. */
+    /* Card base. Static on purpose: the cards aren't links, so they don't
+       lift on hover. Hard offset shadow like jiro-card. */
     .l-card {
-      --mouse-x: 50%;
-      --mouse-y: 50%;
       background: var(--bg-canvas);
       border: 1px solid var(--border-color);
       border-radius: calc(var(--border-radius) * 1.5);
@@ -519,31 +512,8 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
       display: flex;
       flex-direction: column;
       gap: var(--space-md);
-      transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
       overflow: hidden;
       position: relative;
-    }
-    .l-card::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      border-radius: inherit;
-      background: radial-gradient(
-        circle at var(--mouse-x) var(--mouse-y),
-        rgba(255,255,255,0.07) 0%,
-        transparent 60%
-      );
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.3s;
-      z-index: 1;
-    }
-    .l-card:hover::after { opacity: 1; }
-
-    .l-card:hover {
-      border-color: var(--color-primary);
-      box-shadow: var(--shadow-md);
-      transform: translate(-2px, -2px);
     }
 
     /* Culinara: span 2 cols, row 1 */
@@ -636,17 +606,11 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
       color: var(--color-accent);
       margin-top: 2px;
     }
-    .l-privacy-note {
-      margin: var(--space-xl) 0 0;
-      font-size: var(--font-size-md);
-      color: var(--text-secondary);
-      line-height: 1.6;
-    }
     @media (min-width: 601px) {
       .l-privacy-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
-    @media (min-width: 900px) {
-      .l-privacy-list { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    @media (min-width: 1024px) {
+      .l-privacy-list { grid-template-columns: repeat(5, minmax(0, 1fr)); }
     }
 
     /* ── Final CTA ─────────────────────────────────────────────────────────── */
@@ -738,7 +702,6 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
 export class LandingComponent implements OnInit {
   private auth = inject(AuthService);
   private router = inject(Router);
-  private host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
   private revealObserver?: IntersectionObserver;
 
@@ -746,10 +709,22 @@ export class LandingComponent implements OnInit {
   readonly reducedMotion =
     this.isBrowser && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  private readonly revealEls = viewChildren<ElementRef<HTMLElement>>('reveal');
+  /** Sections that have scrolled into view, or were on screen from the start. */
+  protected readonly revealed = signal<ReadonlySet<string>>(new Set());
+  /** Only once this is true can a section be hidden, so the prerendered page and
+   *  a visit without JavaScript always show everything. */
+  protected readonly revealReady = signal(false);
+
   constructor() {
     inject(DestroyRef).onDestroy(() => this.revealObserver?.disconnect());
-    // Browser only: afterNextRender never runs during prerender.
-    afterNextRender(() => this.setUpReveal());
+    if (this.isBrowser && !this.reducedMotion && typeof IntersectionObserver !== 'undefined') {
+      // Re-runs whenever the section elements change. The state lives in a
+      // signal bound to the template, so a re-render that swaps in new nodes
+      // keeps it; the old version set classes on the first nodes it saw and
+      // left their replacements hidden for good.
+      afterRenderEffect(() => this.observeReveals(this.revealEls()));
+    }
   }
 
   async ngOnInit() {
@@ -764,49 +739,31 @@ export class LandingComponent implements OnInit {
   }
 
   /**
-   * One scroll reveal per section. Sections already on screen are marked
-   * visible first, then the host gets `.reveal-ready`, which is what hides
-   * the rest; both happen in the same task, so nothing on screen flashes.
+   * One scroll reveal per section. Sections already on screen are revealed in
+   * the same change detection that turns on `.reveal-ready`, so nothing that
+   * is already visible ever flashes out.
    */
-  private setUpReveal() {
-    if (!this.isBrowser || this.reducedMotion || typeof IntersectionObserver === 'undefined') return;
-
-    const root = this.host.nativeElement;
-    const viewportHeight = window.innerHeight;
-    const pending = Array.from(root.querySelectorAll<HTMLElement>('.l-reveal')).filter(el => {
-      const rect = el.getBoundingClientRect();
-      const onScreen = rect.top < viewportHeight && rect.bottom > 0;
-      if (onScreen) el.classList.add('is-visible');
-      return !onScreen;
-    });
-    if (!pending.length) return;
-
+  private observeReveals(els: readonly ElementRef<HTMLElement>[]) {
+    this.revealObserver?.disconnect();
+    const done = untracked(this.revealed);
     const observer = new IntersectionObserver(entries => {
-      for (const entry of entries) {
-        if (!entry.isIntersecting) continue;
-        entry.target.classList.add('is-visible');
-        observer.unobserve(entry.target);
-      }
+      const seen = entries.filter(e => e.isIntersecting).map(e => e.target as HTMLElement);
+      if (!seen.length) return;
+      seen.forEach(el => observer.unobserve(el));
+      this.revealed.update(set => new Set([...set, ...seen.map(el => el.dataset['reveal']!)]));
     }, { rootMargin: '0px 0px -10% 0px' });
     this.revealObserver = observer;
-    pending.forEach(el => observer.observe(el));
-    root.classList.add('reveal-ready');
-  }
 
-  onCardHover(event: MouseEvent) {
-    if (this.reducedMotion) return;
-    const card = event.currentTarget as HTMLElement;
-    const rect = card.getBoundingClientRect();
-    const x = (((event.clientX - rect.left) / rect.width) * 100).toFixed(1);
-    const y = (((event.clientY - rect.top) / rect.height) * 100).toFixed(1);
-    card.style.setProperty('--mouse-x', `${x}%`);
-    card.style.setProperty('--mouse-y', `${y}%`);
-  }
-
-  onCardLeave(event: MouseEvent) {
-    const card = event.currentTarget as HTMLElement;
-    card.style.setProperty('--mouse-x', '50%');
-    card.style.setProperty('--mouse-y', '50%');
+    const onScreen: string[] = [];
+    for (const { nativeElement: el } of els) {
+      const id = el.dataset['reveal']!;
+      if (done.has(id)) continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.top < window.innerHeight && rect.bottom > 0) onScreen.push(id);
+      else observer.observe(el);
+    }
+    if (onScreen.length) this.revealed.update(set => new Set([...set, ...onScreen]));
+    this.revealReady.set(true);
   }
 
   /**
