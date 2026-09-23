@@ -48,6 +48,25 @@ export const routes: Routes = [
     },
     loadComponent: () => import('./features/auth/register').then(m => m.RegisterComponent),
   },
+  // Legal pages: public, no guard, outside the app shell like the landing page.
+  {
+    path: 'privacy',
+    title: 'Privacy policy',
+    data: {
+      index: true,
+      description: 'What information Jiro keeps, why, where it is stored, and what you can do about it.',
+    },
+    loadComponent: () => import('./features/legal/privacy').then(m => m.PrivacyComponent),
+  },
+  {
+    path: 'terms',
+    title: 'Terms of use',
+    data: {
+      index: true,
+      description: 'The rules for using Jiro, what stays yours, and the limits of the service.',
+    },
+    loadComponent: () => import('./features/legal/terms').then(m => m.TermsComponent),
+  },
   // Opt-in public content, in the normal app shell but with no guard. These two
   // pages read endpoints the API already serves anonymously, and they are the
   // only crawlable content in the app besides the marketing page. Ordering

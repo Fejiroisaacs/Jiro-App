@@ -32,6 +32,8 @@ export const PUBLIC_ROUTES: readonly string[] = [
   '/register',
   '/culinara/discover',
   '/jym/discover',
+  '/privacy',
+  '/terms',
 ];
 
 /**

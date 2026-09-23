@@ -6,5 +6,7 @@ export const serverRoutes: ServerRoute[] = [
   { path: 'register', renderMode: RenderMode.Prerender },
   { path: 'culinara/discover', renderMode: RenderMode.Prerender },
   { path: 'jym/discover', renderMode: RenderMode.Prerender },
+  { path: 'privacy', renderMode: RenderMode.Prerender },
+  { path: 'terms', renderMode: RenderMode.Prerender },
   { path: '**', renderMode: RenderMode.Client },
 ];
