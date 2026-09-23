@@ -1,9 +1,11 @@
 package services
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 
@@ -124,41 +126,116 @@ func (s *UserService) EmailExists(ctx context.Context, email string) (bool, erro
 	return exists, err
 }
 
-func (s *UserService) UpdateSettings(ctx context.Context, userID uuid.UUID, req *models.UpdateSettingsRequest) (*models.User, error) {
-	// Get current settings
-	var currentSettings json.RawMessage
-	err := s.db.QueryRow(ctx, "SELECT settings FROM users WHERE id = $1", userID).Scan(&currentSettings)
-	if err != nil {
-		return nil, err
-	}
+// ErrInvalidSettings wraps every settings validation failure; the handler maps
+// it to 400 and shows the message, so messages must be safe to return.
+var ErrInvalidSettings = errors.New("invalid settings")
 
-	// Merge updates into current settings
-	var settings models.UserSettings
-	if len(currentSettings) > 0 {
-		json.Unmarshal(currentSettings, &settings)
+const (
+	maxThemeLen         = 32
+	maxDashboardBytes   = 4 << 10
+	maxDashboardWidgets = 32
+	dashboardLayoutV    = 1
+)
+
+// Widget ids are checked by pattern, not against a list, so shipping a new
+// widget in the UI never needs an API release.
+var dashboardWidgetIDRegexp = regexp.MustCompile(`^[a-z][a-z0-9_]{0,39}$`)
+
+func invalidSettings(msg string) error {
+	return fmt.Errorf("%w: %s", ErrInvalidSettings, msg)
+}
+
+// validateDashboard strictly decodes a layout and returns it re-encoded, so
+// what is stored is exactly the validated struct and never the caller's bytes.
+func validateDashboard(raw json.RawMessage) (json.RawMessage, error) {
+	if len(raw) > maxDashboardBytes {
+		return nil, invalidSettings("dashboard layout is too large")
 	}
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	var layout models.DashboardLayout
+	if err := dec.Decode(&layout); err != nil {
+		return nil, invalidSettings("dashboard layout is not valid")
+	}
+	if dec.More() {
+		return nil, invalidSettings("dashboard layout is not valid")
+	}
+	if layout.V != dashboardLayoutV {
+		return nil, invalidSettings("dashboard layout version is not supported")
+	}
+	if layout.Widgets == nil {
+		layout.Widgets = []models.DashboardWidget{}
+	}
+	if len(layout.Widgets) > maxDashboardWidgets {
+		return nil, invalidSettings("dashboard layout has too many widgets")
+	}
+	seen := make(map[string]struct{}, len(layout.Widgets))
+	for _, w := range layout.Widgets {
+		if !dashboardWidgetIDRegexp.MatchString(w.ID) {
+			return nil, invalidSettings("dashboard widget id is not valid")
+		}
+		if _, dup := seen[w.ID]; dup {
+			return nil, invalidSettings("dashboard widget ids must be unique")
+		}
+		seen[w.ID] = struct{}{}
+	}
+	return json.Marshal(layout)
+}
+
+// UpdateSettings merges only the fields that were sent into the stored
+// settings object in a single statement. Keys this code does not know about
+// are preserved, and two concurrent saves of different keys cannot clobber
+// each other the way a read-modify-write would.
+func (s *UserService) UpdateSettings(ctx context.Context, userID uuid.UUID, req *models.UpdateSettingsRequest) (*models.User, error) {
+	patch := map[string]any{}
+	remove := []string{}
 
 	if req.Theme != nil {
-		settings.Theme = *req.Theme
+		if len(*req.Theme) > maxThemeLen {
+			return nil, invalidSettings("theme is too long")
+		}
+		if *req.Theme == "" {
+			remove = append(remove, "theme")
+		} else {
+			patch["theme"] = *req.Theme
+		}
 	}
 	if req.WeightUnit != nil {
-		settings.WeightUnit = *req.WeightUnit
+		if *req.WeightUnit != "lbs" && *req.WeightUnit != "kg" {
+			return nil, invalidSettings("weight_unit must be lbs or kg")
+		}
+		patch["weight_unit"] = *req.WeightUnit
 	}
 	if req.Timezone != nil {
-		settings.Timezone = *req.Timezone
+		if *req.Timezone == "" {
+			remove = append(remove, "timezone")
+		} else {
+			patch["timezone"] = *req.Timezone
+		}
+	}
+	if len(req.Dashboard) > 0 {
+		if bytes.Equal(bytes.TrimSpace(req.Dashboard), []byte("null")) {
+			remove = append(remove, "dashboard")
+		} else {
+			layout, err := validateDashboard(req.Dashboard)
+			if err != nil {
+				return nil, err
+			}
+			patch["dashboard"] = layout
+		}
 	}
 
-	settingsJSON, err := json.Marshal(settings)
+	patchJSON, err := json.Marshal(patch)
 	if err != nil {
 		return nil, err
 	}
 
 	user := &models.User{}
 	err = s.db.QueryRow(ctx,
-		`UPDATE users SET settings = $1, updated_at = NOW()
-		 WHERE id = $2
+		`UPDATE users SET settings = (COALESCE(settings, '{}'::jsonb) || $1::jsonb) - $2::text[], updated_at = NOW()
+		 WHERE id = $3
 		 RETURNING id, email, username, display_name, email_verified, bio, avatar_url, settings, created_at, updated_at`,
-		settingsJSON, userID,
+		string(patchJSON), remove, userID,
 	).Scan(&user.ID, &user.Email, &user.Username, &user.DisplayName, &user.EmailVerified, &user.Bio, &user.AvatarUrl, &user.Settings, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {

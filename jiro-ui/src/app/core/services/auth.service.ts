@@ -23,6 +23,13 @@ export interface UserSettings {
   theme?: string;
   weight_unit?: string;
   timezone?: string;
+  /** Dashboard widget order and visibility. Absent means the default layout; send null to reset. */
+  dashboard?: StoredDashboardLayout | null;
+}
+
+export interface StoredDashboardLayout {
+  v: number;
+  widgets: { id: string; visible: boolean }[];
 }
 
 export interface AuthResponse {

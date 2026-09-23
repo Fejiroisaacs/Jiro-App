@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, booleanAttribute } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 /**
@@ -13,12 +13,17 @@ import { RouterLink } from '@angular/router';
   selector: 'jiro-card',
   standalone: true,
   imports: [RouterLink],
+  host: { '[class.fill]': 'fill' },
   template: `
     <a class="jiro-card" [class.clickable]="clickable || !!link" [routerLink]="link ?? null">
       <ng-content></ng-content>
     </a>
   `,
   styles: [`
+    /* fill: stretch to the parent's height (a grid row) and stack the content. */
+    :host(.fill) { display: block; height: 100%; }
+    :host(.fill) .jiro-card { display: flex; flex-direction: column; height: 100%; }
+
     .jiro-card {
       display: block;
       background: var(--bg-surface);
@@ -49,4 +54,5 @@ import { RouterLink } from '@angular/router';
 export class JiroCardComponent {
   @Input() clickable = false;
   @Input() link?: string | unknown[];
+  @Input({ transform: booleanAttribute }) fill = false;
 }

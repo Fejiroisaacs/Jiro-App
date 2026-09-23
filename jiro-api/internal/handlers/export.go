@@ -657,7 +657,7 @@ func (h *ExportHandler) gatherCulinara(ctx context.Context, userID uuid.UUID) (e
 		ShoppingList: []exportShoppingItem{},
 	}
 
-	recipes, err := h.recipeService.ListRecipes(ctx, userID, "")
+	recipes, err := h.recipeService.ListRecipes(ctx, userID, "", nil)
 	if err != nil {
 		return out, err
 	}

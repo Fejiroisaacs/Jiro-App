@@ -13,14 +13,17 @@ export class SettingsService {
 
   private parsedSettings = computed(() => {
     const s = this.auth.user()?.settings;
-    return ((typeof s === 'string' ? JSON.parse(s) : s) ?? {}) as Record<string, string>;
+    return ((typeof s === 'string' ? JSON.parse(s) : s) ?? {}) as Record<string, unknown>;
   });
 
-  weightUnit = computed<string>(() => this.parsedSettings()['weight_unit'] ?? 'lbs');
+  weightUnit = computed<string>(() => (this.parsedSettings()['weight_unit'] as string | undefined) ?? 'lbs');
   theme = computed<Theme>(() => {
-    const stored = this.parsedSettings()['theme'];
+    const stored = this.parsedSettings()['theme'] as string;
     return (THEMES as readonly string[]).includes(stored) ? (stored as Theme) : 'earth';
   });
+
+  /** The raw stored dashboard layout. Unvalidated: read it through resolveLayout(). */
+  dashboard = computed<unknown>(() => this.parsedSettings()['dashboard']);
 
   // Dark mode is stored in localStorage — works without a round-trip and persists across sessions
   private _darkMode = signal<boolean>(

@@ -54,6 +54,22 @@ type UpdateSettingsRequest struct {
 	Theme      *string `json:"theme,omitempty"`
 	WeightUnit *string `json:"weight_unit,omitempty"`
 	Timezone   *string `json:"timezone,omitempty"`
+	// Dashboard is tri-state: empty means "leave alone", the literal `null`
+	// removes the key (back to the default layout), anything else is a layout.
+	Dashboard json.RawMessage `json:"dashboard,omitempty"`
+}
+
+// DashboardLayout is the stored order and visibility of dashboard widgets.
+// Hidden widgets are kept (visible:false) so that an id missing from the list
+// means "a widget added after this layout was saved".
+type DashboardLayout struct {
+	V       int               `json:"v"`
+	Widgets []DashboardWidget `json:"widgets"`
+}
+
+type DashboardWidget struct {
+	ID      string `json:"id"`
+	Visible bool   `json:"visible"`
 }
 
 type UpdateProfileRequest struct {
