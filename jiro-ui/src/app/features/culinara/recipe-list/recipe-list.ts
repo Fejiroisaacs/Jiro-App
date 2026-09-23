@@ -178,7 +178,7 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
               @if (recipe.latest_rating != null) {
 <span class="rating">
                 <span class="star" aria-hidden="true">★</span>
-                <span>{{ recipe.latest_rating }}</span>
+                <span class="sr-only">Rated </span><span>{{ recipe.latest_rating }}</span><span class="sr-only"> out of 5.</span>
               </span>
 }
               @if (recipe.trial_count != null) {
@@ -271,7 +271,7 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
 
     .search-input:focus {
       border-color: var(--color-primary);
-      box-shadow: 0 0 0 3px rgba(122, 59, 46, 0.15);
+      box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.15);
     }
 
     .search-input::placeholder {
@@ -335,7 +335,7 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
     }
 
     .tag-chip--active {
-      background: rgba(122, 59, 46, 0.12);
+      background: rgba(var(--color-primary-rgb), 0.12);
       border-color: var(--color-primary);
       color: var(--color-primary);
     }
@@ -424,7 +424,7 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
     .recipe-tag {
       font-size: var(--font-size-xs);
       padding: 2px 8px;
-      background: rgba(122, 59, 46, 0.08);
+      background: rgba(var(--color-primary-rgb), 0.08);
       color: var(--color-primary);
       border-radius: 10px;
       font-weight: 500;
@@ -538,7 +538,7 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
     }
 
     .collection-chip--active {
-      background: rgba(122, 59, 46, 0.12);
+      background: rgba(var(--color-primary-rgb), 0.12);
       border-color: var(--color-primary);
       color: var(--color-primary);
     }
@@ -636,7 +636,7 @@ export class RecipeListComponent implements OnInit {
     { key: 'newest', label: 'Newest' },
     { key: 'trials', label: 'Most Trials' },
     { key: 'rating', label: 'Highest Rated' },
-    { key: 'az', label: 'A–Z' },
+    { key: 'az', label: 'A-Z' },
   ];
 
   availableTags = computed(() => {
