@@ -148,7 +148,7 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
 
         @if (showVerifyBanner()) {
           <div class="verify-banner" role="status">
-            <span class="verify-text">Please verify your email to unlock sharing features.</span>
+            <span class="verify-text">Verify your email to start saving changes.</span>
             <button type="button" class="verify-banner-btn" (click)="resendVerification()">Resend email</button>
             <button type="button" class="verify-banner-close" aria-label="Dismiss" (click)="dismissVerify()">
               <jiro-icon name="x" [size]="16" />

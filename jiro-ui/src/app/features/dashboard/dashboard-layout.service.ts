@@ -55,7 +55,7 @@ export class DashboardLayoutService {
 function saveErrorMessage(err: unknown): string {
   if (err instanceof HttpErrorResponse && err.status === 403) {
     if (err.error?.error?.code === 'EMAIL_NOT_VERIFIED') {
-      return 'Verify your email first to save your dashboard. Check your inbox, or resend the email from Settings.';
+      return 'Verify your email first to save your dashboard. Check your inbox for the link.';
     }
   }
   return 'Your dashboard could not be saved. Try again.';
