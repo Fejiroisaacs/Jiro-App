@@ -8,7 +8,7 @@ import { JiroPageHeaderComponent } from '../../shared/components/jiro-page-heade
  *
  * Plain static markup with no service calls, so it prerenders. Styles match
  * the privacy page (features/legal/privacy.ts); keep the two in step.
- * Visible [TO CONFIRM: ...], [CONTACT EMAIL] and [DATA CONTROLLER] markers
+ * Visible [TO CONFIRM: ...] and [CONTACT EMAIL] markers
  * are deliberate: they are facts the repo cannot answer.
  */
 @Component({
@@ -36,7 +36,7 @@ import { JiroPageHeaderComponent } from '../../shared/components/jiro-page-heade
         <section aria-labelledby="t-about">
           <h2 id="t-about">About these terms</h2>
           <p>
-            These terms are an agreement between you and <mark class="todo">[DATA CONTROLLER]</mark>,
+            These terms are an agreement between you and Oghenefejiro Anigboro,
             who runs Jiro ("we" and "us"). By creating an account or using Jiro, you agree to them.
             How we handle your information is described in the
             <a routerLink="/privacy">privacy policy</a>.
@@ -181,7 +181,7 @@ import { JiroPageHeaderComponent } from '../../shared/components/jiro-page-heade
           <h2 id="t-contact">Contact</h2>
           <p>
             Questions about these terms: <mark class="todo">[CONTACT EMAIL]</mark>.
-            Jiro is run by <mark class="todo">[DATA CONTROLLER]</mark>.
+            Jiro is run by Oghenefejiro Anigboro.
           </p>
         </section>
       </main>

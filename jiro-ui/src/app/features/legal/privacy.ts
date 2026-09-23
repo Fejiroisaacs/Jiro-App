@@ -9,7 +9,7 @@ import { JiroPageHeaderComponent } from '../../shared/components/jiro-page-heade
  * Plain static markup with no service calls, so it prerenders. Every factual
  * statement here was checked against the code (router, services, migrations,
  * browser storage). When the code changes, this page has to change with it.
- * Visible [TO CONFIRM: ...], [CONTACT EMAIL] and [DATA CONTROLLER] markers
+ * Visible [TO CONFIRM: ...] and [CONTACT EMAIL] markers
  * are deliberate: they are facts the repo cannot answer.
  */
 @Component({
@@ -42,8 +42,8 @@ import { JiroPageHeaderComponent } from '../../shared/components/jiro-page-heade
             where it is kept, and what you can do about it.
           </p>
           <p>
-            Jiro is run by <mark class="todo">[DATA CONTROLLER]</mark>. On this page, "we" and "us"
-            mean <mark class="todo">[DATA CONTROLLER]</mark>.
+            Jiro is run by Oghenefejiro Anigboro. On this page, "we" and "us"
+            mean Oghenefejiro Anigboro.
           </p>
         </section>
 
@@ -199,7 +199,6 @@ import { JiroPageHeaderComponent } from '../../shared/components/jiro-page-heade
           </ul>
           <p>
             Fonts are served from our own domain, so loading a page does not contact a font provider.
-            <mark class="todo">[TO CONFIRM: fonts self-hosted before this page ships.]</mark>
           </p>
           <p>Jiro does not load advertising or third-party analytics scripts.</p>
           <p>
@@ -432,7 +431,7 @@ import { JiroPageHeaderComponent } from '../../shared/components/jiro-page-heade
           <h2 id="p-contact">Contact</h2>
           <p>
             Questions or requests about your information: <mark class="todo">[CONTACT EMAIL]</mark>.
-            Jiro is run by <mark class="todo">[DATA CONTROLLER]</mark>.
+            Jiro is run by Oghenefejiro Anigboro.
           </p>
           <p>See also the <a routerLink="/terms">terms of use</a>.</p>
         </section>
