@@ -21,34 +21,31 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(req).pipe(
     catchError((error: HttpErrorResponse) => {
-      if (error.status === 401) {
-        if (token) {
-          // Token expired — try to refresh
-          return authService.refresh().pipe(
-            switchMap(res => {
-              if (res) {
-                const newReq = req.clone({
-                  setHeaders: { Authorization: `Bearer ${res.access_token}` },
-                });
-                return next(newReq);
-              }
-              // Refresh returned null — session is dead
-              authService.logout();
-              return EMPTY;
-            }),
-            catchError(() => {
-              // Refresh request itself failed
-              authService.logout();
-              return EMPTY;
-            })
-          );
-        }
-        // No token at all — kick to login
+      if (error.status !== 401) return throwError(() => error);
+
+      // Never signed in on this browser: nothing to refresh.
+      if (!token && !authService.isAuthenticated()) {
         authService.logout();
         return EMPTY;
       }
-      return throwError(() => error);
+
+      // Expired token, or a cached session whose startup refresh failed (offline,
+      // rate limited): refresh and retry once.
+      return authService.refresh().pipe(
+        // Only a failure of the refresh itself lands here, and it is transient
+        // (a dead session comes back as null, below). Stay signed in and let the
+        // caller show its error; the next request tries again.
+        catchError(() => throwError(() => error)),
+        switchMap(res => {
+          if (!res) {
+            authService.logout();
+            return EMPTY;
+          }
+          // Errors from the retried request propagate to the caller as normal:
+          // a 404 or 500 after a refresh is not a reason to sign out.
+          return next(req.clone({ setHeaders: { Authorization: `Bearer ${res.access_token}` } }));
+        }),
+      );
     })
   );
 };
-

@@ -1,7 +1,7 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { Observable, tap, catchError, of, shareReplay, finalize } from 'rxjs';
+import { Observable, tap, catchError, of, shareReplay, finalize, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { hasLocalStorage, readLocal, removeLocal, writeLocal } from '../storage';
 
@@ -132,9 +132,9 @@ export class AuthService {
    *  changed for protected routes is that the shell now paints while the guard
    *  waits, instead of the whole bootstrap blocking.
    *
-   *  A 401 on refresh means the session is truly dead — clear auth so the
-   *  guard redirects to login. Non-401 errors (e.g. offline) keep cached
-   *  state so the interceptor can retry lazily once connectivity is restored. */
+   *  A 401 on refresh means the session is truly dead: auth is cleared so the
+   *  guard redirects to login. Anything else (offline, a 429, a 5xx) keeps the
+   *  cached user, and the interceptor tries the refresh again on the next call. */
   init(): Promise<void> {
     if (!hasLocalStorage() || !this.currentUser()) {
       this.markInitialized();
@@ -146,8 +146,11 @@ export class AuthService {
     // instead of firing a second POST /auth/refresh — the refresh cookie
     // rotates on use, so two concurrent refreshes race and one loses, which
     // would sign out a user who has a perfectly live session.
-    this.startRefresh(false)
-      .pipe(finalize(() => this.markInitialized()))
+    this.startRefresh()
+      .pipe(
+        catchError(() => of(null)),
+        finalize(() => this.markInitialized()),
+      )
       .subscribe();
     return Promise.resolve();
   }
@@ -164,26 +167,24 @@ export class AuthService {
       .pipe(tap(res => this.handleAuth(res)));
   }
 
+  /** Emits the new session, or null if the server said the session is dead
+   *  (401, auth already cleared). Errors on anything else (offline, 429, 5xx):
+   *  a failure to reach the server is not a reason to sign someone out. */
   refresh(): Observable<AuthResponse | null> {
-    // The 401 interceptor's entry point: any failed refresh means a dead session.
-    return this.startRefresh(true);
+    return this.startRefresh();
   }
 
   /** Share a single in-flight refresh across all concurrent callers.
    *  Without this, multiple simultaneous 401s each fire their own refresh,
-   *  which causes token-rotation failures and silent API hangs.
-   *
-   *  `clearOnAnyError` is the one thing the two entry points disagree about:
-   *  the interceptor treats any failed refresh as a dead session, while
-   *  startup (`init()`) only clears on an actual 401, so an offline reload
-   *  keeps the cached user and can retry later. */
-  private startRefresh(clearOnAnyError: boolean): Observable<AuthResponse | null> {
+   *  which causes token-rotation failures and silent API hangs. */
+  private startRefresh(): Observable<AuthResponse | null> {
     if (this.refreshing$) return this.refreshing$;
     this.refreshing$ = this.http.post<AuthResponse>(`${API_URL}/auth/refresh`, {}, { withCredentials: true })
       .pipe(
         tap(res => this.handleAuth(res)),
         catchError((err) => {
-          if (clearOnAnyError || err?.status === 401) this.clearAuth();
+          if (err?.status !== 401) return throwError(() => err);
+          this.clearAuth();
           return of(null);
         }),
         finalize(() => { this.refreshing$ = null; }),

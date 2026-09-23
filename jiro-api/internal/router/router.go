@@ -91,21 +91,26 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			public.GET("/jym/public-splits/:id", jymHandler.GetPublicSplit)
 		}
 
-		// Auth routes (rate limited by IP: 5/min)
+		// Auth routes. Credential-guessing routes are limited by IP to 5/min.
+		// Refresh and logout get their own, looser scope: every page load calls
+		// refresh (the access token lives only in memory), a refresh token is an
+		// unguessable 256-bit cookie, and a per-IP limit is shared by everyone
+		// behind one NAT, so 5/min signed people out after a few reloads.
 		auth := v1.Group("/auth")
-		// Before the limiter, so a rejected 429 is covered too. These responses
+		// Before the limiters, so a rejected 429 is covered too. These responses
 		// carry access tokens and single-use reset material.
 		auth.Use(middleware.NoStore())
-		auth.Use(middleware.RateLimitByIP(rl, "auth", 5))
+		strict := middleware.RateLimitByIP(rl, "auth", 5)
+		session := middleware.RateLimitByIP(rl, "session", 60)
 		{
-			auth.POST("/register", authHandler.Register)
-			auth.POST("/login", authHandler.Login)
+			auth.POST("/register", strict, authHandler.Register)
+			auth.POST("/login", strict, authHandler.Login)
 			// Cookie-authenticated, so the only CSRF-reachable routes.
-			auth.POST("/refresh", middleware.RequireTrustedOrigin(cfg.CORSOrigins), authHandler.Refresh)
-			auth.POST("/logout", middleware.RequireTrustedOrigin(cfg.CORSOrigins), authHandler.Logout)
-			auth.POST("/verify-email", authHandler.VerifyEmail)
-			auth.POST("/forgot-password", authHandler.ForgotPassword)
-			auth.POST("/reset-password", authHandler.ResetPassword)
+			auth.POST("/refresh", session, middleware.RequireTrustedOrigin(cfg.CORSOrigins), authHandler.Refresh)
+			auth.POST("/logout", session, middleware.RequireTrustedOrigin(cfg.CORSOrigins), authHandler.Logout)
+			auth.POST("/verify-email", strict, authHandler.VerifyEmail)
+			auth.POST("/forgot-password", strict, authHandler.ForgotPassword)
+			auth.POST("/reset-password", strict, authHandler.ResetPassword)
 		}
 
 		// Protected routes (require JWT, rate limited by user: 300/min)
