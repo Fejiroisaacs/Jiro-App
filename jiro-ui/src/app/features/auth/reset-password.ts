@@ -5,13 +5,15 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { JiroButtonComponent } from '../../shared/components/jiro-button/jiro-button';
 import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-input';
+import { JiroLogoComponent } from '../../shared/components/jiro-logo/jiro-logo';
 
 @Component({
   selector: 'app-reset-password',
   standalone: true,
-  imports: [FormsModule, RouterLink, JiroButtonComponent, JiroInputComponent],
+  imports: [FormsModule, RouterLink, JiroButtonComponent, JiroInputComponent, JiroLogoComponent],
   template: `
     <div class="auth-page">
+      <jiro-logo class="auth-logo" [size]="40" />
       <div class="auth-card">
         <h1>Reset password</h1>
 
@@ -69,8 +71,15 @@ import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-inpu
       display: flex;
       align-items: center;
       justify-content: center;
+      flex-direction: column;
       background: var(--bg-main);
       padding: var(--space-lg);
+    }
+
+    /* Brand above the card; the wordmark takes currentColor. */
+    .auth-logo {
+      color: var(--color-primary);
+      margin-bottom: var(--space-xl);
     }
 
     .auth-card {

@@ -6,16 +6,17 @@ import { AuthService } from '../../core/services/auth.service';
 import { JiroCardComponent } from '../../shared/components/jiro-card/jiro-card';
 import { JiroButtonComponent } from '../../shared/components/jiro-button/jiro-button';
 import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-input';
+import { JiroLogoComponent } from '../../shared/components/jiro-logo/jiro-logo';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [FormsModule, RouterLink, JiroCardComponent, JiroButtonComponent, JiroInputComponent],
+  imports: [FormsModule, RouterLink, JiroCardComponent, JiroButtonComponent, JiroInputComponent, JiroLogoComponent],
   template: `
     <div class="auth-page">
       <div class="auth-container">
         <div class="auth-header">
-          <h1 class="auth-logo">Jiro</h1>
+          <jiro-logo class="auth-logo" [size]="40" />
           <p class="auth-subtitle">Your life, in one place.</p>
         </div>
 
@@ -24,6 +25,7 @@ import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-inpu
              client render replaces it. Login has no content a crawler reads
              through hydration anyway, so the fallback costs nothing here. -->
         <jiro-card ngSkipHydration>
+          <h1 class="auth-title">Sign in</h1>
           <form (ngSubmit)="onSubmit()" class="auth-form">
             <jiro-input
               label="Email"
@@ -76,16 +78,21 @@ import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-inpu
       margin-bottom: var(--space-xl);
     }
 
+    /* <jiro-logo> is inline-flex, so text-align on the header centres it;
+       its wordmark takes currentColor. */
     .auth-logo {
-      font-size: var(--font-size-2xl);
-      font-weight: 700;
       color: var(--color-primary);
-      letter-spacing: -0.5px;
     }
 
     .auth-subtitle {
       color: var(--text-secondary);
       margin-top: var(--space-xs);
+    }
+
+    .auth-title {
+      font-size: var(--font-size-xl);
+      font-weight: 600;
+      margin-bottom: var(--space-md);
     }
 
     .auth-form {

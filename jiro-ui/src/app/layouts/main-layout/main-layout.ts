@@ -10,6 +10,7 @@ import { MODULES, HUB_TABS, JIRO_HOME_TAB, NavTab, moduleForUrl, isSectionPath }
 import { JiroToasterComponent } from '../../shared/components/jiro-toaster/jiro-toaster';
 import { JiroConfirmComponent } from '../../shared/components/jiro-confirm/jiro-confirm';
 import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
+import { JiroLogoComponent } from '../../shared/components/jiro-logo/jiro-logo';
 import { JiroIconComponent } from '../../shared/components/jiro-icon/jiro-icon';
 import { JiroModuleNavComponent } from '../../shared/components/jiro-module-nav/jiro-module-nav';
 import { JiroUserMenuComponent } from '../../shared/components/jiro-user-menu/jiro-user-menu';
@@ -28,7 +29,7 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
   standalone: true,
   imports: [
     RouterOutlet, RouterLink, RouterLinkActive,
-    JiroToasterComponent, JiroConfirmComponent, JiroMarkComponent, JiroIconComponent,
+    JiroToasterComponent, JiroConfirmComponent, JiroMarkComponent, JiroLogoComponent, JiroIconComponent,
     JiroModuleNavComponent, JiroUserMenuComponent, JiroSearchPaletteComponent,
   ],
   template: `
@@ -42,9 +43,9 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
       <aside class="sidebar">
         <div class="sidebar-header">
           @if (collapsed()) {
-            <span class="sidebar-logo-mini">J</span>
+            <jiro-logo class="sidebar-logo" variant="mark" [size]="28" />
           } @else {
-            <span class="sidebar-logo">JIRO</span>
+            <jiro-logo class="sidebar-logo" [size]="28" />
           }
           <button
             type="button"
@@ -217,15 +218,19 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
       height: 56px;
     }
 
+    /* The wordmark takes currentColor; pin it to the sidebar's light text. */
     .sidebar-logo {
-      font-size: var(--font-size-xl);
-      font-weight: 700;
-      letter-spacing: -0.5px;
+      color: var(--text-on-dark);
     }
 
-    .sidebar-logo-mini {
-      font-size: var(--font-size-xl);
-      font-weight: 700;
+    /* Collapsed rail is 64px wide: stack the mark above the toggle so the
+       40px button and the 28px mark do not overflow side by side. */
+    .sidebar-collapsed .sidebar-header {
+      flex-direction: column;
+      justify-content: center;
+      gap: var(--space-xs);
+      height: auto;
+      padding: var(--space-sm);
     }
 
     .toggle-btn {

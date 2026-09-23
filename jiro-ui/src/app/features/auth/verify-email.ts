@@ -3,19 +3,21 @@ import { Component, signal, OnInit } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { JiroButtonComponent } from '../../shared/components/jiro-button/jiro-button';
+import { JiroLogoComponent } from '../../shared/components/jiro-logo/jiro-logo';
 
 @Component({
   selector: 'app-verify-email',
   standalone: true,
-  imports: [RouterLink, JiroButtonComponent],
+  imports: [RouterLink, JiroButtonComponent, JiroLogoComponent],
   template: `
     <div class="auth-page">
+      <jiro-logo class="auth-logo" [size]="40" />
       <div class="auth-card">
 
         @if (state() === 'loading') {
 <div class="state-box">
           <div class="spinner"></div>
-          <p>Verifying your email...</p>
+          <h1 class="state-msg">Verifying your email...</h1>
         </div>
 }
 
@@ -25,7 +27,7 @@ import { JiroButtonComponent } from '../../shared/components/jiro-button/jiro-bu
             <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
             <polyline points="22 4 12 14.01 9 11.01"/>
           </svg>
-          <h2>Email verified!</h2>
+          <h1>Email verified!</h1>
           <p>Your email has been verified successfully.</p>
           <a routerLink="/dashboard" class="action-link">Go to dashboard →</a>
         </div>
@@ -38,7 +40,7 @@ import { JiroButtonComponent } from '../../shared/components/jiro-button/jiro-bu
             <line x1="12" y1="8" x2="12" y2="12"/>
             <line x1="12" y1="16" x2="12.01" y2="16"/>
           </svg>
-          <h2>Link invalid or expired</h2>
+          <h1>Link invalid or expired</h1>
           <p>This verification link is invalid or has expired.</p>
           @if (authService.isAuthenticated()) {
 <jiro-button
@@ -61,7 +63,7 @@ import { JiroButtonComponent } from '../../shared/components/jiro-button/jiro-bu
 
         @if (state() === 'no-token') {
 <div class="state-box error">
-          <h2>Invalid link</h2>
+          <h1>Invalid link</h1>
           <p>No verification token was found in this URL.</p>
           <a routerLink="/dashboard" class="action-link">Go to dashboard →</a>
         </div>
@@ -76,8 +78,15 @@ import { JiroButtonComponent } from '../../shared/components/jiro-button/jiro-bu
       display: flex;
       align-items: center;
       justify-content: center;
+      flex-direction: column;
       background: var(--bg-main);
       padding: var(--space-lg);
+    }
+
+    /* Brand above the card; the wordmark takes currentColor. */
+    .auth-logo {
+      color: var(--color-primary);
+      margin-bottom: var(--space-xl);
     }
 
     .auth-card {
@@ -98,9 +107,19 @@ import { JiroButtonComponent } from '../../shared/components/jiro-button/jiro-bu
       padding: var(--space-lg) 0;
     }
 
-    .state-box h2 {
+    .state-box h1 {
       font-size: var(--font-size-xl);
       font-weight: 600;
+    }
+
+    /* Loading state: the h1 keeps the look of the plain status line it was. */
+    .state-box h1.state-msg {
+      font-family: var(--font-family);
+      font-size: var(--font-size-sm);
+      font-weight: 400;
+      letter-spacing: normal;
+      line-height: var(--line-height-body);
+      color: var(--text-secondary);
     }
 
     .state-box p {

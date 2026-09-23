@@ -6,19 +6,20 @@ import { AuthService } from '../../core/services/auth.service';
 import { JiroCardComponent } from '../../shared/components/jiro-card/jiro-card';
 import { JiroButtonComponent } from '../../shared/components/jiro-button/jiro-button';
 import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-input';
+import { JiroLogoComponent } from '../../shared/components/jiro-logo/jiro-logo';
 
 const USERNAME_PATTERN = /^[a-z0-9_]{3,30}$/;
 
 @Component({
   selector: 'app-register',
   standalone: true,
-  imports: [FormsModule, RouterLink, JiroCardComponent, JiroButtonComponent, JiroInputComponent],
+  imports: [FormsModule, RouterLink, JiroCardComponent, JiroButtonComponent, JiroInputComponent, JiroLogoComponent],
   template: `
     <div class="auth-page">
       <div class="auth-container">
         <div class="auth-header">
-          <h1 class="auth-logo">Jiro</h1>
-          <p class="auth-subtitle">Create an account</p>
+          <jiro-logo class="auth-logo" [size]="40" />
+          <h1 class="auth-subtitle">Create an account</h1>
         </div>
 
         <!-- ngSkipHydration: NgForm (ngModel inside <form>) has a documented
@@ -102,14 +103,20 @@ const USERNAME_PATTERN = /^[a-z0-9_]{3,30}$/;
       margin-bottom: var(--space-xl);
     }
 
+    /* <jiro-logo> is inline-flex, so text-align on the header centres it;
+       its wordmark takes currentColor. */
     .auth-logo {
-      font-size: var(--font-size-2xl);
-      font-weight: 700;
       color: var(--color-primary);
-      letter-spacing: -0.5px;
     }
 
+    /* The page h1, styled as the quiet subtitle it was before (undo the
+       global display-font heading rules). */
     .auth-subtitle {
+      font-family: var(--font-family);
+      font-size: var(--font-size-md);
+      font-weight: 400;
+      letter-spacing: normal;
+      line-height: var(--line-height-body);
       color: var(--text-secondary);
       margin-top: var(--space-xs);
     }
