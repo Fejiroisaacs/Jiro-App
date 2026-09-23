@@ -1,4 +1,5 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectorRef, Component, HostListener, PLATFORM_ID, computed, inject, signal } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { RouterOutlet, RouterLink, RouterLinkActive, Router, NavigationEnd } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map, startWith } from 'rxjs';
@@ -12,6 +13,8 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
 import { JiroIconComponent } from '../../shared/components/jiro-icon/jiro-icon';
 import { JiroModuleNavComponent } from '../../shared/components/jiro-module-nav/jiro-module-nav';
 import { JiroUserMenuComponent } from '../../shared/components/jiro-user-menu/jiro-user-menu';
+import { JiroSearchPaletteComponent } from '../../shared/components/jiro-search/jiro-search-palette';
+import { SearchPaletteService } from '../../core/search-palette.service';
 
 const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
 
@@ -26,11 +29,14 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
   imports: [
     RouterOutlet, RouterLink, RouterLinkActive,
     JiroToasterComponent, JiroConfirmComponent, JiroMarkComponent, JiroIconComponent,
-    JiroModuleNavComponent, JiroUserMenuComponent,
+    JiroModuleNavComponent, JiroUserMenuComponent, JiroSearchPaletteComponent,
   ],
   template: `
     <jiro-toaster />
     <jiro-confirm />
+    @if (signedIn() && searchPalette.open()) {
+      <jiro-search-palette />
+    }
     <div class="layout" [class.sidebar-collapsed]="collapsed()">
       <!-- Sidebar (desktop) -->
       <aside class="sidebar">
@@ -49,6 +55,25 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
             <jiro-icon name="list" [size]="18" />
           </button>
         </div>
+
+        @if (signedIn()) {
+          <div class="sidebar-search">
+            <button
+              type="button"
+              class="nav-item search-btn"
+              aria-haspopup="dialog"
+              [attr.aria-label]="collapsed() ? 'Search' : null"
+              [attr.title]="collapsed() ? 'Search (' + searchShortcut + ')' : null"
+              [attr.aria-keyshortcuts]="isMac ? 'Meta+K' : 'Control+K'"
+              (click)="searchPalette.openPalette()">
+              <jiro-icon name="magnifying-glass" [size]="22" />
+              @if (!collapsed()) {
+                <span class="nav-label">Search</span>
+                <kbd class="search-kbd" aria-hidden="true">{{ searchShortcut }}</kbd>
+              }
+            </button>
+          </div>
+        }
 
         <nav class="sidebar-nav" aria-label="Main">
           <a routerLink="/dashboard" routerLinkActive="active" class="nav-item">
@@ -104,7 +129,17 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
             <span class="mt-title">{{ topbarTitle() }}</span>
           </div>
           @if (signedIn()) {
-            <jiro-user-menu direction="down" [compact]="true" />
+            <div class="mt-right">
+              <button
+                type="button"
+                class="mt-search-btn"
+                aria-label="Search"
+                aria-haspopup="dialog"
+                (click)="searchPalette.openPalette()">
+                <jiro-icon name="magnifying-glass" [size]="22" />
+              </button>
+              <jiro-user-menu direction="down" [compact]="true" />
+            </div>
           } @else {
             <a routerLink="/register" class="guest-cta guest-cta--compact">Get started</a>
           }
@@ -262,6 +297,20 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
       outline-offset: -2px;
     }
 
+    .sidebar-search { padding: 0 var(--space-sm); }
+
+    .search-btn { font-family: inherit; }
+    .search-btn .nav-label { flex: 1; }
+
+    .search-kbd {
+      font-family: inherit;
+      font-size: var(--font-size-xs);
+      padding: 1px 6px;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: var(--border-radius-sm);
+      white-space: nowrap;
+    }
+
     .nav-section {
       padding: var(--space-md) 12px var(--space-xs);
     }
@@ -336,6 +385,27 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
       gap: 10px;
       min-width: 0;
     }
+
+    .mt-right {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      flex-shrink: 0;
+    }
+
+    .mt-search-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 44px;
+      height: 44px;
+      background: none;
+      border: none;
+      border-radius: var(--border-radius);
+      color: var(--text-primary);
+      cursor: pointer;
+    }
+    .mt-search-btn:hover { background: var(--bg-surface-hover); }
 
     .mt-title {
       font-size: var(--font-size-sm);
@@ -475,6 +545,13 @@ export class MainLayoutComponent {
   private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
   private readonly titleStrategy = inject(JiroTitleStrategy);
+  readonly searchPalette = inject(SearchPaletteService);
+  private readonly cdr = inject(ChangeDetectorRef);
+
+  /** ⌘K on Apple platforms, Ctrl K elsewhere (and during prerender). */
+  readonly isMac = isPlatformBrowser(inject(PLATFORM_ID))
+    && /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent);
+  readonly searchShortcut = this.isMac ? '⌘K' : 'Ctrl K';
 
   private readonly nav = toSignal(
     this.router.events.pipe(
@@ -526,6 +603,24 @@ export class MainLayoutComponent {
       moduleNav: route.data['moduleNav'] !== false,
       mobileNav: route.data['mobileNav'] !== false,
     };
+  }
+
+  /**
+   * Ctrl/Cmd+K toggles global search from anywhere — including from inside a
+   * text field, which is why this listens on the document rather than
+   * ignoring editable targets. Guests on the public pages get nothing.
+   */
+  @HostListener('document:keydown', ['$event'])
+  onDocumentKeydown(event: KeyboardEvent) {
+    if (!this.signedIn()) return;
+    if (event.key?.toLowerCase() !== 'k' || event.altKey || event.shiftKey) return;
+    if (!(event.ctrlKey || event.metaKey)) return;
+    event.preventDefault();
+    if (event.repeat) return;
+    this.searchPalette.toggle();
+    // Render and focus the input inside this keydown, so the next keystroke
+    // lands in the search box rather than in whatever had focus before.
+    if (this.searchPalette.open()) this.cdr.detectChanges();
   }
 
   dismissVerify() {

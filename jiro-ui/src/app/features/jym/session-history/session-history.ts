@@ -1,7 +1,9 @@
-import { Component, OnInit, inject, input, signal } from '@angular/core';
+import { Component, Injector, OnInit, afterNextRender, inject, input, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { NavigationEnd, Router } from '@angular/router';
+import { filter } from 'rxjs';
 import { JymService, SessionSummary, SessionWithSets } from '../../../core/services/jym.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { UploadService } from '../../../core/services/upload.service';
@@ -80,7 +82,7 @@ import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
 <div class="sessions-list">
         @for (s of sessions(); track s) {
 <div
-         
+          [id]="'session-' + s.id"
           class="session-card"
           [class.selected]="selectedId() === s.id"
           (click)="loadDetail(s)">
@@ -129,11 +131,11 @@ import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
 
             @if (!detailLoading() && detail()) {
 <div class="detail-sets">
-              @for (group of groupedSets(detail()!.sets); track group) {
+              @for (group of groupedSets(detail()!.sets); track group.exerciseName) {
 <div class="detail-ex">
                 <div class="detail-ex-name">{{ group.exerciseName }}</div>
                 <div class="detail-set-rows">
-                  @for (set of group.sets; track set) {
+                  @for (set of group.sets; track set.id) {
 <div class="detail-set-row">
                     <span class="ds-num">Set {{ set.set_number }}</span>
                     <span class="ds-weight">{{ settingsService.toDisplay(set.weight) | number:'1.1-1' }} {{ settingsService.unitLabel() }}</span>
@@ -502,6 +504,7 @@ export class SessionHistoryComponent implements OnInit {
   embedded = input(false);
   private readonly confirmService = inject(ConfirmService);
   private readonly toast = inject(ToastService);
+  private readonly injector = inject(Injector);
   sessions = signal<SessionSummary[]>([]);
   loading = signal(true);
   selectedId = signal<string | null>(null);
@@ -517,13 +520,62 @@ export class SessionHistoryComponent implements OnInit {
     public router: Router,
     public settingsService: SettingsService,
     private uploadService: UploadService,
-  ) {}
+  ) {
+    // Global search links completed sessions here as ?session=<id>. It navigates
+    // with onSameUrlNavigation: 'reload', so a NavigationEnd arrives even when
+    // the page is already open on that exact URL.
+    this.router.events
+      .pipe(filter(e => e instanceof NavigationEnd), takeUntilDestroyed())
+      .subscribe(() => { if (!this.loading()) this.focusSessionFromUrl(); });
+  }
 
   ngOnInit() {
     this.jymService.listSessions().subscribe({
-      next: s => { this.sessions.set(s); this.loading.set(false); },
-      error: () => this.loading.set(false),
+      next: s => { this.sessions.set(s); this.loading.set(false); this.focusSessionFromUrl(); },
+      error: () => { this.loading.set(false); this.focusSessionFromUrl(); },
     });
+  }
+
+  /**
+   * Opens the session named by ?session=<id>. A session in the loaded list
+   * opens exactly as a click would and is scrolled to. The list is capped, so
+   * an older one is fetched on its own and shown expanded at the top.
+   */
+  private focusSessionFromUrl() {
+    const id = this.router.parseUrl(this.router.url).queryParamMap.get('session');
+    if (!id) return;
+    const inList = this.sessions().find(x => x.id === id);
+    if (inList) {
+      this.openDetail(inList);
+      this.scrollToSession(id);
+      return;
+    }
+    this.selectedId.set(id);
+    this.detail.set(null);
+    this.detailLoading.set(true);
+    this.jymService.getSession(id).subscribe({
+      next: d => {
+        // Guard against the user having opened something else meanwhile.
+        if (this.selectedId() !== id) return;
+        this.sessions.update(list => list.some(x => x.id === id) ? list : [summaryFromDetail(d), ...list]);
+        this.detail.set(d);
+        this.detailLoading.set(false);
+        this.scrollToSession(id);
+      },
+      error: () => {
+        if (this.selectedId() === id) {
+          this.selectedId.set(null);
+          this.detailLoading.set(false);
+        }
+        this.toast.error('Could not open that session.');
+      },
+    });
+  }
+
+  private scrollToSession(id: string) {
+    afterNextRender(() => {
+      document.getElementById('session-' + id)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    }, { injector: this.injector });
   }
 
   loadDetail(s: SessionSummary) {
@@ -532,6 +584,12 @@ export class SessionHistoryComponent implements OnInit {
       this.detail.set(null);
       return;
     }
+    this.openDetail(s);
+  }
+
+  /** Expands a session (never collapses it) and loads its sets. */
+  private openDetail(s: SessionSummary) {
+    if (this.selectedId() === s.id && (this.detail() || this.detailLoading())) return;
     this.selectedId.set(s.id);
     this.detail.set(null);
     this.detailLoading.set(true);
@@ -630,4 +688,20 @@ export class SessionHistoryComponent implements OnInit {
       error: () => this.exporting.set(false),
     });
   }
+}
+
+/**
+ * A list row for a session fetched on its own (outside the capped list).
+ * Totals mirror the list query: every set counts towards set_count and
+ * total_volume, warm-ups included.
+ */
+function summaryFromDetail(d: SessionWithSets): SessionSummary {
+  const { sets, attachments: _attachments, ...session } = d;
+  return {
+    ...session,
+    set_count: sets.length,
+    pr_count: sets.filter(x => x.is_pr).length,
+    total_volume: sets.reduce((sum, x) => sum + x.weight * x.reps_performed, 0),
+    muscle_groups: [],
+  };
 }

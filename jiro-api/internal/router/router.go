@@ -44,6 +44,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 		privateStorageService = services.NewStorageService(cfg.StorageEndpoint, cfg.StoragePrivateBucket, cfg.StorageAccessKey, cfg.StorageSecretKey, "internal://"+cfg.StoragePrivateBucket)
 	}
 	ledgerService := services.NewLedgerService(db)
+	searchService := services.NewSearchService(db)
 
 	// Rate limiter + login fail tracker
 	rl := middleware.NewRateLimiter(db)
@@ -62,6 +63,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	uploadHandler := handlers.NewUploadHandler(storageService, privateStorageService, userService, recipeService, jymService, journalService)
 	journalHandler := handlers.NewJournalHandler(journalService, emailService, privateStorageService, cfg.AppBaseURL)
 	exportHandler := handlers.NewExportHandler(userService, jymService, recipeService, mealPlanService, journalService, ledgerService, db)
+	searchHandler := handlers.NewSearchHandler(searchService)
 
 	// Routes
 	v1 := r.Group("/api/v1")
@@ -147,6 +149,9 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 
 			// Account data export (expensive — tighter limit: 5/min per user)
 			protected.GET("/export/account.json", middleware.RateLimitByUser(rl, "export", 5), exportHandler.ExportAccount)
+
+			// Global search (4 queries per call — tighter limit: 60/min per user)
+			protected.GET("/search", middleware.RateLimitByUser(rl, "search", 60), searchHandler.Search)
 
 			// Culinara (Recipe Module)
 			culinara := protected.Group("/culinara")

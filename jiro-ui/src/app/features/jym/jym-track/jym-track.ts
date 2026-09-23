@@ -1,6 +1,8 @@
 import { Location } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, NavigationEnd, Router } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { filter } from 'rxjs';
 import { SessionHistoryComponent } from '../session-history/session-history';
 import { BodyWeightComponent } from '../body-weight/body-weight';
 import { JiroTabStripComponent, TabOption, tabFromRoute, writeTabToUrl } from '../../../shared/components/jiro-tab-strip/jiro-tab-strip';
@@ -35,6 +37,18 @@ export class JymTrackComponent {
 
   readonly tabs = TABS;
   tab = signal<Tab>(tabFromRoute(this.route, TABS.map(t => t.value), 'sessions'));
+
+  constructor() {
+    // The component is reused when a link (e.g. global search's
+    // ?tab=sessions&session=<id>) lands on this page while it is already open,
+    // so follow ?tab= on every navigation, not just the first.
+    this.router.events
+      .pipe(filter(e => e instanceof NavigationEnd), takeUntilDestroyed())
+      .subscribe(() => {
+        const q = this.router.parseUrl(this.router.url).queryParamMap.get('tab');
+        if (q && TABS.some(t => t.value === q)) this.tab.set(q as Tab);
+      });
+  }
 
   setTab(value: string) {
     this.tab.set(value as Tab);
