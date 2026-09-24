@@ -173,19 +173,19 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
               <img [src]="recipe.cover_image_url" [alt]="recipe.title" class="cover-thumb">
             </div>
 }
-            <div class="recipe-meta">
-              @if (recipe.trial_count != null) {
-<span class="trial-count">
-                {{ recipe.trial_count }} {{ recipe.trial_count === 1 ? 'trial' : 'trials' }}
+            @if (recipe.latest_rating != null || recipe.trial_count != null) {
+<div class="recipe-meta">
+              @if (recipe.latest_rating != null) {
+<span class="rating">
+                <span class="star" aria-hidden="true">★</span>
+                <span class="sr-only">Rated </span><span>{{ recipe.latest_rating }}</span><span class="sr-only"> out of 5.</span>
               </span>
 }
-              @if (recipe.latest_rating != null) {
-<div class="rating">
-                <span class="star">★</span>
-                <span>{{ recipe.latest_rating }}</span>
-              </div>
+              @if (recipe.trial_count != null) {
+<span class="trial-count">{{ recipe.trial_count }} {{ recipe.trial_count === 1 ? 'trial' : 'trials' }}</span>
 }
             </div>
+}
             <h3 class="recipe-title">{{ recipe.title }}</h3>
             @if (recipe.description) {
 <p class="recipe-desc text-secondary">
@@ -200,21 +200,8 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
             </div>
 }
             <div class="card-footer">
-              @if (recipe.base_ingredients && recipe.base_ingredients.length) {
-<div class="ingredient-chips">
-                @for (ing of recipe.base_ingredients.slice(0, 3); track ing) {
-<span
-                 
-                  class="chip">
-                  {{ ing.item }}
-                </span>
-}
-                @if (recipe.base_ingredients.length > 3) {
-<span class="chip chip-more">
-                  +{{ recipe.base_ingredients.length - 3 }}
-                </span>
-}
-              </div>
+              @if (ingredientLine(recipe); as line) {
+<p class="ingredient-line" [title]="line">{{ line }}</p>
 }
               @if (recipe.last_cooked) {
 <span class="last-cooked">
@@ -284,7 +271,7 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
 
     .search-input:focus {
       border-color: var(--color-primary);
-      box-shadow: 0 0 0 3px rgba(122, 59, 46, 0.15);
+      box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.15);
     }
 
     .search-input::placeholder {
@@ -348,7 +335,7 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
     }
 
     .tag-chip--active {
-      background: rgba(122, 59, 46, 0.12);
+      background: rgba(var(--color-primary-rgb), 0.12);
       border-color: var(--color-primary);
       color: var(--color-primary);
     }
@@ -364,6 +351,7 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
 
     .recipe-card {
       text-decoration: none;
+      min-width: 0;
     }
 
     .recipe-card-inner {
@@ -389,15 +377,13 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
     .recipe-meta {
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      gap: var(--space-sm);
     }
 
+    /* Plain meta text beside the rating; pills are reserved for tags. */
     .trial-count {
       font-size: var(--font-size-xs);
       color: var(--text-muted);
-      background: var(--color-secondary);
-      padding: 2px 8px;
-      border-radius: 12px;
     }
 
     .rating {
@@ -438,7 +424,7 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
     .recipe-tag {
       font-size: var(--font-size-xs);
       padding: 2px 8px;
-      background: rgba(122, 59, 46, 0.08);
+      background: rgba(var(--color-primary-rgb), 0.08);
       color: var(--color-primary);
       border-radius: 10px;
       font-weight: 500;
@@ -451,23 +437,15 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
       margin-top: var(--space-xs);
     }
 
-    .ingredient-chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--space-xs);
-    }
-
-    .chip {
+    /* One muted line, truncated with an ellipsis rather than wrapping. */
+    .ingredient-line {
+      margin: 0;
+      min-width: 0;
       font-size: var(--font-size-xs);
-      padding: 2px 8px;
-      background: rgba(196, 149, 106, 0.15);
-      color: var(--color-primary);
-      border-radius: 10px;
-    }
-
-    .chip-more {
-      background: var(--color-secondary);
       color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .last-cooked {
@@ -560,7 +538,7 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
     }
 
     .collection-chip--active {
-      background: rgba(122, 59, 46, 0.12);
+      background: rgba(var(--color-primary-rgb), 0.12);
       border-color: var(--color-primary);
       color: var(--color-primary);
     }
@@ -658,7 +636,7 @@ export class RecipeListComponent implements OnInit {
     { key: 'newest', label: 'Newest' },
     { key: 'trials', label: 'Most Trials' },
     { key: 'rating', label: 'Highest Rated' },
-    { key: 'az', label: 'A–Z' },
+    { key: 'az', label: 'A-Z' },
   ];
 
   availableTags = computed(() => {
@@ -765,6 +743,21 @@ export class RecipeListComponent implements OnInit {
   onRecipeSaved(recipe: Recipe) {
     this.showCreate.set(false);
     this.allRecipes.update(list => [recipe, ...list]);
+  }
+
+  /**
+   * Card ingredient summary: the first three names, comma-separated, with the
+   * rest as a "+N" suffix. Reads `item` (the API contract) and skips entries
+   * without one, so old seeded rows shaped `{ name }` cannot crash the card.
+   */
+  ingredientLine(recipe: Recipe): string {
+    const names = (recipe.base_ingredients ?? [])
+      .map(ing => (typeof ing?.item === 'string' ? ing.item.trim() : ''))
+      .filter(name => name.length > 0);
+    if (names.length === 0) return '';
+    const shown = names.slice(0, 3).join(', ');
+    const extra = names.length - 3;
+    return extra > 0 ? `${shown} +${extra}` : shown;
   }
 
   formatRelative(dateStr: string): string {

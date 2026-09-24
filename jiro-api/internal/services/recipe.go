@@ -54,7 +54,9 @@ func (s *RecipeService) CreateRecipe(ctx context.Context, userID uuid.UUID, req 
 	return recipe, nil
 }
 
-func (s *RecipeService) ListRecipes(ctx context.Context, userID uuid.UUID, search string) ([]models.Recipe, error) {
+// ListRecipes returns the user's recipes, most recently edited first. A nil
+// limit returns every recipe (the account export relies on that).
+func (s *RecipeService) ListRecipes(ctx context.Context, userID uuid.UUID, search string, limit *int) ([]models.Recipe, error) {
 	query := `
 		SELECT r.id, r.user_id, r.title, r.description, r.target_image_url, r.cover_image_url, r.base_ingredients, r.instructions, r.tags,
 		       r.nutrition, r.dietary_flags, r.is_public,
@@ -73,6 +75,11 @@ func (s *RecipeService) ListRecipes(ctx context.Context, userID uuid.UUID, searc
 	}
 
 	query += ` ORDER BY r.updated_at DESC`
+
+	if limit != nil {
+		args = append(args, *limit)
+		query += ` LIMIT $` + strconv.Itoa(len(args))
+	}
 
 	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {

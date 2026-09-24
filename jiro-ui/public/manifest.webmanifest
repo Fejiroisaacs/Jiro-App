@@ -1,12 +1,12 @@
 {
   "name": "Jiro",
   "short_name": "Jiro",
-  "description": "Your modular life OS — fitness, recipes, and more.",
+  "description": "Your life, in one place: recipes, workouts, journal and money.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#F5F0E8",
-  "theme_color": "#7A3B2E",
+  "background_color": "#F2ECE2",
+  "theme_color": "#6E3128",
   "icons": [
     {
       "src": "/icons/apple-touch-icon.png",

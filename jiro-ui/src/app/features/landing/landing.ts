@@ -1,21 +1,26 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, DestroyRef, ElementRef, OnInit, PLATFORM_ID, afterRenderEffect, inject, signal, untracked, viewChildren } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
+import { JiroIconComponent } from '../../shared/components/jiro-icon/jiro-icon';
+import { JiroLogoComponent } from '../../shared/components/jiro-logo/jiro-logo';
+import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
 
 @Component({
   selector: 'app-landing',
   standalone: true,
-  imports: [RouterLink],
+  host: { '[class.reveal-ready]': 'revealReady()' },
+  imports: [RouterLink, JiroIconComponent, JiroLogoComponent, JiroMarkComponent],
   template: `
     <div class="landing">
 
       <!-- ── Nav ───────────────────────────────────────────────────────────── -->
-      <nav class="l-nav">
+      <nav class="l-nav" aria-label="Main">
         <div class="l-nav-inner">
-          <div class="l-logo">
-            <span class="l-logo-mark">J</span>
-            <span class="l-logo-text">iro</span>
-          </div>
+          <!-- The logo is a span inside a link, never a heading: the hero keeps the h1. -->
+          <a routerLink="/" class="l-logo" aria-label="Jiro home">
+            <jiro-logo [size]="30" />
+          </a>
           <div class="l-nav-links">
             <a routerLink="/login" class="l-nav-login">Log in</a>
             <a routerLink="/register" class="l-nav-cta">Get started</a>
@@ -24,134 +29,132 @@ import { AuthService } from '../../core/services/auth.service';
       </nav>
 
       <!-- ── Hero ──────────────────────────────────────────────────────────── -->
+      <!-- Split at desktop: copy on the left, the screenshot on the right,
+           bleeding off the viewport's right edge. Below 900px it stacks. -->
       <section class="l-hero">
-        <div class="l-hero-inner">
-          <h1 class="l-hero-title">Your Life,<br><em>Unified.</em></h1>
-          <p class="l-hero-sub">
-            One modular platform for your recipes, workouts, journal, and more.
-            No ads. No clutter. Just your life, beautifully organised.
-          </p>
-          <div class="l-hero-actions">
-            <a routerLink="/register" class="l-btn l-btn--primary">Get started</a>
-            <!-- A real href, so this works without JavaScript and is reachable
-                 by keyboard. The handler only upgrades the jump to a smooth
-                 scroll; preventDefault is conditional on that. -->
-            <a href="#modules" class="l-btn l-btn--ghost" (click)="scrollToModules($event)">Explore modules</a>
+        <div class="l-hero-grid">
+          <div class="l-hero-copy">
+            <h1 class="l-hero-title">Your life, in one place.</h1>
+            <p class="l-hero-sub">
+              One modular platform for your recipes, workouts, journal, and more.
+              No ads. No clutter. Just your life, beautifully organised.
+            </p>
+            <div class="l-hero-actions">
+              <a routerLink="/register" class="l-btn l-btn--primary">Get started</a>
+              <!-- A real href, so this works without JavaScript and is reachable
+                   by keyboard. The handler only upgrades the jump to a smooth
+                   scroll; preventDefault is conditional on that. -->
+              <a href="#modules" class="l-btn l-btn--ghost" (click)="scrollToModules($event)">Explore modules</a>
+            </div>
+          </div>
+
+          <!-- The real dashboard. Light and dark shots, shown to match the app's
+               own dark-mode setting (html.dark). Phones get a portrait phone
+               shot: the desktop one is unreadable at that width. The light
+               pair is the eager/high-priority one; the dark pair is lazy, so a
+               light-mode visitor never downloads it. -->
+          <div class="l-hero-shot-wrap">
+            <picture class="shot-light">
+              <source media="(max-width: 600px)" srcset="/images/landing/dashboard-phone-light.webp" width="780" height="1280" />
+              <img class="l-hero-shot" width="2160" height="1350"
+                fetchpriority="high" decoding="async" alt="The Jiro dashboard: last workout, journal streak, cook streak, a body weight trend, recent recipes, the month's income and spending with budget bars, and a two-week activity strip." src="/images/landing/dashboard-light.webp" />
+            </picture>
+            <picture class="shot-dark">
+              <source media="(max-width: 600px)" srcset="/images/landing/dashboard-phone-dark.webp" width="780" height="1280" />
+              <img class="l-hero-shot" width="2160" height="1350"
+                loading="lazy" decoding="async" alt="The Jiro dashboard: last workout, journal streak, cook streak, a body weight trend, recent recipes, the month's income and spending with budget bars, and a two-week activity strip." src="/images/landing/dashboard-dark.webp" />
+            </picture>
           </div>
         </div>
-
-        <!-- The real dashboard, shot in dark mode. Re-shoot after UI changes. -->
-        <div class="l-hero-shot-wrap">
-          <img
-            class="l-hero-shot"
-            src="/images/landing/dashboard.webp"
-            width="1440"
-            height="900"
-            fetchpriority="high"
-            decoding="async"
-            alt="The Jiro dashboard in dark mode: a workout in progress, a journal streak, a cook streak, the month's income and spending, budget bars and a two-week activity strip." />
-        </div>
-
-        <!-- Decorative orbs -->
-        <div class="l-orb l-orb--1" aria-hidden="true"></div>
-        <div class="l-orb l-orb--2" aria-hidden="true"></div>
       </section>
 
       <!-- ── Module Bento ───────────────────────────────────────────────────── -->
       <section class="l-modules" id="modules">
-        <div class="l-section-inner">
-          <h2 class="l-section-title">Every corner of your life, covered.</h2>
+        <div #reveal data-reveal="modules" class="l-section-inner l-reveal" [class.is-visible]="revealed().has('modules')">
+          <h2 class="l-section-title l-section-title--with-lead">Every corner of your life, covered.</h2>
+          <p class="l-section-lead">
+            All modules share the same design language, data layer, and account. No juggling five separate apps.
+            Use only what you need. Each module is independent but lives in the same elegant workspace.
+          </p>
 
           <div class="l-bento">
 
             <!-- Culinara — large -->
-            <div class="l-card l-card--culinara" (mousemove)="onCardHover($event)" (mouseleave)="onCardLeave($event)">
+            <div class="l-card l-card--culinara">
               <div class="l-card-content">
                 <div class="l-card-icon">
-                  <img src="/icons/culinara-icon.svg" width="24" height="24" alt="" />
+                  <jiro-mark name="culinara" [size]="24" />
                 </div>
                 <h3 class="l-card-name">Culinara</h3>
                 <p class="l-card-desc">Perfect your recipes. Log every trial, promote the winner to your permanent cookbook.</p>
               </div>
               <div class="l-card-shot">
-                <img
-                  src="/images/landing/culinara.webp"
-                  width="728"
-                  height="232"
-                  loading="lazy"
-                  decoding="async"
-                  alt="The Culinara recipe list: six recipes with tags, ingredient chips, trial counts and star ratings." />
+                <img class="shot-light" width="1456" height="464" loading="lazy" decoding="async"
+                  alt="The Culinara recipe list: recipe cards with tags, a star rating, trial counts and the main ingredients." src="/images/landing/culinara-light.webp" />
+                <img class="shot-dark" width="1456" height="464" loading="lazy" decoding="async"
+                  alt="The Culinara recipe list: recipe cards with tags, a star rating, trial counts and the main ingredients." src="/images/landing/culinara-dark.webp" />
               </div>
             </div>
 
             <!-- Journaly — tall -->
-            <div class="l-card l-card--journaly" (mousemove)="onCardHover($event)" (mouseleave)="onCardLeave($event)">
+            <div class="l-card l-card--journaly">
               <div class="l-card-content">
                 <div class="l-card-icon">
-                  <img src="/icons/journaly-icon.svg" width="24" height="24" alt="" />
+                  <jiro-mark name="journaly" [size]="24" />
                 </div>
                 <h3 class="l-card-name">Journaly</h3>
                 <p class="l-card-desc">Private reflections or shared journals. Track your mood, write daily, watch your streak grow.</p>
               </div>
               <div class="l-card-shot">
-                <img
-                  src="/images/landing/journaly.webp"
-                  width="720"
-                  height="1240"
-                  loading="lazy"
-                  decoding="async"
-                  alt="Journaly on a phone: a writing streak, and a chart of how the last thirty days felt broken down by mood." />
+                <img class="shot-light" width="720" height="1440" loading="lazy" decoding="async"
+                  alt="Journaly on a phone: a writing streak, and a chart of how the last thirty days felt broken down by mood." src="/images/landing/journaly-light.webp" />
+                <img class="shot-dark" width="720" height="1440" loading="lazy" decoding="async"
+                  alt="Journaly on a phone: a writing streak, and a chart of how the last thirty days felt broken down by mood." src="/images/landing/journaly-dark.webp" />
               </div>
             </div>
 
             <!-- Jym — medium -->
-            <div class="l-card l-card--jym" (mousemove)="onCardHover($event)" (mouseleave)="onCardLeave($event)">
+            <div class="l-card l-card--jym">
               <div class="l-card-content">
                 <div class="l-card-icon">
-                  <img src="/icons/jym-icon.svg" width="24" height="24" alt="" />
+                  <jiro-mark name="jym" [size]="24" />
                 </div>
                 <h3 class="l-card-name">Jym</h3>
                 <p class="l-card-desc">Log sets, track volume, and visualise your strength journey with PR detection and progress charts.</p>
               </div>
               <div class="l-card-shot">
-                <img
-                  src="/images/landing/jym.webp"
-                  width="400"
-                  height="300"
-                  loading="lazy"
-                  decoding="async"
-                  alt="A Jym session in progress: two exercises with logged sets, weights in pounds, and personal-record badges." />
+                <img class="shot-light" width="800" height="600" loading="lazy" decoding="async"
+                  alt="A Jym session in progress: logged sets with weights and reps." src="/images/landing/jym-light.webp" />
+                <img class="shot-dark" width="800" height="600" loading="lazy" decoding="async"
+                  alt="A Jym session in progress: logged sets with weights and reps." src="/images/landing/jym-dark.webp" />
               </div>
             </div>
 
             <!-- Ledger — medium -->
-            <div class="l-card l-card--ledger" (mousemove)="onCardHover($event)" (mouseleave)="onCardLeave($event)">
+            <div class="l-card l-card--ledger">
               <div class="l-card-content">
                 <div class="l-card-icon">
-                  <img src="/icons/ledger-icon.svg" width="24" height="24" alt="" />
+                  <jiro-mark name="ledger" [size]="24" />
                 </div>
                 <h3 class="l-card-name">Ledger</h3>
                 <p class="l-card-desc">Track spending, set budgets, and watch your net worth grow over time.</p>
               </div>
               <div class="l-card-shot">
-                <img
-                  src="/images/landing/ledger.webp"
-                  width="498"
-                  height="375"
-                  loading="lazy"
-                  decoding="async"
-                  alt="The Ledger overview: the month's income, spending and savings rate, three budget bars and recent transactions." />
+                <img class="shot-light" width="996" height="750" loading="lazy" decoding="async"
+                  alt="The Ledger month card: net for the month, income, expenses and savings rate." src="/images/landing/ledger-light.webp" />
+                <img class="shot-dark" width="996" height="750" loading="lazy" decoding="async"
+                  alt="The Ledger month card: net for the month, income, expenses and savings rate." src="/images/landing/ledger-dark.webp" />
               </div>
             </div>
 
             <!-- Echo — small -->
-            <div class="l-card l-card--echo" (mousemove)="onCardHover($event)" (mouseleave)="onCardLeave($event)">
+            <div class="l-card l-card--echo">
               <div class="l-card-content">
                 <div class="l-card-icon">
-                  <img src="/icons/echo-icon.svg" width="24" height="24" alt="" />
+                  <jiro-mark name="echo" [size]="24" />
                 </div>
                 <h3 class="l-card-name">Echo</h3>
-                <p class="l-card-desc">Smart reminders that fit your rhythm. Recurring schedules, multi-channel delivery. Coming soon.</p>
+                <p class="l-card-desc">Smart reminders that fit your rhythm. Recurring schedules, multi-channel delivery.</p>
               </div>
               <div class="l-card-badge">Coming soon</div>
             </div>
@@ -160,60 +163,52 @@ import { AuthService } from '../../core/services/auth.service';
         </div>
       </section>
 
-      <!-- ── Why Jiro ───────────────────────────────────────────────────────── -->
-      <section class="l-why">
-        <div class="l-section-inner">
-          <h2 class="l-section-title">Built different, on purpose.</h2>
-          <div class="l-pillars">
-            <div class="l-pillar">
-              <div class="l-pillar-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-                  <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                </svg>
-              </div>
-              <h3>Private by default</h3>
-              <p>Your data is yours. No tracking, no third-party analytics, nothing sold on, no ads. Self-host it if you would rather not take our word for it.</p>
-            </div>
-            <div class="l-pillar">
-              <div class="l-pillar-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-                  <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 1 0 21 12"/><path d="M21 12V2h-10"/>
-                </svg>
-              </div>
-              <h3>One coherent system</h3>
-              <p>All modules share the same design language, data layer, and account — no juggling five separate apps.</p>
-            </div>
-            <div class="l-pillar">
-              <div class="l-pillar-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-                  <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
-                </svg>
-              </div>
-              <h3>Modular by design</h3>
-              <p>Use only what you need. Each module is independent but lives in the same elegant workspace.</p>
-            </div>
-          </div>
+      <!-- ── Privacy ────────────────────────────────────────────────────────── -->
+      <!-- Every line here must stay literally true. The product keeps a
+           first-party event log, so "no analytics" or "no tracking" would not. -->
+      <section class="l-privacy" aria-labelledby="l-privacy-title">
+        <div #reveal data-reveal="privacy" class="l-section-inner l-reveal" [class.is-visible]="revealed().has('privacy')">
+          <h2 class="l-section-title" id="l-privacy-title">Private by default</h2>
+          <ul class="l-privacy-list">
+            <li><jiro-icon name="check-circle" [size]="24" /><span>No ads</span></li>
+            <li><jiro-icon name="check-circle" [size]="24" /><span>No third-party scripts</span></li>
+            <li><jiro-icon name="check-circle" [size]="24" /><span>No third-party analytics</span></li>
+            <li><jiro-icon name="check-circle" [size]="24" /><span>Your data exports in one click</span></li>
+            <li><jiro-icon name="check-circle" [size]="24" /><span>Your data is never sold</span></li>
+          </ul>
         </div>
       </section>
 
       <!-- ── Final CTA ──────────────────────────────────────────────────────── -->
       <section class="l-final">
-        <div class="l-final-inner">
-          <h2>Ready to organise your chaos?</h2>
+        <div #reveal data-reveal="final" class="l-final-inner l-reveal" [class.is-visible]="revealed().has('final')">
+          <h2>Bring it into one place.</h2>
           <a routerLink="/register" class="l-btn l-btn--primary l-btn--lg">Get started</a>
         </div>
-        <div class="l-orb l-orb--3" aria-hidden="true"></div>
       </section>
 
       <!-- ── Footer ─────────────────────────────────────────────────────────── -->
       <footer class="l-footer">
         <div class="l-footer-inner">
-          <span class="l-footer-logo">Jiro</span>
-          <span class="l-footer-copy">© 2026 Jiro. All rights reserved.</span>
-          <div class="l-footer-links">
-            <a routerLink="/login">Log in</a>
-            <a routerLink="/register">Get started</a>
+          <div class="l-footer-brand">
+            <jiro-logo [size]="22" />
+            <span class="l-footer-copy">© 2026 Jiro.</span>
           </div>
+          <nav class="l-footer-nav" aria-label="Footer">
+            <!-- Journaly and Ledger have no public page yet, so they are text. -->
+            <ul class="l-footer-list" aria-label="Modules">
+              <li><a routerLink="/culinara/discover">Culinara</a></li>
+              <li><a routerLink="/jym/discover">Jym</a></li>
+              <li><span>Journaly</span></li>
+              <li><span>Ledger</span></li>
+            </ul>
+            <ul class="l-footer-list" aria-label="Jiro">
+              <li><a routerLink="/login">Log in</a></li>
+              <li><a routerLink="/register">Get started</a></li>
+              <li><a routerLink="/privacy">Privacy</a></li>
+              <li><a routerLink="/terms">Terms</a></li>
+            </ul>
+          </nav>
         </div>
       </footer>
 
@@ -224,7 +219,7 @@ import { AuthService } from '../../core/services/auth.service';
 
     /* ── Reset / Base ──────────────────────────────────────────────────────── */
     .landing {
-      min-height: 100vh;
+      min-height: 100dvh;
       background: var(--bg-canvas);
       color: var(--text-primary);
       overflow-x: hidden;
@@ -235,7 +230,6 @@ import { AuthService } from '../../core/services/auth.service';
     /* ── Layout helpers ────────────────────────────────────────────────────── */
     .l-nav-inner,
     .l-section-inner,
-    .l-hero-inner,
     .l-final-inner,
     .l-footer-inner {
       max-width: 1080px;
@@ -247,7 +241,7 @@ import { AuthService } from '../../core/services/auth.service';
     .l-nav {
       position: sticky;
       top: 0;
-      z-index: 100;
+      z-index: var(--z-sticky);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       background: color-mix(in srgb, var(--bg-canvas) 80%, transparent);
@@ -259,35 +253,32 @@ import { AuthService } from '../../core/services/auth.service';
       justify-content: space-between;
       height: 60px;
     }
-    .l-logo { display: flex; align-items: baseline; gap: 0; }
-    .l-logo-mark {
-      font-size: 1.5rem;
-      font-weight: 800;
-      color: var(--color-primary);
-      line-height: 1;
-    }
-    .l-logo-text {
-      font-size: 1.5rem;
-      font-weight: 700;
+    .l-logo {
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
       color: var(--text-primary);
-      line-height: 1;
+      border-radius: var(--border-radius-sm);
     }
     .l-nav-links { display: flex; align-items: center; gap: var(--space-sm); }
-    .l-nav-login {
+    .l-nav-login,
+    .l-nav-cta {
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+      padding: 0 14px;
       font-size: var(--font-size-sm);
-      color: var(--text-secondary);
-      padding: 7px 14px;
       border-radius: var(--border-radius-sm);
+    }
+    .l-nav-login {
+      color: var(--text-secondary);
       transition: color 0.15s;
     }
     .l-nav-login:hover { color: var(--text-primary); }
     .l-nav-cta {
-      font-size: var(--font-size-sm);
       font-weight: 600;
       color: var(--color-primary);
-      padding: 7px 14px;
       border: 1.5px solid var(--color-primary);
-      border-radius: var(--border-radius-sm);
       transition: background 0.15s, color 0.15s;
     }
     .l-nav-cta:hover {
@@ -300,6 +291,7 @@ import { AuthService } from '../../core/services/auth.service';
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      min-height: 44px;
       font-family: inherit;
       font-weight: 600;
       border-radius: var(--border-radius-sm);
@@ -313,10 +305,6 @@ import { AuthService } from '../../core/services/auth.service';
     .l-btn--primary {
       background: var(--color-primary);
       color: var(--text-on-primary);
-      box-shadow: 0 2px 12px color-mix(in srgb, var(--color-primary) 35%, transparent);
-    }
-    .l-btn--primary:hover {
-      box-shadow: 0 4px 20px color-mix(in srgb, var(--color-primary) 45%, transparent);
     }
     .l-btn--ghost {
       background: transparent;
@@ -326,41 +314,23 @@ import { AuthService } from '../../core/services/auth.service';
     .l-btn--ghost:hover { color: var(--text-primary); border-color: var(--text-secondary); }
     .l-btn--lg { padding: 14px 32px; font-size: var(--font-size-md); }
 
-    /* ── Orbs ──────────────────────────────────────────────────────────────── */
-    .l-orb {
-      position: absolute;
-      border-radius: 50%;
-      filter: blur(80px);
-      pointer-events: none;
-      z-index: 0;
-    }
-    .l-orb--1 {
-      width: 500px; height: 500px;
-      background: color-mix(in srgb, var(--color-primary) 10%, transparent);
-      top: -120px; right: -100px;
-    }
-    .l-orb--2 {
-      width: 300px; height: 300px;
-      background: color-mix(in srgb, var(--color-primary) 6%, transparent);
-      bottom: 0; left: -60px;
-    }
-    .l-orb--3 {
-      width: 600px; height: 400px;
-      background: color-mix(in srgb, var(--color-primary) 8%, transparent);
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-    }
-
     /* ── Hero ──────────────────────────────────────────────────────────────── */
+    /* Mobile first: one column, copy then image, inside the page gutter. */
     .l-hero {
       position: relative;
-      padding: 100px 0 80px;
-      text-align: center;
+      padding: 60px 0 50px;
       overflow: hidden;
     }
-    .l-hero-inner { position: relative; z-index: 1; }
+    .l-hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--space-xl);
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 0 var(--space-xl);
+    }
     .l-hero-title {
-      font-size: clamp(2.8rem, 7vw, 5.5rem);
+      font-size: clamp(2.6rem, 5.5vw, 4.75rem);
       font-weight: 800;
       line-height: 1.05;
       letter-spacing: -0.03em;
@@ -368,43 +338,32 @@ import { AuthService } from '../../core/services/auth.service';
       color: var(--text-primary);
       animation: fadeUp 0.55s 0.05s ease both;
     }
-    .l-hero-title em {
-      font-style: normal;
-      color: var(--color-primary);
-    }
     .l-hero-sub {
       font-size: var(--font-size-lg);
       color: var(--text-secondary);
       max-width: 520px;
-      margin: 0 auto var(--space-xl);
+      margin: 0 0 var(--space-xl);
       line-height: 1.65;
       animation: fadeUp 0.6s 0.1s ease both;
     }
     .l-hero-actions {
       display: flex;
       gap: var(--space-sm);
-      justify-content: center;
       flex-wrap: wrap;
       animation: fadeUp 0.65s 0.15s ease both;
     }
 
-    /* ── Hero Mockup ───────────────────────────────────────────────────────── */
-    /* Abstract Sidebar */
-    .w-12 { width: 48px; } .w-16 { width: 64px; } .w-10 { width: 40px; } .w-20 { width: 80px; } .w-18 { width: 72px; } .w-24 { width: 96px; }
-    .w-full { width: 100%; } .w-3-4 { width: 75%; } .w-2-3 { width: 66%; } .w-5-6 { width: 83%; } .w-1-2 { width: 50%; }
-    /* Abstract Main Content */
-
     /* ── Hero screenshot ───────────────────────────────────────────────────── */
-    .l-hero-shot-wrap {
-      position: relative;
-      z-index: 2;
-      max-width: 900px;
-      margin: 60px auto 0;
-      /* A fixed angle reads as a composition; a photo of a UI that swings with
-         the cursor fights its own perspective. */
-      transform: rotate(-0.6deg);
-    }
+    /* Light/dark screenshot pairs follow the app's own dark-mode class. */
+    .l-hero-shot-wrap picture.shot-dark,
+    .l-card-shot img.shot-dark { display: none; }
+    :host-context(html.dark) .l-hero-shot-wrap picture.shot-light,
+    :host-context(html.dark) .l-card-shot img.shot-light { display: none; }
+    :host-context(html.dark) .l-hero-shot-wrap picture.shot-dark,
+    :host-context(html.dark) .l-card-shot img.shot-dark { display: block; }
 
+    .l-hero-shot-wrap { min-width: 0; }
+    .l-hero-shot-wrap picture { display: block; }
     .l-hero-shot {
       display: block;
       width: 100%;
@@ -415,8 +374,25 @@ import { AuthService } from '../../core/services/auth.service';
       background: var(--bg-surface);
     }
 
-    @media (max-width: 600px) {
-      .l-hero-shot-wrap { margin-top: var(--space-xl); transform: none; }
+    @media (min-width: 601px) {
+      .l-hero { padding: 100px 0 80px; }
+    }
+
+    /* Desktop split. The grid drops its right padding and its max-width, and
+       its left padding keeps the copy on the same line as the 1080px
+       container below; the image is wider than its column, so it runs past
+       the viewport's right edge and the section clips it. */
+    @media (min-width: 900px) {
+      .l-hero-grid {
+        max-width: none;
+        margin: 0;
+        grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+        align-items: center;
+        gap: var(--space-3xl);
+        padding-right: 0;
+        padding-left: max(var(--space-xl), calc((100% - 1080px) / 2 + var(--space-xl)));
+      }
+      .l-hero-shot-wrap { width: 125%; }
     }
 
     /* ── Module card screenshots ───────────────────────────────────────────── */
@@ -450,9 +426,14 @@ import { AuthService } from '../../core/services/auth.service';
       background: none;
       overflow: visible;
     }
+    /* The frame hugs the picture: sized by the image, not stretched to the
+       card, so the border and shadow never wrap empty space below it. */
     .l-card--journaly .l-card-shot img {
-      object-fit: contain;
-      object-position: top center;
+      width: auto;
+      height: auto;
+      max-width: 100%;
+      max-height: 100%;
+      margin: 0 auto;
       border-radius: var(--border-radius);
       border: 1px solid var(--border-color);
       box-shadow: var(--shadow-md);
@@ -478,6 +459,32 @@ import { AuthService } from '../../core/services/auth.service';
       margin: 0 0 var(--space-xl);
       color: var(--text-primary);
     }
+    /* A title with a lead under it gives up most of its bottom margin. */
+    .l-section-title--with-lead { margin-bottom: var(--space-md); }
+    .l-section-lead {
+      font-size: var(--font-size-md);
+      color: var(--text-secondary);
+      line-height: 1.65;
+      max-width: 640px;
+      margin: 0 0 var(--space-xl);
+    }
+
+    /* ── Section reveal ────────────────────────────────────────────────────── */
+    /* One reveal per section. The hidden state only exists once the observer
+       is running (the host gets .reveal-ready from JS), so the prerendered
+       page and a page without JS show everything. Sections already on screen
+       are marked visible before that class lands, so they never flash. */
+    @media (prefers-reduced-motion: no-preference) {
+      :host(.reveal-ready) .l-reveal:not(.is-visible) {
+        opacity: 0;
+        transform: translateY(12px);
+      }
+      :host(.reveal-ready) .l-reveal.is-visible {
+        transition:
+          opacity 600ms cubic-bezier(0.16, 1, 0.3, 1),
+          transform 600ms cubic-bezier(0.16, 1, 0.3, 1);
+      }
+    }
 
     /* ── Modules ───────────────────────────────────────────────────────────── */
     .l-modules {
@@ -494,64 +501,19 @@ import { AuthService } from '../../core/services/auth.service';
       gap: 16px;
     }
 
-    /* Card base */
-    /* The module cards rise in on load, staggered. This was an
-       @angular/animations trigger; both providers for that API are deprecated
-       as of 20.2, and the effect is a one-shot entrance on a static grid, so
-       CSS does it with no package and no provider. The "both" fill mode holds
-       the start state through each card's delay, which is what produces the
-       stagger, and the reduced-motion query removes the animation entirely so
-       the base styles below (fully visible, untransformed) apply as-is. */
-    @keyframes l-bento-in {
-      from { opacity: 0; transform: translateY(40px) scale(0.98); }
-      to   { opacity: 1; transform: none; }
-    }
-
+    /* Card base. Static on purpose: the cards aren't links, so they don't
+       lift on hover. Hard offset shadow like jiro-card. */
     .l-card {
-      animation: l-bento-in 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
-      --mouse-x: 50%;
-      --mouse-y: 50%;
       background: var(--bg-canvas);
       border: 1px solid var(--border-color);
       border-radius: calc(var(--border-radius) * 1.5);
+      box-shadow: var(--shadow-sm);
       padding: var(--space-lg);
       display: flex;
       flex-direction: column;
       gap: var(--space-md);
-      transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
       overflow: hidden;
       position: relative;
-    }
-    .l-card::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      border-radius: inherit;
-      background: radial-gradient(
-        circle at var(--mouse-x) var(--mouse-y),
-        rgba(255,255,255,0.07) 0%,
-        transparent 60%
-      );
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.3s;
-      z-index: 1;
-    }
-    .l-card:hover::after { opacity: 1; }
-    .l-card:nth-child(1) { animation-delay: 0ms; }
-    .l-card:nth-child(2) { animation-delay: 120ms; }
-    .l-card:nth-child(3) { animation-delay: 240ms; }
-    .l-card:nth-child(4) { animation-delay: 360ms; }
-    .l-card:nth-child(5) { animation-delay: 480ms; }
-
-    @media (prefers-reduced-motion: reduce) {
-      .l-card { animation: none; }
-    }
-
-    .l-card:hover {
-      border-color: var(--color-primary);
-      box-shadow: 0 8px 32px rgba(0,0,0,0.08);
-      transform: translateY(-2px);
     }
 
     /* Culinara: span 2 cols, row 1 */
@@ -579,13 +541,12 @@ import { AuthService } from '../../core/services/auth.service';
       grid-row: 2;
     }
 
-    /* Echo: removed from bento, shown inline */
+    /* Echo: a full-width strip under the grid */
     .l-card--echo {
       grid-column: 1 / 4;
       flex-direction: row;
       align-items: center;
       gap: var(--space-xl);
-      opacity: 0.75;
     }
     .l-card--echo .l-card-content { flex: 1; }
     .l-card-badge {
@@ -595,7 +556,7 @@ import { AuthService } from '../../core/services/auth.service';
       letter-spacing: 0.5px;
       padding: 5px 12px;
       border: 1.5px dashed var(--border-color);
-      border-radius: 99px;
+      border-radius: var(--border-radius-pill);
       color: var(--text-secondary);
       flex-shrink: 0;
     }
@@ -606,7 +567,6 @@ import { AuthService } from '../../core/services/auth.service';
       display: flex; align-items: center; justify-content: center;
       margin-bottom: var(--space-xs);
     }
-    .l-card-icon img { display: block; }
     .l-card-name {
       font-size: var(--font-size-lg);
       font-weight: 700;
@@ -620,84 +580,51 @@ import { AuthService } from '../../core/services/auth.service';
       margin: 0;
     }
 
-    /* ── Culinara mockup ───────────────────────────────────────────────────── */
-    .l-card--culinara:hover .mc-recipe-card {
-      transform: translateY(-4px) scale(1.02);
-      box-shadow: 0 16px 40px rgba(0,0,0,0.1);
-    }
-
-    /* ── Journaly mockup ───────────────────────────────────────────────────── */
-    .l-card--journaly:hover .mj-streak {
-      transform: scale(1.05) rotate(2deg);
-    }
-
-    /* ── Jym mockup ────────────────────────────────────────────────────────── */
-    .l-card--jym:hover .mjym-bar {
-      opacity: 0.8;
-    }
-    .l-card--jym:hover .mjym-bar--pr {
-      opacity: 1;
-      transform: scaleY(1.1);
-      transform-origin: bottom;
-    }
-    @keyframes prPulse {
-      0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary) 60%, transparent); }
-      70%  { box-shadow: 0 0 0 10px transparent; }
-      100% { box-shadow: 0 0 0 0 transparent; }
-    }
-    .l-card--jym:hover .mjym-pr-badge {
-      transform: translateY(-4px) scale(1.05);
-    }
-
-    /* ── Ledger mockup ─────────────────────────────────────────────────────── */
-    .l-card--ledger:hover .ml-networth { transform: translateY(-3px); }
-
-    /* ── Why Jiro ──────────────────────────────────────────────────────────── */
-    .l-why { padding: 80px 0; }
-    /* Not three equal columns: privacy is the actual differentiator, so it
-       leads at a wider measure and the other two sit beside it. */
-    .l-pillars {
+    /* ── Privacy ───────────────────────────────────────────────────────────── */
+    .l-privacy { padding: 80px 0; }
+    .l-privacy-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
       display: grid;
-      grid-template-columns: 1.4fr 1fr 1fr;
-      gap: var(--space-xl);
-      align-items: start;
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--space-md) var(--space-xl);
     }
-    .l-pillar { display: flex; flex-direction: column; gap: var(--space-sm); }
-    .l-pillar:first-child h3 { font-size: var(--font-size-xl); }
-    .l-pillar:first-child p { font-size: var(--font-size-md); }
-    .l-pillar-icon {
-      width: 44px; height: 44px;
-      display: flex; align-items: center; justify-content: center;
-      background: color-mix(in srgb, var(--color-primary) 10%, transparent);
-      border-radius: var(--border-radius-sm);
-      color: var(--color-primary);
-      margin-bottom: var(--space-xs);
+    .l-privacy-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-sm);
+      padding-top: var(--space-md);
+      border-top: 1px solid var(--border-color);
+      font-family: var(--font-family-display);
+      font-size: var(--font-size-xl);
+      font-weight: 600;
+      line-height: 1.25;
+      color: var(--text-primary);
     }
-    /* h3, not h4: the level follows the outline under the section's h2, and
-       the size that motivated h4 lives here instead. */
-    .l-pillar h3 { font-size: var(--font-size-md); font-weight: 700; margin: 0; }
-    .l-pillar p { font-size: var(--font-size-sm); color: var(--text-secondary); margin: 0; line-height: 1.6; }
+    .l-privacy-list jiro-icon {
+      color: var(--color-accent);
+      margin-top: 2px;
+    }
+    @media (min-width: 601px) {
+      .l-privacy-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (min-width: 1024px) {
+      .l-privacy-list { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    }
 
     /* ── Final CTA ─────────────────────────────────────────────────────────── */
     .l-final {
-      position: relative;
-      overflow: hidden;
       border-top: 1px solid var(--border-color);
       padding: 100px 0;
       text-align: center;
       background: var(--bg-surface);
     }
-    .l-final-inner { position: relative; z-index: 1; }
     .l-final h2 {
       font-size: clamp(1.8rem, 4vw, 3rem);
       font-weight: 800;
       letter-spacing: -0.02em;
-      margin: 0 0 var(--space-sm);
-    }
-    .l-final p {
-      color: var(--text-secondary);
       margin: 0 0 var(--space-xl);
-      font-size: var(--font-size-md);
     }
 
     /* ── Footer ────────────────────────────────────────────────────────────── */
@@ -707,25 +634,47 @@ import { AuthService } from '../../core/services/auth.service';
     }
     .l-footer-inner {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: space-between;
-      gap: var(--space-md);
+      gap: var(--space-lg) var(--space-xl);
       flex-wrap: wrap;
     }
-    .l-footer-logo { font-weight: 800; font-size: var(--font-size-md); color: var(--text-primary); }
+    .l-footer-brand {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+      color: var(--text-primary);
+      padding-top: 10px;
+    }
     .l-footer-copy { font-size: var(--font-size-xs); color: var(--text-secondary); }
-    .l-footer-links { display: flex; gap: var(--space-md); }
-    .l-footer-links a { font-size: var(--font-size-xs); color: var(--text-secondary); transition: color 0.15s; }
-    .l-footer-links a:hover { color: var(--text-primary); }
+    .l-footer-nav { display: flex; flex-wrap: wrap; gap: 0 var(--space-2xl); }
+    .l-footer-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .l-footer-list a,
+    .l-footer-list span {
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+    .l-footer-list a { transition: color 0.15s; }
+    .l-footer-list a:hover { color: var(--text-primary); }
 
     /* ── Animations ────────────────────────────────────────────────────────── */
     @keyframes fadeUp {
       from { opacity: 0; transform: translateY(16px); }
       to   { opacity: 1; transform: translateY(0); }
     }
-    @keyframes heroFloat {
-      0%, 100% { transform: translateY(0px); }
-      50%       { transform: translateY(-10px); }
+    @media (prefers-reduced-motion: reduce) {
+      .l-hero-title,
+      .l-hero-sub,
+      .l-hero-actions { animation: none; }
     }
 
     /* ── Responsive ────────────────────────────────────────────────────────── */
@@ -738,11 +687,9 @@ import { AuthService } from '../../core/services/auth.service';
       .l-card--jym { grid-column: 2; grid-row: auto; }
       .l-card--ledger { grid-column: 1; grid-row: auto; }
       .l-card--echo { grid-column: 1 / 3; }
-      .l-pillars { grid-template-columns: 1fr; gap: var(--space-lg); }
     }
 
     @media (max-width: 600px) {
-      .l-hero { padding: 60px 0 50px; }
       .l-bento { grid-template-columns: 1fr; }
       .l-card--culinara,
       .l-card--journaly,
@@ -755,10 +702,30 @@ import { AuthService } from '../../core/services/auth.service';
 export class LandingComponent implements OnInit {
   private auth = inject(AuthService);
   private router = inject(Router);
+  private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
+  private revealObserver?: IntersectionObserver;
 
-  /** Honour the OS setting: no glare, entrance stagger or smooth scroll. */
+  /** Honour the OS setting: no glare, section reveal or smooth scroll. */
   readonly reducedMotion =
-    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.isBrowser && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  private readonly revealEls = viewChildren<ElementRef<HTMLElement>>('reveal');
+  /** Sections that have scrolled into view, or were on screen from the start. */
+  protected readonly revealed = signal<ReadonlySet<string>>(new Set());
+  /** Only once this is true can a section be hidden, so the prerendered page and
+   *  a visit without JavaScript always show everything. */
+  protected readonly revealReady = signal(false);
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => this.revealObserver?.disconnect());
+    if (this.isBrowser && !this.reducedMotion && typeof IntersectionObserver !== 'undefined') {
+      // Re-runs whenever the section elements change. The state lives in a
+      // signal bound to the template, so a re-render that swaps in new nodes
+      // keeps it; the old version set classes on the first nodes it saw and
+      // left their replacements hidden for good.
+      afterRenderEffect(() => this.observeReveals(this.revealEls()));
+    }
+  }
 
   async ngOnInit() {
     // Wait for the startup token refresh to settle before deciding. The stored
@@ -771,20 +738,32 @@ export class LandingComponent implements OnInit {
     }
   }
 
-  onCardHover(event: MouseEvent) {
-    if (this.reducedMotion) return;
-    const card = event.currentTarget as HTMLElement;
-    const rect = card.getBoundingClientRect();
-    const x = (((event.clientX - rect.left) / rect.width) * 100).toFixed(1);
-    const y = (((event.clientY - rect.top) / rect.height) * 100).toFixed(1);
-    card.style.setProperty('--mouse-x', `${x}%`);
-    card.style.setProperty('--mouse-y', `${y}%`);
-  }
+  /**
+   * One scroll reveal per section. Sections already on screen are revealed in
+   * the same change detection that turns on `.reveal-ready`, so nothing that
+   * is already visible ever flashes out.
+   */
+  private observeReveals(els: readonly ElementRef<HTMLElement>[]) {
+    this.revealObserver?.disconnect();
+    const done = untracked(this.revealed);
+    const observer = new IntersectionObserver(entries => {
+      const seen = entries.filter(e => e.isIntersecting).map(e => e.target as HTMLElement);
+      if (!seen.length) return;
+      seen.forEach(el => observer.unobserve(el));
+      this.revealed.update(set => new Set([...set, ...seen.map(el => el.dataset['reveal']!)]));
+    }, { rootMargin: '0px 0px -10% 0px' });
+    this.revealObserver = observer;
 
-  onCardLeave(event: MouseEvent) {
-    const card = event.currentTarget as HTMLElement;
-    card.style.setProperty('--mouse-x', '50%');
-    card.style.setProperty('--mouse-y', '50%');
+    const onScreen: string[] = [];
+    for (const { nativeElement: el } of els) {
+      const id = el.dataset['reveal']!;
+      if (done.has(id)) continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.top < window.innerHeight && rect.bottom > 0) onScreen.push(id);
+      else observer.observe(el);
+    }
+    if (onScreen.length) this.revealed.update(set => new Set([...set, ...onScreen]));
+    this.revealReady.set(true);
   }
 
   /**

@@ -19,11 +19,11 @@ export const routes: Routes = [
   {
     path: '',
     pathMatch: 'full',
-    title: 'Your life, unified',
+    title: 'Your life, in one place',
     data: {
       index: true,
       description:
-        'One private, modular home for your recipes, workouts, journal and money. No ads, no tracking, nothing sold on.',
+        'Your life, in one place: recipes, workouts, journal and money. Private by default, with no ads and no third-party tracking.',
       ogType: 'website',
     },
     loadComponent: () => import('./features/landing/landing').then(m => m.LandingComponent),
@@ -47,6 +47,25 @@ export const routes: Routes = [
       description: 'Create a Jiro account and start with whichever module you need first. Free, and your data stays yours.',
     },
     loadComponent: () => import('./features/auth/register').then(m => m.RegisterComponent),
+  },
+  // Legal pages: public, no guard, outside the app shell like the landing page.
+  {
+    path: 'privacy',
+    title: 'Privacy policy',
+    data: {
+      index: true,
+      description: 'What information Jiro keeps, why, where it is stored, and what you can do about it.',
+    },
+    loadComponent: () => import('./features/legal/privacy').then(m => m.PrivacyComponent),
+  },
+  {
+    path: 'terms',
+    title: 'Terms of use',
+    data: {
+      index: true,
+      description: 'The rules for using Jiro, what stays yours, and the limits of the service.',
+    },
+    loadComponent: () => import('./features/legal/terms').then(m => m.TermsComponent),
   },
   // Opt-in public content, in the normal app shell but with no guard. These two
   // pages read endpoints the API already serves anonymously, and they are the
@@ -283,6 +302,12 @@ export const routes: Routes = [
         title: 'New entry',
         data: { ...PRIVATE_PAGE },
         loadComponent: () => import('./features/journal/journal-editor/journal-editor').then(m => m.JournalEditorComponent),
+      },
+      {
+        path: 'journal/entries',
+        title: 'All entries',
+        data: { ...PRIVATE_PAGE },
+        loadComponent: () => import('./features/journal/journal-entries/journal-entries').then(m => m.JournalEntriesComponent),
       },
       {
         path: 'journal/:id/edit',

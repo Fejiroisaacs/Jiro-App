@@ -94,7 +94,7 @@ func (h *JournalHandler) ListEntries(c *gin.Context) {
 		offset = 0
 	}
 
-	entries, err := h.journalService.ListEntries(c.Request.Context(), userID,
+	entries, total, err := h.journalService.ListEntries(c.Request.Context(), userID,
 		c.Query("mood"), c.Query("tag"), c.Query("q"),
 		c.Query("from"), c.Query("to"),
 		limit, offset)
@@ -103,6 +103,9 @@ func (h *JournalHandler) ListEntries(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to list entries"}})
 		return
 	}
+	// The body stays a bare array for existing callers; the total matching
+	// the filters travels in a header for paginated views.
+	c.Header("X-Total-Count", strconv.Itoa(total))
 	c.JSON(http.StatusOK, entries)
 }
 

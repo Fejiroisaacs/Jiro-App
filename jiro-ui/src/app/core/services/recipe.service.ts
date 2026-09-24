@@ -129,10 +129,14 @@ export interface Collection {
 export class RecipeService {
   constructor(private http: HttpClient) { }
 
-  listRecipes(search?: string): Observable<Recipe[]> {
+  /** Most recently edited first. `limit` (1-50) caps the list; omit it for every recipe. */
+  listRecipes(search?: string, limit?: number): Observable<Recipe[]> {
     let params = new HttpParams();
     if (search) {
       params = params.set('q', search);
+    }
+    if (limit !== undefined) {
+      params = params.set('limit', limit);
     }
     return this.http.get<Recipe[]>(`${API_URL}/recipes`, { params });
   }

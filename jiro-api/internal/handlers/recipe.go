@@ -50,7 +50,19 @@ func (h *RecipeHandler) List(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 	search := c.Query("q")
 
-	recipes, err := h.recipeService.ListRecipes(c.Request.Context(), userID, search)
+	var limit *int
+	if raw, ok := c.GetQuery("limit"); ok {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 1 || n > 50 {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{
+				Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: "limit must be an integer from 1 to 50"},
+			})
+			return
+		}
+		limit = &n
+	}
+
+	recipes, err := h.recipeService.ListRecipes(c.Request.Context(), userID, search, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to list recipes"},

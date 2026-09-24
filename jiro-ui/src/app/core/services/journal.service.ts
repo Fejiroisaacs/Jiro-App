@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
 const API_URL = `${environment.apiUrl}/journal`;
@@ -166,6 +166,33 @@ export class JournalService {
     if (params.limit) p = p.set('limit', params.limit);
     if (params.offset) p = p.set('offset', params.offset);
     return this.http.get<JournalEntry[]>(`${API_URL}/entries`, { params: p });
+  }
+
+  /**
+   * One page of entries plus the number matching the filters, read from the
+   * X-Total-Count header. Without the header the total is a lower bound
+   * (what this page proves exists), so a pager never offers a page that
+   * cannot be shown.
+   */
+  listEntriesPage(params: ListEntriesParams = {}): Observable<{ entries: JournalEntry[]; total: number }> {
+    let p = new HttpParams();
+    if (params.q) p = p.set('q', params.q);
+    if (params.mood) p = p.set('mood', params.mood);
+    if (params.tag) p = p.set('tag', params.tag);
+    if (params.from) p = p.set('from', params.from);
+    if (params.to) p = p.set('to', params.to);
+    if (params.limit) p = p.set('limit', params.limit);
+    if (params.offset) p = p.set('offset', params.offset);
+    return this.http.get<JournalEntry[]>(`${API_URL}/entries`, { params: p, observe: 'response' }).pipe(
+      map(res => {
+        const entries = res.body ?? [];
+        const header = Number(res.headers.get('X-Total-Count'));
+        const total = res.headers.has('X-Total-Count') && Number.isFinite(header)
+          ? header
+          : entries.length + (params.offset ?? 0);
+        return { entries, total };
+      }),
+    );
   }
 
   getEntry(id: string): Observable<JournalEntry> {

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -39,7 +40,7 @@ func (h *UserHandler) GetMe(c *gin.Context) {
 }
 
 // UpdateMe handles PATCH /user/me.
-// Accepts settings fields (theme, weight_unit, timezone) and/or profile fields
+// Accepts settings fields (theme, weight_unit, timezone, dashboard) and/or profile fields
 // (username, display_name, bio) in the same request body.
 func (h *UserHandler) UpdateMe(c *gin.Context) {
 	userID, exists := c.Get("user_id")
@@ -56,6 +57,8 @@ func (h *UserHandler) UpdateMe(c *gin.Context) {
 		Theme      *string `json:"theme"`
 		WeightUnit *string `json:"weight_unit"`
 		Timezone   *string `json:"timezone"`
+		// Absent: empty (untouched). Explicit null: the bytes `null` (reset).
+		Dashboard json.RawMessage `json:"dashboard"`
 		// Profile fields
 		Username    *string `json:"username"`
 		DisplayName *string `json:"display_name"`
@@ -73,17 +76,22 @@ func (h *UserHandler) UpdateMe(c *gin.Context) {
 	var err error
 
 	// Apply settings update if any settings field is present.
-	if req.Theme != nil || req.WeightUnit != nil || req.Timezone != nil {
+	if req.Theme != nil || req.WeightUnit != nil || req.Timezone != nil || len(req.Dashboard) > 0 {
 		settingsReq := &models.UpdateSettingsRequest{
 			Theme:      req.Theme,
 			WeightUnit: req.WeightUnit,
 			Timezone:   req.Timezone,
+			Dashboard:  req.Dashboard,
 		}
 		user, err = h.userService.UpdateSettings(c.Request.Context(), uid, settingsReq)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-				Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to update settings"},
-			})
+			if errors.Is(err, services.ErrInvalidSettings) {
+				c.JSON(http.StatusBadRequest, models.ErrorResponse{
+					Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()},
+				})
+				return
+			}
+			respondInternal(c, err, "failed to update settings")
 			return
 		}
 	}

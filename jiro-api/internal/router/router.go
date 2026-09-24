@@ -44,6 +44,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 		privateStorageService = services.NewStorageService(cfg.StorageEndpoint, cfg.StoragePrivateBucket, cfg.StorageAccessKey, cfg.StorageSecretKey, "internal://"+cfg.StoragePrivateBucket)
 	}
 	ledgerService := services.NewLedgerService(db)
+	searchService := services.NewSearchService(db)
 
 	// Rate limiter + login fail tracker
 	rl := middleware.NewRateLimiter(db)
@@ -62,6 +63,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	uploadHandler := handlers.NewUploadHandler(storageService, privateStorageService, userService, recipeService, jymService, journalService)
 	journalHandler := handlers.NewJournalHandler(journalService, emailService, privateStorageService, cfg.AppBaseURL)
 	exportHandler := handlers.NewExportHandler(userService, jymService, recipeService, mealPlanService, journalService, ledgerService, db)
+	searchHandler := handlers.NewSearchHandler(searchService)
 
 	// Routes
 	v1 := r.Group("/api/v1")
@@ -89,21 +91,26 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			public.GET("/jym/public-splits/:id", jymHandler.GetPublicSplit)
 		}
 
-		// Auth routes (rate limited by IP: 5/min)
+		// Auth routes. Credential-guessing routes are limited by IP to 5/min.
+		// Refresh and logout get their own, looser scope: every page load calls
+		// refresh (the access token lives only in memory), a refresh token is an
+		// unguessable 256-bit cookie, and a per-IP limit is shared by everyone
+		// behind one NAT, so 5/min signed people out after a few reloads.
 		auth := v1.Group("/auth")
-		// Before the limiter, so a rejected 429 is covered too. These responses
+		// Before the limiters, so a rejected 429 is covered too. These responses
 		// carry access tokens and single-use reset material.
 		auth.Use(middleware.NoStore())
-		auth.Use(middleware.RateLimitByIP(rl, "auth", 5))
+		strict := middleware.RateLimitByIP(rl, "auth", 5)
+		session := middleware.RateLimitByIP(rl, "session", 60)
 		{
-			auth.POST("/register", authHandler.Register)
-			auth.POST("/login", authHandler.Login)
+			auth.POST("/register", strict, authHandler.Register)
+			auth.POST("/login", strict, authHandler.Login)
 			// Cookie-authenticated, so the only CSRF-reachable routes.
-			auth.POST("/refresh", middleware.RequireTrustedOrigin(cfg.CORSOrigins), authHandler.Refresh)
-			auth.POST("/logout", middleware.RequireTrustedOrigin(cfg.CORSOrigins), authHandler.Logout)
-			auth.POST("/verify-email", authHandler.VerifyEmail)
-			auth.POST("/forgot-password", authHandler.ForgotPassword)
-			auth.POST("/reset-password", authHandler.ResetPassword)
+			auth.POST("/refresh", session, middleware.RequireTrustedOrigin(cfg.CORSOrigins), authHandler.Refresh)
+			auth.POST("/logout", session, middleware.RequireTrustedOrigin(cfg.CORSOrigins), authHandler.Logout)
+			auth.POST("/verify-email", strict, authHandler.VerifyEmail)
+			auth.POST("/forgot-password", strict, authHandler.ForgotPassword)
+			auth.POST("/reset-password", strict, authHandler.ResetPassword)
 		}
 
 		// Protected routes (require JWT, rate limited by user: 300/min)
@@ -147,6 +154,9 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 
 			// Account data export (expensive — tighter limit: 5/min per user)
 			protected.GET("/export/account.json", middleware.RateLimitByUser(rl, "export", 5), exportHandler.ExportAccount)
+
+			// Global search (4 queries per call — tighter limit: 60/min per user)
+			protected.GET("/search", middleware.RateLimitByUser(rl, "search", 60), searchHandler.Search)
 
 			// Culinara (Recipe Module)
 			culinara := protected.Group("/culinara")

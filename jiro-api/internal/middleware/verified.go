@@ -52,7 +52,7 @@ func RequireVerifiedEmail(userService *services.UserService) gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusForbidden, models.ErrorResponse{
 				Error: models.ErrorDetail{
 					Code:    "EMAIL_NOT_VERIFIED",
-					Message: "Verify your email to make changes. Check your inbox, or resend the email from Settings.",
+					Message: "Verify your email to make changes. Check your inbox for the link.",
 				},
 			})
 			return
