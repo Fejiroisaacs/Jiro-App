@@ -1,15 +1,18 @@
 import {
   Component, Input, Output, EventEmitter,
   signal, OnChanges, SimpleChanges, HostListener,
+  ElementRef, Injector, afterNextRender, inject,
 } from '@angular/core';
+import { A11yModule } from '@angular/cdk/a11y';
 
 import { JournalEntry, JournalService, MOODS } from '../../../core/services/journal.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
+import { isJiroModalOpen } from '../../../shared/components/jiro-modal/jiro-modal';
 
 @Component({
   selector: 'journal-day-modal',
   standalone: true,
-  imports: [JiroButtonComponent],
+  imports: [A11yModule, JiroButtonComponent],
   template: `
     <!-- Backdrop -->
     <div class="backdrop" (click)="close.emit()" aria-hidden="true"></div>
@@ -20,6 +23,8 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
       role="dialog"
       aria-labelledby="dm-date"
       aria-modal="true"
+      cdkTrapFocus
+      [cdkTrapFocusAutoCapture]="true"
       (touchstart)="touchStartY = $event.touches[0].clientY"
       (touchend)="onSwipeEnd($event)">
 
@@ -29,7 +34,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
       <!-- Header -->
       <div class="modal-header">
         @if (expanded() || expandLoading()) {
-<button class="hdr-btn" (click)="expanded.set(null); expandLoading.set(false)" aria-label="Back to list">
+<button class="hdr-btn" (click)="backToList()" aria-label="Back to list">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="15,18 9,12 15,6"/>
           </svg>
@@ -60,12 +65,8 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
 <div class="entry-list">
           @for (e of entries; track e) {
 <div
-           
             class="entry-card"
-            (click)="expandEntry(e)"
-            tabindex="0"
-            role="button"
-            (keydown.enter)="expandEntry(e)">
+            (click)="expandEntry(e)">
             @if (showAuthor) {
 <div class="card-author">{{ authorName(e) }}</div>
 }
@@ -73,7 +74,9 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
               @if (e.mood) {
 <span class="mood-chip">{{ moodLabel(e.mood) }}</span>
 }
-              <span class="entry-time">{{ formatTime(e.created_at) }}</span>
+              <!-- The card is clickable anywhere; this button is its keyboard and
+                   screen-reader handle, kept outside the Delete button's subtree. -->
+              <button type="button" class="entry-time card-open" [attr.aria-label]="openLabel(e)">{{ formatTime(e.created_at) }}</button>
             </div>
             @if (e.title) {
 <h3 class="card-title">{{ e.title }}</h3>
@@ -284,7 +287,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
       cursor: pointer;
       transition: transform 0.15s ease-out, border-color 0.15s, box-shadow 0.15s;
     }
-    .entry-card:hover, .entry-card:focus-visible {
+    .entry-card:hover, .entry-card:has(.card-open:focus-visible) {
       transform: translateY(-2px);
       border-color: var(--color-primary);
       box-shadow: 0 4px 14px rgba(var(--shadow-rgb), 0.12);
@@ -303,6 +306,12 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
       margin-bottom: var(--space-xs);
     }
     .entry-time { font-size: var(--font-size-xs); color: var(--text-secondary); margin-left: auto; }
+    .card-open {
+      padding: 0; border: 0; background: none;
+      font-family: inherit; cursor: pointer;
+    }
+    .card-open:focus-visible { outline: none; } /* drawn on the whole card above */
+    .entry-card:has(.card-open:focus-visible) { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 
     .card-title { font-size: var(--font-size-md); font-weight: 600; margin: 0 0 var(--space-xs); }
     .card-excerpt {
@@ -493,7 +502,23 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
   `],
 })
 export class JournalDayModalComponent implements OnChanges {
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
+
   constructor(private svc: JournalService) {}
+
+  /**
+   * The list and the open entry replace each other, so the focused control
+   * can vanish and drop focus to <body>. After the swap, focus the nth match
+   * of `selector` unless focus is still inside the dialog.
+   */
+  private keepFocus(selector: string, nth = 0) {
+    afterNextRender(() => {
+      const root = this.host.nativeElement;
+      if (root.contains(document.activeElement)) return;
+      root.querySelectorAll<HTMLElement>(selector)[Math.max(nth, 0)]?.focus();
+    }, { injector: this.injector });
+  }
 
   @Input() date: string | null = null;
   @Input() entries: JournalEntry[] = [];
@@ -525,7 +550,21 @@ export class JournalDayModalComponent implements OnChanges {
     }
   }
 
+  openLabel(e: JournalEntry): string {
+    const what = e.title || this.excerpt(e.body).slice(0, 60) || 'entry';
+    return `Open ${what}, ${this.formatTime(e.created_at)}`;
+  }
+
+  backToList() {
+    const shown = this.expanded();
+    this.expanded.set(null);
+    this.expandLoading.set(false);
+    const i = shown ? this.entries.findIndex(x => x.id === shown.id) : -1;
+    this.keepFocus('.card-open', i);
+  }
+
   expandEntry(e: JournalEntry) {
+    this.keepFocus('[aria-label="Back to list"]');
     // Use cached version if images are already loaded
     if (e.images && e.images.length > 0) {
       this.expanded.set(e);
@@ -552,9 +591,9 @@ export class JournalDayModalComponent implements OnChanges {
 
   @HostListener('document:keydown.escape')
   onEscape() {
+    if (isJiroModalOpen()) return; // a confirm opened from here closes first
     if (this.lightboxUrl())   { this.lightboxUrl.set(null);   return; }
-    if (this.expandLoading()) { this.expandLoading.set(false); return; }
-    if (this.expanded())      { this.expanded.set(null);       return; }
+    if (this.expandLoading() || this.expanded()) { this.backToList(); return; }
     this.close.emit();
   }
 

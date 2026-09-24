@@ -7,8 +7,6 @@ import { DashboardLayout, WIDGET_BY_ID, defaultLayout, widgetLabel } from './wid
 
 let dialogSeq = 0;
 
-const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
-
 /**
  * Show, hide and reorder dashboard widgets. Works on a draft: nothing is
  * saved until Save, and Esc, Cancel or the backdrop discard the draft.
@@ -19,7 +17,7 @@ const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), a[href], [tabi
   standalone: true,
   imports: [JiroModalComponent, JiroButtonComponent, JiroIconComponent, JiroMarkComponent],
   template: `
-    <jiro-modal title="Customise dashboard" maxWidth="560px" (close)="cancel.emit()" (keydown)="trapTab($event)">
+    <jiro-modal title="Customise dashboard" maxWidth="560px" (close)="cancel.emit()">
       <p class="cd-intro">Choose which cards show and the order they appear in.</p>
 
       <ul class="cd-list">
@@ -29,6 +27,7 @@ const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), a[href], [tabi
               <input
                 type="checkbox"
                 class="cd-check"
+                [attr.cdkFocusInitial]="first ? '' : null"
                 [checked]="row.visible"
                 [attr.aria-label]="row.checkLabel"
                 (change)="toggle(i, $any($event.target).checked)" />
@@ -180,12 +179,6 @@ export class CustomiseDashboardComponent {
     }),
   );
 
-  constructor() {
-    afterNextRender(() => {
-      this.host.nativeElement.querySelector<HTMLInputElement>('.cd-check')?.focus();
-    });
-  }
-
   moveId(id: string, dir: 'up' | 'down'): string {
     return `${this.uid}-${id}-${dir}`;
   }
@@ -222,25 +215,6 @@ export class CustomiseDashboardComponent {
   reset() {
     this.edited.set(defaultLayout());
     this.announcement.set('Default layout restored. Save to keep it.');
-  }
-
-  /** jiro-modal has no focus trap; keep Tab inside the dialog. */
-  trapTab(event: KeyboardEvent) {
-    if (event.key !== 'Tab') return;
-    const dialog = this.host.nativeElement.querySelector<HTMLElement>('[role="dialog"]');
-    if (!dialog) return;
-    const items = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(el => el.offsetParent !== null);
-    if (items.length === 0) return;
-    const first = items[0];
-    const lastEl = items[items.length - 1];
-    const active = dialog.ownerDocument.activeElement;
-    if (event.shiftKey && (active === first || !dialog.contains(active))) {
-      event.preventDefault();
-      lastEl.focus();
-    } else if (!event.shiftKey && (active === lastEl || !dialog.contains(active))) {
-      event.preventDefault();
-      first.focus();
-    }
   }
 }
 

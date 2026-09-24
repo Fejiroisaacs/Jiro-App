@@ -18,7 +18,7 @@ import { IconName } from '../../icons/icons.generated';
       @if (icon(); as i) {
         <div class="es-icon"><jiro-icon [name]="i" [size]="compact() ? 24 : 40" /></div>
       }
-      <h3 class="es-heading">{{ heading() }}</h3>
+      <h2 class="es-heading">{{ heading() }}</h2>
       @if (message()) {
         <p class="es-message">{{ message() }}</p>
       }

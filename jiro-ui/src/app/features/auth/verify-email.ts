@@ -10,7 +10,7 @@ import { JiroLogoComponent } from '../../shared/components/jiro-logo/jiro-logo';
   standalone: true,
   imports: [RouterLink, JiroButtonComponent, JiroLogoComponent],
   template: `
-    <div class="auth-page">
+    <main class="auth-page">
       <jiro-logo class="auth-logo" [size]="40" />
       <div class="auth-card">
 
@@ -70,7 +70,7 @@ import { JiroLogoComponent } from '../../shared/components/jiro-logo/jiro-logo';
 }
 
       </div>
-    </div>
+    </main>
   `,
   styles: [`
     .auth-page {

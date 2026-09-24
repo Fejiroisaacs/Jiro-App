@@ -28,6 +28,7 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
         </div>
       </nav>
 
+      <main>
       <!-- ── Hero ──────────────────────────────────────────────────────────── -->
       <!-- Split at desktop: copy on the left, the screenshot on the right,
            bleeding off the viewport's right edge. Below 900px it stacks. -->
@@ -186,6 +187,7 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
           <a routerLink="/register" class="l-btn l-btn--primary l-btn--lg">Get started</a>
         </div>
       </section>
+      </main>
 
       <!-- ── Footer ─────────────────────────────────────────────────────────── -->
       <footer class="l-footer">

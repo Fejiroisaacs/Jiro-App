@@ -186,7 +186,7 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
 }
             </div>
 }
-            <h3 class="recipe-title">{{ recipe.title }}</h3>
+            <h2 class="recipe-title">{{ recipe.title }}</h2>
             @if (recipe.description) {
 <p class="recipe-desc text-secondary">
               {{ recipe.description }}

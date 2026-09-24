@@ -124,10 +124,10 @@ import { ToastService } from '../../core/services/toast.service';
 
         <div class="setting-row">
           <div>
-            <label class="setting-label">Weight Unit</label>
+            <label class="setting-label" for="setting-weight-unit">Weight Unit</label>
             <p class="text-secondary setting-desc">Used across all fitness tracking</p>
           </div>
-          <select [(ngModel)]="weightUnit" (change)="save()" class="jiro-select">
+          <select id="setting-weight-unit" [(ngModel)]="weightUnit" (change)="save()" class="jiro-select">
             <option value="lbs">Pounds (lbs)</option>
             <option value="kg">Kilograms (kg)</option>
           </select>
@@ -135,10 +135,10 @@ import { ToastService } from '../../core/services/toast.service';
 
         <div class="setting-row">
           <div>
-            <label class="setting-label">Timezone</label>
+            <label class="setting-label" for="setting-timezone">Timezone</label>
             <p class="text-secondary setting-desc">Used for reminder scheduling</p>
           </div>
-          <select [(ngModel)]="timezone" (change)="save()" class="jiro-select">
+          <select id="setting-timezone" [(ngModel)]="timezone" (change)="save()" class="jiro-select">
             @for (tz of commonTimezones; track tz) {
 <option [value]="tz">{{ tz }}</option>
 }

@@ -72,7 +72,7 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
 <jiro-card [link]="['/jym/discover', split.id]">
           <div class="split-card-inner">
             <div class="card-header">
-              <h3 class="split-name">{{ split.name }}</h3>
+              <h2 class="split-name">{{ split.name }}</h2>
               <span class="routine-badge">{{ split.routine_count }} {{ split.routine_count === 1 ? 'day' : 'days' }}</span>
             </div>
             @if (split.description) {

@@ -177,9 +177,11 @@ interface ExerciseBlock {
         <!-- Exercise blocks -->
         @for (block of blocks(); track block; let bi = $index) {
 <div class="ex-block">
-          <div class="block-header" role="button" tabindex="0" [class.block-open]="!isCollapsed(bi)" [attr.aria-expanded]="!isCollapsed(bi)" (click)="toggleBlock(bi)" (keydown.enter)="toggleBlock(bi)" (keydown.space)="$event.preventDefault(); toggleBlock(bi)">
+          <!-- The whole header toggles on click; the name button is its keyboard and
+               screen reader handle (its click bubbles up here). Delete stops propagation. -->
+          <div class="block-header" [class.block-open]="!isCollapsed(bi)" (click)="toggleBlock(bi)">
             <div class="block-title">
-              <h3>{{ block.exerciseName }}</h3>
+              <h2><button type="button" class="block-toggle" [attr.aria-expanded]="!isCollapsed(bi)" [attr.aria-controls]="'block-body-' + bi">{{ block.exerciseName }}</button></h2>
               @if (block.muscleGroup) {
 <span class="mg-tag">{{ block.muscleGroup }}</span>
 }
@@ -206,6 +208,7 @@ interface ExerciseBlock {
             </div>
           </div>
 
+          <div [id]="'block-body-' + bi">
           @if (!isCollapsed(bi)) {
 
             <!-- Progressive overload suggestion -->
@@ -367,6 +370,7 @@ interface ExerciseBlock {
             </div>
           
 }
+          </div>
         </div>
 }
 
@@ -723,11 +727,17 @@ interface ExerciseBlock {
     }
 
     .block-header:hover { background: var(--bg-surface); }
-    .block-header:focus-visible { outline-offset: -2px; }
+    .block-header:has(.block-toggle:focus-visible) { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+
+    .block-toggle {
+      padding: 0; border: 0; background: none; color: inherit;
+      font: inherit; letter-spacing: inherit; text-align: left; cursor: pointer;
+    }
+    .block-toggle:focus-visible { outline: none; } /* drawn on the whole header above */
 
     .block-title { display: flex; align-items: center; gap: var(--space-sm); flex: 1; min-width: 0; }
 
-    .block-title h3 { font-size: var(--font-size-md); font-weight: 600; }
+    .block-title h2 { font-size: var(--font-size-md); font-weight: 600; }
 
     .sets-done-tag {
       font-size: var(--font-size-xs); padding: 2px 8px; border-radius: 10px;

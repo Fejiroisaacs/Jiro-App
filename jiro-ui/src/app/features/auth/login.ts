@@ -13,7 +13,7 @@ import { JiroLogoComponent } from '../../shared/components/jiro-logo/jiro-logo';
   standalone: true,
   imports: [FormsModule, RouterLink, JiroCardComponent, JiroButtonComponent, JiroInputComponent, JiroLogoComponent],
   template: `
-    <div class="auth-page">
+    <main class="auth-page">
       <div class="auth-container">
         <div class="auth-header">
           <jiro-logo class="auth-logo" [size]="40" />
@@ -56,7 +56,7 @@ import { JiroLogoComponent } from '../../shared/components/jiro-logo/jiro-logo';
           </p>
         </jiro-card>
       </div>
-    </div>
+    </main>
   `,
   styles: [`
     .auth-page {
@@ -118,6 +118,12 @@ import { JiroLogoComponent } from '../../shared/components/jiro-logo/jiro-logo';
       margin-top: var(--space-md);
       font-size: var(--font-size-sm);
       color: var(--text-secondary);
+    }
+
+    /* Underlined: inside a sentence, colour alone doesn't mark it as a link. */
+    .auth-footer a {
+      text-decoration: underline;
+      text-underline-offset: 2px;
     }
   `]
 })

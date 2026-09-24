@@ -10,7 +10,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
   standalone: true,
   imports: [JiroButtonComponent],
   template: `
-    <div class="share-page">
+    <main class="share-page">
       <div class="share-container">
 
         <div class="brand">
@@ -108,7 +108,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
 }
 
       </div>
-    </div>
+    </main>
   `,
   styles: [`
     :host { display: block; }
