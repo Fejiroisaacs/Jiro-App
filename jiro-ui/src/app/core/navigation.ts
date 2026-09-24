@@ -61,6 +61,7 @@ export const MODULES: ModuleNav[] = [
     home: '/journal',
     tabs: [
       { label: 'Journaly', route: '/journal', exact: true, mark: 'journaly' },
+      { label: 'Entries', route: '/journal/entries', icon: 'list' },
       { label: 'Groups', route: '/journal/groups', icon: 'users' },
       { label: 'Collections', route: '/journal/collections', icon: 'folder' },
     ],

@@ -760,7 +760,7 @@ func (h *ExportHandler) gatherJournaly(ctx context.Context, userID uuid.UUID) (e
 
 	// ListEntries is paginated and caps a page at 50, so walk it to the end.
 	for page := 0; page < exportMaxPages; page++ {
-		batch, err := h.journalService.ListEntries(ctx, userID, "", "", "", "", "", exportJournalPageSize, page*exportJournalPageSize)
+		batch, _, err := h.journalService.ListEntries(ctx, userID, "", "", "", "", "", exportJournalPageSize, page*exportJournalPageSize)
 		if err != nil {
 			return out, err
 		}

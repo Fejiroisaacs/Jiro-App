@@ -130,7 +130,13 @@ func (s *JournalService) GetEntry(ctx context.Context, userID, entryID uuid.UUID
 	return entry, nil
 }
 
-func (s *JournalService) ListEntries(ctx context.Context, userID uuid.UUID, mood, tag, q, from, to string, limit, offset int) ([]models.JournalEntry, error) {
+// journalEntryFilter builds the WHERE clause and positional args shared by
+// ListEntries' page query and its count query. It returns the index of the
+// next free placeholder so the caller can append LIMIT/OFFSET.
+//
+// q is escaped with escapeLike so % and _ match literally; Postgres's default
+// LIKE escape character is backslash, matching the search service.
+func journalEntryFilter(userID uuid.UUID, mood, tag, q, from, to string) (string, []any, int) {
 	args := []any{userID}
 	where := `WHERE e.user_id = $1 AND e.group_id IS NULL`
 	i := 2
@@ -147,7 +153,7 @@ func (s *JournalService) ListEntries(ctx context.Context, userID uuid.UUID, mood
 	}
 	if q != "" {
 		where += fmt.Sprintf(` AND (e.title ILIKE $%d OR e.body ILIKE $%d)`, i, i)
-		args = append(args, "%"+q+"%")
+		args = append(args, "%"+escapeLike(q)+"%")
 		i++
 	}
 	if from != "" {
@@ -160,9 +166,25 @@ func (s *JournalService) ListEntries(ctx context.Context, userID uuid.UUID, mood
 		args = append(args, to)
 		i++
 	}
+	return where, args, i
+}
+
+// ListEntries returns one page of the user's personal entries, newest first,
+// plus the total number of entries matching the filters. The total comes from
+// a separate COUNT so it is still correct when offset is past the last row.
+func (s *JournalService) ListEntries(ctx context.Context, userID uuid.UUID, mood, tag, q, from, to string, limit, offset int) ([]models.JournalEntry, int, error) {
+	where, args, i := journalEntryFilter(userID, mood, tag, q, from, to)
+
+	var total int
+	if err := s.db.QueryRow(ctx, `SELECT COUNT(*) FROM journal_entries e `+where, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
 
 	if limit <= 0 || limit > 50 {
 		limit = 20
+	}
+	if offset < 0 {
+		offset = 0
 	}
 	args = append(args, limit, offset)
 
@@ -175,23 +197,23 @@ func (s *JournalService) ListEntries(ctx context.Context, userID uuid.UUID, mood
 
 	rows, err := s.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer rows.Close()
 
-	var entries []models.JournalEntry
+	entries := []models.JournalEntry{}
 	for rows.Next() {
 		var e models.JournalEntry
 		if err := rows.Scan(&e.ID, &e.UserID, &e.GroupID, &e.Title, &e.Body, &e.Mood, &e.Tags, &e.CreatedAt, &e.UpdatedAt); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		e.Images = []models.JournalImage{}
 		entries = append(entries, e)
 	}
-	if entries == nil {
-		entries = []models.JournalEntry{}
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
 	}
-	return entries, nil
+	return entries, total, nil
 }
 
 func (s *JournalService) UpdateEntry(ctx context.Context, userID, entryID uuid.UUID, req *models.UpdateJournalEntryRequest) (*models.JournalEntry, error) {

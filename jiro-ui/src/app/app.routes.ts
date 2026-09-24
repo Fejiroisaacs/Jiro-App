@@ -304,6 +304,12 @@ export const routes: Routes = [
         loadComponent: () => import('./features/journal/journal-editor/journal-editor').then(m => m.JournalEditorComponent),
       },
       {
+        path: 'journal/entries',
+        title: 'All entries',
+        data: { ...PRIVATE_PAGE },
+        loadComponent: () => import('./features/journal/journal-entries/journal-entries').then(m => m.JournalEntriesComponent),
+      },
+      {
         path: 'journal/:id/edit',
         title: 'Edit entry',
         data: { ...PRIVATE_PAGE },
