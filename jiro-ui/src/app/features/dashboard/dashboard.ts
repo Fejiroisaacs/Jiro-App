@@ -180,7 +180,7 @@ export class DashboardComponent {
 
   readonly activity = computed<WidgetData<ActivityData>>(() => {
     const r = this.results();
-    return combine(r.sessions, r.journalCalendar, (s, c) => ({ workoutDays: s.workoutDays, journalDays: c.days }));
+    return combine(r.sessions, r.journalCalendar, (s, c) => ({ workoutCounts: s.workoutCounts, journalCounts: c.counts }));
   });
 
   /** Accounts decide whether the card works; a failed summary or budget list degrades inside it. */

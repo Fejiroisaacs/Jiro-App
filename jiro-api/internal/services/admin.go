@@ -77,6 +77,7 @@ type AdminUserSummary struct {
 	Username      *string    `json:"username"`
 	DisplayName   *string    `json:"display_name"`
 	EmailVerified bool       `json:"email_verified"`
+	IsDemo        bool       `json:"is_demo"`
 	SessionCount  int        `json:"session_count"`
 	RecipeCount   int        `json:"recipe_count"`
 	SplitCount    int        `json:"split_count"`
@@ -92,7 +93,7 @@ type AdminUserDetail struct {
 func (s *AdminService) ListUsers(ctx context.Context, search string, limit, offset int) ([]AdminUserSummary, error) {
 	rows, err := s.db.Query(ctx, `
 		SELECT
-			u.id, u.email, u.username, u.display_name, u.email_verified, u.created_at,
+			u.id, u.email, u.username, u.display_name, u.email_verified, u.is_demo, u.created_at,
 			(SELECT COUNT(*) FROM sessions     WHERE user_id = u.id) AS session_count,
 			(SELECT COUNT(*) FROM recipes      WHERE user_id = u.id) AS recipe_count,
 			(SELECT COUNT(*) FROM splits       WHERE user_id = u.id) AS split_count,
@@ -111,7 +112,7 @@ func (s *AdminService) ListUsers(ctx context.Context, search string, limit, offs
 	for rows.Next() {
 		var u AdminUserSummary
 		if err := rows.Scan(
-			&u.ID, &u.Email, &u.Username, &u.DisplayName, &u.EmailVerified, &u.CreatedAt,
+			&u.ID, &u.Email, &u.Username, &u.DisplayName, &u.EmailVerified, &u.IsDemo, &u.CreatedAt,
 			&u.SessionCount, &u.RecipeCount, &u.SplitCount, &u.LastLoginAt,
 		); err != nil {
 			return nil, err
@@ -128,7 +129,7 @@ func (s *AdminService) GetUser(ctx context.Context, userID uuid.UUID) (*AdminUse
 	var u AdminUserDetail
 	err := s.db.QueryRow(ctx, `
 		SELECT
-			u.id, u.email, u.username, u.display_name, u.email_verified, u.created_at,
+			u.id, u.email, u.username, u.display_name, u.email_verified, u.is_demo, u.created_at,
 			(SELECT COUNT(*) FROM sessions     WHERE user_id = u.id) AS session_count,
 			(SELECT COUNT(*) FROM recipes      WHERE user_id = u.id) AS recipe_count,
 			(SELECT COUNT(*) FROM splits       WHERE user_id = u.id) AS split_count,
@@ -137,7 +138,7 @@ func (s *AdminService) GetUser(ctx context.Context, userID uuid.UUID) (*AdminUse
 		FROM users u
 		WHERE u.id = $1
 	`, userID).Scan(
-		&u.ID, &u.Email, &u.Username, &u.DisplayName, &u.EmailVerified, &u.CreatedAt,
+		&u.ID, &u.Email, &u.Username, &u.DisplayName, &u.EmailVerified, &u.IsDemo, &u.CreatedAt,
 		&u.SessionCount, &u.RecipeCount, &u.SplitCount, &u.LastLoginAt, &u.LastSessionAt,
 	)
 	if err != nil {

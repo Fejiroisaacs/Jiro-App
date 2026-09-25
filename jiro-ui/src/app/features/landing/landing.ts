@@ -1,7 +1,7 @@
 import { Component, DestroyRef, ElementRef, OnInit, PLATFORM_ID, afterRenderEffect, inject, signal, untracked, viewChildren } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
-import { AuthService } from '../../core/services/auth.service';
+import { AuthService, demoLoginErrorMessage } from '../../core/services/auth.service';
 import { JiroIconComponent } from '../../shared/components/jiro-icon/jiro-icon';
 import { JiroLogoComponent } from '../../shared/components/jiro-logo/jiro-logo';
 import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
@@ -28,6 +28,7 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
         </div>
       </nav>
 
+      <main>
       <!-- ── Hero ──────────────────────────────────────────────────────────── -->
       <!-- Split at desktop: copy on the left, the screenshot on the right,
            bleeding off the viewport's right edge. Below 900px it stacks. -->
@@ -41,11 +42,23 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
             </p>
             <div class="l-hero-actions">
               <a routerLink="/register" class="l-btn l-btn--primary">Get started</a>
-              <!-- A real href, so this works without JavaScript and is reachable
-                   by keyboard. The handler only upgrades the jump to a smooth
-                   scroll; preventDefault is conditional on that. -->
-              <a href="#modules" class="l-btn l-btn--ghost" (click)="scrollToModules($event)">Explore modules</a>
+              <!-- The demo signs in through the API, so it needs JavaScript;
+                   before hydration the click simply does nothing yet. -->
+              <button type="button" class="l-btn l-btn--secondary" [disabled]="demoLoading()"
+                      [attr.aria-busy]="demoLoading() ? 'true' : null" (click)="tryDemo()">
+                @if (demoLoading()) { <span class="spinner spinner--sm l-btn-spinner" aria-hidden="true"></span> }
+                Try the demo
+              </button>
             </div>
+            @if (demoError()) {
+              <p class="l-hero-error" role="alert">{{ demoError() }}</p>
+            }
+            <!-- A real href, so this works without JavaScript and is reachable
+                 by keyboard. The handler only upgrades the jump to a smooth
+                 scroll; preventDefault is conditional on that. -->
+            <a href="#modules" class="l-hero-more" (click)="scrollToModules($event)">
+              Explore modules <jiro-icon name="caret-down" [size]="14" />
+            </a>
           </div>
 
           <!-- The real dashboard. Light and dark shots, shown to match the app's
@@ -186,6 +199,7 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
           <a routerLink="/register" class="l-btn l-btn--primary l-btn--lg">Get started</a>
         </div>
       </section>
+      </main>
 
       <!-- ── Footer ─────────────────────────────────────────────────────────── -->
       <footer class="l-footer">
@@ -306,12 +320,15 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
       background: var(--color-primary);
       color: var(--text-on-primary);
     }
-    .l-btn--ghost {
-      background: transparent;
-      color: var(--text-secondary);
-      border: 1px solid var(--border-color);
+    .l-btn--secondary {
+      gap: var(--space-sm);
+      background: var(--bg-surface);
+      color: var(--color-primary);
+      border: 1px solid var(--color-primary);
     }
-    .l-btn--ghost:hover { color: var(--text-primary); border-color: var(--text-secondary); }
+    .l-btn--secondary:hover:not(:disabled) { background: rgba(var(--color-primary-rgb), 0.08); }
+    .l-btn:disabled { cursor: progress; opacity: 0.75; transform: none; }
+    .l-btn-spinner { border-color: transparent; border-top-color: currentColor; }
     .l-btn--lg { padding: 14px 32px; font-size: var(--font-size-md); }
 
     /* ── Hero ──────────────────────────────────────────────────────────────── */
@@ -351,6 +368,24 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
       gap: var(--space-sm);
       flex-wrap: wrap;
       animation: fadeUp 0.65s 0.15s ease both;
+    }
+    .l-hero-actions .l-btn { white-space: nowrap; }
+    .l-hero-more {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: var(--space-md);
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      animation: fadeUp 0.7s 0.2s ease both;
+    }
+    .l-hero-more:hover { color: var(--text-primary); }
+    .l-hero-error {
+      margin: var(--space-sm) 0 0;
+      font-size: var(--font-size-sm);
+      color: var(--color-danger);
     }
 
     /* ── Hero screenshot ───────────────────────────────────────────────────── */
@@ -674,7 +709,7 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
     @media (prefers-reduced-motion: reduce) {
       .l-hero-title,
       .l-hero-sub,
-      .l-hero-actions { animation: none; }
+      .l-hero-actions, .l-hero-more { animation: none; }
     }
 
     /* ── Responsive ────────────────────────────────────────────────────────── */
@@ -704,6 +739,9 @@ export class LandingComponent implements OnInit {
   private router = inject(Router);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
   private revealObserver?: IntersectionObserver;
+
+  protected readonly demoLoading = signal(false);
+  protected readonly demoError = signal('');
 
   /** Honour the OS setting: no glare, section reveal or smooth scroll. */
   readonly reducedMotion =
@@ -764,6 +802,20 @@ export class LandingComponent implements OnInit {
     }
     if (onScreen.length) this.revealed.update(set => new Set([...set, ...onScreen]));
     this.revealReady.set(true);
+  }
+
+  /** Signs in to the shared, look-only demo account and opens the dashboard. */
+  tryDemo() {
+    if (this.demoLoading()) return;
+    this.demoLoading.set(true);
+    this.demoError.set('');
+    this.auth.demoLogin().subscribe({
+      next: () => this.router.navigateByUrl('/dashboard'),
+      error: err => {
+        this.demoLoading.set(false);
+        this.demoError.set(demoLoginErrorMessage(err));
+      },
+    });
   }
 
   /**

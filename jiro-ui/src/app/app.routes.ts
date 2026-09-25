@@ -127,6 +127,21 @@ export const routes: Routes = [
         data: { ...PRIVATE_PAGE },
         loadComponent: () => import('./features/guide/guide').then(m => m.GuideComponent),
       },
+      // One of the user's days across all four modules. Bare /day, a bad date
+      // and a future one are all replaced with today by the page itself, since
+      // "today" depends on the signed-in user's timezone.
+      {
+        path: 'day',
+        title: 'Day',
+        data: { ...PRIVATE_PAGE },
+        loadComponent: () => import('./features/day/day-page').then(m => m.DayPageComponent),
+      },
+      {
+        path: 'day/:date',
+        title: 'Day',
+        data: { ...PRIVATE_PAGE },
+        loadComponent: () => import('./features/day/day-page').then(m => m.DayPageComponent),
+      },
       {
         path: 'guide/jym',
         title: 'Jym guide',
@@ -141,7 +156,7 @@ export const routes: Routes = [
         data: { ...PRIVATE_PAGE },
         loadComponent: () => import('./features/culinara/recipe-list/recipe-list').then(m => m.RecipeListComponent),
       },
-      { path: 'culinara/shopping', redirectTo: 'culinara/grocery-list', pathMatch: 'full' },
+      { path: 'culinara/shopping', redirectTo: '/culinara/grocery-list', pathMatch: 'full' },
       {
         path: 'culinara/grocery-list',
         title: 'Grocery list',
@@ -202,12 +217,12 @@ export const routes: Routes = [
         loadComponent: () => import('./features/jym/jym-track/jym-track').then(m => m.JymTrackComponent),
       },
       // ── Jym legacy redirects (old flat routes → new container routes) ────────
-      { path: 'jym/train', redirectTo: 'jym/exercises', pathMatch: 'full' },
+      { path: 'jym/train', redirectTo: '/jym/exercises', pathMatch: 'full' },
       { path: 'jym/prs', redirectTo: () => '/jym/exercises?tab=prs', pathMatch: 'full' },
-      { path: 'jym/splits', redirectTo: 'jym/plan', pathMatch: 'full' },
+      { path: 'jym/splits', redirectTo: '/jym/plan', pathMatch: 'full' },
       { path: 'jym/series', redirectTo: () => '/jym/plan?tab=series', pathMatch: 'full' },
       { path: 'jym/templates', redirectTo: () => '/jym/plan?tab=templates', pathMatch: 'full' },
-      { path: 'jym/sessions', redirectTo: 'jym/track', pathMatch: 'full' },
+      { path: 'jym/sessions', redirectTo: '/jym/track', pathMatch: 'full' },
       { path: 'jym/bodyweight', redirectTo: () => '/jym/track?tab=bodyweight', pathMatch: 'full' },
       // ── Jym drill-down pages (push navigation, bottom nav stays visible) ────
       {
@@ -277,7 +292,7 @@ export const routes: Routes = [
         data: { ...PRIVATE_PAGE },
         loadComponent: () => import('./features/ledger/budgets/budgets-page').then(m => m.BudgetsPageComponent),
       },
-      { path: 'ledger/networth', redirectTo: 'ledger/net-worth', pathMatch: 'full' },
+      { path: 'ledger/networth', redirectTo: '/ledger/net-worth', pathMatch: 'full' },
       {
         path: 'ledger/net-worth',
         title: 'Net worth',

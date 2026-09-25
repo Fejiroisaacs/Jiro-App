@@ -24,6 +24,8 @@ export class ToastService {
   private readonly _toasts = signal<Toast[]>([]);
   readonly toasts = this._toasts.asReadonly();
   private seq = 0;
+  private lastNoticeAt = 0;
+  private quietUntil = 0;
 
   show(message: string, options: ToastOptions = {}): number {
     const id = ++this.seq;
@@ -39,7 +41,23 @@ export class ToastService {
   }
 
   error(message: string, duration = 4500) {
+    // Just after a read-only notice, a component's own "could not save" toast
+    // would say the same thing in other words.
+    if (Date.now() < this.quietUntil) return -1;
     return this.show(message, { kind: 'error', duration });
+  }
+
+  /**
+   * Why a write was refused on the look-only demo. One save can fire several
+   * requests, so this shows once per burst: repeats within `burstMs` of the
+   * last one are dropped, and so are error toasts in that window.
+   */
+  readOnlyNotice(message: string, burstMs = 2000) {
+    const now = Date.now();
+    const inBurst = now - this.lastNoticeAt < burstMs;
+    this.lastNoticeAt = now;
+    this.quietUntil = now + burstMs;
+    if (!inBurst) this.show(message, { kind: 'info', duration: 5000 });
   }
 
   info(message: string, duration?: number) {

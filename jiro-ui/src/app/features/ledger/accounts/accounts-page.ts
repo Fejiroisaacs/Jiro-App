@@ -133,7 +133,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
 
               <!-- Name + Balance -->
               <div class="acct-body">
-                <h3 class="acct-name">{{ account.name }}</h3>
+                <h2 class="acct-name">{{ account.name }}</h2>
                 <div class="acct-balance-row">
                   <span class="acct-balance"
                     [class.balance-asset]="account.type !== 'credit'"

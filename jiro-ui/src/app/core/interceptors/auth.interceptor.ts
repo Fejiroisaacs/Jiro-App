@@ -2,13 +2,15 @@ import { HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { catchError, switchMap, throwError, EMPTY } from 'rxjs';
 import { AuthService } from '../services/auth.service';
+import { ToastService } from '../services/toast.service';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const authService = inject(AuthService);
+  const toast = inject(ToastService);
   const token = authService.getToken();
 
   // Don't add auth header to public auth endpoints
-  const publicAuthPaths = ['/auth/login', '/auth/register', '/auth/refresh', '/auth/logout', '/auth/verify-email', '/auth/forgot-password', '/auth/reset-password'];
+  const publicAuthPaths = ['/auth/login', '/auth/demo', '/auth/register', '/auth/refresh', '/auth/logout', '/auth/verify-email', '/auth/forgot-password', '/auth/reset-password'];
   if (publicAuthPaths.some(path => req.url.includes(path))) {
     return next(req);
   }
@@ -21,6 +23,13 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(req).pipe(
     catchError((error: HttpErrorResponse) => {
+      // A write from the look-only demo. Say why once, here, rather than in
+      // every component; the caller still gets the error to reset its state.
+      // Never a reason to refresh or sign out.
+      if (error.status === 403 && error.error?.error?.code === 'DEMO_READ_ONLY') {
+        toast.readOnlyNotice(error.error.error.message);
+        return throwError(() => error);
+      }
       if (error.status !== 401) return throwError(() => error);
 
       // Never signed in on this browser: nothing to refresh.

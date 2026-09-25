@@ -58,10 +58,10 @@ func (s *UserService) CreateUser(ctx context.Context, email, passwordHash, displ
 func (s *UserService) GetByEmail(ctx context.Context, email string) (*models.User, error) {
 	user := &models.User{}
 	err := s.db.QueryRow(ctx,
-		`SELECT id, email, password_hash, username, display_name, email_verified, is_admin, bio, avatar_url, settings, created_at, updated_at
+		`SELECT id, email, password_hash, username, display_name, email_verified, is_admin, is_demo, bio, avatar_url, settings, created_at, updated_at
 		 FROM users WHERE email = $1`,
 		email,
-	).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Username, &user.DisplayName, &user.EmailVerified, &user.IsAdmin, &user.Bio, &user.AvatarUrl, &user.Settings, &user.CreatedAt, &user.UpdatedAt)
+	).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Username, &user.DisplayName, &user.EmailVerified, &user.IsAdmin, &user.IsDemo, &user.Bio, &user.AvatarUrl, &user.Settings, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -86,27 +86,27 @@ func (s *UserService) IsAdmin(ctx context.Context, id uuid.UUID) (bool, error) {
 	return isAdmin, nil
 }
 
-// IsEmailVerified is read per request rather than carried in the JWT, so
-// verifying takes effect immediately instead of at the next token refresh.
-func (s *UserService) IsEmailVerified(ctx context.Context, id uuid.UUID) (bool, error) {
-	var verified bool
-	err := s.db.QueryRow(ctx, `SELECT email_verified FROM users WHERE id = $1`, id).Scan(&verified)
+// WriteAccess returns what the write gate needs in one query. It is read per
+// request rather than carried in the JWT, so verifying takes effect
+// immediately instead of at the next token refresh.
+func (s *UserService) WriteAccess(ctx context.Context, id uuid.UUID) (verified, demo bool, err error) {
+	err = s.db.QueryRow(ctx, `SELECT email_verified, is_demo FROM users WHERE id = $1`, id).Scan(&verified, &demo)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return false, ErrUserNotFound
+			return false, false, ErrUserNotFound
 		}
-		return false, err
+		return false, false, err
 	}
-	return verified, nil
+	return verified, demo, nil
 }
 
 func (s *UserService) GetByID(ctx context.Context, id uuid.UUID) (*models.User, error) {
 	user := &models.User{}
 	err := s.db.QueryRow(ctx,
-		`SELECT id, email, username, display_name, email_verified, is_admin, bio, avatar_url, settings, created_at, updated_at
+		`SELECT id, email, username, display_name, email_verified, is_admin, is_demo, bio, avatar_url, settings, created_at, updated_at
 		 FROM users WHERE id = $1`,
 		id,
-	).Scan(&user.ID, &user.Email, &user.Username, &user.DisplayName, &user.EmailVerified, &user.IsAdmin, &user.Bio, &user.AvatarUrl, &user.Settings, &user.CreatedAt, &user.UpdatedAt)
+	).Scan(&user.ID, &user.Email, &user.Username, &user.DisplayName, &user.EmailVerified, &user.IsAdmin, &user.IsDemo, &user.Bio, &user.AvatarUrl, &user.Settings, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

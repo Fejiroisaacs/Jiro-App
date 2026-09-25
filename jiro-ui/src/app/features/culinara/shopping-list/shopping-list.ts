@@ -48,7 +48,7 @@ const STORAGE_KEY = 'culinara_shopping_list';
             <path d="M16 10a4 4 0 0 1-8 0"/>
           </svg>
         </div>
-        <h3>Your grocery list is empty</h3>
+        <h2>Your grocery list is empty</h2>
         <p class="text-secondary">Open a recipe and tap "Add to grocery list" to start building your list.</p>
         <a routerLink="/culinara" style="margin-top: 8px;">
           <jiro-button variant="primary" type="button">Browse Recipes</jiro-button>
@@ -142,7 +142,7 @@ const STORAGE_KEY = 'culinara_shopping_list';
       color: var(--text-muted);
     }
 
-    .empty-state h3 {
+    .empty-state h2 {
       font-size: var(--font-size-lg);
       font-weight: 600;
     }

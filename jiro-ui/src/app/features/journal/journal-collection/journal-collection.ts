@@ -105,7 +105,7 @@ import { UploadService } from '../../../core/services/upload.service';
       <!-- Not found -->
       @if (!loading() && !collection()) {
 <div class="state-center">
-        <h3>Collection not found</h3>
+        <h2>Collection not found</h2>
         <p class="text-secondary">This collection may have been deleted.</p>
         <jiro-button variant="primary" type="button" (click)="router.navigate(['/journal'])">Back to Journaly</jiro-button>
       </div>
@@ -118,7 +118,7 @@ import { UploadService } from '../../../core/services/upload.service';
         <!-- Empty -->
         @if (entries().length === 0) {
 <div class="state-center">
-          <h3>No entries yet</h3>
+          <h2>No entries yet</h2>
           <p class="text-secondary">Add entries to this collection from the editor or entry cards.</p>
           <jiro-button variant="primary" type="button" (click)="router.navigate(['/journal/new'])">Write Entry</jiro-button>
         </div>
@@ -152,7 +152,7 @@ import { UploadService } from '../../../core/services/upload.service';
               </div>
             </div>
             @if (e.title) {
-<h3 class="entry-title">{{ e.title }}</h3>
+<h2 class="entry-title">{{ e.title }}</h2>
 }
             <p class="entry-excerpt">{{ excerpt(e.body) }}</p>
             <div class="entry-footer">
@@ -284,6 +284,7 @@ import { UploadService } from '../../../core/services/upload.service';
 
     /* State */
     .state-center { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--space-sm); padding: var(--space-xl) 0; }
+    .state-center h2 { font-size: 1.17em; } /* the size these had as h3 */
 
     /* Entry cards */
     .entries-list { display: flex; flex-direction: column; gap: var(--space-md); }

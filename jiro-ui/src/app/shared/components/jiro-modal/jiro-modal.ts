@@ -1,19 +1,32 @@
-import { Component, EventEmitter, HostListener, Input, Output } from '@angular/core';
+import { A11yModule } from '@angular/cdk/a11y';
+import { AfterViewInit, Component, ElementRef, EventEmitter, HostListener, Injector, Input, OnDestroy, Output, afterNextRender, inject, viewChild } from '@angular/core';
 
 import { JiroIconComponent } from '../jiro-icon/jiro-icon';
 
 let modalSeq = 0;
 
+/** Open modals, oldest first. Escape closes only the top one (dialogs do nest). */
+const openModals: JiroModalComponent[] = [];
+
+/** For custom dialogs that sit under a jiro-modal (a confirm) and must leave Escape to it. */
+export function isJiroModalOpen(): boolean {
+  return openModals.length > 0;
+}
+
 @Component({
   selector: 'jiro-modal',
   standalone: true,
-  imports: [JiroIconComponent],
+  imports: [A11yModule, JiroIconComponent],
   template: `
     <div class="modal-backdrop" (click)="onBackdropClick($event)">
       <div
+        #dialog
         class="modal-content"
         role="dialog"
         aria-modal="true"
+        tabindex="-1"
+        cdkTrapFocus
+        [cdkTrapFocusAutoCapture]="true"
         [attr.aria-labelledby]="title ? titleId : null"
         [style.max-width]="maxWidth">
         @if (title) {
@@ -54,6 +67,7 @@ let modalSeq = 0;
       overflow-y: auto;
       animation: slideUp 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     }
+    .modal-content:focus { outline: none; } /* focused only as the no-tabbables fallback */
 
     .modal-header {
       display: flex;
@@ -103,16 +117,40 @@ let modalSeq = 0;
     }
   `]
 })
-export class JiroModalComponent {
+export class JiroModalComponent implements AfterViewInit, OnDestroy {
   @Input() title = '';
   @Input() maxWidth = '520px';
   @Output() close = new EventEmitter<void>();
 
   readonly titleId = `jiro-modal-title-${++modalSeq}`;
 
+  private readonly injector = inject(Injector);
+  private readonly dialog = viewChild.required<ElementRef<HTMLElement>>('dialog');
+
+  constructor() {
+    openModals.push(this);
+  }
+
+  // cdkTrapFocusAutoCapture moves focus to [cdkFocusInitial] or the first
+  // tabbable element, and hands it back to the opener on destroy. This runs
+  // after it: honour a consumer's autofocus, and fall back to the dialog
+  // itself when it has nothing tabbable.
+  ngAfterViewInit() {
+    afterNextRender(() => {
+      const dialog = this.dialog().nativeElement;
+      const auto = dialog.querySelector<HTMLElement>('[autofocus]');
+      if (auto) auto.focus();
+      else if (!dialog.contains(dialog.ownerDocument.activeElement)) dialog.focus();
+    }, { injector: this.injector });
+  }
+
+  ngOnDestroy() {
+    openModals.splice(openModals.indexOf(this), 1);
+  }
+
   @HostListener('document:keydown.escape')
   onEscape() {
-    this.close.emit();
+    if (openModals[openModals.length - 1] === this) this.close.emit();
   }
 
   onBackdropClick(event: MouseEvent) {

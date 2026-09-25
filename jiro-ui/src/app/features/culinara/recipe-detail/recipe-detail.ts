@@ -284,7 +284,7 @@ type MobileTab = 'recipe' | 'trials';
             @if (r.base_ingredients && r.base_ingredients.length) {
 <div class="section">
               <div class="section-header">
-                <h3 class="section-title">Base Ingredients</h3>
+                <h2 class="section-title">Base Ingredients</h2>
                 <button class="add-grocery-btn" type="button" (click)="addToGrocery()" title="Add to grocery list" aria-label="Add these ingredients to the grocery list">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
@@ -308,7 +308,7 @@ type MobileTab = 'recipe' | 'trials';
             <!-- Instructions -->
             @if (r.instructions) {
 <div class="section">
-              <h3 class="section-title">Instructions</h3>
+              <h2 class="section-title">Instructions</h2>
               <div class="instructions-text">{{ r.instructions }}</div>
             </div>
 }

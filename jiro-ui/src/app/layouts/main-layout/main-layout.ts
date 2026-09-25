@@ -12,6 +12,7 @@ import { JiroConfirmComponent } from '../../shared/components/jiro-confirm/jiro-
 import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
 import { JiroLogoComponent } from '../../shared/components/jiro-logo/jiro-logo';
 import { JiroIconComponent } from '../../shared/components/jiro-icon/jiro-icon';
+import { JiroButtonComponent } from '../../shared/components/jiro-button/jiro-button';
 import { JiroModuleNavComponent } from '../../shared/components/jiro-module-nav/jiro-module-nav';
 import { JiroUserMenuComponent } from '../../shared/components/jiro-user-menu/jiro-user-menu';
 import { JiroSearchPaletteComponent } from '../../shared/components/jiro-search/jiro-search-palette';
@@ -21,7 +22,7 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
 
 /**
  * The signed-in shell: sidebar (desktop) or top bar + bottom bar (phone),
- * the module tab row, the verify banner, toasts and confirm dialogs.
+ * the module tab row, the demo or verify banner, toasts and confirm dialogs.
  * Navigation comes from core/navigation.ts; nothing here is hand-listed.
  */
 @Component({
@@ -29,7 +30,7 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
   standalone: true,
   imports: [
     RouterOutlet, RouterLink, RouterLinkActive,
-    JiroToasterComponent, JiroConfirmComponent, JiroMarkComponent, JiroLogoComponent, JiroIconComponent,
+    JiroToasterComponent, JiroConfirmComponent, JiroMarkComponent, JiroLogoComponent, JiroIconComponent, JiroButtonComponent,
     JiroModuleNavComponent, JiroUserMenuComponent, JiroSearchPaletteComponent,
   ],
   template: `
@@ -80,6 +81,10 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
           <a routerLink="/dashboard" routerLinkActive="active" class="nav-item">
             <jiro-icon name="squares-four" [size]="22" />
             @if (!collapsed()) { <span class="nav-label">Dashboard</span> }
+          </a>
+          <a routerLink="/day" routerLinkActive="active" class="nav-item" [attr.aria-label]="collapsed() ? 'Today' : null">
+            <jiro-icon name="calendar-blank" [size]="22" />
+            @if (!collapsed()) { <span class="nav-label">Today</span> }
           </a>
           <a routerLink="/guide" routerLinkActive="active" class="nav-item">
             <jiro-icon name="book-open" [size]="22" />
@@ -146,7 +151,13 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
           }
         </header>
 
-        @if (showVerifyBanner()) {
+        @if (isDemo()) {
+          <div class="demo-bar" role="status">
+            <jiro-icon class="demo-icon" name="info" [size]="18" />
+            <span class="demo-text">You're exploring sample data.</span>
+            <jiro-button size="sm" (click)="createAccount()">Create account</jiro-button>
+          </div>
+        } @else if (showVerifyBanner()) {
           <div class="verify-banner" role="status">
             <span class="verify-text">Verify your email to start saving changes.</span>
             <button type="button" class="verify-banner-btn" (click)="resendVerification()">Resend email</button>
@@ -468,6 +479,22 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
     }
     .verify-banner-close:hover { color: var(--text-primary); background: rgba(var(--color-primary-rgb), 0.1); }
 
+    /* Shown on every page of the demo, so it stays one slim row where it
+       fits and wraps the button under the text where it does not. */
+    .demo-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--space-xs) var(--space-sm);
+      padding: 6px var(--space-lg);
+      background: rgba(var(--color-primary-rgb), 0.12);
+      border-bottom: 1px solid rgba(var(--color-primary-rgb), 0.25);
+      font-size: var(--font-size-sm);
+      color: var(--text-primary);
+    }
+    .demo-icon { color: var(--color-primary); flex-shrink: 0; }
+    .demo-text { flex: 1 1 auto; min-width: 0; }
+
     .content {
       flex: 1;
       padding: var(--space-xl);
@@ -529,6 +556,7 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
       .mobile-topbar { display: flex; }
 
       .verify-banner { padding: 8px var(--space-md); }
+      .demo-bar { padding: 6px var(--space-sm) 6px var(--space-md); }
 
       .content {
         padding: var(--space-md);
@@ -591,10 +619,12 @@ export class MainLayoutComponent {
    */
   readonly signedIn = computed(() => !!this.auth.user());
 
+  readonly isDemo = this.auth.isDemo;
+
   private readonly verifyDismissed = signal(readDismissed());
   readonly showVerifyBanner = computed(() => {
     const user = this.auth.user();
-    if (!user || user.email_verified || this.verifyDismissed()) return false;
+    if (!user || user.is_demo || user.email_verified || this.verifyDismissed()) return false;
     // Focus screens (cook mode) need the vertical space more than the nudge,
     // and the banner is waiting on every other page.
     return this.mobileNavAllowed();
@@ -626,6 +656,11 @@ export class MainLayoutComponent {
     // Render and focus the input inside this keydown, so the next keystroke
     // lands in the search box rather than in whatever had focus before.
     if (this.searchPalette.open()) this.cdr.detectChanges();
+  }
+
+  /** Leave the demo and start a real account: a normal sign-out, then register. */
+  createAccount() {
+    this.auth.logout('/register');
   }
 
   dismissVerify() {

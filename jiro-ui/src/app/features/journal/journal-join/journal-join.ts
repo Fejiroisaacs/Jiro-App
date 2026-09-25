@@ -12,7 +12,7 @@ type State = 'loading' | 'joining' | 'success' | 'error' | 'no-token' | 'not-log
   standalone: true,
   imports: [RouterLink, JiroButtonComponent],
   template: `
-    <div class="join-page">
+    <main class="join-page">
       <div class="join-card">
 
         <!-- Logo / branding -->
@@ -100,7 +100,7 @@ type State = 'loading' | 'joining' | 'success' | 'error' | 'no-token' | 'not-log
 }
 
       </div>
-    </div>
+    </main>
   `,
   styles: [`
     .join-page {

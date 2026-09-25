@@ -22,6 +22,8 @@ export interface AdminUser {
   username: string | null;
   display_name: string | null;
   email_verified: boolean;
+  /** The shared "Try the demo" account. */
+  is_demo: boolean;
   session_count: number;
   recipe_count: number;
   split_count: number;

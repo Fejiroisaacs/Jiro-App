@@ -62,7 +62,7 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
 <jiro-card class="split-card">
           <div class="split-header">
             <div class="split-info">
-              <h3 class="split-name">{{ split.name }}</h3>
+              <h2 class="split-name">{{ split.name }}</h2>
               @if (split.description) {
 <p class="split-desc text-secondary">{{ split.description }}</p>
 }

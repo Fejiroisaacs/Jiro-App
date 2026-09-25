@@ -1,18 +1,23 @@
-import { Component, computed, input } from '@angular/core';
-import { utcDateKey } from '../../../core/services/dashboard.service';
+import { Component, computed, inject, input } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { STRIP_DAYS } from '../../../core/services/dashboard.service';
+import { SettingsService } from '../../../core/services/settings.service';
+import { addDays, longDayLabel, narrowWeekday, relativeDayName, todayKey } from '../../../core/utils/day';
 import { WIDGET_BY_ID } from '../widget-catalog';
 import { WIDGET_TEXT_STYLES, WidgetData, WidgetShellComponent, widgetState } from './widget-shell';
 
 export interface ActivityData {
-  /** UTC calendar days (YYYY-MM-DD) with a completed workout. */
-  workoutDays: Set<string>;
-  /** UTC calendar days with a journal entry. */
-  journalDays: Set<string>;
+  /** Sessions per day, keyed YYYY-MM-DD in the user's timezone. */
+  workoutCounts: Map<string, number>;
+  /** Journal entries per day, same keys. */
+  journalCounts: Map<string, number>;
 }
 
 interface ActivityDay {
   key: string;
   label: string;
+  /** The link's accessible name: "Wednesday 23 September: 1 workout, 1 entry". */
+  name: string;
   workout: boolean;
   journal: boolean;
   today: boolean;
@@ -21,22 +26,26 @@ interface ActivityDay {
 @Component({
   selector: 'dash-activity-widget',
   standalone: true,
-  imports: [WidgetShellComponent],
+  imports: [RouterLink, WidgetShellComponent],
   template: `
     <dash-widget-shell [def]="def" [state]="state()" skeleton="strip">
       <span head class="act-legend" aria-hidden="true">
         <i class="act-dot act-dot--w"></i> Workouts <i class="act-dot act-dot--j"></i> Journal
       </span>
       @if (data()) {
-        <div class="act-grid" role="img" [attr.aria-label]="summary()">
+        <p class="sr-only">{{ summary() }}</p>
+        <ol class="act-grid">
           @for (day of days(); track day.key) {
-            <div class="act-col" [class.act-col--today]="day.today" [title]="day.key">
-              <span class="act-cell" [class.on-w]="day.workout"></span>
-              <span class="act-cell" [class.on-j]="day.journal"></span>
-              <span class="act-day">{{ day.label }}</span>
-            </div>
+            <li class="act-li">
+              <a class="act-col" [class.act-col--today]="day.today" [routerLink]="['/day', day.key]"
+                [attr.aria-label]="day.name" [attr.aria-current]="day.today ? 'date' : null">
+                <span class="act-cell" [class.on-w]="day.workout"></span>
+                <span class="act-cell" [class.on-j]="day.journal"></span>
+                <span class="act-day" aria-hidden="true">{{ day.label }}</span>
+              </a>
+            </li>
           }
-        </div>
+        </ol>
       }
     </dash-widget-shell>
   `,
@@ -54,8 +63,21 @@ interface ActivityDay {
     .act-dot:first-child { margin-left: 0; }
     .act-dot--w { background: var(--color-primary); }
     .act-dot--j { background: var(--color-accent); }
-    .act-grid { display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 6px; }
-    .act-col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .act-grid { display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 6px; list-style: none; margin: 0; padding: 0; }
+    .act-li { min-width: 0; }
+    .act-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 0;
+      border-radius: var(--border-radius-sm);
+      color: inherit;
+      text-decoration: none;
+    }
+    .act-col:hover { text-decoration: none; background: var(--bg-surface-hover); }
+    .act-col:hover .act-cell:not(.on-w):not(.on-j) { background: var(--border-color); }
+    .act-col:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
     .act-cell {
       display: block;
       width: 100%;
@@ -81,21 +103,30 @@ export class ActivityWidgetComponent {
   readonly def = WIDGET_BY_ID.get('activity')!;
   readonly state = computed(() => widgetState(this.data()));
 
-  // Days are UTC calendar days, the unit the API uses for streaks and calendars.
+  private readonly settings = inject(SettingsService);
+
+  // Days are the user's calendar days (settings timezone), the same ones the
+  // day view and GET /day use, so each column opens exactly what it counts.
   readonly days = computed<ActivityDay[]>(() => {
     const d = this.data();
-    const todayKey = utcDateKey(new Date());
+    const today = todayKey(this.settings.timezone());
     const days: ActivityDay[] = [];
-    for (let i = 13; i >= 0; i--) {
-      const date = new Date();
-      date.setUTCDate(date.getUTCDate() - i);
-      const key = utcDateKey(date);
+    for (let i = STRIP_DAYS - 1; i >= 0; i--) {
+      const key = addDays(today, -i);
+      const w = d?.workoutCounts.get(key) ?? 0;
+      const j = d?.journalCounts.get(key) ?? 0;
+      const rel = relativeDayName(key, today);
+      const date = longDayLabel(key, today);
+      const what = w || j
+        ? [w ? `${w} ${w === 1 ? 'workout' : 'workouts'}` : '', j ? `${j} ${j === 1 ? 'entry' : 'entries'}` : ''].filter(Boolean).join(', ')
+        : 'no workout or entry';
       days.push({
         key,
-        label: date.toLocaleDateString('en-GB', { weekday: 'narrow', timeZone: 'UTC' }),
-        workout: !!d?.workoutDays.has(key),
-        journal: !!d?.journalDays.has(key),
-        today: key === todayKey,
+        label: narrowWeekday(key),
+        name: `${rel ? rel + ', ' : ''}${date}: ${what}`,
+        workout: w > 0,
+        journal: j > 0,
+        today: key === today,
       });
     }
     return days;
