@@ -515,11 +515,12 @@ export class DayPageComponent {
   slot(s: string): string { return SLOT_LABELS[s] ?? s; }
   mood(v: string): string { return MOODS.find(m => m.value === v)?.label ?? v; }
   plural(n: number, one: string, many: string): string { return `${n} ${n === 1 ? one : many}`; }
-  money(v: number): string { return formatCurrency(v); }
+  // One currency per user (Settings); the account's own currency column is no longer shown.
+  money(v: number): string { return formatCurrency(v, this.settings.currency()); }
 
   amount(t: DayTransaction): string {
-    if (t.type === 'transfer') return formatSignedCurrency(t.amount, t.currency, 'never');
-    return formatSignedCurrency(t.type === 'expense' ? -Math.abs(t.amount) : Math.abs(t.amount), t.currency);
+    if (t.type === 'transfer') return formatSignedCurrency(t.amount, this.settings.currency(), 'never');
+    return formatSignedCurrency(t.type === 'expense' ? -Math.abs(t.amount) : Math.abs(t.amount), this.settings.currency());
   }
 
   amountColor(t: DayTransaction): string { return transactionColor(t.type); }

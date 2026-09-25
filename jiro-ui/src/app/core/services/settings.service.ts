@@ -20,6 +20,11 @@ export class SettingsService {
   weightUnit = computed<string>(() => (this.parsedSettings()['weight_unit'] as string | undefined) ?? 'lbs');
   /** The IANA zone the user's days are cut in (settings, else the browser's). The API uses the same setting. */
   timezone = computed<string>(() => resolveTimeZone(this.parsedSettings()['timezone'] as string | undefined));
+  /** The ISO 4217 code every Ledger amount is shown in: one currency per user, USD by default. */
+  currency = computed<string>(() => {
+    const stored = this.parsedSettings()['currency'];
+    return typeof stored === 'string' && /^[A-Z]{3}$/.test(stored) ? stored : 'USD';
+  });
   theme = computed<Theme>(() => {
     const stored = this.parsedSettings()['theme'] as string;
     return (THEMES as readonly string[]).includes(stored) ? (stored as Theme) : 'earth';

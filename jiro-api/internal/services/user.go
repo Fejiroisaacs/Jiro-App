@@ -141,6 +141,9 @@ const (
 // widget in the UI never needs an API release.
 var dashboardWidgetIDRegexp = regexp.MustCompile(`^[a-z][a-z0-9_]{0,39}$`)
 
+// currencyCodeRegexp is the shape of an ISO 4217 code; the UI offers a list.
+var currencyCodeRegexp = regexp.MustCompile(`^[A-Z]{3}$`)
+
 func invalidSettings(msg string) error {
 	return fmt.Errorf("%w: %s", ErrInvalidSettings, msg)
 }
@@ -211,6 +214,15 @@ func (s *UserService) UpdateSettings(ctx context.Context, userID uuid.UUID, req 
 			remove = append(remove, "timezone")
 		} else {
 			patch["timezone"] = *req.Timezone
+		}
+	}
+	if req.Currency != nil {
+		if *req.Currency == "" {
+			remove = append(remove, "currency")
+		} else if !currencyCodeRegexp.MatchString(*req.Currency) {
+			return nil, invalidSettings("currency must be a three-letter ISO 4217 code such as USD")
+		} else {
+			patch["currency"] = *req.Currency
 		}
 	}
 	if len(req.Dashboard) > 0 {

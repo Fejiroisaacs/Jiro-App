@@ -55,6 +55,8 @@ type UpdateSettingsRequest struct {
 	Theme      *string `json:"theme,omitempty"`
 	WeightUnit *string `json:"weight_unit,omitempty"`
 	Timezone   *string `json:"timezone,omitempty"`
+	// Currency is the ISO 4217 code every Ledger amount is shown in.
+	Currency *string `json:"currency,omitempty"`
 	// Dashboard is tri-state: empty means "leave alone", the literal `null`
 	// removes the key (back to the default layout), anything else is a layout.
 	Dashboard json.RawMessage `json:"dashboard,omitempty"`

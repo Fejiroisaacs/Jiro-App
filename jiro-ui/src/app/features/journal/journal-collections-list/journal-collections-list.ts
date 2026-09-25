@@ -14,12 +14,12 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
   template: `
     <div class="collections-page">
 
-      <jiro-page-header heading="Journaly" subtitle="Your reflection space">
+      <jiro-page-header heading="Collections" subtitle="Your entries, gathered by theme">
         <jiro-button actions variant="primary" type="button" routerLink="/journal/new">New entry</jiro-button>
       </jiro-page-header>
 
       <div class="section-row">
-        <h2 class="section-title">Collections</h2>
+        <h2 class="section-title">Your collections</h2>
         <jiro-button variant="secondary" type="button" (click)="showCreate.set(true)">+ New</jiro-button>
       </div>
 
@@ -65,10 +65,10 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     @if (showCreate()) {
 <jiro-modal title="New Collection" (close)="showCreate.set(false)">
       <div class="modal-form">
-        <label class="form-label">Name</label>
-        <input type="text" class="form-control" [(ngModel)]="newName" placeholder="e.g. Europe Trip 2024" maxlength="100" />
-        <label class="form-label" style="margin-top: var(--space-sm)">Description (optional)</label>
-        <input type="text" class="form-control" [(ngModel)]="newDesc" placeholder="A brief description..." maxlength="255" />
+        <label class="form-label" for="new-coll-name">Name</label>
+        <input id="new-coll-name" type="text" class="form-control" [(ngModel)]="newName" placeholder="e.g. Europe Trip 2024" maxlength="100" />
+        <label class="form-label" for="new-coll-desc" style="margin-top: var(--space-sm)">Description (optional)</label>
+        <input id="new-coll-desc" type="text" class="form-control" [(ngModel)]="newDesc" placeholder="A brief description..." maxlength="255" />
       </div>
       <div class="modal-actions">
         <jiro-button variant="secondary" type="button" (click)="showCreate.set(false)">Cancel</jiro-button>

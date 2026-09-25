@@ -3,7 +3,9 @@ package services
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/models"
 	"github.com/google/uuid"
@@ -11,7 +13,16 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var ErrMealPlanEntryNotFound = errors.New("meal plan entry not found")
+var (
+	ErrMealPlanEntryNotFound = errors.New("meal plan entry not found")
+	// ErrMealPlanEntryEmpty is an entry with neither a recipe nor a label.
+	ErrMealPlanEntryEmpty = errors.New("choose a recipe or write a note")
+	ErrInvalidRecipeID    = errors.New("invalid recipe_id")
+)
+
+// mealPlanLabelMaxLen caps a custom label such as "Dinner out" (the column
+// allows 255; a slot chip shows far less).
+const mealPlanLabelMaxLen = 80
 
 type MealPlanService struct {
 	db *pgxpool.Pool
@@ -19,6 +30,16 @@ type MealPlanService struct {
 
 func NewMealPlanService(db *pgxpool.Pool) *MealPlanService {
 	return &MealPlanService{db: db}
+}
+
+// Today is today's calendar date (at UTC midnight) in the user's location:
+// settings timezone, else tzHint, else UTC.
+func (s *MealPlanService) Today(ctx context.Context, userID uuid.UUID, tzHint string) (time.Time, error) {
+	loc, err := userLocation(ctx, s.db, userID, tzHint)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return calendarToday(time.Now(), loc), nil
 }
 
 // GetOrCreatePlan returns the meal plan for the given week, creating it if needed.
@@ -161,11 +182,26 @@ func (s *MealPlanService) AddEntry(ctx context.Context, userID uuid.UUID, planID
 		return nil, ErrNotOwner
 	}
 
+	// A custom label is free text in place of a recipe ("Dinner out").
+	// Blank means none; whitespace is tidied the way it will be shown.
+	var label *string
+	if req.CustomLabel != nil {
+		if l := strings.Join(strings.Fields(*req.CustomLabel), " "); l != "" {
+			if utf8.RuneCountInString(l) > mealPlanLabelMaxLen {
+				l = string([]rune(l)[:mealPlanLabelMaxLen])
+			}
+			label = &l
+		}
+	}
+	if (req.RecipeID == nil || *req.RecipeID == "") && label == nil {
+		return nil, ErrMealPlanEntryEmpty
+	}
+
 	var recipeID *uuid.UUID
 	if req.RecipeID != nil && *req.RecipeID != "" {
 		id, err := uuid.Parse(*req.RecipeID)
 		if err != nil {
-			return nil, errors.New("invalid recipe_id")
+			return nil, ErrInvalidRecipeID
 		}
 		recipeID = &id
 
@@ -196,7 +232,7 @@ func (s *MealPlanService) AddEntry(ctx context.Context, userID uuid.UUID, planID
 		`INSERT INTO meal_plan_entries (meal_plan_id, recipe_id, day_of_week, meal_slot, custom_label, position)
 		 VALUES ($1, $2, $3, $4, $5, $6)
 		 RETURNING id, meal_plan_id, recipe_id, day_of_week, meal_slot, custom_label, position, created_at`,
-		planID, recipeID, req.DayOfWeek, req.MealSlot, req.CustomLabel, pos,
+		planID, recipeID, req.DayOfWeek, req.MealSlot, label, pos,
 	).Scan(&entry.ID, &entry.MealPlanID, &entry.RecipeID,
 		&entry.DayOfWeek, &entry.MealSlot, &entry.CustomLabel, &entry.Position, &entry.CreatedAt)
 	if err != nil {

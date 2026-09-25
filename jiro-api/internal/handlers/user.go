@@ -57,6 +57,7 @@ func (h *UserHandler) UpdateMe(c *gin.Context) {
 		Theme      *string `json:"theme"`
 		WeightUnit *string `json:"weight_unit"`
 		Timezone   *string `json:"timezone"`
+		Currency   *string `json:"currency"`
 		// Absent: empty (untouched). Explicit null: the bytes `null` (reset).
 		Dashboard json.RawMessage `json:"dashboard"`
 		// Profile fields
@@ -76,11 +77,12 @@ func (h *UserHandler) UpdateMe(c *gin.Context) {
 	var err error
 
 	// Apply settings update if any settings field is present.
-	if req.Theme != nil || req.WeightUnit != nil || req.Timezone != nil || len(req.Dashboard) > 0 {
+	if req.Theme != nil || req.WeightUnit != nil || req.Timezone != nil || req.Currency != nil || len(req.Dashboard) > 0 {
 		settingsReq := &models.UpdateSettingsRequest{
 			Theme:      req.Theme,
 			WeightUnit: req.WeightUnit,
 			Timezone:   req.Timezone,
+			Currency:   req.Currency,
 			Dashboard:  req.Dashboard,
 		}
 		user, err = h.userService.UpdateSettings(c.Request.Context(), uid, settingsReq)

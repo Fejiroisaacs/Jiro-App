@@ -7,6 +7,7 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
 import { WIDGET_BY_ID } from '../widget-catalog';
 import { WIDGET_TEXT_STYLES, WidgetData, WidgetShellComponent, widgetState } from './widget-shell';
 import { daysAgo, plural } from './format';
+import { todayKey } from '../../../core/utils/day';
 
 const DAY_MS = 86_400_000;
 const WINDOW_DAYS = 30;
@@ -117,7 +118,7 @@ export class BodyWeightWidgetComponent {
       latest: fmt(latestDisplay),
       unit,
       change,
-      when: daysAgo(latest.at),
+      when: daysAgo(latest.at, todayKey(this.settings.timezone())),
       label: `Body weight ${fmt(latestDisplay)} ${unit}${spoken}`,
       points: sparkline(entries.filter(e => e.t >= Date.now() - WINDOW_DAYS * DAY_MS)),
     };

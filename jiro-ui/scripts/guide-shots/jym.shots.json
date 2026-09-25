@@ -1,0 +1,149 @@
+[
+  {
+    "name": "home",
+    "path": "/jym",
+    "waitFor": ".stats-section",
+    "actions": [
+      {
+        "wait": 800
+      }
+    ],
+    "hide": [
+      ".jym-dash > .splits-summary:last-of-type"
+    ]
+  },
+  {
+    "name": "exercise-detail",
+    "path": "/jym/exercises",
+    "waitFor": "a.ex-link",
+    "actions": [
+      {
+        "click": "a.ex-link:has-text(\"Bench Press\")"
+      },
+      {
+        "wait": 2000
+      }
+    ],
+    "clip": ".detail-body"
+  },
+  {
+    "name": "prs",
+    "path": "/jym/exercises?tab=prs",
+    "waitFor": ".summary-strip",
+    "actions": [
+      {
+        "wait": 500
+      }
+    ]
+  },
+  {
+    "name": "split-builder",
+    "path": "/jym/plan",
+    "waitFor": ".split-card",
+    "actions": [
+      {
+        "click": ".split-card jiro-button:has-text(\"Build\")"
+      },
+      {
+        "wait": 1500
+      }
+    ],
+    "clip": ".split-detail"
+  },
+  {
+    "name": "add-exercise",
+    "path": "/jym/plan",
+    "waitFor": ".split-card",
+    "actions": [
+      {
+        "click": ".split-card jiro-button:has-text(\"Build\")"
+      },
+      {
+        "wait": 1500
+      },
+      {
+        "click": ".routine-column:has-text(\"Day 2\") .add-ex-btn"
+      },
+      {
+        "wait": 800
+      },
+      {
+        "fill": ".ex-picker input.form-input",
+        "value": "raise"
+      },
+      {
+        "wait": 300
+      },
+      {
+        "click": ".ex-pick-btn:has-text(\"Lateral Raise\")"
+      },
+      {
+        "wait": 300
+      }
+    ],
+    "clip": ".modal-content"
+  },
+  {
+    "name": "new-series",
+    "path": "/jym/plan",
+    "waitFor": ".split-card",
+    "actions": [
+      {
+        "click": ".split-card jiro-button:has-text(\"Series\")"
+      },
+      {
+        "wait": 400
+      },
+      {
+        "fill": "[role=dialog] input[name=seriesName]",
+        "value": "Autumn block"
+      },
+      {
+        "click": "[role=dialog] .dur-btn:has-text(\"Weeks\")"
+      },
+      {
+        "fill": "[role=dialog] input[name=targetWeeks]",
+        "value": "8"
+      }
+    ],
+    "clip": ".modal-content"
+  },
+  {
+    "name": "series-detail",
+    "path": "/jym/plan?tab=series",
+    "waitFor": ".series-card",
+    "actions": [
+      {
+        "click": ".series-card .view-btn"
+      },
+      {
+        "wait": 2000
+      }
+    ],
+    "clip": ".series-detail"
+  },
+  {
+    "name": "track-sessions",
+    "path": "/jym/track",
+    "waitFor": ".session-card",
+    "actions": [
+      {
+        "click": ".session-card:has-text(\"Push\")"
+      },
+      {
+        "wait": 1500
+      }
+    ],
+    "clip": ".session-history"
+  },
+  {
+    "name": "body-weight",
+    "path": "/jym/track?tab=bodyweight",
+    "waitFor": ".log-card",
+    "actions": [
+      {
+        "wait": 1200
+      }
+    ]
+  }
+]

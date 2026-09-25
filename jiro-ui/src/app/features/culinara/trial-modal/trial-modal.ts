@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, OnInit, Output, signal } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output, inject, signal } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import {
@@ -10,6 +10,8 @@ import {
 } from '../../../core/services/recipe.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { StarRatingComponent } from '../../../shared/components/star-rating/star-rating';
+import { SettingsService } from '../../../core/services/settings.service';
+import { dayKey, todayKey, zonedNoonISO } from '../../../core/utils/day';
 
 @Component({
   selector: 'app-trial-modal',
@@ -225,19 +227,24 @@ export class TrialModalComponent implements OnInit {
   saving = signal(false);
   error = signal('');
 
+  private readonly settings = inject(SettingsService);
+  /** The day the trial was loaded with, so an edit that keeps it keeps the stored time. */
+  private originalDay = '';
+
   constructor(private recipeService: RecipeService) {}
 
   ngOnInit() {
+    const tz = this.settings.timezone();
     if (this.trial) {
-      // Edit mode — pre-fill
-      const d = new Date(this.trial.date_cooked);
-      this.dateCookedStr = d.toISOString().split('T')[0];
+      // Edit mode: show the stored instant as a day in the user's zone.
+      this.dateCookedStr = this.trial.date_cooked ? dayKey(this.trial.date_cooked, tz) : '';
+      this.originalDay = this.dateCookedStr;
       this.modifications = this.trial.modifications ? [...this.trial.modifications] : [];
       this.notes = this.trial.notes ?? '';
       this.rating = this.trial.rating ?? 0;
     } else {
       // Create mode — default to today
-      this.dateCookedStr = new Date().toISOString().split('T')[0];
+      this.dateCookedStr = todayKey(tz);
     }
   }
 
@@ -258,7 +265,7 @@ export class TrialModalComponent implements OnInit {
     if (this.trial) {
       // Edit mode
       const req: UpdateTrialRequest = {
-        date_cooked: this.dateCookedStr ? new Date(this.dateCookedStr + 'T12:00:00Z').toISOString() : undefined,
+        date_cooked: this.dateCookedFor(this.trial),
         notes: this.notes.trim() || undefined,
         modifications: filteredMods.length ? filteredMods : [],
         rating: this.rating > 0 ? this.rating : undefined,
@@ -270,7 +277,7 @@ export class TrialModalComponent implements OnInit {
     } else {
       // Create mode
       const req: CreateTrialRequest = {
-        date_cooked: this.dateCookedStr ? new Date(this.dateCookedStr + 'T12:00:00Z').toISOString() : undefined,
+        date_cooked: this.dateCookedFor(null),
         notes: this.notes.trim() || undefined,
         modifications: filteredMods.length ? filteredMods : undefined,
         rating: this.rating > 0 ? this.rating : undefined,
@@ -280,5 +287,16 @@ export class TrialModalComponent implements OnInit {
         error: (err) => { this.saving.set(false); this.error.set(err.error?.message ?? 'Failed to log trial'); },
       });
     }
+  }
+
+  /**
+   * The instant to send for the chosen day: local noon in the user's zone, so
+   * the trial counts on that day everywhere (day view, cook streak). An edit
+   * that leaves the day alone sends the stored instant back unchanged.
+   */
+  private dateCookedFor(trial: RecipeTrial | null): string | undefined {
+    if (!this.dateCookedStr) return undefined;
+    if (trial?.date_cooked && this.dateCookedStr === this.originalDay) return trial.date_cooked;
+    return zonedNoonISO(this.dateCookedStr, this.settings.timezone());
   }
 }

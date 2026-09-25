@@ -7,16 +7,20 @@ import {
   ElementRef,
   signal,
   computed,
+  inject,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { chartTones } from '../../../shared/chart-theme';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
-import { LedgerService, ComparisonResponse } from '../../../core/services/ledger.service';
+import { LedgerService, ComparisonResponse, ComparisonCategory, ComparisonValue } from '../../../core/services/ledger.service';
+import { formatCurrency, formatPctChange, formatSignedCurrency, parseDateOnly } from '../shared/ledger-utils';
 import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-card';
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
+import { SettingsService } from '../../../core/services/settings.service';
+import { todayKey } from '../../../core/utils/day';
 
 Chart.register(...registerables);
 
@@ -29,18 +33,31 @@ interface DateRange {
   bTo: string;
 }
 
+/**
+ * The calendar date a Date's local fields name, as YYYY-MM-DD. The ranges
+ * below are built with local-field arithmetic, so reading them back through
+ * toISOString (UTC) would shift every bound a day early east of UTC.
+ */
 function isoDate(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-function computePresetRanges(preset: Preset): DateRange | null {
-  const now = new Date();
+/**
+ * The preset's two periods. A is the previous period (the base) and B the
+ * current one, so the change (B - A) reads naturally: up means the current
+ * period is higher. `today` is the user's day key (settings zone).
+ */
+export function computePresetRanges(preset: Preset, today: string): DateRange | null {
+  const [ty, tm, td] = today.split('-').map(Number);
+  const now = new Date(ty, tm - 1, td);
   if (preset === 'month') {
-    const aFrom = isoDate(new Date(now.getFullYear(), now.getMonth(), 1));
-    const aTo   = isoDate(new Date(now.getFullYear(), now.getMonth() + 1, 0));
-    const bFrom = isoDate(new Date(now.getFullYear(), now.getMonth() - 1, 1));
-    const bTo   = isoDate(new Date(now.getFullYear(), now.getMonth(), 0));
-    return { aFrom, aTo, bFrom, bTo };
+    return {
+      aFrom: isoDate(new Date(now.getFullYear(), now.getMonth() - 1, 1)),
+      aTo:   isoDate(new Date(now.getFullYear(), now.getMonth(), 0)),
+      bFrom: isoDate(new Date(now.getFullYear(), now.getMonth(), 1)),
+      bTo:   isoDate(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
+    };
   }
   if (preset === 'week') {
     const day = now.getDay(); // 0=Sun
@@ -49,24 +66,35 @@ function computePresetRanges(preset: Preset): DateRange | null {
     const lastMonday = new Date(monday); lastMonday.setDate(monday.getDate() - 7);
     const lastSunday = new Date(lastMonday); lastSunday.setDate(lastMonday.getDate() + 6);
     return {
-      aFrom: isoDate(monday),
-      aTo:   isoDate(sunday),
-      bFrom: isoDate(lastMonday),
-      bTo:   isoDate(lastSunday),
+      aFrom: isoDate(lastMonday),
+      aTo:   isoDate(lastSunday),
+      bFrom: isoDate(monday),
+      bTo:   isoDate(sunday),
     };
   }
   if (preset === 'quarter') {
     const q = Math.floor(now.getMonth() / 3);
-    const aFrom = isoDate(new Date(now.getFullYear(), q * 3, 1));
-    const aTo   = isoDate(new Date(now.getFullYear(), q * 3 + 3, 0));
     const prevQ = q === 0 ? 3 : q - 1;
     const prevYear = q === 0 ? now.getFullYear() - 1 : now.getFullYear();
-    const bFrom = isoDate(new Date(prevYear, prevQ * 3, 1));
-    const bTo   = isoDate(new Date(prevYear, prevQ * 3 + 3, 0));
-    return { aFrom, aTo, bFrom, bTo };
+    return {
+      aFrom: isoDate(new Date(prevYear, prevQ * 3, 1)),
+      aTo:   isoDate(new Date(prevYear, prevQ * 3 + 3, 0)),
+      bFrom: isoDate(new Date(now.getFullYear(), q * 3, 1)),
+      bTo:   isoDate(new Date(now.getFullYear(), q * 3 + 3, 0)),
+    };
   }
   return null;
 }
+
+/** The two periods' names for each preset: [earlier, later]. */
+const PRESET_NAMES: Record<Preset, [string, string]> = {
+  month:   ['Last month', 'This month'],
+  week:    ['Last week', 'This week'],
+  quarter: ['Last quarter', 'This quarter'],
+  custom:  ['Period A', 'Period B'],
+};
+
+type SortColumn = 'name' | 'a' | 'b' | 'delta' | 'delta_pct';
 
 @Component({
   selector: 'app-comparison-page',
@@ -79,25 +107,25 @@ function computePresetRanges(preset: Preset): DateRange | null {
     <div class="comparison-page">
 
       <!-- ── Header ── -->
-      <jiro-page-header heading="Compare periods" subtitle="See how your finances changed between two periods" />
+      <jiro-page-header heading="Compare periods" subtitle="See how your money changed from one period to the next" />
 
       <!-- ── Period Selector ── -->
       <jiro-card>
         <div class="selector-card">
-          <div class="selector-label">Select periods</div>
+          <div class="selector-label" id="compare-presets">Compare</div>
 
           <!-- Preset toggle group -->
-          <div class="preset-group">
-            <button class="preset-btn" [class.active]="selectedPreset() === 'month'"   (click)="selectPreset('month')">
-              This Month vs Last
+          <div class="preset-group" role="group" aria-labelledby="compare-presets">
+            <button type="button" class="preset-btn" [class.active]="selectedPreset() === 'month'" [attr.aria-pressed]="selectedPreset() === 'month'" (click)="selectPreset('month')">
+              This month vs last
             </button>
-            <button class="preset-btn" [class.active]="selectedPreset() === 'week'"    (click)="selectPreset('week')">
-              This Week vs Last
+            <button type="button" class="preset-btn" [class.active]="selectedPreset() === 'week'" [attr.aria-pressed]="selectedPreset() === 'week'" (click)="selectPreset('week')">
+              This week vs last
             </button>
-            <button class="preset-btn" [class.active]="selectedPreset() === 'quarter'" (click)="selectPreset('quarter')">
-              This Quarter vs Last
+            <button type="button" class="preset-btn" [class.active]="selectedPreset() === 'quarter'" [attr.aria-pressed]="selectedPreset() === 'quarter'" (click)="selectPreset('quarter')">
+              This quarter vs last
             </button>
-            <button class="preset-btn" [class.active]="selectedPreset() === 'custom'"  (click)="selectPreset('custom')">
+            <button type="button" class="preset-btn" [class.active]="selectedPreset() === 'custom'" [attr.aria-pressed]="selectedPreset() === 'custom'" (click)="selectPreset('custom')">
               Custom
             </button>
           </div>
@@ -105,53 +133,44 @@ function computePresetRanges(preset: Preset): DateRange | null {
           <!-- Custom date pickers -->
           @if (selectedPreset() === 'custom') {
 <div class="custom-ranges">
-            <div class="range-group">
-              <div class="range-label">
-                <span class="period-dot dot-a"></span>
-                Period A
-              </div>
+            <p class="custom-help">Period A is the one you compare against; the change shows how Period B differs from it.</p>
+            <fieldset class="range-group">
+              <legend class="range-label">
+                <span class="period-dot dot-a" aria-hidden="true"></span>
+                Period A (earlier)
+              </legend>
               <div class="date-inputs">
                 <div class="date-field">
-                  <label class="date-field-label">From</label>
-                  <input type="date" class="date-input" [(ngModel)]="customAFrom" />
-                </div>
-                <div class="date-sep">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                    <line x1="5" y1="12" x2="19" y2="12"/><polyline points="13,6 19,12 13,18"/>
-                  </svg>
+                  <label class="date-field-label" for="cmp-a-from">From</label>
+                  <input id="cmp-a-from" type="date" class="date-input" [(ngModel)]="customAFrom" />
                 </div>
                 <div class="date-field">
-                  <label class="date-field-label">To</label>
-                  <input type="date" class="date-input" [(ngModel)]="customATo" />
+                  <label class="date-field-label" for="cmp-a-to">To</label>
+                  <input id="cmp-a-to" type="date" class="date-input" [(ngModel)]="customATo" />
                 </div>
               </div>
-            </div>
+            </fieldset>
 
-            <div class="range-group">
-              <div class="range-label">
-                <span class="period-dot dot-b"></span>
-                Period B
-              </div>
+            <fieldset class="range-group">
+              <legend class="range-label">
+                <span class="period-dot dot-b" aria-hidden="true"></span>
+                Period B (later)
+              </legend>
               <div class="date-inputs">
                 <div class="date-field">
-                  <label class="date-field-label">From</label>
-                  <input type="date" class="date-input" [(ngModel)]="customBFrom" />
-                </div>
-                <div class="date-sep">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                    <line x1="5" y1="12" x2="19" y2="12"/><polyline points="13,6 19,12 13,18"/>
-                  </svg>
+                  <label class="date-field-label" for="cmp-b-from">From</label>
+                  <input id="cmp-b-from" type="date" class="date-input" [(ngModel)]="customBFrom" />
                 </div>
                 <div class="date-field">
-                  <label class="date-field-label">To</label>
-                  <input type="date" class="date-input" [(ngModel)]="customBTo" />
+                  <label class="date-field-label" for="cmp-b-to">To</label>
+                  <input id="cmp-b-to" type="date" class="date-input" [(ngModel)]="customBTo" />
                 </div>
               </div>
-            </div>
+            </fieldset>
 
             <div class="custom-apply">
               <jiro-button variant="primary" type="button" [loading]="loading()" (click)="applyCustom()">
-                Apply Comparison
+                Compare
               </jiro-button>
             </div>
           </div>
@@ -161,13 +180,13 @@ function computePresetRanges(preset: Preset): DateRange | null {
           @if (selectedPreset() !== 'custom' && activeRange()) {
 <div class="range-summary">
             <span class="range-chip">
-              <span class="period-dot dot-a"></span>
-              A: {{ activeRange()!.aFrom | date:'mediumDate' }} — {{ activeRange()!.aTo | date:'mediumDate' }}
+              <span class="period-dot dot-a" aria-hidden="true"></span>
+              {{ names()[0] }}: {{ rangeText(activeRange()!.aFrom, activeRange()!.aTo) }}
             </span>
-            <span class="range-sep">vs</span>
+            <span class="range-sep">then</span>
             <span class="range-chip">
-              <span class="period-dot dot-b"></span>
-              B: {{ activeRange()!.bFrom | date:'mediumDate' }} — {{ activeRange()!.bTo | date:'mediumDate' }}
+              <span class="period-dot dot-b" aria-hidden="true"></span>
+              {{ names()[1] }}: {{ rangeText(activeRange()!.bFrom, activeRange()!.bTo) }}
             </span>
           </div>
 }
@@ -196,205 +215,99 @@ function computePresetRanges(preset: Preset): DateRange | null {
       }
 
       <!-- ── Results ── -->
-      @if (!loading() && result()) {
+      @if (!loading() && result(); as res) {
 <div class="results-body">
 
         <!-- Summary cards -->
         <div class="summary-grid">
-
-          <!-- Income -->
-          <jiro-card>
-            <div class="summary-card">
-              <div class="summary-card-header">
-                <div class="summary-icon income-icon">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="23,6 13.5,15.5 8.5,10.5 1,18"/><polyline points="17,6 23,6 23,12"/>
-                  </svg>
+          @for (card of summaryCards(); track card.key) {
+            <jiro-card>
+              <div class="summary-card">
+                <div class="summary-card-header">
+                  <span class="summary-title">{{ card.title }}</span>
                 </div>
-                <span class="summary-title">Total Income</span>
+                <dl class="summary-periods">
+                  <div class="summary-period">
+                    <dt><span class="period-dot dot-a" aria-hidden="true"></span>{{ names()[0] }}</dt>
+                    <dd class="period-val" [class.negative-val]="card.value.a < 0">{{ money(card.value.a) }}</dd>
+                  </div>
+                  <div class="summary-period">
+                    <dt><span class="period-dot dot-b" aria-hidden="true"></span>{{ names()[1] }}</dt>
+                    <dd class="period-val" [class.negative-val]="card.value.b < 0">{{ money(card.value.b) }}</dd>
+                  </div>
+                </dl>
+                <p class="summary-delta" [ngClass]="deltaClass(card.value.delta, card.upIsGood)">
+                  {{ changeSentence(card.value) }}
+                </p>
               </div>
-              <div class="summary-periods">
-                <div class="summary-period">
-                  <span class="period-dot dot-a"></span>
-                  <span class="period-val">{{ result()!.summary.income.a | currency }}</span>
-                </div>
-                <div class="summary-period">
-                  <span class="period-dot dot-b"></span>
-                  <span class="period-val">{{ result()!.summary.income.b | currency }}</span>
-                </div>
-              </div>
-              <div class="summary-delta" [ngClass]="incomeDeltaClass()">
-                <span class="delta-arrow">{{ result()!.summary.income.delta >= 0 ? '↑' : '↓' }}</span>
-                {{ formatDelta(result()!.summary.income.delta, result()!.summary.income.delta_pct) }}
-              </div>
-            </div>
-          </jiro-card>
-
-          <!-- Expenses -->
-          <jiro-card>
-            <div class="summary-card">
-              <div class="summary-card-header">
-                <div class="summary-icon expense-icon">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="23,18 13.5,8.5 8.5,13.5 1,6"/><polyline points="17,18 23,18 23,12"/>
-                  </svg>
-                </div>
-                <span class="summary-title">Total Expenses</span>
-              </div>
-              <div class="summary-periods">
-                <div class="summary-period">
-                  <span class="period-dot dot-a"></span>
-                  <span class="period-val">{{ result()!.summary.expenses.a | currency }}</span>
-                </div>
-                <div class="summary-period">
-                  <span class="period-dot dot-b"></span>
-                  <span class="period-val">{{ result()!.summary.expenses.b | currency }}</span>
-                </div>
-              </div>
-              <div class="summary-delta" [ngClass]="expenseDeltaClass()">
-                <span class="delta-arrow">{{ result()!.summary.expenses.delta >= 0 ? '↑' : '↓' }}</span>
-                {{ formatDelta(result()!.summary.expenses.delta, result()!.summary.expenses.delta_pct) }}
-              </div>
-            </div>
-          </jiro-card>
-
-          <!-- Net Cashflow -->
-          <jiro-card>
-            <div class="summary-card">
-              <div class="summary-card-header">
-                <div class="summary-icon net-icon">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-                  </svg>
-                </div>
-                <span class="summary-title">Net Cashflow</span>
-              </div>
-              <div class="summary-periods">
-                <div class="summary-period">
-                  <span class="period-dot dot-a"></span>
-                  <span class="period-val" [class.negative-val]="result()!.summary.net.a < 0">
-                    {{ result()!.summary.net.a | currency }}
-                  </span>
-                </div>
-                <div class="summary-period">
-                  <span class="period-dot dot-b"></span>
-                  <span class="period-val" [class.negative-val]="result()!.summary.net.b < 0">
-                    {{ result()!.summary.net.b | currency }}
-                  </span>
-                </div>
-              </div>
-              <div class="summary-delta" [ngClass]="netDeltaClass()">
-                <span class="delta-arrow">{{ result()!.summary.net.delta >= 0 ? '↑' : '↓' }}</span>
-                {{ formatDelta(result()!.summary.net.delta, result()!.summary.net.delta_pct) }}
-              </div>
-            </div>
-          </jiro-card>
-
+            </jiro-card>
+          }
         </div>
 
         <!-- ── Bar Chart ── -->
         <jiro-card>
           <div class="chart-section">
             <div class="chart-header">
-              <h2 class="chart-title">Period Overview</h2>
+              <h2 class="chart-title">Period overview</h2>
               <div class="chart-legend">
                 <span class="legend-item">
-                  <span class="legend-dot" [style.background]="seriesColors().a"></span>
-                  Period A
+                  <span class="legend-dot" [style.background]="seriesColors().a" aria-hidden="true"></span>
+                  {{ names()[0] }}
                 </span>
                 <span class="legend-item">
-                  <span class="legend-dot" [style.background]="seriesColors().b"></span>
-                  Period B
+                  <span class="legend-dot" [style.background]="seriesColors().b" aria-hidden="true"></span>
+                  {{ names()[1] }}
                 </span>
               </div>
             </div>
             <div class="chart-wrap">
-              <canvas #compareChart></canvas>
+              <canvas #compareChart role="img" [attr.aria-label]="chartLabel()"></canvas>
             </div>
           </div>
         </jiro-card>
 
-        <!-- ── Category detail — desktop table ── -->
+        <!-- ── Category detail ── -->
         <jiro-card>
           <div class="cat-section">
             <div class="cat-header">
-              <h2 class="cat-title">Category Breakdown</h2>
-              <span class="cat-count">{{ result()!.categories.length }} categories</span>
+              <h2 class="cat-title">By category</h2>
+              <span class="cat-count">{{ res.categories.length }} {{ res.categories.length === 1 ? 'category' : 'categories' }}</span>
             </div>
 
-            <!-- Desktop table -->
+            <!-- Desktop table: each header is a sort button -->
+            @if (res.categories.length > 0) {
             <div class="table-wrap">
               <table class="cat-table">
+                <caption class="sr-only">Income and spending by category, {{ names()[0] }} then {{ names()[1] }}</caption>
                 <thead>
                   <tr>
-                    <th class="th-sort" (click)="toggleSort('name')">
-                      Category
-                      <svg class="sort-icon" [class.active-col]="sortColumn() === 'name'" [class.dir-asc]="sortColumn() === 'name' && sortDir() === 'asc'" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <polyline points="6,9 12,15 18,9"/>
-                      </svg>
-                    </th>
-                    <th class="th-sort th-num" (click)="toggleSort('a')">
-                      Period A
-                      <svg class="sort-icon" [class.active-col]="sortColumn() === 'a'" [class.dir-asc]="sortColumn() === 'a' && sortDir() === 'asc'" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <polyline points="6,9 12,15 18,9"/>
-                      </svg>
-                    </th>
-                    <th class="th-sort th-num" (click)="toggleSort('b')">
-                      Period B
-                      <svg class="sort-icon" [class.active-col]="sortColumn() === 'b'" [class.dir-asc]="sortColumn() === 'b' && sortDir() === 'asc'" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <polyline points="6,9 12,15 18,9"/>
-                      </svg>
-                    </th>
-                    <th class="th-sort th-num" (click)="toggleSort('delta')">
-                      Delta ($)
-                      <svg class="sort-icon" [class.active-col]="sortColumn() === 'delta'" [class.dir-asc]="sortColumn() === 'delta' && sortDir() === 'asc'" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <polyline points="6,9 12,15 18,9"/>
-                      </svg>
-                    </th>
-                    <th class="th-sort th-num" (click)="toggleSort('delta_pct')">
-                      Delta (%)
-                      <svg class="sort-icon" [class.active-col]="sortColumn() === 'delta_pct'" [class.dir-asc]="sortColumn() === 'delta_pct' && sortDir() === 'asc'" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <polyline points="6,9 12,15 18,9"/>
-                      </svg>
-                    </th>
+                    @for (col of columns(); track col.key) {
+                      <th scope="col" [class.th-num]="col.key !== 'name'" [attr.aria-sort]="ariaSort(col.key)">
+                        <button type="button" class="sort-btn" (click)="toggleSort(col.key)">
+                          {{ col.label }}
+                          <svg class="sort-icon" [class.active-col]="sortColumn() === col.key" [class.dir-asc]="sortColumn() === col.key && sortDir() === 'asc'" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                            <polyline points="6,9 12,15 18,9"/>
+                          </svg>
+                        </button>
+                      </th>
+                    }
                   </tr>
                 </thead>
                 <tbody>
-                  @for (cat of sortedCategories(); track cat) {
+                  @for (cat of sortedCategories(); track cat.type + (cat.category_id ?? 'none')) {
 <tr>
-                    <td class="cat-name-cell">
-                      <span class="cat-color-dot" [style.background]="cat.color || 'var(--text-muted)'"></span>
-                      {{ cat.name }}
-                    </td>
-                    <td class="num-cell">{{ cat.a | currency }}</td>
-                    <td class="num-cell">{{ cat.b | currency }}</td>
+                    <th scope="row" class="cat-name-cell">
+                      <span class="cat-color-dot" aria-hidden="true" [style.background]="cat.color || 'var(--text-muted)'"></span>
+                      <span class="cat-name-text">{{ cat.name }}</span>
+                      <span class="cat-type">{{ cat.type === 'income' ? 'Income' : 'Spending' }}</span>
+                    </th>
+                    <td class="num-cell">{{ money(cat.a) }}</td>
+                    <td class="num-cell">{{ money(cat.b) }}</td>
                     <td class="num-cell">
-                      <span class="delta-badge" [ngClass]="catDeltaClass(cat.delta)">
-                        {{ cat.delta >= 0 ? '+' : '' }}{{ cat.delta | currency }}
-                      </span>
-                    </td>
-                    <td class="num-cell">
-                      <span class="delta-badge" [ngClass]="catDeltaClass(cat.delta)">
-                        {{ cat.delta_pct >= 0 ? '+' : '' }}{{ cat.delta_pct | number:'1.1-1' }}%
-                      </span>
-                    </td>
-                  </tr>
-}
-                  <!-- Total row -->
-                  @if (result()!.categories.length > 0) {
-<tr class="total-row">
-                    <td class="total-label">Total</td>
-                    <td class="num-cell total-val">{{ totalA() | currency }}</td>
-                    <td class="num-cell total-val">{{ totalB() | currency }}</td>
-                    <td class="num-cell">
-                      <span class="delta-badge" [ngClass]="catDeltaClass(totalDelta())">
-                        {{ totalDelta() >= 0 ? '+' : '' }}{{ totalDelta() | currency }}
-                      </span>
+                      <span class="delta-badge" [ngClass]="deltaClass(cat.delta, cat.type === 'income')">{{ signed(cat.delta) }}</span>
                     </td>
                     <td class="num-cell">
-                      <span class="delta-badge" [ngClass]="catDeltaClass(totalDelta())">
-                        {{ totalA() !== 0 ? ((totalDelta() / totalA()) * 100 | number:'1.1-1') + '%' : '—' }}
-                      </span>
+                      <span class="delta-badge" [ngClass]="deltaClass(cat.delta, cat.type === 'income')">{{ pct(cat.delta_pct, cat.b) }}</span>
                     </td>
                   </tr>
 }
@@ -403,69 +316,38 @@ function computePresetRanges(preset: Preset): DateRange | null {
             </div>
 
             <!-- Mobile card list -->
-            <div class="mobile-cat-list">
-              @for (cat of sortedCategories(); track cat) {
-<div class="mobile-cat-card">
+            <ul class="mobile-cat-list">
+              @for (cat of sortedCategories(); track cat.type + (cat.category_id ?? 'none')) {
+<li class="mobile-cat-card">
                 <div class="mcc-header">
-                  <span class="cat-color-dot" [style.background]="cat.color || 'var(--text-muted)'"></span>
+                  <span class="cat-color-dot" aria-hidden="true" [style.background]="cat.color || 'var(--text-muted)'"></span>
                   <span class="mcc-name">{{ cat.name }}</span>
+                  <span class="cat-type">{{ cat.type === 'income' ? 'Income' : 'Spending' }}</span>
                 </div>
-                <div class="mcc-periods">
+                <dl class="mcc-periods">
                   <div class="mcc-period">
-                    <span class="mcc-period-label">Period A</span>
-                    <span class="mcc-period-val">{{ cat.a | currency }}</span>
+                    <dt class="mcc-period-label">{{ names()[0] }}</dt>
+                    <dd class="mcc-period-val">{{ money(cat.a) }}</dd>
                   </div>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="mcc-arrow">
-                    <line x1="5" y1="12" x2="19" y2="12"/><polyline points="13,6 19,12 13,18"/>
-                  </svg>
                   <div class="mcc-period">
-                    <span class="mcc-period-label">Period B</span>
-                    <span class="mcc-period-val">{{ cat.b | currency }}</span>
+                    <dt class="mcc-period-label">{{ names()[1] }}</dt>
+                    <dd class="mcc-period-val">{{ money(cat.b) }}</dd>
                   </div>
-                </div>
+                </dl>
                 <div class="mcc-delta">
-                  <span class="delta-badge" [ngClass]="catDeltaClass(cat.delta)">
-                    {{ cat.delta >= 0 ? '↑' : '↓' }}
-                    {{ cat.delta >= 0 ? '+' : '' }}{{ cat.delta | currency }}
-                    ({{ cat.delta_pct >= 0 ? '+' : '' }}{{ cat.delta_pct | number:'1.1-1' }}%)
+                  <span class="delta-badge" [ngClass]="deltaClass(cat.delta, cat.type === 'income')">
+                    {{ signed(cat.delta) }} ({{ pct(cat.delta_pct, cat.b) }})
                   </span>
                 </div>
-              </div>
+              </li>
 }
-
-              <!-- Mobile total -->
-              @if (result()!.categories.length > 0) {
-<div class="mobile-cat-card total-card">
-                <div class="mcc-header">
-                  <span class="mcc-name total-label">Total</span>
-                </div>
-                <div class="mcc-periods">
-                  <div class="mcc-period">
-                    <span class="mcc-period-label">Period A</span>
-                    <span class="mcc-period-val total-val">{{ totalA() | currency }}</span>
-                  </div>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="mcc-arrow">
-                    <line x1="5" y1="12" x2="19" y2="12"/><polyline points="13,6 19,12 13,18"/>
-                  </svg>
-                  <div class="mcc-period">
-                    <span class="mcc-period-label">Period B</span>
-                    <span class="mcc-period-val total-val">{{ totalB() | currency }}</span>
-                  </div>
-                </div>
-                <div class="mcc-delta">
-                  <span class="delta-badge" [ngClass]="catDeltaClass(totalDelta())">
-                    {{ totalDelta() >= 0 ? '↑' : '↓' }}
-                    {{ totalDelta() >= 0 ? '+' : '' }}{{ totalDelta() | currency }}
-                  </span>
-                </div>
-              </div>
-}
-            </div>
+            </ul>
+            }
 
             <!-- Empty categories -->
-            @if (result()!.categories.length === 0) {
+            @if (res.categories.length === 0) {
 <div class="no-categories">
-              <p class="text-secondary">No category data found for the selected periods.</p>
+              <p class="text-secondary">No income or spending in either period.</p>
             </div>
 }
           </div>
@@ -852,11 +734,37 @@ function computePresetRanges(preset: Preset): DateRange | null {
 
     .th-num { text-align: right; }
 
-    .th-sort {
+    .sort-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      min-height: 32px;
+      padding: 0;
+      border: none;
+      background: none;
+      font: inherit;
+      color: inherit;
+      text-transform: inherit;
+      letter-spacing: inherit;
       cursor: pointer;
-      user-select: none;
     }
-    .th-sort:hover { color: var(--text-primary); }
+    .sort-btn:hover { color: var(--text-primary); }
+    .sort-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+    .th-num .sort-btn { justify-content: flex-end; width: 100%; }
+
+    .cat-type {
+      font-size: var(--font-size-xs);
+      font-weight: 500;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    .cat-name-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+    .custom-help { font-size: var(--font-size-sm); color: var(--text-secondary); margin: 0; }
+    fieldset.range-group { border: none; margin: 0; padding: 0; min-width: 0; }
+    dl, dd { margin: 0; }
+    .summary-period dt { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-size-xs); color: var(--text-muted); }
+    .summary-delta { margin: 0; }
 
     .sort-icon {
       margin-left: 3px;
@@ -882,6 +790,8 @@ function computePresetRanges(preset: Preset): DateRange | null {
       display: flex;
       align-items: center;
       gap: var(--space-sm);
+      font-weight: 500;
+      text-align: left;
     }
 
     .cat-color-dot {
@@ -1051,61 +961,63 @@ export class ComparisonPageComponent implements OnInit, AfterViewInit, OnDestroy
   seriesColors = signal<{ a: string; b: string }>({ a: 'var(--color-primary)', b: 'var(--color-accent)' });
 
   // ── Sorting ────────────────────────────────────────────────────────────────
-  sortColumn = signal<string>('delta');
+  sortColumn = signal<SortColumn>('delta');
   sortDir    = signal<'asc' | 'desc'>('desc');
+
+  /** The two periods' names: "Last month" / "This month", or "Period A" / "Period B" for custom ranges. */
+  names = computed(() => PRESET_NAMES[this.selectedPreset()]);
+
+  columns = computed<{ key: SortColumn; label: string }[]>(() => [
+    { key: 'name', label: 'Category' },
+    { key: 'a', label: this.names()[0] },
+    { key: 'b', label: this.names()[1] },
+    { key: 'delta', label: 'Change' },
+    { key: 'delta_pct', label: 'Change %' },
+  ]);
 
   sortedCategories = computed(() => {
     const col = this.sortColumn();
-    const dir = this.sortDir();
+    const dir = this.sortDir() === 'asc' ? 1 : -1;
     const cats = this.result()?.categories ?? [];
-    return [...cats].sort((a, b) => {
-      const av = (a as any)[col] ?? 0;
-      const bv = (b as any)[col] ?? 0;
-      if (col === 'name') {
-        const cmp = String(av).localeCompare(String(bv));
-        return dir === 'asc' ? cmp : -cmp;
+    const value = (c: ComparisonCategory): number => {
+      if (col === 'delta_pct') {
+        // "new" (no base) sorts above every percentage, "n/a" below.
+        if (c.delta_pct === null) return c.b !== 0 ? Number.MAX_SAFE_INTEGER : Number.MIN_SAFE_INTEGER;
+        return c.delta_pct;
       }
-      return dir === 'asc' ? av - bv : bv - av;
+      return col === 'name' ? 0 : c[col];
+    };
+    return [...cats].sort((a, b) => {
+      if (col === 'name') return dir * a.name.localeCompare(b.name);
+      return dir * (value(a) - value(b)) || a.name.localeCompare(b.name);
     });
   });
 
-  // ── Totals ─────────────────────────────────────────────────────────────────
-  totalA = computed(() =>
-    (this.result()?.categories ?? []).reduce((acc, c) => acc + c.a, 0)
-  );
-
-  totalB = computed(() =>
-    (this.result()?.categories ?? []).reduce((acc, c) => acc + c.b, 0)
-  );
-
-  totalDelta = computed(() => this.totalB() - this.totalA());
-
-  // ── Delta class helpers ────────────────────────────────────────────────────
-  incomeDeltaClass = computed(() => {
-    const d = this.result()?.summary.income.delta ?? 0;
-    if (d > 0) return 'delta-positive';
-    if (d < 0) return 'delta-negative';
-    return 'delta-neutral';
+  /** Income, spending and net, each with whether a rise is good news. */
+  summaryCards = computed(() => {
+    const s = this.result()?.summary;
+    if (!s) return [];
+    return [
+      { key: 'income', title: 'Income', value: s.income, upIsGood: true },
+      { key: 'expenses', title: 'Spending', value: s.expenses, upIsGood: false },
+      { key: 'net', title: 'Net cash flow', value: s.net, upIsGood: true },
+    ];
   });
 
-  expenseDeltaClass = computed(() => {
-    // For expenses: negative delta (less spending) = green, positive = red
-    const d = this.result()?.summary.expenses.delta ?? 0;
-    if (d < 0) return 'delta-positive';
-    if (d > 0) return 'delta-negative';
-    return 'delta-neutral';
-  });
-
-  netDeltaClass = computed(() => {
-    const d = this.result()?.summary.net.delta ?? 0;
-    if (d > 0) return 'delta-positive';
-    if (d < 0) return 'delta-negative';
-    return 'delta-neutral';
+  chartLabel = computed(() => {
+    const s = this.result()?.summary;
+    if (!s) return 'Comparison chart';
+    const [a, b] = this.names();
+    return `Bar chart. Income: ${a} ${this.money(s.income.a)}, ${b} ${this.money(s.income.b)}. `
+      + `Spending: ${a} ${this.money(s.expenses.a)}, ${b} ${this.money(s.expenses.b)}. `
+      + `Net cash flow: ${a} ${this.money(s.net.a)}, ${b} ${this.money(s.net.b)}.`;
   });
 
   private chart: Chart | null = null;
   private dataReady  = false;
   private viewReady  = false;
+
+  private readonly settings = inject(SettingsService);
 
   constructor(private ledgerService: LedgerService) {}
 
@@ -1129,7 +1041,7 @@ export class ComparisonPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.selectedPreset.set(preset);
     if (preset === 'custom') return;
 
-    const range = computePresetRanges(preset);
+    const range = computePresetRanges(preset, todayKey(this.settings.timezone()));
     if (!range) return;
     this.activeRange.set(range);
     this.fetch(range.aFrom, range.aTo, range.bFrom, range.bTo);
@@ -1180,7 +1092,8 @@ export class ComparisonPageComponent implements OnInit, AfterViewInit, OnDestroy
     // Read at draw time so a theme or dark-mode change lands on the next redraw.
     const tone = chartTones();
     this.seriesColors.set({ a: tone.primary, b: tone.accent });
-    const labels = ['Income', 'Expenses', 'Net Cashflow'];
+    const labels = ['Income', 'Spending', 'Net cash flow'];
+    const [nameA, nameB] = this.names();
     const aData  = [res.summary.income.a, res.summary.expenses.a, res.summary.net.a];
     const bData  = [res.summary.income.b, res.summary.expenses.b, res.summary.net.b];
 
@@ -1190,14 +1103,14 @@ export class ComparisonPageComponent implements OnInit, AfterViewInit, OnDestroy
         labels,
         datasets: [
           {
-            label: 'Period A',
+            label: nameA,
             data: aData,
             backgroundColor: tone.primary,
             borderRadius: 4,
             borderSkipped: false,
           },
           {
-            label: 'Period B',
+            label: nameB,
             data: bData,
             backgroundColor: tone.accent,
             borderRadius: 4,
@@ -1212,11 +1125,7 @@ export class ComparisonPageComponent implements OnInit, AfterViewInit, OnDestroy
           legend: { display: false },
           tooltip: {
             callbacks: {
-              label: ctx => {
-                const val = ctx.parsed.y ?? 0;
-                const sign = val < 0 ? '-' : '';
-                return ` ${ctx.dataset.label}: ${sign}$${Math.abs(val).toFixed(2)}`;
-              },
+              label: ctx => ` ${ctx.dataset.label}: ${this.money(ctx.parsed.y ?? 0)}`,
             },
           },
         },
@@ -1230,7 +1139,7 @@ export class ComparisonPageComponent implements OnInit, AfterViewInit, OnDestroy
             ticks: {
               font: { size: 11 },
               color: tone.muted,
-              callback: v => `$${Number(v).toLocaleString()}`,
+              callback: v => new Intl.NumberFormat('en-US', { style: 'currency', currency: this.settings.currency(), maximumFractionDigits: 0 }).format(Number(v)),
             },
           },
         },
@@ -1241,7 +1150,7 @@ export class ComparisonPageComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
   // ── Sorting ────────────────────────────────────────────────────────────────
-  toggleSort(col: string): void {
+  toggleSort(col: SortColumn): void {
     if (this.sortColumn() === col) {
       this.sortDir.set(this.sortDir() === 'asc' ? 'desc' : 'asc');
     } else {
@@ -1250,19 +1159,46 @@ export class ComparisonPageComponent implements OnInit, AfterViewInit, OnDestroy
     }
   }
 
-  // ── Category delta class ───────────────────────────────────────────────────
-  // Without category type context we treat a positive delta as negative
-  // (more spending / less income) and a negative delta as positive (improvement).
-  // This is conservative — the badge is at least consistently meaningful.
-  catDeltaClass(delta: number): string {
-    if (delta < 0) return 'delta-positive';
-    if (delta > 0) return 'delta-negative';
-    return 'delta-neutral';
+  ariaSort(col: SortColumn): 'ascending' | 'descending' | 'none' {
+    if (this.sortColumn() !== col) return 'none';
+    return this.sortDir() === 'asc' ? 'ascending' : 'descending';
   }
 
   // ── Formatting ─────────────────────────────────────────────────────────────
-  formatDelta(delta: number, deltaPct: number): string {
-    const sign = delta >= 0 ? '+' : '';
-    return `${sign}$${Math.abs(delta).toFixed(2)} (${sign}${deltaPct.toFixed(1)}%)`;
+
+  /** Green when the change is good news: more income, or less spending. */
+  deltaClass(delta: number, upIsGood: boolean): string {
+    if (delta === 0) return 'delta-neutral';
+    return (delta > 0) === upIsGood ? 'delta-positive' : 'delta-negative';
+  }
+
+  money(v: number): string {
+    return formatCurrency(v, this.settings.currency());
+  }
+
+  signed(v: number): string {
+    return formatSignedCurrency(v, this.settings.currency());
+  }
+
+  pct(p: number | null, current: number): string {
+    return formatPctChange(p, current);
+  }
+
+  /** "Up $120.00 (+12.5%) on last month", "Down ...", "No change ...", or "New ..." from zero. */
+  changeSentence(v: ComparisonValue): string {
+    const [earlier] = this.names();
+    const base = this.selectedPreset() === 'custom' ? 'on Period A' : `on ${earlier.toLowerCase()}`;
+    if (v.delta === 0) return `No change ${base}`;
+    const amount = this.money(Math.abs(v.delta));
+    const pct = formatPctChange(v.delta_pct, v.b);
+    const dir = v.delta > 0 ? 'Up' : 'Down';
+    return pct === 'new' || pct === 'n/a'
+      ? `${dir} ${amount} ${base} (${pct === 'new' ? 'nothing before' : 'n/a'})`
+      : `${dir} ${amount} (${pct}) ${base}`;
+  }
+
+  rangeText(from: string, to: string): string {
+    const fmt = (s: string) => parseDateOnly(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return `${fmt(from)} to ${fmt(to)}`;
   }
 }

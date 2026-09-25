@@ -14,12 +14,12 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
   template: `
     <div class="groups-page">
 
-      <jiro-page-header heading="Journaly" subtitle="Your reflection space">
+      <jiro-page-header heading="Groups" subtitle="Shared journals with people you invite">
         <jiro-button actions variant="primary" type="button" routerLink="/journal/new">New entry</jiro-button>
       </jiro-page-header>
 
       <div class="section-row">
-        <h2 class="section-title">My Groups</h2>
+        <h2 class="section-title">Your groups</h2>
         <jiro-button variant="secondary" type="button" (click)="showCreate.set(true)">+ New Group</jiro-button>
       </div>
 
@@ -61,8 +61,8 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     @if (showCreate()) {
 <jiro-modal title="New Group" (close)="showCreate.set(false)">
       <div class="modal-form">
-        <label class="form-label">Group name</label>
-        <input type="text" class="form-control" [(ngModel)]="newName" placeholder="e.g. Weekend Adventures" maxlength="100" />
+        <label class="form-label" for="new-group-name">Group name</label>
+        <input id="new-group-name" type="text" class="form-control" [(ngModel)]="newName" placeholder="e.g. Weekend Adventures" maxlength="100" />
       </div>
       <div class="modal-actions">
         <jiro-button variant="secondary" type="button" (click)="showCreate.set(false)">Cancel</jiro-button>

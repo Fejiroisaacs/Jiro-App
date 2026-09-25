@@ -1,0 +1,250 @@
+[
+  {
+    "name": "overview",
+    "path": "/ledger",
+    "waitFor": ".txn-row",
+    "actions": [
+      {
+        "wait": 600
+      }
+    ]
+  },
+  {
+    "name": "add-account",
+    "path": "/ledger/accounts",
+    "waitFor": ".acct-card",
+    "actions": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Add account"
+        }
+      },
+      {
+        "fill": ".modal-content input[name=name]",
+        "value": "Everyday Checking"
+      },
+      {
+        "fill": ".modal-content input[name=balance]",
+        "value": "2500"
+      }
+    ],
+    "clip": ".modal-content"
+  },
+  {
+    "name": "log-transaction",
+    "path": "/ledger",
+    "waitFor": ".txn-row",
+    "actions": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Log transaction"
+        }
+      },
+      {
+        "fill": ".modal-content input[name=amount]",
+        "value": "42.50"
+      },
+      {
+        "fill": ".modal-content input[name=description]",
+        "value": "Weekly shop"
+      },
+      {
+        "wait": 400
+      }
+    ],
+    "clip": ".modal-content"
+  },
+  {
+    "name": "repeat",
+    "path": "/ledger",
+    "waitFor": ".txn-row",
+    "viewport": {
+      "width": 1280,
+      "height": 1000
+    },
+    "actions": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Log transaction"
+        }
+      },
+      {
+        "fill": ".modal-content input[name=amount]",
+        "value": "1650"
+      },
+      {
+        "fill": ".modal-content input[name=description]",
+        "value": "Rent"
+      },
+      {
+        "click": {
+          "role": "switch",
+          "name": "Repeat"
+        }
+      },
+      {
+        "wait": 400
+      }
+    ],
+    "clip": ".modal-content"
+  },
+  {
+    "name": "transfer",
+    "path": "/ledger",
+    "waitFor": ".txn-row",
+    "actions": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Log transaction"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Transfer",
+          "exact": true
+        }
+      },
+      {
+        "fill": ".modal-content input[name=amount]",
+        "value": "400"
+      },
+      {
+        "fill": ".modal-content input[name=description]",
+        "value": "Monthly savings"
+      },
+      {
+        "wait": 400
+      }
+    ],
+    "clip": ".modal-content"
+  },
+  {
+    "name": "transactions",
+    "path": "/ledger/transactions",
+    "waitFor": ".tx-row",
+    "actions": [
+      {
+        "click": ".desktop-filters .type-btn:nth-child(3)"
+      },
+      {
+        "wait": 1200
+      }
+    ]
+  },
+  {
+    "name": "edit-transaction",
+    "path": "/ledger/transactions",
+    "waitFor": ".tx-row",
+    "actions": [
+      {
+        "click": ".tx-row"
+      },
+      {
+        "wait": 600
+      },
+      {
+        "scroll": ".modal-content .danger-row"
+      },
+      {
+        "wait": 400
+      }
+    ],
+    "clip": ".modal-content"
+  },
+  {
+    "name": "budgets",
+    "path": "/ledger/budgets",
+    "waitFor": ".budget-card",
+    "actions": [
+      {
+        "wait": 400
+      }
+    ]
+  },
+  {
+    "name": "edit-budget",
+    "path": "/ledger/budgets",
+    "waitFor": ".budget-card",
+    "actions": [
+      {
+        "click": ".budget-card .icon-btn"
+      },
+      {
+        "wait": 400
+      }
+    ],
+    "clip": ".modal-content"
+  },
+  {
+    "name": "categories",
+    "path": "/ledger/budgets",
+    "waitFor": ".cm-row",
+    "actions": [
+      {
+        "wait": 400
+      }
+    ],
+    "clip": "ledger-category-manager",
+    "viewport": {
+      "width": 1280,
+      "height": 1000
+    }
+  },
+  {
+    "name": "delete-category",
+    "path": "/ledger/budgets",
+    "waitFor": ".cm-row",
+    "actions": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Delete Entertainment"
+        }
+      },
+      {
+        "wait": 400
+      }
+    ],
+    "clip": ".modal-content"
+  },
+  {
+    "name": "net-worth",
+    "path": "/ledger/net-worth",
+    "waitFor": ".chart-card canvas",
+    "actions": [
+      {
+        "wait": 1500
+      }
+    ]
+  },
+  {
+    "name": "compare",
+    "path": "/ledger/compare",
+    "waitFor": ".summary-card",
+    "actions": [
+      {
+        "wait": 1500
+      }
+    ]
+  },
+  {
+    "name": "phone-nav",
+    "path": "/ledger/budgets",
+    "waitFor": ".budget-card",
+    "actions": [
+      {
+        "wait": 600
+      }
+    ],
+    "clip": "body",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    }
+  }
+]

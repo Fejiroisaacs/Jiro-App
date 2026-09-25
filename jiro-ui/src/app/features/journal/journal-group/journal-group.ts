@@ -7,10 +7,14 @@ import {
   JournalGroup,
   JournalGroupMember,
   JournalEntry,
+  JournalInviteLink,
+  INVITE_LINK_DAYS,
   MOODS,
 } from '../../../core/services/journal.service';
 import { AuthService } from '../../../core/services/auth.service';
-import { JournalWeekViewComponent, toISO, currentWeekBounds } from '../journal-week-view/journal-week-view';
+import { JournalWeekViewComponent, currentWeekBounds } from '../journal-week-view/journal-week-view';
+import { SettingsService } from '../../../core/services/settings.service';
+import { dayKey } from '../../../core/utils/day';
 import { JournalDayModalComponent } from '../journal-day-modal/journal-day-modal';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
@@ -46,7 +50,7 @@ import { ToastService } from '../../../core/services/toast.service';
         </div>
         @if (group()) {
 <div class="header-actions">
-          <jiro-button variant="secondary" type="button" (click)="showMembers.set(true)">
+          <jiro-button variant="secondary" type="button" (click)="openMembers()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
               <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
@@ -216,12 +220,56 @@ import { ToastService } from '../../../core/services/toast.service';
       </div>
 }
 
+      <!-- Invite link (owner only) -->
+      @if (isOwner()) {
+<div class="invite-section">
+        <h3 class="invite-title">Invite link</h3>
+        <p class="invite-help text-secondary">
+          Anyone with a Jiro account who opens the link while signed in can join. A link works for {{ inviteLinkDays }} days, and making a new one turns the old one off.
+        </p>
+        @if (linkLoading()) {
+          <p class="invite-help text-secondary">Checking for a link...</p>
+        } @else if (newLinkUrl()) {
+          <div class="invite-row">
+            <label class="sr-only" for="invite-link-url">Invite link</label>
+            <input
+              id="invite-link-url"
+              #linkInput
+              type="text"
+              class="invite-input"
+              readonly
+              [value]="newLinkUrl()"
+              (focus)="linkInput.select()" />
+            <jiro-button variant="primary" type="button" (click)="copyLink(linkInput)">Copy</jiro-button>
+          </div>
+          <p class="invite-help text-secondary">Works until {{ formatExpiry(inviteLink()!.expires_at) }}. Copy it now: for your privacy Jiro keeps only a scrambled copy, so it cannot show this link again.</p>
+        } @else if (inviteLink()) {
+          <p class="invite-help">A link is on until {{ formatExpiry(inviteLink()!.expires_at) }}. Jiro cannot show it again; make a new link to copy one.</p>
+        }
+        @if (!linkLoading()) {
+        <div class="link-actions">
+          <jiro-button variant="secondary" type="button" [disabled]="linkBusy()" (click)="createLink()">
+            {{ inviteLink() ? 'Make a new link' : 'Create invite link' }}
+          </jiro-button>
+          @if (inviteLink()) {
+            <jiro-button variant="danger" type="button" [disabled]="linkBusy()" (click)="revokeLink()">Turn off link</jiro-button>
+          }
+        </div>
+        }
+        @if (linkError()) {
+<p class="invite-error" role="alert">{{ linkError() }}</p>
+}
+      </div>
+}
+
       <!-- Invite section (owner only) -->
       @if (isOwner()) {
 <div class="invite-section">
-        <h4 class="invite-title">Invite someone</h4>
+        <h3 class="invite-title">Invite by email</h3>
         <div class="invite-row">
+          <label class="sr-only" for="invite-email">Email address to invite</label>
           <input
+            id="invite-email"
             type="email"
             class="invite-input"
             placeholder="friend@example.com"
@@ -232,10 +280,10 @@ import { ToastService } from '../../../core/services/toast.service';
           </jiro-button>
         </div>
         @if (inviteError()) {
-<p class="invite-error">{{ inviteError() }}</p>
+<p class="invite-error" role="alert">{{ inviteError() }}</p>
 }
         @if (inviteSuccess()) {
-<p class="invite-success">{{ inviteSuccess() }}</p>
+<p class="invite-success" role="status">{{ inviteSuccess() }}</p>
 }
       </div>
 }
@@ -243,9 +291,11 @@ import { ToastService } from '../../../core/services/toast.service';
       <!-- Rename group (owner only) -->
       @if (isOwner()) {
 <div class="rename-section">
-        <h4 class="invite-title">Rename group</h4>
+        <h3 class="invite-title">Rename group</h3>
         <div class="invite-row">
+          <label class="sr-only" for="rename-group">New group name</label>
           <input
+            id="rename-group"
             type="text"
             class="invite-input"
             [(ngModel)]="renameVal"
@@ -365,6 +415,10 @@ import { ToastService } from '../../../core/services/toast.service';
     }
     .invite-input:focus { border-color: var(--color-primary); }
     .invite-error { font-size: var(--font-size-xs); color: var(--color-danger); margin-top: var(--space-xs); }
+    .invite-help { font-size: var(--font-size-xs); margin: 0 0 var(--space-sm); line-height: 1.5; }
+    .invite-row + .invite-help { margin-top: var(--space-xs); }
+    .invite-input { min-width: 0; }
+    .link-actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
     .invite-success { font-size: var(--font-size-xs); color: var(--color-success); margin-top: var(--space-xs); }
 
     .danger-zone { margin-top: var(--space-lg); padding-top: var(--space-lg); border-top: 1px solid var(--border-color); }
@@ -412,14 +466,17 @@ export class JournalGroupComponent implements OnInit {
   loading = signal(true);
   loadingEntries = signal(false);
 
-  weekFrom = signal(currentWeekBounds().from);
-  weekTo = signal(currentWeekBounds().to);
+  private readonly settings = inject(SettingsService);
+
+  /** The week the calendar shows, as day keys in the viewer's zone. */
+  weekFrom = signal(currentWeekBounds(this.settings.timezone()).from);
+  weekTo = signal(currentWeekBounds(this.settings.timezone()).to);
 
   weekEntries = computed(() => {
     const from = this.weekFrom();
     const to = this.weekTo();
     return this.entries().filter(e => {
-      const key = toISO(new Date(e.created_at));
+      const key = this.dayOf(e.created_at);
       return key >= from && key <= to;
     });
   });
@@ -439,13 +496,22 @@ export class JournalGroupComponent implements OnInit {
   dayModalEntries = computed(() => {
     const date = this.dayModalDate();
     if (!date) return [];
-    return this.entries().filter(e => toISO(new Date(e.created_at)) === date);
+    return this.entries().filter(e => this.dayOf(e.created_at) === date);
   });
 
   currentUserId = computed(() => this.auth.user()?.id ?? null);
 
   showMembers = signal(false);
 
+
+  readonly inviteLinkDays = INVITE_LINK_DAYS;
+  /** The group's working link (never its token once fetched again). */
+  inviteLink = signal<JournalInviteLink | null>(null);
+  /** The full URL of a link made in this visit; the only time it is known. */
+  newLinkUrl = signal('');
+  linkLoading = signal(false);
+  linkBusy = signal(false);
+  linkError = signal('');
 
   inviteEmail = '';
   inviting = signal(false);
@@ -504,7 +570,12 @@ export class JournalGroupComponent implements OnInit {
 
   openEntryModal(entry: JournalEntry) {
     this.dayModalInitEntry.set(entry);
-    this.dayModalDate.set(toISO(new Date(entry.created_at)));
+    this.dayModalDate.set(this.dayOf(entry.created_at));
+  }
+
+  /** The viewer's calendar day of an instant, as the week view cuts it. */
+  private dayOf(instant: string): string {
+    return dayKey(instant, this.settings.timezone());
   }
 
   closeDayModal() {
@@ -567,17 +638,95 @@ export class JournalGroupComponent implements OnInit {
         this.svc.getGroup(this.groupId).subscribe(g => this.group.set(g));
       },
       error: (err: any) => {
-        const code = err?.error?.code;
+        const code = err?.error?.error?.code;
         if (code === 'USER_NOT_FOUND') {
           this.inviteError.set('No Jiro account found with that email.');
         } else if (code === 'ALREADY_MEMBER') {
           this.inviteError.set('That user is already a member.');
         } else {
-          this.inviteError.set(err?.error?.message ?? 'Failed to send invite.');
+          this.inviteError.set(err?.error?.error?.message ?? 'Failed to send invite.');
         }
         this.inviting.set(false);
       },
     });
+  }
+
+  openMembers() {
+    this.showMembers.set(true);
+    if (!this.isOwner() || this.newLinkUrl()) return;
+    this.linkLoading.set(true);
+    this.linkError.set('');
+    this.svc.getInviteLink(this.groupId).subscribe({
+      next: link => { this.inviteLink.set(link); this.linkLoading.set(false); },
+      error: () => { this.linkLoading.set(false); this.linkError.set('Could not check the invite link.'); },
+    });
+  }
+
+  async createLink() {
+    if (this.inviteLink()) {
+      const ok = await this.confirmService.confirm({
+        title: 'Make a new invite link?',
+        message: 'The current link stops working. Anyone who already joined stays in the group.',
+        confirmLabel: 'Make new link',
+        danger: false,
+      });
+      if (!ok) return;
+    }
+    this.linkBusy.set(true);
+    this.linkError.set('');
+    this.svc.createInviteLink(this.groupId).subscribe({
+      next: link => {
+        this.inviteLink.set(link);
+        this.newLinkUrl.set(`${window.location.origin}/journal/join?token=${link.token}`);
+        this.linkBusy.set(false);
+      },
+      error: (err: any) => {
+        this.linkBusy.set(false);
+        this.linkError.set(err?.error?.error?.message ?? 'Could not make an invite link.');
+      },
+    });
+  }
+
+  async revokeLink() {
+    const ok = await this.confirmService.confirm({
+      title: 'Turn off the invite link?',
+      message: 'Nobody new can join with it. Anyone who already joined stays in the group.',
+      confirmLabel: 'Turn off link',
+      danger: true,
+    });
+    if (!ok) return;
+    this.linkBusy.set(true);
+    this.linkError.set('');
+    this.svc.revokeInviteLink(this.groupId).subscribe({
+      next: () => {
+        this.inviteLink.set(null);
+        this.newLinkUrl.set('');
+        this.linkBusy.set(false);
+        this.toast.success('Invite link turned off');
+      },
+      error: (err: any) => {
+        this.linkBusy.set(false);
+        this.linkError.set(err?.error?.error?.message ?? 'Could not turn off the link.');
+      },
+    });
+  }
+
+  async copyLink(input: HTMLInputElement) {
+    const url = this.newLinkUrl();
+    try {
+      await navigator.clipboard.writeText(url);
+      this.toast.success('Invite link copied');
+    } catch {
+      // No clipboard access (older browser, insecure context): select it so
+      // the owner can copy it themselves.
+      input.focus();
+      input.select();
+      this.toast.error('Could not copy. The link is selected; copy it from there.');
+    }
+  }
+
+  formatExpiry(s: string): string {
+    return new Date(s).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: this.settings.timezone() });
   }
 
   async removeMember(m: JournalGroupMember) {

@@ -65,6 +65,29 @@ func PickLocation(setting, hint string) (*time.Location, string) {
 	return UserLocation(hint)
 }
 
+// userLocation reads the user's settings timezone and returns the zone their
+// days are cut in, with the same precedence as GET /day (PickLocation). Every
+// day-based endpoint calls it once per request. The zone's name
+// (loc.String()) is also valid for Postgres's AT TIME ZONE: the embedded
+// tzdata and Postgres's use the same IANA names.
+func userLocation(ctx context.Context, db *pgxpool.Pool, userID uuid.UUID, hint string) (*time.Location, error) {
+	var tzName *string
+	if err := db.QueryRow(ctx,
+		`SELECT settings->>'timezone' FROM users WHERE id = $1`, userID,
+	).Scan(&tzName); err != nil {
+		return nil, fmt.Errorf("load timezone: %w", err)
+	}
+	loc, _ := PickLocation(deref(tzName), hint)
+	return loc, nil
+}
+
+// calendarToday is today's calendar date in loc, at UTC midnight (the form
+// the day and week helpers here work in).
+func calendarToday(now time.Time, loc *time.Location) time.Time {
+	y, m, d := now.In(loc).Date()
+	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+}
+
 // DayWindow is the instant range [start, end) of the calendar day
 // year-month-day in loc: local midnight to the next local midnight. The end
 // comes from AddDate on the calendar date, not start+24h, so the window is

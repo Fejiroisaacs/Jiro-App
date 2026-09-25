@@ -31,6 +31,8 @@ var (
 	ErrShareForbidden     = errors.New("not your share link")
 
 	ErrInvalidSessionType = errors.New("session type must be normal, deload or test")
+	ErrSessionEnded       = errors.New("session has already ended")
+	ErrDuplicateRoutine   = errors.New("routine listed more than once")
 )
 
 // validSessionTypes mirrors the sessions.session_type CHECK constraint
@@ -634,25 +636,103 @@ func (s *JymService) ReplaceRoutineItems(ctx context.Context, userID, routineID 
 	if err != nil || !exists {
 		return nil, ErrRoutineNotFound
 	}
+	if err := s.checkItemExercises(ctx, userID, items); err != nil {
+		return nil, err
+	}
 
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback(ctx)
-
-	if _, err = tx.Exec(ctx, `DELETE FROM routine_items WHERE routine_id = $1`, routineID); err != nil {
+	if err := replaceItemsTx(ctx, tx, routineID, items); err != nil {
 		return nil, err
 	}
+	if err = tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return s.listRoutineItems(ctx, routineID)
+}
 
-	for _, item := range items {
-		if owned, err := s.ownsExercise(ctx, item.ExerciseID, userID); err != nil {
+// ReplaceSplitItems replaces the items of several days of one split in a
+// single transaction. Moving an exercise from one day to another touches two
+// routines; saving them one request at a time could leave the exercise on
+// both days (or neither) if the second save failed.
+func (s *JymService) ReplaceSplitItems(ctx context.Context, userID, splitID uuid.UUID, entries []models.RoutineItemsEntry) ([]models.RoutineItemsResult, error) {
+	var owns bool
+	if err := s.db.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM splits WHERE id = $1 AND user_id = $2)`,
+		splitID, userID,
+	).Scan(&owns); err != nil {
+		return nil, err
+	}
+	if !owns {
+		return nil, ErrSplitNotFound
+	}
+
+	seen := make(map[uuid.UUID]bool, len(entries))
+	for _, e := range entries {
+		if seen[e.RoutineID] {
+			return nil, ErrDuplicateRoutine
+		}
+		seen[e.RoutineID] = true
+		var inSplit bool
+		if err := s.db.QueryRow(ctx,
+			`SELECT EXISTS(SELECT 1 FROM routines WHERE id = $1 AND split_id = $2)`,
+			e.RoutineID, splitID,
+		).Scan(&inSplit); err != nil {
 			return nil, err
-		} else if !owned {
-			return nil, ErrExerciseNotFound
+		}
+		if !inSplit {
+			return nil, ErrRoutineNotFound
+		}
+		if err := s.checkItemExercises(ctx, userID, e.Items); err != nil {
+			return nil, err
 		}
 	}
 
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	for _, e := range entries {
+		if err := replaceItemsTx(ctx, tx, e.RoutineID, e.Items); err != nil {
+			return nil, err
+		}
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	result := make([]models.RoutineItemsResult, 0, len(entries))
+	for _, e := range entries {
+		items, err := s.listRoutineItems(ctx, e.RoutineID)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, models.RoutineItemsResult{RoutineID: e.RoutineID, Items: items})
+	}
+	return result, nil
+}
+
+func (s *JymService) checkItemExercises(ctx context.Context, userID uuid.UUID, items []models.ReplaceItemEntry) error {
+	for _, item := range items {
+		if owned, err := s.ownsExercise(ctx, item.ExerciseID, userID); err != nil {
+			return err
+		} else if !owned {
+			return ErrExerciseNotFound
+		}
+	}
+	return nil
+}
+
+// replaceItemsTx swaps a routine's items for the given list, in order.
+// Zero targets fall back to 3 sets of 8.
+func replaceItemsTx(ctx context.Context, tx pgx.Tx, routineID uuid.UUID, items []models.ReplaceItemEntry) error {
+	if _, err := tx.Exec(ctx, `DELETE FROM routine_items WHERE routine_id = $1`, routineID); err != nil {
+		return err
+	}
 	for i, item := range items {
 		sets := item.TargetSets
 		if sets == 0 {
@@ -662,20 +742,18 @@ func (s *JymService) ReplaceRoutineItems(ctx context.Context, userID, routineID 
 		if reps == 0 {
 			reps = 8
 		}
-		if _, err = tx.Exec(ctx,
+		if _, err := tx.Exec(ctx,
 			`INSERT INTO routine_items (routine_id, exercise_id, target_sets, target_reps, order_index)
 			 VALUES ($1, $2, $3, $4, $5)`,
 			routineID, item.ExerciseID, sets, reps, i,
 		); err != nil {
-			return nil, err
+			return err
 		}
 	}
+	return nil
+}
 
-	if err = tx.Commit(ctx); err != nil {
-		return nil, err
-	}
-
-	// Return updated items with exercise names
+func (s *JymService) listRoutineItems(ctx context.Context, routineID uuid.UUID) ([]models.RoutineItemWithExercise, error) {
 	rows, err := s.db.Query(ctx,
 		`SELECT ri.id, ri.routine_id, ri.exercise_id, ri.target_sets, ri.target_reps, ri.order_index,
 		        e.name, e.muscle_group
@@ -690,7 +768,7 @@ func (s *JymService) ReplaceRoutineItems(ctx context.Context, userID, routineID 
 	}
 	defer rows.Close()
 
-	var result []models.RoutineItemWithExercise
+	result := []models.RoutineItemWithExercise{}
 	for rows.Next() {
 		var item models.RoutineItemWithExercise
 		if err := rows.Scan(
@@ -702,10 +780,7 @@ func (s *JymService) ReplaceRoutineItems(ctx context.Context, userID, routineID 
 		}
 		result = append(result, item)
 	}
-	if result == nil {
-		result = []models.RoutineItemWithExercise{}
-	}
-	return result, nil
+	return result, rows.Err()
 }
 
 // ─── Sessions ─────────────────────────────────────────────────────────────────
@@ -1033,6 +1108,9 @@ func (s *JymService) ListFormChecks(ctx context.Context, userID, exerciseID uuid
 	return result, nil
 }
 
+// UpdateSession changes a session's notes or type, and finishes it when
+// EndedAt is set. A session finishes once: finishing an ended one is
+// ErrSessionEnded, so a stale tab cannot move the end time.
 func (s *JymService) UpdateSession(ctx context.Context, userID, sessionID uuid.UUID, req *models.UpdateSessionRequest) (*models.Session, error) {
 	sess := &models.Session{}
 	err := s.db.QueryRow(ctx,
@@ -1041,11 +1119,20 @@ func (s *JymService) UpdateSession(ctx context.Context, userID, sessionID uuid.U
 		   notes        = COALESCE($4, notes),
 		   session_type = COALESCE($5, session_type)
 		 WHERE id = $1 AND user_id = $2
+		   AND ($3::timestamptz IS NULL OR ended_at IS NULL)
 		 RETURNING id, user_id, routine_id, series_id, session_type, started_at, ended_at, notes`,
 		sessionID, userID, req.EndedAt, req.Notes, req.SessionType,
 	).Scan(&sess.ID, &sess.UserID, &sess.RoutineID, &sess.SeriesID, &sess.SessionType, &sess.StartedAt, &sess.EndedAt, &sess.Notes)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			// Tell "no such session" apart from "already finished".
+			var ended bool
+			if qerr := s.db.QueryRow(ctx,
+				`SELECT ended_at IS NOT NULL FROM sessions WHERE id = $1 AND user_id = $2`,
+				sessionID, userID,
+			).Scan(&ended); qerr == nil && ended {
+				return nil, ErrSessionEnded
+			}
 			return nil, ErrSessionNotFound
 		}
 		return nil, err
@@ -1114,11 +1201,52 @@ func (s *JymService) GetSessionAttachmentKeys(ctx context.Context, userID, sessi
 
 // ─── Sets ─────────────────────────────────────────────────────────────────────
 
+// isNewPR reports whether a set beats the best non-warm-up set before it: a
+// strictly heavier weight, or the same weight for more reps. A warm-up is
+// never a PR, whatever it weighs.
+func isNewPR(weight float64, reps int, isWarmup bool, bestWeight float64, bestReps int) bool {
+	if isWarmup {
+		return false
+	}
+	return weight > bestWeight || (weight == bestWeight && reps > bestReps)
+}
+
+// roundWeight rounds kg to the 2 decimals session_sets.weight keeps.
+func roundWeight(kg float64) float64 {
+	return math.Round(kg*100) / 100
+}
+
+// bestWorkingSet returns the heaviest non-warm-up weight the user has logged
+// for an exercise and the most reps done at that weight. excludeSetID and
+// before narrow it to the sets logged before a given one; pass uuid.Nil and
+// nil for all history. Zeroes when there is no history.
+func bestWorkingSet(ctx context.Context, q interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
+}, userID, exerciseID, excludeSetID uuid.UUID, before *time.Time) (float64, int, error) {
+	var bestWeight float64
+	var bestReps int
+	err := q.QueryRow(ctx,
+		`WITH hist AS (
+		   SELECT ss.weight, ss.reps_performed
+		   FROM session_sets ss
+		   JOIN sessions s ON ss.session_id = s.id
+		   WHERE ss.exercise_id = $1 AND s.user_id = $2 AND ss.is_warmup = false
+		     AND ss.id <> $3
+		     AND ($4::timestamptz IS NULL OR ss.created_at < $4)
+		 )
+		 SELECT COALESCE(MAX(weight), 0),
+		        COALESCE(MAX(reps_performed) FILTER (WHERE weight = (SELECT MAX(weight) FROM hist)), 0)
+		 FROM hist`,
+		exerciseID, userID, excludeSetID, before,
+	).Scan(&bestWeight, &bestReps)
+	return bestWeight, bestReps, err
+}
+
 func (s *JymService) LogSet(ctx context.Context, userID, sessionID uuid.UUID, req *models.CreateSetRequest) (*models.SessionSet, error) {
-	// Verify session ownership and get session type
+	// Verify session ownership, and that it is still live
 	var ownerID uuid.UUID
-	var sessionType string
-	if err := s.db.QueryRow(ctx, `SELECT user_id, session_type FROM sessions WHERE id = $1`, sessionID).Scan(&ownerID, &sessionType); err != nil {
+	var endedAt *time.Time
+	if err := s.db.QueryRow(ctx, `SELECT user_id, ended_at FROM sessions WHERE id = $1`, sessionID).Scan(&ownerID, &endedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrSessionNotFound
 		}
@@ -1127,34 +1255,9 @@ func (s *JymService) LogSet(ctx context.Context, userID, sessionID uuid.UUID, re
 	if ownerID != userID {
 		return nil, ErrNotOwner
 	}
-
-	isWarmup := req.IsWarmup != nil && *req.IsWarmup
-
-	// A PR is: strictly higher weight than ever before, OR same weight with more reps.
-	var isPR bool
-	var bestWeight float64
-	var bestReps int
-	// Fetch historical best: highest weight ever, and max reps achieved at that weight.
-	// COALESCE on aggregates guarantees exactly one row even when there is no history.
-	s.db.QueryRow(ctx,
-		`SELECT
-				COALESCE(MAX(ss.weight), 0),
-				COALESCE(MAX(ss.reps_performed) FILTER (
-					WHERE ss.weight = (
-						SELECT MAX(ss2.weight)
-						FROM session_sets ss2
-						JOIN sessions s2 ON ss2.session_id = s2.id
-						WHERE ss2.exercise_id = $1 AND s2.user_id = $2
-						AND ss2.is_warmup = false
-					)
-				), 0)
-			FROM session_sets ss
-			JOIN sessions s ON ss.session_id = s.id
-			WHERE ss.exercise_id = $1 AND s.user_id = $2 AND ss.is_warmup = false`,
-		req.ExerciseID, userID,
-	).Scan(&bestWeight, &bestReps)
-	isPR = req.Weight > bestWeight ||
-		(req.Weight == bestWeight && req.RepsPerformed > bestReps)
+	if endedAt != nil {
+		return nil, ErrSessionEnded
+	}
 
 	if owned, err := s.ownsExercise(ctx, req.ExerciseID, userID); err != nil {
 		return nil, err
@@ -1162,12 +1265,22 @@ func (s *JymService) LogSet(ctx context.Context, userID, sessionID uuid.UUID, re
 		return nil, ErrExerciseNotFound
 	}
 
+	isWarmup := req.IsWarmup != nil && *req.IsWarmup
+	// Compare at the precision the column stores, or a lbs user's 175 lbs
+	// (79.3787 kg) never ties the 79.38 already saved.
+	weight := roundWeight(req.Weight)
+	bestWeight, bestReps, err := bestWorkingSet(ctx, s.db, userID, req.ExerciseID, uuid.Nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	isPR := isNewPR(weight, req.RepsPerformed, isWarmup, bestWeight, bestReps)
+
 	set := &models.SessionSet{}
-	err := s.db.QueryRow(ctx,
+	err = s.db.QueryRow(ctx,
 		`INSERT INTO session_sets (session_id, exercise_id, set_number, weight, reps_performed, rpe, is_pr, is_warmup, exercise_note)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		 RETURNING id, session_id, exercise_id, set_number, weight, reps_performed, rpe, is_pr, is_warmup, exercise_note, created_at`,
-		sessionID, req.ExerciseID, req.SetNumber, req.Weight, req.RepsPerformed, req.RPE, isPR, isWarmup, req.ExerciseNote,
+		sessionID, req.ExerciseID, req.SetNumber, weight, req.RepsPerformed, req.RPE, isPR, isWarmup, req.ExerciseNote,
 	).Scan(&set.ID, &set.SessionID, &set.ExerciseID, &set.SetNumber, &set.Weight,
 		&set.RepsPerformed, &set.RPE, &set.IsPR, &set.IsWarmup, &set.ExerciseNote, &set.CreatedAt)
 	if err != nil {
@@ -1176,9 +1289,18 @@ func (s *JymService) LogSet(ctx context.Context, userID, sessionID uuid.UUID, re
 	return set, nil
 }
 
+// UpdateSet edits a logged set. When the weight, reps or warm-up flag change,
+// the PR flag is worked out again against the sets logged before it, so
+// marking a PR set as a warm-up takes its badge away.
 func (s *JymService) UpdateSet(ctx context.Context, userID, setID uuid.UUID, req *models.UpdateSetRequest) (*models.SessionSet, error) {
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
 	set := &models.SessionSet{}
-	err := s.db.QueryRow(ctx,
+	err = tx.QueryRow(ctx,
 		`UPDATE session_sets SET
 		   weight         = COALESCE($3, weight),
 		   reps_performed = COALESCE($4, reps_performed),
@@ -1195,6 +1317,24 @@ func (s *JymService) UpdateSet(ctx context.Context, userID, setID uuid.UUID, req
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrSetNotFound
 		}
+		return nil, err
+	}
+
+	if req.Weight != nil || req.RepsPerformed != nil || req.IsWarmup != nil {
+		bestWeight, bestReps, err := bestWorkingSet(ctx, tx, userID, set.ExerciseID, set.ID, &set.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		isPR := isNewPR(set.Weight, set.RepsPerformed, set.IsWarmup, bestWeight, bestReps)
+		if isPR != set.IsPR {
+			if _, err := tx.Exec(ctx, `UPDATE session_sets SET is_pr = $2 WHERE id = $1`, set.ID, isPR); err != nil {
+				return nil, err
+			}
+			set.IsPR = isPR
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
 	return set, nil
@@ -1651,19 +1791,28 @@ func csvSafe(v string) string {
 	return v
 }
 
-func (s *JymService) StreamSessionsCSV(ctx context.Context, userID uuid.UUID, from, to *time.Time, exerciseID *uuid.UUID, w io.Writer) error {
-	args := []interface{}{userID}
+// StreamSessionsCSV writes the user's sets as CSV. from and to are calendar
+// dates (only their year/month/day are used); they, and the date column, are
+// the user's calendar days in their location (settings timezone, else
+// tzHint, else UTC), the days the app shows each session under.
+func (s *JymService) StreamSessionsCSV(ctx context.Context, userID uuid.UUID, from, to *time.Time, exerciseID *uuid.UUID, tzHint string, w io.Writer) error {
+	loc, err := userLocation(ctx, s.db, userID, tzHint)
+	if err != nil {
+		return err
+	}
+	args := []interface{}{userID, loc.String()}
 	where := "WHERE s.user_id = $1"
-	p := 2
+	p := 3
 
 	if from != nil {
+		start, _ := DayWindow(from.Year(), from.Month(), from.Day(), loc)
 		where += fmt.Sprintf(" AND s.started_at >= $%d", p)
-		args = append(args, *from)
+		args = append(args, start)
 		p++
 	}
 	if to != nil {
 		// include the full end day
-		end := to.AddDate(0, 0, 1)
+		_, end := DayWindow(to.Year(), to.Month(), to.Day(), loc)
 		where += fmt.Sprintf(" AND s.started_at < $%d", p)
 		args = append(args, end)
 		p++
@@ -1675,7 +1824,7 @@ func (s *JymService) StreamSessionsCSV(ctx context.Context, userID uuid.UUID, fr
 
 	query := `
 		SELECT
-			s.started_at::date,
+			(s.started_at AT TIME ZONE $2)::date,
 			s.id,
 			COALESCE(r.name, ''),
 			e.name,

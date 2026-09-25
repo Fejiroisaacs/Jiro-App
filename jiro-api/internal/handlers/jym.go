@@ -421,6 +421,39 @@ func (h *JymHandler) ReplaceRoutineItems(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+// ReplaceSplitItems saves the full item lists of several days of one split
+// in one transaction (a drag between days changes two of them).
+func (h *JymHandler) ReplaceSplitItems(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	splitID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid split ID"}})
+		return
+	}
+	var req models.ReplaceSplitItemsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()}})
+		return
+	}
+	result, err := h.jymService.ReplaceSplitItems(c.Request.Context(), userID, splitID, req.Routines)
+	if err != nil {
+		switch err {
+		case services.ErrSplitNotFound:
+			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Split not found"}})
+		case services.ErrRoutineNotFound:
+			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Routine not found in this split"}})
+		case services.ErrExerciseNotFound:
+			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Exercise not found"}})
+		case services.ErrDuplicateRoutine:
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: "Each routine may appear only once"}})
+		default:
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to update routine items"}})
+		}
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
 // ─── Templates ────────────────────────────────────────────────────────────────
 
 func (h *JymHandler) ListTemplates(c *gin.Context) {
@@ -533,15 +566,16 @@ func (h *JymHandler) UpdateSession(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()}})
 		return
 	}
-	// Default ended_at to now if not provided
-	if req.EndedAt == nil {
-		now := time.Now()
-		req.EndedAt = &now
-	}
+	// Only a request that carries ended_at finishes the session. Saving notes
+	// or the session type mid-workout must leave it running.
 	sess, err := h.jymService.UpdateSession(c.Request.Context(), userID, sessionID, &req)
 	if err != nil {
 		if err == services.ErrSessionNotFound {
 			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Session not found"}})
+			return
+		}
+		if err == services.ErrSessionEnded {
+			respondSessionEnded(c)
 			return
 		}
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to update session"}})
@@ -740,6 +774,10 @@ func (h *JymHandler) LogSet(c *gin.Context) {
 			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Session not found"}})
 			return
 		}
+		if err == services.ErrSessionEnded {
+			respondSessionEnded(c)
+			return
+		}
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to log set"}})
 		return
 	}
@@ -875,7 +913,8 @@ func (h *JymHandler) ExportSessions(c *gin.Context) {
 	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
 	c.Status(http.StatusOK)
 
-	if err := h.jymService.StreamSessionsCSV(c.Request.Context(), userID, from, to, exerciseID, c.Writer); err != nil {
+	// tz is only a fallback for a user with no timezone setting, as on GET /day.
+	if err := h.jymService.StreamSessionsCSV(c.Request.Context(), userID, from, to, exerciseID, c.Query("tz"), c.Writer); err != nil {
 		log.Error().Err(err).Msg("failed to stream sessions CSV")
 	}
 	analytics.TrackEvent(h.db, userID, "export.csv", nil)
@@ -966,4 +1005,10 @@ func (h *JymHandler) ImportShare(c *gin.Context) {
 	}
 	analytics.TrackEvent(h.db, userID, "split.import", nil)
 	c.JSON(http.StatusCreated, models.ImportShareResponse{SplitID: newSplitID.String()})
+}
+
+// respondSessionEnded is the 409 for writes that only make sense while a
+// session is live (logging a set, finishing it).
+func respondSessionEnded(c *gin.Context) {
+	c.JSON(http.StatusConflict, models.ErrorResponse{Error: models.ErrorDetail{Code: "SESSION_ENDED", Message: "This session has already finished"}})
 }

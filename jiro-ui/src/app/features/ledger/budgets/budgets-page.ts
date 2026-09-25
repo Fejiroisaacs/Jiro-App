@@ -14,7 +14,11 @@ import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-he
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { periodLabel, clamp, formatCurrency } from '../shared/ledger-utils';
+import { SettingsService } from '../../../core/services/settings.service';
+import { periodLabel, clamp, formatCurrency, currencySymbol } from '../shared/ledger-utils';
+import { LedgerCategoryDialogComponent } from '../shared/category-dialog/ledger-category-dialog';
+import { LedgerCategoryManagerComponent } from '../shared/category-manager/ledger-category-manager';
+import { LedgerCategory } from '../../../core/services/ledger.service';
 
 @Component({
   selector: 'app-budgets-page',
@@ -22,12 +26,13 @@ import { periodLabel, clamp, formatCurrency } from '../shared/ledger-utils';
   imports: [
     CommonModule, FormsModule, JiroCardComponent, JiroButtonComponent, JiroModalComponent,
     JiroIconComponent, JiroPageHeaderComponent, JiroEmptyStateComponent,
+    LedgerCategoryDialogComponent, LedgerCategoryManagerComponent,
   ],
   template: `
     <div class="budgets-page">
 
       <!-- Header -->
-      <jiro-page-header heading="Budgets" subtitle="Track your spending against limits">
+      <jiro-page-header heading="Budgets" subtitle="Spending limits, and the categories behind them">
         <jiro-button actions type="button" (click)="openAddModal()">
           <jiro-icon name="plus" [size]="14" />
           Add budget
@@ -41,7 +46,7 @@ import { periodLabel, clamp, formatCurrency } from '../shared/ledger-utils';
 
       <!-- Summary bar -->
       @if (!loading() && budgets().length > 0) {
-<div class="summary-bar">
+<section class="summary-bar" aria-label="All budgets, this period">
         <div class="summary-item">
           <span class="summary-label">Total budgeted</span>
           <span class="summary-value">{{ money(totalBudgeted()) }}</span>
@@ -58,7 +63,7 @@ import { periodLabel, clamp, formatCurrency } from '../shared/ledger-utils';
             {{ money(totalBudgeted() - totalSpent()) }}
           </span>
         </div>
-      </div>
+      </section>
 }
 
       <!-- Empty state -->
@@ -76,7 +81,7 @@ import { periodLabel, clamp, formatCurrency } from '../shared/ledger-utils';
       <!-- Budget grid -->
       @if (!loading() && budgets().length > 0) {
 <div class="budgets-grid">
-        @for (budget of budgets(); track budget) {
+        @for (budget of budgets(); track budget.id) {
 <jiro-card class="budget-card">
 
           <!-- Card header -->
@@ -84,16 +89,21 @@ import { periodLabel, clamp, formatCurrency } from '../shared/ledger-utils';
             <div class="category-info">
               <span
                 class="color-dot"
+                aria-hidden="true"
                 [style.background]="budget.category_color || 'var(--text-muted)'">
               </span>
-              <span class="category-name">{{ budget.category_name }}</span>
+              <h2 class="category-name">{{ budget.category_name }}</h2>
             </div>
             <span class="period-badge">{{ periodLabel(budget.period) }}</span>
           </div>
 
           <!-- Progress bar -->
           <div class="progress-section">
-            <div class="progress-track">
+            <div class="progress-track" role="progressbar"
+              [attr.aria-label]="budget.category_name + ' budget used'"
+              aria-valuemin="0" aria-valuemax="100"
+              [attr.aria-valuenow]="clamp(round(budget.pct_used), 0, 100)"
+              [attr.aria-valuetext]="round(budget.pct_used) + '% used'">
               <div
                 class="progress-fill"
                 [style.width.%]="clamp(budget.pct_used, 0, 100)"
@@ -118,20 +128,22 @@ import { periodLabel, clamp, formatCurrency } from '../shared/ledger-utils';
 }
             @if (budget.remaining < 0) {
 <span class="remaining-over">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
                 <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
               </svg>
               Over budget by {{ money(-budget.remaining) }}
             </span>
 }
-            <button class="delete-btn" type="button" (click)="deleteBudget(budget)" title="Delete budget"
-              [attr.aria-label]="'Delete the ' + budget.category_name + ' budget'">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <polyline points="3,6 5,6 21,6"/>
-                <path d="M19,6l-1,14a2,2,0,0,1-2,2H8a2,2,0,0,1-2-2L5,6"/>
-                <path d="M10,11v6M14,11v6M9,6V4a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1V6"/>
-              </svg>
-            </button>
+            <span class="card-actions">
+              <button class="icon-btn" type="button" (click)="openEdit(budget)"
+                [attr.aria-label]="'Edit the ' + budget.category_name + ' budget'">
+                <jiro-icon name="pencil-simple" [size]="16" />
+              </button>
+              <button class="icon-btn delete-btn" type="button" (click)="deleteBudget(budget)"
+                [attr.aria-label]="'Delete the ' + budget.category_name + ' budget'">
+                <jiro-icon name="trash" [size]="16" />
+              </button>
+            </span>
           </div>
 
         </jiro-card>
@@ -139,36 +151,39 @@ import { periodLabel, clamp, formatCurrency } from '../shared/ledger-utils';
       </div>
 }
 
+      <!-- Categories: rename, recolour, delete -->
+      @if (!loading()) {
+        <ledger-category-manager class="cat-manager" (changed)="onCategoriesChanged()" />
+      }
+
       <!-- Add Budget Modal -->
       @if (showAddModal()) {
-<jiro-modal title="Add Budget" maxWidth="480px" (close)="closeAddModal()">
+<jiro-modal title="Add budget" maxWidth="480px" (close)="closeAddModal()">
         <form class="modal-form" (ngSubmit)="submitBudget()">
 
           <div class="form-group">
             <div class="label-row">
-              <label class="form-label">Category</label>
-              <button type="button" class="new-cat-btn" (click)="openCatModal()">+ New</button>
+              <label class="form-label" for="budget-add-category">Category</label>
+              <button type="button" class="new-cat-btn" (click)="showCatDialog.set(true)">+ New category</button>
             </div>
-            <select class="form-input" [(ngModel)]="newCategoryId" name="category" required>
+            <select id="budget-add-category" class="form-input" [(ngModel)]="newCategoryId" name="category" required>
               <option value="" disabled>Select a category...</option>
-              @for (cat of expenseCategories(); track cat) {
-
+              @for (cat of expenseCategories(); track cat.id) {
                 <option [value]="cat.id">{{ cat.name }}</option>
-                @for (child of cat.children; track child) {
-<option [value]="child.id">
-                  &nbsp;&nbsp;{{ child.name }}
-                </option>
-}
-              
-}
+                @for (child of cat.children; track child.id) {
+                  <option [value]="child.id">{{ cat.name }} / {{ child.name }}</option>
+                }
+              }
             </select>
           </div>
 
           <div class="form-group">
-            <label class="form-label">Limit ($)</label>
+            <label class="form-label" for="budget-add-amount">Limit ({{ symbol() }})</label>
             <input
+              id="budget-add-amount"
               class="form-input"
               type="number"
+              inputmode="decimal"
               [(ngModel)]="newAmount"
               name="amount"
               min="0.01"
@@ -178,62 +193,71 @@ import { periodLabel, clamp, formatCurrency } from '../shared/ledger-utils';
           </div>
 
           <div class="form-group">
-            <label class="form-label">Period</label>
-            <select class="form-input" [(ngModel)]="newPeriod" name="period">
+            <label class="form-label" for="budget-add-period">Period</label>
+            <select id="budget-add-period" class="form-input" [(ngModel)]="newPeriod" name="period">
+              <option value="monthly">Monthly</option>
+              <option value="weekly">Weekly</option>
+              <option value="yearly">Yearly</option>
+            </select>
+            <p class="field-hint">A budget always tracks the current {{ periodWord(newPeriod) }}, starting over at the next one.</p>
+          </div>
+
+          @if (formError()) {
+            <p class="form-error" role="alert">{{ formError() }}</p>
+          }
+          <div class="form-actions">
+            <jiro-button variant="secondary" type="button" (click)="closeAddModal()">Cancel</jiro-button>
+            <jiro-button variant="primary" type="submit" [disabled]="saving() || !newCategoryId || !newAmount">
+              {{ saving() ? 'Saving...' : 'Create budget' }}
+            </jiro-button>
+          </div>
+
+        </form>
+      </jiro-modal>
+}
+
+      <!-- Edit Budget Modal -->
+      @if (editing(); as b) {
+<jiro-modal [title]="'Edit the ' + b.category_name + ' budget'" maxWidth="480px" (close)="closeEdit()">
+        <form class="modal-form" (ngSubmit)="submitEdit(b)">
+          <div class="form-group">
+            <label class="form-label" for="budget-edit-amount">Limit ({{ symbol() }})</label>
+            <input
+              id="budget-edit-amount"
+              class="form-input"
+              type="number"
+              inputmode="decimal"
+              [(ngModel)]="editAmount"
+              name="amount"
+              min="0.01"
+              step="0.01"
+              required />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="budget-edit-period">Period</label>
+            <select id="budget-edit-period" class="form-input" [(ngModel)]="editPeriod" name="period">
               <option value="monthly">Monthly</option>
               <option value="weekly">Weekly</option>
               <option value="yearly">Yearly</option>
             </select>
           </div>
-
-          <div class="form-group">
-            <label class="form-label">Start Date</label>
-            <input
-              class="form-input"
-              type="date"
-              [(ngModel)]="newStartDate"
-              name="startDate"
-              required />
-          </div>
-
+          @if (formError()) {
+            <p class="form-error" role="alert">{{ formError() }}</p>
+          }
           <div class="form-actions">
-            <jiro-button variant="secondary" type="button" (click)="closeAddModal()">Cancel</jiro-button>
-            <jiro-button variant="primary" type="submit" [disabled]="saving() || !newCategoryId || !newAmount">
-              {{ saving() ? 'Saving...' : 'Create Budget' }}
-            </jiro-button>
-          </div>
-
-        </form>
-      </jiro-modal>
-}
-
-      <!-- New Category Modal -->
-      @if (showCatModal()) {
-<jiro-modal title="New Category" maxWidth="400px" (close)="closeCatModal()">
-        <form class="modal-form" (ngSubmit)="submitCategory()">
-          <div class="form-group">
-            <label class="form-label">Name</label>
-            <input class="form-input" type="text" [(ngModel)]="catForm.name" name="cat_name" placeholder="e.g. Groceries" required />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Type</label>
-            <div class="seg-group">
-              <button type="button" class="seg-btn" [class.active]="catForm.type === 'expense'" (click)="catForm.type = 'expense'">Expense</button>
-              <button type="button" class="seg-btn" [class.active]="catForm.type === 'income'" (click)="catForm.type = 'income'">Income</button>
-            </div>
-          </div>
-          @if (catError()) {
-<p class="form-error">{{ catError() }}</p>
-}
-          <div class="form-actions">
-            <jiro-button variant="secondary" type="button" (click)="closeCatModal()">Cancel</jiro-button>
-            <jiro-button variant="primary" type="submit" [disabled]="catSaving() || !catForm.name.trim()">
-              {{ catSaving() ? 'Saving...' : 'Create' }}
+            <jiro-button variant="secondary" type="button" (click)="closeEdit()">Cancel</jiro-button>
+            <jiro-button variant="primary" type="submit" [disabled]="saving() || !editAmount || editAmount <= 0">
+              {{ saving() ? 'Saving...' : 'Save changes' }}
             </jiro-button>
           </div>
         </form>
       </jiro-modal>
 }
+
+      <!-- New Category (from the Add budget dialog) -->
+      @if (showCatDialog()) {
+        <ledger-category-dialog defaultType="expense" (saved)="onCategoryCreated($event)" (closed)="showCatDialog.set(false)" />
+      }
 
     </div>
   `,
@@ -304,13 +328,27 @@ import { periodLabel, clamp, formatCurrency } from '../shared/ledger-utils';
     /* ── Budgets grid ── */
     .budgets-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
       gap: var(--space-lg);
     }
 
     @media (max-width: 600px) {
-      .budgets-grid { grid-template-columns: 1fr; }
+      .budgets-grid { grid-template-columns: minmax(0, 1fr); }
     }
+
+    .cat-manager { display: block; margin-top: var(--space-2xl); }
+
+    .card-actions { display: inline-flex; gap: 2px; margin-left: auto; flex-shrink: 0; }
+
+    .icon-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 40px; height: 40px; border: none; background: none; cursor: pointer;
+      border-radius: var(--border-radius); color: var(--text-secondary);
+    }
+    .icon-btn:hover { background: var(--bg-canvas); color: var(--color-primary); }
+    .icon-btn.delete-btn:hover { color: var(--color-danger); }
+
+    .field-hint { font-size: var(--font-size-xs); color: var(--text-muted); margin: 0; line-height: 1.5; }
 
     .budget-card { display: flex; flex-direction: column; gap: var(--space-md); }
 
@@ -334,6 +372,7 @@ import { periodLabel, clamp, formatCurrency } from '../shared/ledger-utils';
       font-size: var(--font-size-md);
       font-weight: 600;
       color: var(--text-primary);
+      margin: 0;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -374,8 +413,10 @@ import { periodLabel, clamp, formatCurrency } from '../shared/ledger-utils';
 
     .progress-labels {
       display: flex;
+      flex-wrap: wrap;
       justify-content: space-between;
-      align-items: center;
+      align-items: baseline;
+      gap: 2px var(--space-sm);
     }
 
     .spent-label { font-size: var(--font-size-sm); color: var(--text-secondary); }
@@ -384,6 +425,8 @@ import { periodLabel, clamp, formatCurrency } from '../shared/ledger-utils';
       font-size: var(--font-size-xs);
       font-weight: 600;
       color: var(--color-accent);
+      white-space: nowrap;
+      margin-left: auto;
     }
 
     .pct-label.warn { color: var(--color-warning); }
@@ -411,29 +454,6 @@ import { periodLabel, clamp, formatCurrency } from '../shared/ledger-utils';
       color: var(--color-danger);
     }
 
-    /* ── Delete button ── */
-    .delete-btn {
-      min-width: 40px; min-height: 40px;
-      flex-shrink: 0;
-      background: none;
-      border: 1px solid var(--border-color);
-      color: var(--text-muted);
-      cursor: pointer;
-      width: 32px; height: 32px;
-      border-radius: var(--border-radius);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.15s;
-      position: relative;
-    }
-
-    .delete-btn:hover {
-      color: var(--color-danger);
-      border-color: rgba(var(--color-danger-rgb), 0.3);
-      background: rgba(var(--color-danger-rgb), 0.05);
-      box-shadow: 1px 1px 0 rgba(var(--color-danger-rgb), 0.2);
-    }
 
     /* ── Modal form ── */
     .modal-form { display: flex; flex-direction: column; gap: var(--space-md); }
@@ -449,7 +469,7 @@ import { periodLabel, clamp, formatCurrency } from '../shared/ledger-utils';
     .new-cat-btn {
       background: none;
       border: none;
-      padding: 0;
+      padding: 8px 0;
       font-size: var(--font-size-sm);
       font-weight: 500;
       color: var(--color-primary);
@@ -501,30 +521,6 @@ import { periodLabel, clamp, formatCurrency } from '../shared/ledger-utils';
 
     .form-error { font-size: var(--font-size-sm); color: var(--color-danger); margin: 0; }
 
-    /* ── Segmented control ── */
-    .seg-group {
-      display: flex;
-      border: 1px solid var(--border-color);
-      border-radius: var(--border-radius);
-      overflow: hidden;
-    }
-    .seg-btn {
-      flex: 1;
-      padding: 9px 12px;
-      border: none;
-      background: var(--bg-surface);
-      color: var(--text-secondary);
-      font-size: var(--font-size-sm);
-      font-weight: 500;
-      cursor: pointer;
-      transition: background 0.15s, color 0.15s;
-    }
-    .seg-btn + .seg-btn { border-left: 1px solid var(--border-color); }
-    .seg-btn.active {
-      background: var(--color-primary);
-      color: var(--text-on-primary);
-    }
-
     /* ── Delete confirm ── */
   `]
 })
@@ -540,17 +536,21 @@ export class BudgetsPageComponent implements OnInit {
   showAddModal = signal(false);
   private readonly confirmService = inject(ConfirmService);
   private readonly toast = inject(ToastService);
+  private readonly settings = inject(SettingsService);
 
-  showCatModal = signal(false);
-  catSaving = signal(false);
-  catError = signal('');
-  catForm = { name: '', type: 'expense' as 'expense' | 'income' };
+  showCatDialog = signal(false);
+  formError = signal('');
+  readonly symbol = computed(() => currencySymbol(this.settings.currency()));
 
-  // Form fields
+  // Add form fields
   newCategoryId = '';
   newAmount: number | null = null;
   newPeriod: 'monthly' | 'weekly' | 'yearly' = 'monthly';
-  newStartDate = '';
+
+  // Edit form fields
+  editing = signal<BudgetWithSpend | null>(null);
+  editAmount: number | null = null;
+  editPeriod: 'monthly' | 'weekly' | 'yearly' = 'monthly';
 
   expenseCategories = computed(() =>
     this.categories().filter(c => c.type === 'expense')
@@ -568,10 +568,28 @@ export class BudgetsPageComponent implements OnInit {
 
   ngOnInit() {
     this.loadBudgets();
+    this.loadCategories();
+  }
+
+  private loadCategories() {
     this.ledgerService.listCategories().subscribe({
       next: cats => this.categories.set(cats),
       error: () => {},
     });
+  }
+
+  /** A category was renamed, recoloured or deleted: budgets show its name and colour. */
+  onCategoriesChanged() {
+    this.loadCategories();
+    this.ledgerService.listBudgets().subscribe({ next: b => this.budgets.set(b) });
+  }
+
+  round(v: number): number {
+    return Math.round(v);
+  }
+
+  private reason(err: unknown, fallback: string): string {
+    return (err as { error?: { error?: { message?: string } } })?.error?.error?.message ?? fallback;
   }
 
   private loadBudgets() {
@@ -586,7 +604,7 @@ export class BudgetsPageComponent implements OnInit {
     this.newCategoryId = '';
     this.newAmount = null;
     this.newPeriod = 'monthly';
-    this.newStartDate = this.todayIso();
+    this.formError.set('');
     this.showAddModal.set(true);
   }
 
@@ -597,60 +615,63 @@ export class BudgetsPageComponent implements OnInit {
   submitBudget() {
     if (!this.newCategoryId || !this.newAmount) return;
     this.saving.set(true);
+    this.formError.set('');
     this.ledgerService.createBudget({
       category_id: this.newCategoryId,
       amount: this.newAmount,
       period: this.newPeriod,
-      start_date: this.newStartDate,
     }).subscribe({
       next: () => {
         this.saving.set(false);
         this.closeAddModal();
+        this.toast.success('Budget created');
         this.loadBudgets();
       },
-      error: () => this.saving.set(false),
-    });
-  }
-
-  openCatModal() {
-    this.catForm = { name: '', type: 'expense' };
-    this.catError.set('');
-    this.showCatModal.set(true);
-  }
-
-  closeCatModal() {
-    this.showCatModal.set(false);
-    this.catError.set('');
-  }
-
-  submitCategory() {
-    if (!this.catForm.name.trim()) return;
-    this.catSaving.set(true);
-    this.catError.set('');
-    this.ledgerService.createCategory({ name: this.catForm.name.trim(), type: this.catForm.type }).subscribe({
-      next: (created) => {
-        this.catSaving.set(false);
-        this.showCatModal.set(false);
-        this.ledgerService.listCategories().subscribe({
-          next: cats => {
-            this.categories.set(cats);
-            if (this.catForm.type === 'expense') {
-              this.newCategoryId = created.id;
-            }
-          },
-          error: () => {},
-        });
-      },
-      error: () => {
-        this.catSaving.set(false);
-        this.catError.set('Failed to create category. Please try again.');
+      error: err => {
+        this.saving.set(false);
+        this.formError.set(this.reason(err, 'The budget could not be saved. Please try again.'));
       },
     });
+  }
+
+  openEdit(b: BudgetWithSpend) {
+    this.editAmount = b.amount;
+    this.editPeriod = b.period;
+    this.formError.set('');
+    this.editing.set(b);
+  }
+
+  closeEdit() {
+    this.editing.set(null);
+  }
+
+  submitEdit(b: BudgetWithSpend) {
+    if (!this.editAmount || this.editAmount <= 0) return;
+    this.saving.set(true);
+    this.formError.set('');
+    this.ledgerService.updateBudget(b.id, { amount: this.editAmount, period: this.editPeriod }).subscribe({
+      next: () => {
+        this.saving.set(false);
+        this.closeEdit();
+        this.toast.success('Budget saved');
+        this.loadBudgets();
+      },
+      error: err => {
+        this.saving.set(false);
+        this.formError.set(this.reason(err, 'The budget could not be saved. Please try again.'));
+      },
+    });
+  }
+
+  onCategoryCreated(created: LedgerCategory) {
+    this.showCatDialog.set(false);
+    this.loadCategories();
+    if (created.type === 'expense') this.newCategoryId = created.id;
   }
 
   /** Budget amounts through the shared formatter: separators and one currency. */
   money(value: number): string {
-    return formatCurrency(value);
+    return formatCurrency(value, this.settings.currency());
   }
 
   /** "month" / "week" / "year", for the "of $400 this month" line. */
@@ -676,7 +697,4 @@ export class BudgetsPageComponent implements OnInit {
     });
   }
 
-  private todayIso(): string {
-    return new Date().toISOString().slice(0, 10);
-  }
 }

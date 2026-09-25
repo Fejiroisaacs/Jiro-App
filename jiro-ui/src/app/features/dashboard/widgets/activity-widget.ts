@@ -91,9 +91,13 @@ interface ActivityDay {
     .act-day { font-size: 10px; color: var(--text-muted); }
     .act-col--today .act-day { color: var(--color-primary); font-weight: 700; }
 
-    @media (max-width: 480px) {
-      .act-grid { gap: 3px; }
-      .act-day { font-size: 9px; }
+    /* Phones: 14 columns would be ~17px taps. Two rows of 7 (last week over
+       this week) keep every day at a comfortable width; 14 is exactly two
+       weeks, so each column holds the same weekday in both rows. */
+    @media (max-width: 600px) {
+      .act-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); row-gap: var(--space-sm); }
+      .act-col { padding: 4px 0; }
+      .act-cell { max-width: 28px; }
     }
   `],
 })

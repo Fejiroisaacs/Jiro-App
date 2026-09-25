@@ -1,0 +1,239 @@
+[
+  {
+    "name": "new-recipe",
+    "path": "/culinara",
+    "waitFor": ".recipe-card",
+    "viewport": {
+      "width": 1280,
+      "height": 1000
+    },
+    "actions": [
+      {
+        "click": {
+          "role": "button",
+          "name": "New recipe"
+        }
+      },
+      {
+        "fill": ".modal-content input[name=title]",
+        "value": "Lemon Garlic Pasta"
+      },
+      {
+        "fill": ".modal-content textarea[name=description]",
+        "value": "Fifteen minutes, one pot of water."
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Dinner",
+          "exact": true
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "+ Add ingredient"
+        }
+      },
+      {
+        "fill": ".modal-content .ingredient-row:nth-child(1) .ing-item",
+        "value": "Spaghetti"
+      },
+      {
+        "fill": ".modal-content .ingredient-row:nth-child(1) .ing-amount",
+        "value": "200g"
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "+ Add ingredient"
+        }
+      },
+      {
+        "fill": ".modal-content .ingredient-row:nth-child(2) .ing-item",
+        "value": "Garlic"
+      },
+      {
+        "fill": ".modal-content .ingredient-row:nth-child(2) .ing-amount",
+        "value": "3 cloves"
+      },
+      {
+        "fill": ".modal-content textarea[name=instructions]",
+        "value": "Boil the spaghetti in salted water.\nSoften the garlic in olive oil.\nToss with the pasta, lemon and a splash of pasta water."
+      }
+    ],
+    "clip": ".modal-content"
+  },
+  {
+    "name": "find-recipes",
+    "path": "/culinara",
+    "waitFor": ".recipe-card",
+    "actions": [
+      {
+        "click": {
+          "role": "button",
+          "name": "quick",
+          "exact": true
+        }
+      },
+      {
+        "wait": 300
+      }
+    ]
+  },
+  {
+    "name": "recipe-page",
+    "path": "/culinara",
+    "waitFor": ".recipe-card",
+    "actions": [
+      {
+        "click": {
+          "role": "link",
+          "name": "Greek Chicken Rice Bowls"
+        }
+      },
+      {
+        "wait": 300
+      }
+    ]
+  },
+  {
+    "name": "cook-mode",
+    "path": "/culinara",
+    "waitFor": ".recipe-card",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "actions": [
+      {
+        "click": {
+          "role": "link",
+          "name": "Greek Chicken Rice Bowls"
+        }
+      },
+      {
+        "wait": 300
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Start cooking"
+        }
+      },
+      {
+        "wait": 300
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "4 stars"
+        }
+      }
+    ],
+    "clip": "body"
+  },
+  {
+    "name": "log-trial",
+    "path": "/culinara",
+    "waitFor": ".recipe-card",
+    "viewport": {
+      "width": 1280,
+      "height": 900
+    },
+    "actions": [
+      {
+        "click": {
+          "role": "link",
+          "name": "Greek Chicken Rice Bowls"
+        }
+      },
+      {
+        "wait": 300
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "+ Log Trial"
+        }
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "+ Add modification"
+        }
+      },
+      {
+        "fill": ".modal-content .mod-row .mod-item",
+        "value": "Lemon juice"
+      },
+      {
+        "fill": ".modal-content .mod-row .mod-change",
+        "value": "4 tbsp"
+      },
+      {
+        "fill": ".modal-content textarea[name=notes]",
+        "value": "More lemon was better. Try it again next week."
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "4 stars"
+        }
+      }
+    ],
+    "clip": ".modal-content"
+  },
+  {
+    "name": "promote-trial",
+    "path": "/culinara",
+    "waitFor": ".recipe-card",
+    "actions": [
+      {
+        "click": {
+          "role": "link",
+          "name": "Greek Chicken Rice Bowls"
+        }
+      },
+      {
+        "wait": 300
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Promote",
+          "exact": true
+        }
+      }
+    ],
+    "clip": ".modal-content"
+  },
+  {
+    "name": "meal-planner",
+    "path": "/culinara/meal-planner",
+    "waitFor": ".calendar-grid"
+  },
+  {
+    "name": "planner-picker",
+    "path": "/culinara/meal-planner",
+    "waitFor": ".calendar-grid",
+    "actions": [
+      {
+        "click": ".calendar-cell:nth-of-type(14) .cell-add"
+      },
+      {
+        "fill": "#planner-recipe-search",
+        "value": "oat"
+      },
+      {
+        "wait": 200
+      }
+    ],
+    "clip": ".modal-content"
+  },
+  {
+    "name": "grocery-list",
+    "path": "/culinara/grocery-list",
+    "waitFor": ".shop-item"
+  }
+]

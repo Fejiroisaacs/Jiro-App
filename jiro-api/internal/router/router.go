@@ -192,6 +192,18 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 				culinara.POST("/meal-plan/:plan_id/entries", mealPlanHandler.AddEntry)
 				culinara.DELETE("/meal-plan/entries/:entry_id", mealPlanHandler.RemoveEntry)
 
+				// Grocery list
+				culinara.GET("/grocery-list", recipeHandler.ListGroceryItems)
+				culinara.DELETE("/grocery-list", recipeHandler.ClearGroceryList)
+				culinara.DELETE("/grocery-list/checked", recipeHandler.ClearCheckedGroceryItems)
+				culinara.POST("/grocery-list/check", recipeHandler.SetGroceryChecked)
+				culinara.POST("/grocery-list/import", recipeHandler.ImportGroceryList)
+				culinara.POST("/grocery-list/items", recipeHandler.AddGroceryItem)
+				culinara.PATCH("/grocery-list/items/:id", recipeHandler.UpdateGroceryItem)
+				culinara.DELETE("/grocery-list/items/:id", recipeHandler.DeleteGroceryItem)
+				culinara.POST("/grocery-list/recipes/:recipe_id", recipeHandler.AddRecipeToGroceryList)
+				culinara.POST("/grocery-list/meal-plan/:plan_id", recipeHandler.AddMealPlanToGroceryList)
+
 				// Public toggle
 				culinara.PATCH("/recipes/:id/public", recipeHandler.SetPublicStatus)
 
@@ -229,6 +241,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 				jym.PUT("/routines/:id", jymHandler.UpdateRoutine)
 				jym.DELETE("/routines/:id", jymHandler.DeleteRoutine)
 				jym.PUT("/routines/:id/items", jymHandler.ReplaceRoutineItems)
+				jym.PUT("/splits/:id/items", jymHandler.ReplaceSplitItems)
 
 				// Templates (standalone routines)
 				jym.GET("/templates", jymHandler.ListTemplates)
@@ -285,6 +298,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 				ledger.GET("/transactions", ledgerHandler.ListTransactions)
 				ledger.GET("/transactions/:id", ledgerHandler.GetTransaction)
 				ledger.PATCH("/transactions/:id", ledgerHandler.UpdateTransaction)
+				ledger.POST("/transactions/:id/stop-recurring", ledgerHandler.StopRecurring)
 				ledger.DELETE("/transactions/:id", ledgerHandler.DeleteTransaction)
 
 				// Categories
@@ -296,6 +310,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 				// Budgets
 				ledger.POST("/budgets", ledgerHandler.CreateBudget)
 				ledger.GET("/budgets", ledgerHandler.ListBudgets)
+				ledger.PATCH("/budgets/:id", ledgerHandler.UpdateBudget)
 				ledger.DELETE("/budgets/:id", ledgerHandler.DeleteBudget)
 
 				// Summary, Net Worth, Comparison
@@ -328,13 +343,18 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			// Groups
 			// Invite acceptance requires auth: the invite is bound to the
 			// redeeming user, so an anonymous caller has nobody to activate.
-			journal.POST("/groups/join", journalHandler.JoinGroup)
+			// Tokens are 256-bit, so the limit is for abuse, not guessing.
+			journal.GET("/groups/join/preview", middleware.RateLimitByUser(rl, "journal-join", 30), journalHandler.PreviewInvite)
+			journal.POST("/groups/join", middleware.RateLimitByUser(rl, "journal-join", 30), journalHandler.JoinGroup)
 			journal.POST("/groups", journalHandler.CreateGroup)
 			journal.GET("/groups", journalHandler.ListGroups)
 			journal.GET("/groups/:id", journalHandler.GetGroup)
 			journal.PUT("/groups/:id", journalHandler.UpdateGroup)
 			journal.DELETE("/groups/:id", journalHandler.DeleteGroup)
 			journal.POST("/groups/:id/invite", journalHandler.InviteMember)
+			journal.GET("/groups/:id/invite-link", journalHandler.GetInviteLink)
+			journal.POST("/groups/:id/invite-link", middleware.RateLimitByUser(rl, "journal-invite-link", 10), journalHandler.CreateInviteLink)
+			journal.DELETE("/groups/:id/invite-link", journalHandler.RevokeInviteLink)
 			journal.DELETE("/groups/:id/members/:user_id", journalHandler.RemoveMember)
 			journal.POST("/groups/:id/entries", journalHandler.CreateGroupEntry)
 			journal.GET("/groups/:id/entries", journalHandler.ListGroupEntries)

@@ -62,19 +62,23 @@ func (s *DemoService) Login(ctx context.Context) (uuid.UUID, error) {
 		return uuid.Nil, err
 	}
 
-	now := time.Now().UTC()
+	// The demo's today is a New York date (see demoDate), so its "yesterday"
+	// is the yesterday the day view and streaks show a New York user. The seed
+	// and the anchor take that date; keepFresh takes the instant and converts.
+	now := time.Now()
+	today := demoDate(now)
 	var id uuid.UUID
 	var anchor *time.Time
 	err = tx.QueryRow(ctx, `SELECT id, demo_anchor_at FROM users WHERE is_demo`).Scan(&id, &anchor)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
-		if id, err = s.seed(ctx, tx, now); err != nil {
+		if id, err = s.seed(ctx, tx, today); err != nil {
 			return uuid.Nil, fmt.Errorf("seed demo: %w", err)
 		}
 	case err != nil:
 		return uuid.Nil, err
 	case anchor == nil:
-		if _, err := tx.Exec(ctx, `UPDATE users SET demo_anchor_at = $2 WHERE id = $1`, id, now); err != nil {
+		if _, err := tx.Exec(ctx, `UPDATE users SET demo_anchor_at = $2 WHERE id = $1`, id, today); err != nil {
 			return uuid.Nil, err
 		}
 	default:
@@ -123,11 +127,12 @@ func (s *DemoService) seed(ctx context.Context, tx pgx.Tx, now time.Time) (uuid.
 	return id, nil
 }
 
-// demoDayShift is how many whole calendar days (UTC) the data must move so
+// demoDayShift is how many whole calendar days (in the demo's timezone; the
+// anchor is stored as UTC midnight of such a date) the data must move so
 // that what was "yesterday" at anchor is yesterday again at now. Never
 // negative, so a clock step backwards does nothing.
 func demoDayShift(anchor, now time.Time) int {
-	days := int(utcDay(now).Sub(utcDay(anchor)).Hours() / 24)
+	days := int(demoDate(now).Sub(utcDay(anchor)).Hours() / 24)
 	if days < 0 {
 		return 0
 	}
@@ -183,6 +188,7 @@ var demoShifts = []demoShift{
 	{sql: `UPDATE meal_plan_entries e SET created_at = e.created_at + ` + demoTS + ` FROM meal_plans p WHERE p.id = e.meal_plan_id AND p.user_id = $1`},
 	{sql: `UPDATE meal_plans SET week_start = week_start + $2::int * 7 + ` + fmt.Sprint(demoParkDays) + ` WHERE user_id = $1`, by: shiftWeeks},
 	{sql: `UPDATE meal_plans SET week_start = week_start - ` + fmt.Sprint(demoParkDays) + ` WHERE user_id = $1`, by: shiftNone},
+	{sql: `UPDATE grocery_items SET created_at = created_at + ` + demoTS + `, updated_at = updated_at + ` + demoTS + ` WHERE user_id = $1`},
 
 	// Journaly
 	{sql: `UPDATE journal_entries SET created_at = created_at + ` + demoTS + `, updated_at = updated_at + ` + demoTS + ` WHERE user_id = $1`},
@@ -197,6 +203,8 @@ var demoShifts = []demoShift{
 	{sql: `UPDATE ledger_budgets SET start_date = start_date + $2::int, created_at = created_at + ` + demoTS + `, updated_at = updated_at + ` + demoTS + ` WHERE user_id = $1`},
 	{sql: `UPDATE ledger_networth_snapshots SET snapshot_date = snapshot_date + $2::int + ` + fmt.Sprint(demoParkDays) + ` WHERE user_id = $1`},
 	{sql: `UPDATE ledger_networth_snapshots SET snapshot_date = snapshot_date - ` + fmt.Sprint(demoParkDays) + ` WHERE user_id = $1`, by: shiftNone},
+	// A recurring series' next due date (the demo never writes copies itself).
+	{sql: `UPDATE ledger_transactions SET recurrence_next_date = recurrence_next_date + $2::int WHERE user_id = $1 AND recurrence_next_date IS NOT NULL`},
 }
 
 // keepFresh slides every demo date forward by the whole days since anchor

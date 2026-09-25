@@ -1,7 +1,7 @@
 import { Component, signal } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { JiroCardComponent } from '../../shared/components/jiro-card/jiro-card';
 import { JiroButtonComponent } from '../../shared/components/jiro-button/jiro-button';
@@ -77,7 +77,7 @@ const USERNAME_PATTERN = /^[a-z0-9_]{3,30}$/;
           </form>
 
           <p class="auth-footer">
-            Already have an account? <a routerLink="/login">Sign in</a>
+            Already have an account? <a routerLink="/login" [queryParams]="returnQuery">Sign in</a>
           </p>
         </jiro-card>
       </div>
@@ -152,7 +152,19 @@ export class RegisterComponent {
   passwordMismatch = signal(false);
   usernameError = signal('');
 
-  constructor(private authService: AuthService, private router: Router) {}
+  /** Where to go once registered: a same-origin path from ?returnUrl=
+   *  (as login reads it, e.g. a group invite), else the dashboard. */
+  private returnUrl = '/dashboard';
+  /** Carries ?returnUrl= over to the sign-in link, when there is one. */
+  returnQuery: { returnUrl: string } | null = null;
+
+  constructor(private authService: AuthService, private router: Router, route: ActivatedRoute) {
+    const requested = route.snapshot.queryParamMap.get('returnUrl') ?? '';
+    if (requested.startsWith('/') && !requested.startsWith('//')) {
+      this.returnUrl = requested;
+      this.returnQuery = { returnUrl: requested };
+    }
+  }
 
   canSubmit(): boolean {
     const usernameOk = !this.username || USERNAME_PATTERN.test(this.username.toLowerCase());
@@ -176,7 +188,7 @@ export class RegisterComponent {
 
     this.authService.register(this.email, this.password, this.displayName.trim(), this.username.toLowerCase() || undefined).subscribe({
       next: () => {
-        this.router.navigate(['/dashboard']);
+        this.router.navigateByUrl(this.returnUrl);
       },
       error: (err) => {
         this.loading.set(false);

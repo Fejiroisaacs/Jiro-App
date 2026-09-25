@@ -161,8 +161,25 @@ type UpdateRoutineRequest struct {
 // ReplaceRoutineItemsRequest is an ordered list for bulk replace after drag-drop.
 type ReplaceItemEntry struct {
 	ExerciseID uuid.UUID `json:"exercise_id" binding:"required"`
-	TargetSets int       `json:"target_sets"`
-	TargetReps int       `json:"target_reps"`
+	TargetSets int       `json:"target_sets" binding:"min=0,max=50"`
+	TargetReps int       `json:"target_reps" binding:"min=0,max=1000"`
+}
+
+// RoutineItemsEntry is one day's full, ordered item list inside a split-wide save.
+type RoutineItemsEntry struct {
+	RoutineID uuid.UUID          `json:"routine_id" binding:"required"`
+	Items     []ReplaceItemEntry `json:"items" binding:"max=100,dive"`
+}
+
+// ReplaceSplitItemsRequest saves several days of one split atomically, e.g.
+// the source and target day when an exercise is dragged between them.
+type ReplaceSplitItemsRequest struct {
+	Routines []RoutineItemsEntry `json:"routines" binding:"required,min=1,max=50,dive"`
+}
+
+type RoutineItemsResult struct {
+	RoutineID uuid.UUID                 `json:"routine_id"`
+	Items     []RoutineItemWithExercise `json:"items"`
 }
 
 // ─── Body Weight ──────────────────────────────────────────────────────────────

@@ -23,16 +23,59 @@ func TestDemoDayShift(t *testing.T) {
 		anchor, now string
 		want        int
 	}{
-		{"2026-09-24T10:00:00Z", "2026-09-24T23:59:00Z", 0},      // same day
-		{"2026-09-24T23:00:00Z", "2026-09-25T00:30:00Z", 1},      // calendar day, not 24 hours
-		{"2026-09-24T10:00:00Z", "2026-09-25T09:59:00Z", 1},      // under 24 hours but a new day
-		{"2026-09-14T10:00:00Z", "2026-09-24T10:00:00Z", 10},     // ten days
-		{"2026-02-27T12:00:00Z", "2026-03-02T01:00:00Z", 3},      // across a month end
-		{"2026-09-24T10:00:00Z", "2026-09-20T10:00:00Z", 0},      // clock went backwards
-		{"2026-09-24T02:00:00+05:00", "2026-09-24T12:00:00Z", 1}, // compared in UTC
+		// The anchor is a date (UTC midnight of a New York date); now is an
+		// instant, read in New York.
+		{"2026-09-24T00:00:00Z", "2026-09-24T23:59:00Z", 0},  // 19:59 in New York, same day
+		{"2026-09-24T00:00:00Z", "2026-09-25T03:59:00Z", 0},  // UTC is on the 25th, New York is not
+		{"2026-09-24T00:00:00Z", "2026-09-25T04:00:00Z", 1},  // New York midnight (EDT)
+		{"2026-09-14T00:00:00Z", "2026-09-24T16:00:00Z", 10}, // ten days
+		{"2026-02-27T00:00:00Z", "2026-03-02T06:00:00Z", 3},  // across a month end (EST)
+		{"2026-09-24T00:00:00Z", "2026-09-20T10:00:00Z", 0},  // clock went backwards
 	} {
 		if got := demoDayShift(mustTime(t, tc.anchor), mustTime(t, tc.now)); got != tc.want {
 			t.Errorf("demoDayShift(%s, %s) = %d, want %d", tc.anchor, tc.now, got, tc.want)
+		}
+	}
+}
+
+// Every seeded instant must fall on the same calendar date in UTC and in the
+// demo's timezone, or items drift to the previous New York evening (UTC hours
+// 00-04) and break "yesterday" and the streaks.
+func TestDemoTimesLandOnTheirNewYorkDay(t *testing.T) {
+	loc, err := time.LoadLocation(demoTimeZone)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, seed := range []string{"2026-09-25T00:00:00Z", "2026-01-15T00:00:00Z"} { // EDT and EST
+		ds := buildDemoDataset(mustTime(t, seed))
+		check := func(what string, ts time.Time) {
+			if ts.IsZero() {
+				return
+			}
+			if ts.UTC().Format("2006-01-02") != ts.In(loc).Format("2006-01-02") {
+				t.Errorf("%s at %s is %s in New York", what, ts.UTC().Format(time.RFC3339), ts.In(loc).Format("2006-01-02 15:04"))
+			}
+		}
+		for _, e := range ds.JournalEntries {
+			check("journal entry", e.CreatedAt)
+		}
+		for _, tr := range ds.Trials {
+			check("trial", tr.DateCooked)
+		}
+		for _, se := range ds.Sessions {
+			check("session start", se.StartedAt)
+		}
+	}
+}
+
+func TestDemoDate(t *testing.T) {
+	for in, want := range map[string]string{
+		"2026-09-25T01:00:00Z": "2026-09-24", // 21:00 the evening before in New York
+		"2026-09-25T04:00:00Z": "2026-09-25",
+		"2026-01-15T04:59:00Z": "2026-01-14", // EST: UTC-5
+	} {
+		if got := demoDate(mustTime(t, in)).Format("2006-01-02"); got != want {
+			t.Errorf("demoDate(%s) = %s, want %s", in, got, want)
 		}
 	}
 }
@@ -176,6 +219,28 @@ func TestDemoDatasetReferences(t *testing.T) {
 		}
 	}
 
+	if len(ds.GroceryItems) == 0 {
+		t.Errorf("the demo has no grocery list")
+	}
+	groceryKeys := map[string]bool{}
+	for _, g := range ds.GroceryItems {
+		if g.RecipeID != nil && !recipes[*g.RecipeID] {
+			t.Errorf("grocery item %q references a missing recipe", g.Item)
+		}
+		if (g.RecipeID == nil) != (g.RecipeTitle == "") {
+			t.Errorf("grocery item %q: a recipe item needs its title, a manual one none", g.Item)
+		}
+		source := groceryManualSource
+		if g.RecipeID != nil {
+			source = groceryRecipeSource(*g.RecipeID)
+		}
+		k := source + "|" + normalizeIngredientName(g.Item)
+		if groceryKeys[k] {
+			t.Errorf("duplicate grocery item %q (UNIQUE(user_id, source_key, name_key))", g.Item)
+		}
+		groceryKeys[k] = true
+	}
+
 	entries := map[uuid.UUID]bool{}
 	moods := map[string]bool{"happy": true, "grateful": true, "energised": true, "calm": true, "tired": true, "sad": true, "anxious": true, "stressed": true}
 	for _, e := range ds.JournalEntries {
@@ -282,6 +347,9 @@ func TestDemoDatasetDatesRelativeToNow(t *testing.T) {
 	for _, c := range ds.RecipeCollections {
 		checkTS("recipe collection", c.CreatedAt)
 	}
+	for _, g := range ds.GroceryItems {
+		checkTS("grocery item", g.CreatedAt)
+	}
 	for _, e := range ds.JournalEntries {
 		checkTS("journal entry", e.CreatedAt)
 	}
@@ -339,6 +407,9 @@ func TestDemoDatasetCopy(t *testing.T) {
 	}
 	for _, e := range ds.MealPlanEntries {
 		texts = append(texts, e.CustomLabel)
+	}
+	for _, g := range ds.GroceryItems {
+		texts = append(texts, g.Item, g.Amount)
 	}
 	for _, e := range ds.JournalEntries {
 		texts = append(texts, e.Title, e.Body)

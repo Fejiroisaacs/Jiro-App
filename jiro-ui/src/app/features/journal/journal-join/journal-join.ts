@@ -1,11 +1,22 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { JournalService } from '../../../core/services/journal.service';
+import { JournalService, JoinPreview } from '../../../core/services/journal.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { SettingsService } from '../../../core/services/settings.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 
-type State = 'loading' | 'joining' | 'success' | 'error' | 'no-token' | 'not-logged-in';
+type State =
+  | 'loading'      // waiting for auth, then the preview
+  | 'no-token'
+  | 'not-logged-in'
+  | 'ready'        // preview shown, Join offered
+  | 'already'      // already in the group
+  | 'demo'         // the look-only demo: can see, cannot join
+  | 'joining'
+  | 'success'
+  | 'unverified'   // the account must verify its email before joining
+  | 'error';
 
 @Component({
   selector: 'app-journal-join',
@@ -23,11 +34,47 @@ type State = 'loading' | 'joining' | 'success' | 'error' | 'no-token' | 'not-log
         </div>
         <h1 class="join-title">Journaly</h1>
 
+        <div aria-live="polite" class="join-live">
         <!-- Loading / joining -->
         @if (state() === 'loading' || state() === 'joining') {
 <div class="join-state">
-          <span class="spinner"></span>
-          <p class="text-secondary">{{ state() === 'loading' ? 'Preparing...' : 'Joining group...' }}</p>
+          <span class="spinner" aria-hidden="true"></span>
+          <p class="text-secondary">{{ state() === 'loading' ? 'Opening your invite...' : 'Joining the group...' }}</p>
+        </div>
+}
+
+        <!-- Preview: ready to join -->
+        @if (state() === 'ready' && preview(); as p) {
+<div class="join-state">
+          <h2>Join {{ p.group_name }}?</h2>
+          <p class="text-secondary">
+            A shared journal with {{ p.member_count }} {{ p.member_count === 1 ? 'member' : 'members' }}.
+            Members read each other's entries in the group; your own journal stays private.
+          </p>
+          <jiro-button block variant="primary" type="button" (click)="joinGroup()">Join group</jiro-button>
+          <p class="join-note text-secondary">This invite works until {{ formatExpiry(p.expires_at) }}.</p>
+          <a routerLink="/journal" class="secondary-link">Not now</a>
+        </div>
+}
+
+        <!-- Already a member -->
+        @if (state() === 'already' && preview(); as p) {
+<div class="join-state">
+          <h2>You're already in {{ p.group_name }}</h2>
+          <p class="text-secondary">Nothing to do here.</p>
+          <jiro-button block variant="primary" type="button" (click)="router.navigate(['/journal/groups', p.group_id])">Open group</jiro-button>
+        </div>
+}
+
+        <!-- Demo: look-only -->
+        @if (state() === 'demo') {
+<div class="join-state">
+          <h2>{{ preview() ? 'Invited to ' + preview()!.group_name : 'Group invite' }}</h2>
+          <p class="text-secondary">
+            The demo is look-only, so it cannot join groups. Leave the demo and create your own account, and this invite opens again afterwards.
+          </p>
+          <jiro-button block variant="primary" type="button" (click)="leaveDemoToRegister()">Create an account</jiro-button>
+          <a routerLink="/journal" class="secondary-link">Back to the demo</a>
         </div>
 }
 
@@ -42,9 +89,21 @@ type State = 'loading' | 'joining' | 'success' | 'error' | 'no-token' | 'not-log
           <h2>You're in!</h2>
           <p class="text-secondary">You've joined <strong>{{ groupName() }}</strong>. Start reading and writing together.</p>
           <jiro-button block variant="primary" type="button" (click)="router.navigate(['/journal/groups', groupId()])">
-            Open Group
+            Open group
           </jiro-button>
           <a routerLink="/journal" class="secondary-link">Back to Journaly</a>
+        </div>
+}
+
+        <!-- Unverified email -->
+        @if (state() === 'unverified') {
+<div class="join-state">
+          <h2>Verify your email first</h2>
+          <p class="text-secondary">
+            Jiro sent a link to your email when you signed up. Open it, then come back to this page and join.
+          </p>
+          <jiro-button block variant="primary" type="button" (click)="joinGroup()">I've verified, join now</jiro-button>
+          <a routerLink="/journal" class="secondary-link">Go to Journaly</a>
         </div>
 }
 
@@ -56,7 +115,7 @@ type State = 'loading' | 'joining' | 'success' | 'error' | 'no-token' | 'not-log
               <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
             </svg>
           </div>
-          <h2>Invite problem</h2>
+          <h2>This invite does not work</h2>
           <p class="text-secondary">{{ errorMessage() }}</p>
           <jiro-button block variant="primary" type="button" (click)="router.navigate(['/journal'])">
             Go to Journaly
@@ -73,7 +132,7 @@ type State = 'loading' | 'joining' | 'success' | 'error' | 'no-token' | 'not-log
             </svg>
           </div>
           <h2>Invalid link</h2>
-          <p class="text-secondary">This invite link appears to be incomplete. Ask the group owner to resend the invite.</p>
+          <p class="text-secondary">This invite link is incomplete. Check you copied all of it, or ask the group owner to send it again.</p>
           <jiro-button block variant="primary" type="button" (click)="router.navigate(['/journal'])">
             Go to Journaly
           </jiro-button>
@@ -89,15 +148,16 @@ type State = 'loading' | 'joining' | 'success' | 'error' | 'no-token' | 'not-log
             </svg>
           </div>
           <h2>Sign in to join</h2>
-          <p class="text-secondary">You need a Jiro account to accept this group invite.</p>
-          <jiro-button block variant="primary" type="button" (click)="goToLogin()">
-            Sign In
+          <p class="text-secondary">You've been invited to a shared journal. Sign in, or create a free Jiro account, and you'll come straight back here.</p>
+          <jiro-button block variant="primary" type="button" (click)="goTo('/login')">
+            Sign in
           </jiro-button>
           <p class="create-account text-secondary">
-            No account? <a routerLink="/register" class="link">Create one free</a>
+            No account? <a [routerLink]="['/register']" [queryParams]="{ returnUrl: returnPath() }" class="link">Create one free</a>
           </p>
         </div>
 }
+        </div>
 
       </div>
     </main>
@@ -129,6 +189,7 @@ type State = 'loading' | 'joining' | 'success' | 'error' | 'no-token' | 'not-log
 
     .join-logo { margin-bottom: var(--space-xs); color: var(--color-primary); }
     .join-title { font-size: var(--font-size-xl); font-weight: 700; margin: 0 0 var(--space-md); letter-spacing: -0.5px; }
+    .join-live { width: 100%; }
 
     .join-state {
       display: flex;
@@ -142,10 +203,14 @@ type State = 'loading' | 'joining' | 'success' | 'error' | 'no-token' | 'not-log
     .join-icon { color: var(--text-secondary); }
     .join-icon.success-icon { color: var(--color-positive); }
     .join-icon.error-icon { color: var(--color-warning); }
-    .join-state h2 { margin: 0; font-size: var(--font-size-lg); }
-    .join-state p { margin: 0; font-size: var(--font-size-sm); }
+    .join-state h2 { margin: 0; font-size: var(--font-size-lg); overflow-wrap: anywhere; }
+    .join-state p { margin: 0; font-size: var(--font-size-sm); line-height: 1.5; }
+    .join-state .join-note { font-size: var(--font-size-xs); }
 
     .secondary-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 32px;
       font-size: var(--font-size-sm);
       color: var(--text-secondary);
       text-decoration: none;
@@ -163,11 +228,14 @@ type State = 'loading' | 'joining' | 'success' | 'error' | 'no-token' | 'not-log
 })
 export class JournalJoinComponent implements OnInit {
   state = signal<State>('loading');
+  preview = signal<JoinPreview | null>(null);
   groupId = signal('');
   groupName = signal('');
   errorMessage = signal('');
+  returnPath = signal('');
 
   private token = '';
+  private readonly settings = inject(SettingsService);
 
   constructor(
     private route: ActivatedRoute,
@@ -176,21 +244,31 @@ export class JournalJoinComponent implements OnInit {
     private auth: AuthService,
   ) { }
 
-  ngOnInit() {
+  async ngOnInit() {
     this.token = this.route.snapshot.queryParamMap.get('token') ?? '';
+    this.returnPath.set(`/journal/join?token=${encodeURIComponent(this.token)}`);
 
     if (!this.token) {
       this.state.set('no-token');
       return;
     }
 
-    // Check if logged in
-    if (!this.auth.user()) {
+    // A cached user may still be refreshing; wait until auth has settled.
+    await this.auth.whenInitialized();
+    if (!this.auth.isAuthenticated()) {
       this.state.set('not-logged-in');
       return;
     }
 
-    this.joinGroup();
+    this.svc.previewInvite(this.token).subscribe({
+      next: p => {
+        this.preview.set(p);
+        if (this.auth.isDemo()) this.state.set('demo');
+        else if (p.already_member) this.state.set('already');
+        else this.state.set('ready');
+      },
+      error: (err: any) => this.fail(err),
+    });
   }
 
   joinGroup() {
@@ -201,17 +279,36 @@ export class JournalJoinComponent implements OnInit {
         this.groupName.set(res.group_name);
         this.state.set('success');
       },
-      error: (err: any) => {
-        const msg = err?.error?.message ?? 'The invite link is invalid or has expired.';
-        this.errorMessage.set(msg);
-        this.state.set('error');
-      },
+      error: (err: any) => this.fail(err),
     });
   }
 
-  goToLogin() {
-    // Key must match what login reads, or the invite is lost on sign-in.
-    const returnPath = `/journal/join?token=${this.token}`;
-    this.router.navigate(['/login'], { queryParams: { returnUrl: returnPath } });
+  private fail(err: any) {
+    const code = err?.error?.error?.code;
+    if (code === 'DEMO_READ_ONLY') { this.state.set('demo'); return; }
+    if (code === 'EMAIL_NOT_VERIFIED') { this.state.set('unverified'); return; }
+    if (err?.status === 401) { this.state.set('not-logged-in'); return; }
+    if (err?.status === 429) {
+      this.errorMessage.set('Too many tries in a row. Wait a minute, then open the link again.');
+    } else {
+      this.errorMessage.set(err?.error?.error?.message ?? 'Something went wrong opening this invite. Try the link again.');
+    }
+    this.state.set('error');
+  }
+
+  goTo(path: '/login' | '/register') {
+    this.router.navigate([path], { queryParams: { returnUrl: this.returnPath() } });
+  }
+
+  /** Signs out of the demo, then opens registration that returns here. */
+  leaveDemoToRegister() {
+    this.auth.logout(`/register?returnUrl=${encodeURIComponent(this.returnPath())}`);
+  }
+
+  formatExpiry(s: string): string {
+    return new Date(s).toLocaleString('en-US', {
+      month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+      timeZone: this.settings.timezone(),
+    });
   }
 }

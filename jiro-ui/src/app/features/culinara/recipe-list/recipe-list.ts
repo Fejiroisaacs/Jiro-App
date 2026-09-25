@@ -1,4 +1,5 @@
-import { Component, OnInit, computed, signal, effect } from '@angular/core';
+import { Component, Injector, OnInit, afterNextRender, computed, effect, inject, signal } from '@angular/core';
+import { ToastService } from '../../../core/services/toast.service';
 
 import { FormsModule } from '@angular/forms';
 import { RecipeService, Recipe, CookStreak, Collection } from '../../../core/services/recipe.service';
@@ -97,45 +98,57 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
       </div>
 }
 
-      <!-- Collection filter -->
-      @if (collections().length > 0) {
-<div class="collection-filter">
-        <button
-          class="collection-chip"
-          [class.collection-chip--active]="activeCollection() === null"
-          (click)="activeCollection.set(null)">
-          All
-        </button>
-        @for (col of collections(); track col) {
-<button
-         
-          class="collection-chip"
-          [class.collection-chip--active]="activeCollection() === col.id"
-          (click)="activeCollection.set(activeCollection() === col.id ? null : col.id)">
-          <svg class="folder-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> {{ col.name }}
-          @if (col.recipe_count) {
-<span class="col-count">{{ col.recipe_count }}</span>
-}
-        </button>
-}
-        @if (!showNewCollectionInput) {
-<button class="collection-chip collection-chip--add" (click)="showNewCollectionInput = true">
-          +
-        </button>
-}
-        @if (showNewCollectionInput) {
-<div class="new-collection-inline">
-          <input
-            class="new-collection-input"
-            [(ngModel)]="newCollectionName"
-            placeholder="Collection name"
-            (keydown.enter)="createCollection()"
-            (keydown.escape)="showNewCollectionInput = false; newCollectionName = ''" />
-          <button class="new-collection-save" (click)="createCollection()">✓</button>
+      <!-- Collection filter. Shown with no collections too, so the first one
+           can be made here and not only from the New Recipe form. -->
+      @if (collectionsLoaded()) {
+        <div class="collection-filter" role="group" aria-label="Collections">
+          @if (collections().length > 0) {
+            <button type="button"
+              class="collection-chip"
+              [class.collection-chip--active]="activeCollection() === null"
+              [attr.aria-pressed]="activeCollection() === null"
+              (click)="activeCollection.set(null)">
+              All
+            </button>
+          }
+          @for (col of collections(); track col.id) {
+            <button type="button"
+              class="collection-chip"
+              [class.collection-chip--active]="activeCollection() === col.id"
+              [attr.aria-pressed]="activeCollection() === col.id"
+              (click)="activeCollection.set(activeCollection() === col.id ? null : col.id)">
+              <svg class="folder-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> {{ col.name }}
+              @if (col.recipe_count) {
+                <span class="col-count" [attr.aria-label]="col.recipe_count + (col.recipe_count === 1 ? ' recipe' : ' recipes')">{{ col.recipe_count }}</span>
+              }
+            </button>
+          }
+          @if (!showNewCollectionInput) {
+            @if (collections().length === 0) {
+              <button type="button" class="collection-chip collection-chip--new" (click)="openNewCollection()">
+                <span aria-hidden="true">+</span> New collection
+              </button>
+            } @else {
+              <button type="button" class="collection-chip collection-chip--add" (click)="openNewCollection()"
+                aria-label="New collection" title="New collection">+</button>
+            }
+          } @else {
+            <form class="new-collection-inline" (ngSubmit)="createCollection()">
+              <input
+                id="new-collection-name"
+                name="collectionName"
+                class="new-collection-input"
+                aria-label="Collection name"
+                maxlength="100"
+                autocomplete="off"
+                [(ngModel)]="newCollectionName"
+                placeholder="Collection name"
+                (keydown.escape)="cancelNewCollection()" />
+              <button type="submit" class="new-collection-save" aria-label="Create collection" title="Create collection">✓</button>
+            </form>
+          }
         </div>
-}
-      </div>
-}
+      }
 
       <!-- Loading -->
       @if (loading()) {
@@ -546,6 +559,12 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
     .collection-chip--add {
       font-size: var(--font-size-md);
       padding: 2px 10px;
+      min-width: 32px;
+      justify-content: center;
+    }
+
+    .collection-chip--new {
+      border-style: dashed;
     }
 
     .col-count {
@@ -582,9 +601,9 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
       color: var(--text-on-primary);
       border: none;
       border-radius: 50%;
-      width: 22px;
-      height: 22px;
-      font-size: 12px;
+      width: 28px;
+      height: 28px;
+      font-size: 13px;
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -621,6 +640,9 @@ export class RecipeListComponent implements OnInit {
   allRecipes = signal<Recipe[]>([]);
   cookStreak = signal<CookStreak | null>(null);
   collections = signal<Collection[]>([]);
+  collectionsLoaded = signal(false);
+  private readonly toast = inject(ToastService);
+  private readonly injector = inject(Injector);
   activeCollection = signal<string | null>(null);
   loading = signal(true);
   showCreate = signal(false);
@@ -695,8 +717,22 @@ export class RecipeListComponent implements OnInit {
 
   loadCollections() {
     this.recipeService.listCollections().subscribe({
-      next: (cols) => this.collections.set(cols),
+      next: (cols) => {
+        this.collections.set(cols);
+        this.collectionsLoaded.set(true);
+      },
     });
+  }
+
+  openNewCollection() {
+    this.showNewCollectionInput = true;
+    // The input only exists after this change is rendered.
+    afterNextRender(() => document.getElementById('new-collection-name')?.focus(), { injector: this.injector });
+  }
+
+  cancelNewCollection() {
+    this.showNewCollectionInput = false;
+    this.newCollectionName = '';
   }
 
   createCollection() {
@@ -704,10 +740,11 @@ export class RecipeListComponent implements OnInit {
     if (!name) return;
     this.recipeService.createCollection(name).subscribe({
       next: () => {
-        this.newCollectionName = '';
-        this.showNewCollectionInput = false;
+        this.cancelNewCollection();
         this.loadCollections();
+        this.toast.success(`Collection "${name}" created`);
       },
+      error: () => this.toast.error('Could not create the collection'),
     });
   }
 

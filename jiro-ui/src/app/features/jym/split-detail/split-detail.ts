@@ -3,16 +3,17 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
-import { JymService, SplitWithRoutines, Routine, RoutineItem, Exercise, CreateSeriesRequest } from '../../../core/services/jym.service';
+import { JymService, SplitWithRoutines, Routine, RoutineItem, Exercise, ReplaceItemEntry } from '../../../core/services/jym.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-series-modal';
 
 @Component({
   selector: 'app-split-detail',
   standalone: true,
-  imports: [FormsModule, DragDropModule, JiroButtonComponent, JiroModalComponent],
+  imports: [FormsModule, DragDropModule, JiroButtonComponent, JiroModalComponent, JymNewSeriesModalComponent],
   template: `
     @if (split()) {
 <div class="split-detail">
@@ -177,7 +178,9 @@ import { ToastService } from '../../../core/services/toast.service';
 }
               </div>
               <div class="item-targets">
-                <span class="target-text">{{ item.target_sets }}×{{ item.target_reps }}</span>
+                <button type="button" class="target-text" (click)="openTargetEdit(ri, ii)"
+                  [attr.aria-label]="'Edit target for ' + item.exercise_name + ': ' + item.target_sets + ' sets of ' + item.target_reps + ' reps'"
+                  title="Edit sets and reps">{{ item.target_sets }}×{{ item.target_reps }}</button>
               </div>
               <button class="icon-btn" type="button" (click)="removeItem(ri, ii)" title="Remove exercise"
                 [attr.aria-label]="'Remove ' + item.exercise_name + ' from ' + routine.name">
@@ -217,12 +220,12 @@ import { ToastService } from '../../../core/services/toast.service';
 <jiro-modal title="Add Training Day" maxWidth="400px" (close)="showAddRoutine.set(false)">
       <form class="simple-form" (ngSubmit)="addRoutine()">
         <div class="form-group">
-          <label class="form-label">Day Name</label>
-          <input class="form-input" type="text" [(ngModel)]="newRoutineName" name="name" placeholder="e.g. Push Day" required />
+          <label class="form-label" for="add-day-name">Day Name</label>
+          <input id="add-day-name" class="form-input" type="text" [(ngModel)]="newRoutineName" name="name" placeholder="e.g. Push Day" required />
         </div>
         <div class="form-group">
-          <label class="form-label">Day Order</label>
-          <input class="form-input" type="number" [(ngModel)]="newRoutineDay" name="day" min="1" />
+          <label class="form-label" for="add-day-order">Day Order</label>
+          <input id="add-day-order" class="form-input" type="number" [(ngModel)]="newRoutineDay" name="day" min="1" />
         </div>
         <div class="form-actions">
           <jiro-button variant="secondary" type="button" (click)="showAddRoutine.set(false)">Cancel</jiro-button>
@@ -239,7 +242,8 @@ import { ToastService } from '../../../core/services/toast.service';
 <jiro-modal title="Add Exercise" maxWidth="480px" (close)="showExPicker.set(false)">
       <div class="ex-picker">
         @if (!creatingExercise()) {
-<input class="form-input" type="text" [(ngModel)]="exSearch" (input)="filterExercises()" placeholder="Search exercises..." />
+<label class="sr-only" for="picker-search">Search exercises</label>
+<input id="picker-search" class="form-input" type="search" [(ngModel)]="exSearch" (input)="filterExercises()" placeholder="Search exercises..." />
 }
         @if (!creatingExercise()) {
 <div class="ex-picker-list">
@@ -272,12 +276,12 @@ import { ToastService } from '../../../core/services/toast.service';
         @if (creatingExercise()) {
 <div class="inline-create-form">
           <div class="form-group">
-            <label class="form-label">Exercise Name *</label>
-            <input class="form-input" type="text" [(ngModel)]="newExName" placeholder="e.g. Bulgarian Split Squat" />
+            <label class="form-label" for="picker-new-name">Exercise Name *</label>
+            <input id="picker-new-name" class="form-input" type="text" [(ngModel)]="newExName" placeholder="e.g. Bulgarian Split Squat" />
           </div>
           <div class="form-group">
-            <label class="form-label">Muscle Group</label>
-            <select class="form-input" [(ngModel)]="newExMuscleGroup">
+            <label class="form-label" for="picker-new-mg">Muscle Group</label>
+            <select id="picker-new-mg" class="form-input" [(ngModel)]="newExMuscleGroup">
               <option value="">None</option>
               @for (mg of muscleGroups; track mg) {
 <option [value]="mg">{{ mg }}</option>
@@ -301,12 +305,12 @@ import { ToastService } from '../../../core/services/toast.service';
 <div class="target-inputs">
           <div class="target-row">
             <div class="form-group">
-              <label class="form-label">Sets</label>
-              <input class="form-input" type="number" [(ngModel)]="pickerSets" min="1" max="10" />
+              <label class="form-label" for="picker-sets">Sets</label>
+              <input id="picker-sets" class="form-input" type="number" [(ngModel)]="pickerSets" min="1" max="20" />
             </div>
             <div class="form-group">
-              <label class="form-label">Reps</label>
-              <input class="form-input" type="number" [(ngModel)]="pickerReps" min="1" max="100" />
+              <label class="form-label" for="picker-reps">Reps</label>
+              <input id="picker-reps" class="form-input" type="number" [(ngModel)]="pickerReps" min="1" max="100" />
             </div>
           </div>
           <jiro-button variant="primary" type="button" (click)="confirmAddExercise()">
@@ -320,37 +324,26 @@ import { ToastService } from '../../../core/services/toast.service';
 
     <!-- Start Series Modal -->
     @if (showSeriesModal()) {
-<jiro-modal title="Start Series" maxWidth="440px" (close)="showSeriesModal.set(false)">
-      <form class="simple-form" (ngSubmit)="createSeries()">
-        <div class="form-group">
-          <label class="form-label">Series Name</label>
-          <input class="form-input" type="text" [(ngModel)]="seriesName" name="seriesName" placeholder="e.g. Cut Phase 1" required />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Duration</label>
-          <div class="dur-options">
-            <button type="button" class="dur-btn" [class.active]="seriesDuration === 'open'" (click)="seriesDuration = 'open'">Open-ended</button>
-            <button type="button" class="dur-btn" [class.active]="seriesDuration === 'weeks'" (click)="seriesDuration = 'weeks'">Weeks</button>
-            <button type="button" class="dur-btn" [class.active]="seriesDuration === 'sessions'" (click)="seriesDuration = 'sessions'">Sessions</button>
+      <jym-new-series-modal [splitId]="splitId" [defaultName]="seriesDefaultName()" (closed)="showSeriesModal.set(false)" />
+    }
+
+    <!-- Edit Target Modal -->
+    @if (targetEdit(); as te) {
+<jiro-modal [title]="'Target for ' + te.name" maxWidth="360px" (close)="targetEdit.set(null)">
+      <form class="simple-form" (ngSubmit)="saveTargetEdit()">
+        <div class="target-row">
+          <div class="form-group">
+            <label class="form-label" for="edit-target-sets">Sets</label>
+            <input id="edit-target-sets" class="form-input" type="number" [(ngModel)]="editSets" name="editSets" min="1" max="20" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="edit-target-reps">Reps</label>
+            <input id="edit-target-reps" class="form-input" type="number" [(ngModel)]="editReps" name="editReps" min="1" max="100" required />
           </div>
         </div>
-        @if (seriesDuration === 'weeks') {
-<div class="form-group">
-          <label class="form-label">Target Weeks</label>
-          <input class="form-input" type="number" [(ngModel)]="seriesTargetWeeks" name="targetWeeks" min="1" max="52" />
-        </div>
-}
-        @if (seriesDuration === 'sessions') {
-<div class="form-group">
-          <label class="form-label">Target Sessions</label>
-          <input class="form-input" type="number" [(ngModel)]="seriesTargetSessions" name="targetSessions" min="1" max="200" />
-        </div>
-}
         <div class="form-actions">
-          <jiro-button variant="secondary" type="button" (click)="showSeriesModal.set(false)">Cancel</jiro-button>
-          <jiro-button variant="primary" type="submit" [disabled]="creatingSeries() || !seriesName.trim()">
-            {{ creatingSeries() ? 'Starting...' : 'Start Series' }}
-          </jiro-button>
+          <jiro-button variant="secondary" type="button" (click)="targetEdit.set(null)">Cancel</jiro-button>
+          <jiro-button variant="primary" type="submit" [disabled]="!validTarget(editSets, 20) || !validTarget(editReps, 100)">Save</jiro-button>
         </div>
       </form>
     </jiro-modal>
@@ -543,6 +536,7 @@ import { ToastService } from '../../../core/services/toast.service';
     .item-targets { flex-shrink: 0; }
 
     .target-text {
+      font-family: inherit; cursor: pointer; min-height: 32px;
       background: var(--bg-canvas);
       color: var(--color-primary);
       font-size: var(--font-size-xs);
@@ -553,6 +547,8 @@ import { ToastService } from '../../../core/services/toast.service';
       box-shadow: 1px 1px 0 rgba(var(--shadow-rgb), 0.1);
       white-space: nowrap;
     }
+
+    .target-text:hover { border-color: var(--color-primary); }
 
     .empty-list {
       font-size: var(--font-size-xs); color: var(--text-muted);
@@ -688,24 +684,6 @@ import { ToastService } from '../../../core/services/toast.service';
     }
     .share-revoke-btn:hover { color: var(--color-danger); }
 
-    /* Series modal */
-    .simple-form { display: flex; flex-direction: column; gap: var(--space-md); }
-
-    .dur-options { display: flex; gap: var(--space-xs); }
-
-    .dur-btn {
-      flex: 1; padding: 8px 12px; border: 1px solid var(--border-color);
-      border-radius: var(--border-radius); background: var(--bg-surface);
-      color: var(--text-secondary); font-size: var(--font-size-sm);
-      cursor: pointer; transition: all 0.15s; font-family: inherit;
-    }
-
-    .dur-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
-
-    .dur-btn.active {
-      background: rgba(var(--color-primary-rgb), 0.1); border-color: var(--color-primary);
-      color: var(--color-primary); font-weight: 500;
-    }
 
     @media (max-width: 600px) {
       .header-btns {
@@ -731,11 +709,11 @@ export class SplitDetailComponent implements OnInit {
 
   // Series creation
   showSeriesModal = signal(false);
-  creatingSeries = signal(false);
-  seriesName = '';
-  seriesDuration: 'open' | 'weeks' | 'sessions' = 'open';
-  seriesTargetWeeks = 8;
-  seriesTargetSessions = 20;
+
+  // Editing one exercise's target sets and reps
+  targetEdit = signal<{ ri: number; ii: number; name: string } | null>(null);
+  editSets = 3;
+  editReps = 8;
 
   editName = '';
   editingTags = signal(false);
@@ -765,7 +743,7 @@ export class SplitDetailComponent implements OnInit {
   newExError = signal('');
   readonly muscleGroups = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs', 'Glutes', 'Core', 'Cardio', 'Other'];
 
-  private splitId = '';
+  splitId = '';
 
   constructor(
     private jymService: JymService,
@@ -794,7 +772,7 @@ export class SplitDetailComponent implements OnInit {
     });
   }
 
-  goBack() { this.router.navigate(['/jym']); }
+  goBack() { this.router.navigate(['/jym/plan']); }
 
   startEditName() {
     this.editName = this.split()?.name || '';
@@ -878,31 +856,80 @@ export class SplitDetailComponent implements OnInit {
     const lists = this.routines();
     const prevIdx = lists.findIndex(r => 'routine-' + r.id === event.previousContainer.id);
     const currIdx = routineIndex;
+    if (prevIdx < 0) return;
 
     if (event.previousContainer === event.container) {
+      if (event.previousIndex === event.currentIndex) return;
       const items = [...lists[currIdx].items];
       moveItemInArray(items, event.previousIndex, event.currentIndex);
       this.routines.update(rs => rs.map((r, i) => i === currIdx ? { ...r, items } : r));
-    } else {
-      const prevItems = [...lists[prevIdx].items];
-      const currItems = [...lists[currIdx].items];
-      const [moved] = prevItems.splice(event.previousIndex, 1);
-      currItems.splice(event.currentIndex, 0, moved);
-      this.routines.update(rs => rs.map((r, i) => {
-        if (i === prevIdx) return { ...r, items: prevItems };
-        if (i === currIdx) return { ...r, items: currItems };
-        return r;
-      }));
+      this.persistItems(currIdx);
+      return;
     }
 
-    // Persist to backend
-    const routine = this.routines()[currIdx];
-    const entries = routine.items.map((item, idx) => ({
-      exercise_id: item.exercise_id,
-      target_sets: item.target_sets,
-      target_reps: item.target_reps,
+    // Moving between days changes two days. Save both in one request so the
+    // exercise can never end up on both (or neither) after a reload.
+    const prevItems = [...lists[prevIdx].items];
+    const currItems = [...lists[currIdx].items];
+    const [moved] = prevItems.splice(event.previousIndex, 1);
+    currItems.splice(event.currentIndex, 0, moved);
+    this.routines.update(rs => rs.map((r, i) => {
+      if (i === prevIdx) return { ...r, items: prevItems };
+      if (i === currIdx) return { ...r, items: currItems };
+      return r;
     }));
-    this.jymService.replaceRoutineItems(routine.id, entries).subscribe();
+
+    const source = this.routines()[prevIdx];
+    const target = this.routines()[currIdx];
+    this.jymService.replaceSplitItems(this.splitId, [
+      { routine_id: source.id, items: toEntries(source.items) },
+      { routine_id: target.id, items: toEntries(target.items) },
+    ]).subscribe({
+      next: saved => {
+        const byId = new Map(saved.map(r => [r.routine_id, r.items]));
+        this.routines.update(rs => rs.map(r => byId.has(r.id) ? { ...r, items: byId.get(r.id)! } : r));
+      },
+      error: () => this.saveFailed(),
+    });
+  }
+
+  /** Saves one day's full item list; on failure reloads so the page matches the server. */
+  private persistItems(routineIndex: number) {
+    const routine = this.routines()[routineIndex];
+    this.jymService.replaceRoutineItems(routine.id, toEntries(routine.items)).subscribe({
+      next: saved => this.routines.update(rs => rs.map(r => r.id === routine.id ? { ...r, items: saved } : r)),
+      error: () => this.saveFailed(),
+    });
+  }
+
+  private saveFailed() {
+    this.toast.error('Could not save that change. Showing the saved plan.');
+    this.loadSplit();
+  }
+
+  openTargetEdit(ri: number, ii: number) {
+    const item = this.routines()[ri]?.items[ii];
+    if (!item) return;
+    this.editSets = item.target_sets;
+    this.editReps = item.target_reps;
+    this.targetEdit.set({ ri, ii, name: item.exercise_name });
+  }
+
+  validTarget(v: number, max: number): boolean {
+    return Number.isInteger(v) && v >= 1 && v <= max;
+  }
+
+  saveTargetEdit() {
+    const te = this.targetEdit();
+    if (!te || !this.validTarget(this.editSets, 20) || !this.validTarget(this.editReps, 100)) return;
+    const sets = this.editSets;
+    const reps = this.editReps;
+    this.routines.update(rs => rs.map((r, i) => i !== te.ri ? r : {
+      ...r,
+      items: r.items.map((it, j) => j !== te.ii ? it : { ...it, target_sets: sets, target_reps: reps }),
+    }));
+    this.targetEdit.set(null);
+    this.persistItems(te.ri);
   }
 
   openExercisePicker(routineIndex: number) {
@@ -979,17 +1006,7 @@ export class SplitDetailComponent implements OnInit {
 
     const updatedItems = [...routine.items, newItem];
     this.routines.update(rs => rs.map((r, i) => i === ri ? { ...r, items: updatedItems } : r));
-
-    const entries = updatedItems.map(item => ({
-      exercise_id: item.exercise_id,
-      target_sets: item.target_sets,
-      target_reps: item.target_reps,
-    }));
-    this.jymService.replaceRoutineItems(routine.id, entries).subscribe({
-      next: saved => {
-        this.routines.update(rs => rs.map((r, i) => i === ri ? { ...r, items: saved } : r));
-      },
-    });
+    this.persistItems(ri);
 
     this.showExPicker.set(false);
     this.pickerSelectedEx.set(null);
@@ -1027,41 +1044,23 @@ export class SplitDetailComponent implements OnInit {
     const routine = this.routines()[routineIndex];
     const updatedItems = routine.items.filter((_, i) => i !== itemIndex);
     this.routines.update(rs => rs.map((r, i) => i === routineIndex ? { ...r, items: updatedItems } : r));
-
-    const entries = updatedItems.map(item => ({
-      exercise_id: item.exercise_id,
-      target_sets: item.target_sets,
-      target_reps: item.target_reps,
-    }));
-    this.jymService.replaceRoutineItems(routine.id, entries).subscribe();
+    this.persistItems(routineIndex);
   }
 
   openSeriesModal() {
-    const s = this.split();
-    this.seriesName = s ? s.name + ' Run' : '';
-    this.seriesDuration = 'open';
-    this.seriesTargetWeeks = 8;
-    this.seriesTargetSessions = 20;
     this.showSeriesModal.set(true);
   }
 
-  createSeries() {
-    if (!this.seriesName.trim()) return;
-    this.creatingSeries.set(true);
-    const req: CreateSeriesRequest = {
-      split_id: this.splitId,
-      name: this.seriesName.trim(),
-      duration_type: this.seriesDuration,
-      ...(this.seriesDuration === 'weeks' ? { target_weeks: this.seriesTargetWeeks } : {}),
-      ...(this.seriesDuration === 'sessions' ? { target_sessions: this.seriesTargetSessions } : {}),
-    };
-    this.jymService.createSeries(req).subscribe({
-      next: sr => {
-        this.showSeriesModal.set(false);
-        this.creatingSeries.set(false);
-        this.router.navigate(['/jym/series', sr.id]);
-      },
-      error: () => this.creatingSeries.set(false),
-    });
+  seriesDefaultName(): string {
+    const name = this.split()?.name;
+    return name ? name + ' Run' : '';
   }
+}
+
+function toEntries(items: RoutineItem[]): ReplaceItemEntry[] {
+  return items.map(item => ({
+    exercise_id: item.exercise_id,
+    target_sets: item.target_sets,
+    target_reps: item.target_reps,
+  }));
 }

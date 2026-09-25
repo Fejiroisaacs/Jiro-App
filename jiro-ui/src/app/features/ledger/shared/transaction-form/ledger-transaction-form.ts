@@ -1,9 +1,14 @@
-import { Component, Input, Output, EventEmitter, OnInit, signal } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, inject, signal, computed } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
-import { LedgerService, LedgerAccount, CategoryTree } from '../../../../core/services/ledger.service';
+import {
+  LedgerService, LedgerAccount, CategoryTree, LedgerCategory, LedgerTransaction, RecurrenceInterval,
+} from '../../../../core/services/ledger.service';
 import { JiroButtonComponent } from '../../../../shared/components/jiro-button/jiro-button';
-import { JiroModalComponent } from '../../../../shared/components/jiro-modal/jiro-modal';
+import { SettingsService } from '../../../../core/services/settings.service';
+import { todayKey } from '../../../../core/utils/day';
+import { LedgerCategoryDialogComponent } from '../category-dialog/ledger-category-dialog';
+import { currencySymbol, formatDate, intervalPhrase } from '../ledger-utils';
 
 export interface TransactionPayload {
   type: 'income' | 'expense' | 'transfer';
@@ -14,21 +19,23 @@ export interface TransactionPayload {
   description: string;
   notes?: string | null;
   is_recurring: boolean;
-  recurrence_interval?: 'weekly' | 'biweekly' | 'monthly' | 'yearly' | null;
+  recurrence_interval?: RecurrenceInterval | null;
   date: string;
 }
+
+let formSeq = 0;
 
 @Component({
   selector: 'ledger-transaction-form',
   standalone: true,
-  imports: [FormsModule, JiroButtonComponent, JiroModalComponent],
+  imports: [FormsModule, JiroButtonComponent, LedgerCategoryDialogComponent],
   template: `
     <form class="tx-form" (ngSubmit)="submit()">
 
       <!-- Type -->
       <div class="form-group">
-        <label class="form-label">Type</label>
-        <div class="type-toggle">
+        <span class="form-label" [id]="uid + '-type'">Type</span>
+        <div class="type-toggle" role="group" [attr.aria-labelledby]="uid + '-type'">
           <button type="button" class="type-btn" [disabled]="lockType" [attr.aria-pressed]="form.type === 'expense'" [class.active]="form.type === 'expense'" (click)="setType('expense')">Expense</button>
           <button type="button" class="type-btn" [disabled]="lockType" [attr.aria-pressed]="form.type === 'income'" [class.active]="form.type === 'income'" (click)="setType('income')">Income</button>
           <button type="button" class="type-btn" [disabled]="lockType" [attr.aria-pressed]="form.type === 'transfer'" [class.active]="form.type === 'transfer'" (click)="setType('transfer')">Transfer</button>
@@ -37,97 +44,124 @@ export interface TransactionPayload {
 
       <!-- Account -->
       <div class="form-group">
-        <label class="form-label">{{ form.type === 'transfer' ? 'From Account' : 'Account' }}</label>
-        <select class="form-input" [(ngModel)]="form.account_id" name="account_id" required>
+        <label class="form-label" [for]="uid + '-account'">{{ form.type === 'transfer' ? 'From account' : 'Account' }}</label>
+        <select class="form-input" [id]="uid + '-account'" [(ngModel)]="form.account_id" name="account_id" required>
           <option value="">Select account</option>
-          @for (a of accounts; track a) {
-<option [value]="a.id">{{ a.name }} ({{ a.currency }})</option>
-}
+          @for (a of accounts; track a.id) {
+            <option [value]="a.id">{{ a.name }}{{ a.is_active ? '' : ' (inactive)' }}</option>
+          }
         </select>
       </div>
 
       <!-- To Account (transfers only) -->
       @if (form.type === 'transfer') {
-<div class="form-group">
-        <label class="form-label">To Account</label>
-        <select class="form-input" [(ngModel)]="form.transfer_to_account_id" name="transfer_to_account_id">
-          <option value="">Select destination</option>
-          @for (a of accounts; track a) {
-<option [value]="a.id" [disabled]="a.id === form.account_id">{{ a.name }} ({{ a.currency }})</option>
-}
-        </select>
-      </div>
-}
+        <div class="form-group">
+          <label class="form-label" [for]="uid + '-to'">To account</label>
+          <select class="form-input" [id]="uid + '-to'" [(ngModel)]="form.transfer_to_account_id" name="transfer_to_account_id">
+            <option value="">Select destination</option>
+            @for (a of accounts; track a.id) {
+              <option [value]="a.id" [disabled]="a.id === form.account_id">{{ a.name }}{{ a.is_active ? '' : ' (inactive)' }}</option>
+            }
+          </select>
+        </div>
+      }
 
       <!-- Category (income/expense only) -->
       @if (form.type !== 'transfer') {
-<div class="form-group">
-        <div class="label-row">
-          <label class="form-label">Category <span class="optional-label">(optional)</span></label>
-          <button type="button" class="new-cat-btn" (click)="openCatModal()">+ New</button>
+        <div class="form-group">
+          <div class="label-row">
+            <label class="form-label" [for]="uid + '-category'">Category <span class="optional-label">(optional)</span></label>
+            <button type="button" class="new-cat-btn" (click)="showCatDialog.set(true)">+ New category</button>
+          </div>
+          <select class="form-input" [id]="uid + '-category'" [(ngModel)]="form.category_id" name="category_id">
+            <option value="">Uncategorised</option>
+            @for (c of categoriesByType(); track c.id) {
+              <option [value]="c.id">{{ c.name }}</option>
+            }
+          </select>
         </div>
-        <select class="form-input" [(ngModel)]="form.category_id" name="category_id">
-          <option value="">No category</option>
-          @for (c of categoriesByType(); track c.id) {
-<option [value]="c.id">{{ c.name }}</option>
-}
-        </select>
-      </div>
-}
+      }
 
       <!-- Amount -->
       <div class="form-group">
-        <label class="form-label">Amount</label>
-        <input class="form-input" type="number" min="0.01" step="0.01"
+        <label class="form-label" [for]="uid + '-amount'">Amount ({{ symbol() }})</label>
+        <input class="form-input" type="number" min="0.01" step="0.01" inputmode="decimal" [id]="uid + '-amount'"
           [(ngModel)]="form.amount" name="amount" placeholder="0.00" required />
       </div>
 
       <!-- Description -->
       <div class="form-group">
-        <label class="form-label">Description <span class="optional-label">(optional)</span></label>
-        <input class="form-input" type="text"
+        <label class="form-label" [for]="uid + '-desc'">Description <span class="optional-label">(optional)</span></label>
+        <input class="form-input" type="text" [id]="uid + '-desc'" maxlength="255"
           [(ngModel)]="form.description" name="description" placeholder="What was this for?" />
       </div>
 
       <!-- Notes -->
       <div class="form-group">
-        <label class="form-label">Notes <span class="optional-label">(optional)</span></label>
-        <textarea class="form-input form-textarea" [(ngModel)]="form.notes" name="notes"
+        <label class="form-label" [for]="uid + '-notes'">Notes <span class="optional-label">(optional)</span></label>
+        <textarea class="form-input form-textarea" [id]="uid + '-notes'" [(ngModel)]="form.notes" name="notes"
           rows="2" placeholder="Additional details..."></textarea>
       </div>
 
       <!-- Date -->
       <div class="form-group">
-        <label class="form-label">Date</label>
-        <input class="form-input" type="date" [(ngModel)]="form.date" name="date" required />
+        <label class="form-label" [for]="uid + '-date'">Date</label>
+        <input class="form-input" type="date" [id]="uid + '-date'" [(ngModel)]="form.date" name="date" required />
       </div>
 
-      <!-- Recurring -->
-      <div class="form-group">
-        <div class="toggle-row">
-          <label class="form-label" style="margin:0">Recurring</label>
-          <button type="button" class="toggle-btn" [class.on]="form.is_recurring"
-            (click)="form.is_recurring = !form.is_recurring">
-            <span class="toggle-knob"></span>
-          </button>
+      <!-- Repeat -->
+      @if (isCopy()) {
+        <div class="series-note">
+          @if (source?.series_interval) {
+            <p>
+              Ledger added this from a transaction that repeats {{ intervalPhrase(source!.series_interval) }}.
+              @if (source?.series_next_date) { The next one is due {{ formatDate(source!.series_next_date!) }}. }
+              Changes here apply to this one only.
+            </p>
+            <jiro-button variant="secondary" size="sm" type="button" [disabled]="saving" (click)="stopSeries.emit()">Stop repeating</jiro-button>
+          } @else {
+            <p>Ledger added this from a repeating transaction that has since stopped.</p>
+          }
         </div>
-      </div>
+      } @else {
+        <div class="form-group">
+          <div class="toggle-row">
+            <span class="form-label" [id]="uid + '-repeat'">Repeat</span>
+            <button type="button" class="toggle-btn" role="switch"
+              [attr.aria-checked]="form.is_recurring" [attr.aria-labelledby]="uid + '-repeat'"
+              [attr.aria-describedby]="uid + '-repeat-hint'"
+              [class.on]="form.is_recurring" (click)="form.is_recurring = !form.is_recurring">
+              <span class="toggle-knob"></span>
+            </button>
+          </div>
+          <p class="field-hint" [id]="uid + '-repeat-hint'">
+            @if (form.is_recurring) {
+              Ledger adds a copy on each date it falls due, and catches up on any it missed, whenever you open Ledger.
+              @if (wasRecurring && source?.recurrence_next_date) { Next due {{ formatDate(source!.recurrence_next_date!) }}. }
+            } @else if (wasRecurring) {
+              Saving with Repeat off stops the series. Copies already added stay.
+            } @else {
+              Turn on for rent, pay and subscriptions: Ledger then adds each one for you.
+            }
+          </p>
+        </div>
 
-      @if (form.is_recurring) {
-<div class="form-group">
-        <label class="form-label">Repeat every</label>
-        <select class="form-input" [(ngModel)]="form.recurrence_interval" name="recurrence_interval">
-          <option value="weekly">Week</option>
-          <option value="biweekly">Two weeks</option>
-          <option value="monthly">Month</option>
-          <option value="yearly">Year</option>
-        </select>
-      </div>
-}
+        @if (form.is_recurring) {
+          <div class="form-group">
+            <label class="form-label" [for]="uid + '-interval'">Repeat every</label>
+            <select class="form-input" [id]="uid + '-interval'" [(ngModel)]="form.recurrence_interval" name="recurrence_interval">
+              <option value="weekly">Week</option>
+              <option value="biweekly">Two weeks</option>
+              <option value="monthly">Month (same day; the last day in shorter months)</option>
+              <option value="yearly">Year</option>
+            </select>
+          </div>
+        }
+      }
 
       @if (error) {
-<p class="form-error">{{ error }}</p>
-}
+        <p class="form-error" role="alert">{{ error }}</p>
+      }
 
       <div class="form-actions">
         <jiro-button variant="secondary" type="button" (click)="cancel()">Cancel</jiro-button>
@@ -138,34 +172,12 @@ export interface TransactionPayload {
       </div>
     </form>
 
-    <!-- New Category Modal -->
-    @if (showCatModal()) {
-<jiro-modal title="New Category" maxWidth="400px" (close)="closeCatModal()">
-      <form class="tx-form" (ngSubmit)="submitCategory()">
-        <div class="form-group">
-          <label class="form-label">Name</label>
-          <input class="form-input" type="text" [(ngModel)]="catForm.name" name="cat_name"
-            placeholder="e.g. Groceries" required />
-        </div>
-        <div class="form-group">
-          <label class="form-label">Type</label>
-          <div class="type-toggle">
-            <button type="button" class="type-btn" [class.active]="catForm.type === 'expense'" (click)="catForm.type = 'expense'">Expense</button>
-            <button type="button" class="type-btn" [class.active]="catForm.type === 'income'" (click)="catForm.type = 'income'">Income</button>
-          </div>
-        </div>
-        @if (catError()) {
-<p class="form-error">{{ catError() }}</p>
-}
-        <div class="form-actions">
-          <jiro-button variant="secondary" type="button" (click)="closeCatModal()">Cancel</jiro-button>
-          <jiro-button variant="primary" type="submit" [disabled]="catSaving() || !catForm.name.trim()">
-            {{ catSaving() ? 'Saving...' : 'Create' }}
-          </jiro-button>
-        </div>
-      </form>
-    </jiro-modal>
-}
+    @if (showCatDialog()) {
+      <ledger-category-dialog
+        [defaultType]="form.type === 'income' ? 'income' : 'expense'"
+        (saved)="onCategoryCreated($event)"
+        (closed)="showCatDialog.set(false)" />
+    }
   `,
   styles: [`
     :host { display: block; }
@@ -178,10 +190,10 @@ export interface TransactionPayload {
 
     .optional-label { font-weight: 400; color: var(--text-muted); }
 
-    .label-row { display: flex; align-items: center; justify-content: space-between; }
+    .label-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); }
 
     .new-cat-btn {
-      background: none; border: none; padding: 0;
+      background: none; border: none; padding: 8px 0; min-height: 32px;
       font-size: var(--font-size-sm); font-weight: 500;
       color: var(--color-primary); cursor: pointer; line-height: 1;
     }
@@ -203,8 +215,18 @@ export interface TransactionPayload {
       box-shadow: 2px 2px 0 var(--color-primary);
       transform: translate(-1px, -1px);
     }
-    select.form-input { appearance: none; cursor: pointer; }
+    select.form-input { appearance: none; cursor: pointer; text-overflow: ellipsis; }
     .form-textarea { resize: vertical; font-family: inherit; min-height: 60px; }
+
+    .field-hint { font-size: var(--font-size-xs); color: var(--text-muted); margin: 0; line-height: 1.5; }
+
+    .series-note {
+      display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-sm);
+      padding: var(--space-sm) var(--space-md);
+      border: 1px solid var(--border-color); border-radius: var(--border-radius);
+      background: var(--bg-canvas);
+    }
+    .series-note p { margin: 0; font-size: var(--font-size-sm); color: var(--text-secondary); line-height: 1.5; }
 
     .form-error { font-size: var(--font-size-sm); color: var(--color-danger); margin: 0; }
 
@@ -213,6 +235,7 @@ export interface TransactionPayload {
       justify-content: flex-end;
       gap: var(--space-sm);
       margin-top: var(--space-xs);
+      flex-wrap: wrap;
     }
 
     /* Type toggle */
@@ -223,7 +246,7 @@ export interface TransactionPayload {
       overflow: hidden;
     }
     .type-btn {
-      flex: 1; padding: 9px 12px; border: none;
+      flex: 1; padding: 9px 12px; border: none; min-height: 40px;
       background: var(--bg-surface); color: var(--text-secondary);
       font-size: var(--font-size-sm); font-weight: 500;
       cursor: pointer; transition: background 0.15s, color 0.15s;
@@ -231,8 +254,9 @@ export interface TransactionPayload {
     .type-btn + .type-btn { border-left: 1px solid var(--border-color); }
     .type-btn.active { background: var(--color-primary); color: var(--text-on-primary); }
     .type-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .type-btn.active:disabled { opacity: 0.8; }
 
-    /* Recurring toggle */
+    /* Repeat switch */
     .toggle-row { display: flex; align-items: center; justify-content: space-between; }
     .toggle-btn {
       width: 44px; height: 24px; border-radius: 12px;
@@ -255,17 +279,27 @@ export class LedgerTransactionFormComponent implements OnInit {
   @Input() submitLabel = 'Log transaction';
   /** Pre-fill the form: an existing transaction when editing, or just a date when logging for a given day. */
   @Input() initial: Partial<TransactionPayload> | null = null;
-  /** Transfers cannot change account or amount once written, so lock them. */
+  /** The transaction being edited, for its series (null when logging a new one). */
+  @Input() source: LedgerTransaction | null = null;
+  /** The type is fixed once a transaction exists. */
   @Input() lockType = false;
 
   @Output() formSubmit = new EventEmitter<TransactionPayload>();
   @Output() formCancel = new EventEmitter<void>();
+  /** "Stop repeating" on a copy Ledger added. */
+  @Output() stopSeries = new EventEmitter<void>();
 
   private allCategories = signal<CategoryTree[]>([]);
-  showCatModal = signal(false);
-  catSaving = signal(false);
-  catError = signal('');
-  catForm = { name: '', type: 'expense' as 'expense' | 'income' };
+  showCatDialog = signal(false);
+
+  private readonly settings = inject(SettingsService);
+  readonly uid = `tx-form-${++formSeq}`;
+  readonly symbol = computed(() => currencySymbol(this.settings.currency()));
+  readonly formatDate = formatDate;
+  readonly intervalPhrase = intervalPhrase;
+
+  /** Whether the transaction being edited heads a series right now. */
+  wasRecurring = false;
 
   form = {
     type: 'expense' as 'income' | 'expense' | 'transfer',
@@ -276,11 +310,16 @@ export class LedgerTransactionFormComponent implements OnInit {
     description: '',
     notes: '',
     is_recurring: false,
-    recurrence_interval: 'monthly' as 'weekly' | 'biweekly' | 'monthly' | 'yearly',
-    date: new Date().toISOString().slice(0, 10),
+    recurrence_interval: 'monthly' as RecurrenceInterval,
+    date: todayKey(this.settings.timezone()),
   };
 
   constructor(private ledgerService: LedgerService) {}
+
+  /** A copy Ledger added for a series: it cannot start a series of its own. */
+  isCopy(): boolean {
+    return !!this.source?.recurrence_source_id && !this.source.is_recurring;
+  }
 
   ngOnInit() {
     this.loadCategories();
@@ -300,6 +339,7 @@ export class LedgerTransactionFormComponent implements OnInit {
         date: i.date ?? this.form.date,
       };
     }
+    this.wasRecurring = !!this.source?.is_recurring && !!this.source.recurrence_next_date;
     // Auto-select first account if only one available
     if (!this.form.account_id && this.accounts.length === 1) {
       this.form.account_id = this.accounts[0].id;
@@ -332,40 +372,19 @@ export class LedgerTransactionFormComponent implements OnInit {
     this.form.transfer_to_account_id = '';
   }
 
-  openCatModal() {
-    this.catForm = { name: '', type: this.form.type === 'income' ? 'income' : 'expense' };
-    this.catError.set('');
-    this.showCatModal.set(true);
-  }
-
-  closeCatModal() {
-    this.showCatModal.set(false);
-  }
-
-  submitCategory() {
-    if (!this.catForm.name.trim()) return;
-    this.catSaving.set(true);
-    this.ledgerService.createCategory({ name: this.catForm.name.trim(), type: this.catForm.type }).subscribe({
-      next: created => {
-        this.catSaving.set(false);
-        this.showCatModal.set(false);
-        this.loadCategories();
-        // Auto-select newly created category if type matches
-        if (created.type === this.form.type) {
-          this.form.category_id = created.id;
-        }
-      },
-      error: () => {
-        this.catSaving.set(false);
-        this.catError.set('Failed to create category.');
-      },
-    });
+  onCategoryCreated(created: LedgerCategory) {
+    this.showCatDialog.set(false);
+    this.loadCategories();
+    if (created.type === this.form.type) {
+      this.form.category_id = created.id;
+    }
   }
 
   submit() {
     if (!this.form.account_id || !this.form.amount) return;
     if (this.form.type === 'transfer' && !this.form.transfer_to_account_id) return;
 
+    const repeat = !this.isCopy() && this.form.is_recurring;
     const payload: TransactionPayload = {
       type: this.form.type,
       account_id: this.form.account_id,
@@ -374,8 +393,8 @@ export class LedgerTransactionFormComponent implements OnInit {
       amount: this.form.amount,
       description: this.form.description.trim(),
       notes: this.form.notes.trim() || null,
-      is_recurring: this.form.is_recurring,
-      recurrence_interval: this.form.is_recurring ? this.form.recurrence_interval : null,
+      is_recurring: repeat,
+      recurrence_interval: repeat ? this.form.recurrence_interval : null,
       date: this.form.date,
     };
 
@@ -396,8 +415,8 @@ export class LedgerTransactionFormComponent implements OnInit {
       description: '',
       notes: '',
       is_recurring: false,
-      recurrence_interval: 'monthly' as 'weekly' | 'biweekly' | 'monthly' | 'yearly',
-      date: new Date().toISOString().slice(0, 10),
+      recurrence_interval: 'monthly',
+      date: todayKey(this.settings.timezone()),
     };
   }
 }

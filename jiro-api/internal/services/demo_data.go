@@ -1,6 +1,7 @@
 package services
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"strings"
@@ -109,6 +110,17 @@ type demoMealPlanEntry struct {
 	CustomLabel string
 }
 
+// demoGroceryItem is one line of the grocery list. RecipeID nil means an
+// item typed in by hand.
+type demoGroceryItem struct {
+	RecipeID    *uuid.UUID
+	RecipeTitle string
+	Item        string
+	Amount      string
+	Checked     bool
+	CreatedAt   time.Time
+}
+
 type demoJournalEntry struct {
 	ID        uuid.UUID
 	Title     string
@@ -177,6 +189,7 @@ type demoDataset struct {
 	MealPlanID        uuid.UUID
 	MealPlanWeek      string // Monday of the seed week
 	MealPlanEntries   []demoMealPlanEntry
+	GroceryItems      []demoGroceryItem
 
 	JournalEntries      []demoJournalEntry
 	JournalCollectionID uuid.UUID
@@ -191,6 +204,23 @@ type demoDataset struct {
 
 // demoSettings is the demo user's settings column.
 const demoSettings = `{"weight_unit":"lbs","timezone":"America/New_York"}`
+
+// demoTimeZone matches demoSettings. The app cuts days in the user's
+// timezone, so the demo's "today" (for seeding and for sliding dates) is the
+// New York calendar day, not the UTC one.
+const demoTimeZone = "America/New_York"
+
+// demoDate is t's calendar date in the demo's timezone, as UTC midnight of
+// that date (the same shape utcDay returns). Seed times are UTC hours 05-23,
+// which fall on that same calendar date in New York all year round.
+func demoDate(t time.Time) time.Time {
+	loc, err := time.LoadLocation(demoTimeZone)
+	if err != nil { // tzdata is embedded (day.go), so this does not happen
+		return utcDay(t)
+	}
+	y, m, d := t.In(loc).Date()
+	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+}
 
 func utcDay(t time.Time) time.Time {
 	t = t.UTC()
@@ -274,14 +304,14 @@ func buildDemoJym(ds *demoDataset, at func(int, int, int) time.Time, date func(i
 	for di, day := range days {
 		routineIDs[di] = uuid.New()
 		ds.Routines = append(ds.Routines, demoRoutine{
-			ID: routineIDs[di], Name: day.name, DayOrder: di + 1, CreatedAt: at(-44, 1, 12+di),
+			ID: routineIDs[di], Name: day.name, DayOrder: di + 1, CreatedAt: at(-44, 21, 12+di),
 		})
 		for li, lift := range day.lifts {
 			id := uuid.New()
 			exerciseIDs[lift.name] = id
 			ds.Exercises = append(ds.Exercises, demoExercise{
 				ID: id, Name: lift.name, MuscleGroup: lift.muscle, Notes: lift.notes,
-				CreatedAt: at(-44, 0, 40+len(ds.Exercises)),
+				CreatedAt: at(-44, 20, 40+len(ds.Exercises)),
 			})
 			ds.RoutineItems = append(ds.RoutineItems, demoRoutineItem{
 				RoutineID: routineIDs[di], ExerciseID: id, TargetSets: lift.sets, TargetReps: lift.reps, OrderIndex: li,
@@ -581,6 +611,33 @@ Stir in the chocolate and season. Top with sour cream and green onion.`,
 		{r(chili), 5, "dinner", ""},
 		{r(risotto), 6, "dinner", ""},
 	}
+
+	// The grocery list: the week's two meal prep recipes added from the
+	// planner the evening before, a few things ticked off already, and two
+	// items typed in by hand.
+	titles := map[uuid.UUID]string{}
+	ingredients := map[uuid.UUID]string{}
+	for _, rec := range ds.Recipes {
+		titles[rec.ID] = rec.Title
+		ingredients[rec.ID] = rec.Ingredients
+	}
+	checked := map[string]bool{"Rolled oats": true, "Milk": true, "Jasmine rice": true}
+	listAt := at(-1, 21, 30)
+	for _, rid := range []uuid.UUID{oats, bowls} {
+		var ing []demoIngredient
+		_ = json.Unmarshal([]byte(ingredients[rid]), &ing)
+		for _, in := range ing {
+			ds.GroceryItems = append(ds.GroceryItems, demoGroceryItem{
+				RecipeID: r(rid), RecipeTitle: titles[rid], Item: in.Item, Amount: in.Amount,
+				Checked: checked[in.Item], CreatedAt: listAt.Add(time.Duration(len(ds.GroceryItems)) * time.Second),
+			})
+		}
+	}
+	for _, m := range []struct{ item, amount string }{{"Coffee beans", "1 bag"}, {"Paper towels", ""}} {
+		ds.GroceryItems = append(ds.GroceryItems, demoGroceryItem{
+			Item: m.item, Amount: m.amount, CreatedAt: at(-1, 21, 45).Add(time.Duration(len(ds.GroceryItems)) * time.Second),
+		})
+	}
 }
 
 // ─── Journaly ────────────────────────────────────────────────────────────────
@@ -599,7 +656,7 @@ Started the new push pull legs program today. Kept the weights lighter than I wa
 
 Goal for the next six weeks: bench 175 and a clean 285 deadlift for five.`)
 
-	add(-31, 1, 40, "", "tired", []string{"sleep", "work"}, `
+	add(-31, 22, 40, "", "tired", []string{"sleep", "work"}, `
 Long day. The quarterly review ran two hours over and I ate lunch at 4. Skipped the evening walk. Going to bed early and not looking at my phone.`)
 
 	add(-29, 23, 30, "Sunday reset", "calm", []string{"routine", "cooking"}, `
@@ -607,7 +664,7 @@ Did the whole Sunday thing: laundry, groceries, meal prepped the Greek chicken b
 
 Nice to start the week with the fridge already full.`)
 
-	add(-26, 0, 15, "", "stressed", []string{"work", "money"}, `
+	add(-26, 21, 15, "", "stressed", []string{"work", "money"}, `
 Car needs new brakes, $480. Not the end of the world but it wipes out what I had set aside for the month. Moving the concert money back into savings to make up for it.`)
 
 	add(-22, 23, 50, "Risotto attempt", "happy", []string{"cooking"}, `
@@ -618,7 +675,7 @@ Sam said it was good, which is either true or kind.`)
 	add(-19, 23, 5, "", "grateful", []string{"friends"}, `
 Priya came over and we talked until midnight. It has been way too long since I just sat and talked with someone without checking the time. Want to do that more.`)
 
-	add(-17, 1, 20, "", "anxious", []string{"work"}, `
+	add(-17, 22, 20, "", "anxious", []string{"work"}, `
 Presentation to the leadership team on Thursday. I know the material but I keep rehearsing the opening in my head. Wrote out the first two minutes word for word so I can stop thinking about it.`)
 
 	add(-15, 23, 45, "", "tired", []string{"training", "sleep"}, `
@@ -643,7 +700,7 @@ Plan: cook on Wednesdays instead of ordering.`)
 	add(-3, 23, 35, "", "grateful", []string{"family", "cooking"}, `
 Big pot of turkey chili, froze half of it for the busy weeks. Mom called to ask for the recipe, which has never happened before.`)
 
-	add(-2, 0, 50, "", "calm", []string{"routine"}, `
+	add(-2, 21, 50, "", "calm", []string{"routine"}, `
 Quiet evening. Read for an hour, went to bed at 10:30. More days like this, please.`)
 
 	add(-1, 23, 20, "Six weeks done", "happy", []string{"training", "wins"}, `
@@ -886,6 +943,15 @@ func (ds *demoDataset) queue(b *pgx.Batch, userID uuid.UUID) {
 	for i, e := range ds.MealPlanEntries {
 		b.Queue(`INSERT INTO meal_plan_entries (meal_plan_id, recipe_id, day_of_week, meal_slot, custom_label, position, created_at) VALUES ($1,$2,$3,$4,$5,0,$6)`,
 			ds.MealPlanID, e.RecipeID, e.DayOfWeek, e.Slot, nullIfEmpty(e.CustomLabel), planCreated.Add(time.Duration(i)*time.Minute))
+	}
+	for i, g := range ds.GroceryItems {
+		source := groceryManualSource
+		if g.RecipeID != nil {
+			source = groceryRecipeSource(*g.RecipeID)
+		}
+		b.Queue(`INSERT INTO grocery_items (user_id, item, amount, recipe_id, recipe_title, source_key, name_key, checked, position, created_at, updated_at)
+		         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$10)`,
+			userID, g.Item, g.Amount, g.RecipeID, nullIfEmpty(g.RecipeTitle), source, normalizeIngredientName(g.Item), g.Checked, i, g.CreatedAt)
 	}
 
 	for _, e := range ds.JournalEntries {

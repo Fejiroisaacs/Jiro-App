@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/models"
@@ -373,17 +374,27 @@ func applyModifications(base, mods json.RawMessage) json.RawMessage {
 		return base
 	}
 
-	// Build a map for fast lookup
+	// Names match ignoring case and surrounding or repeated whitespace, so a
+	// trial's "feta" updates the recipe's "Feta" instead of adding a second
+	// feta. The recipe keeps its own spelling of the name.
 	idx := make(map[string]int)
 	for i, ing := range ingredients {
-		idx[ing.Item] = i
+		key := normalizeIngredientName(ing.Item)
+		if _, dup := idx[key]; !dup {
+			idx[key] = i
+		}
 	}
 
 	for _, mod := range modifications {
-		if i, exists := idx[mod.Item]; exists {
+		key := normalizeIngredientName(mod.Item)
+		if key == "" {
+			continue
+		}
+		if i, exists := idx[key]; exists {
 			ingredients[i].Amount = mod.Change
 		} else {
-			ingredients = append(ingredients, Ingredient{Item: mod.Item, Amount: mod.Change})
+			ingredients = append(ingredients, Ingredient{Item: strings.TrimSpace(mod.Item), Amount: mod.Change})
+			idx[key] = len(ingredients) - 1
 		}
 	}
 
@@ -391,18 +402,24 @@ func applyModifications(base, mods json.RawMessage) json.RawMessage {
 	return result
 }
 
-func (s *RecipeService) GetCookStreak(ctx context.Context, userID uuid.UUID) (*models.CookStreakResponse, error) {
+// GetCookStreak counts cook days in the user's location (settings timezone,
+// else tzHint, else UTC), the days GET /day lists a trial under.
+func (s *RecipeService) GetCookStreak(ctx context.Context, userID uuid.UUID, tzHint string) (*models.CookStreakResponse, error) {
+	loc, err := userLocation(ctx, s.db, userID, tzHint)
+	if err != nil {
+		return nil, err
+	}
 	rows, err := s.db.Query(ctx,
 		// ::text because the rows are scanned into a string below and pgx will
 		// not convert a date column to one; without the cast this endpoint
 		// returned 500 for every user who had ever logged a trial.
 		// date_cooked is nullable, and a trial with no date has no day to count.
-		`SELECT DISTINCT (date_cooked AT TIME ZONE 'UTC')::date::text AS cook_date
+		`SELECT DISTINCT (date_cooked AT TIME ZONE $2)::date::text AS cook_date
 		 FROM recipe_trials rt
 		 JOIN recipes r ON rt.recipe_id = r.id
 		 WHERE r.user_id = $1 AND rt.date_cooked IS NOT NULL
 		 ORDER BY cook_date DESC`,
-		userID,
+		userID, loc.String(),
 	)
 	if err != nil {
 		return nil, err
@@ -418,7 +435,7 @@ func (s *RecipeService) GetCookStreak(ctx context.Context, userID uuid.UUID) (*m
 		dates = append(dates, d)
 	}
 
-	current, longest := dayStreaks(dates, time.Now())
+	current, longest := dayStreaks(dates, time.Now().In(loc))
 
 	return &models.CookStreakResponse{
 		CurrentStreak: current,

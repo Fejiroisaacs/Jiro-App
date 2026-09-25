@@ -1,7 +1,8 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { SettingsService } from './settings.service';
 
 const API_URL = `${environment.apiUrl}/jym`;
 
@@ -238,6 +239,8 @@ export interface UpdateSplitRequest { name?: string; description?: string; visib
 export interface CreateRoutineRequest { name: string; day_order?: number; }
 export interface UpdateRoutineRequest { name?: string; day_order?: number; }
 export interface ReplaceItemEntry { exercise_id: string; target_sets: number; target_reps: number; }
+export interface RoutineItemsEntry { routine_id: string; items: ReplaceItemEntry[]; }
+export interface RoutineItemsResult { routine_id: string; items: RoutineItem[]; }
 export interface CreateSessionRequest { routine_id?: string; series_id?: string; session_type?: 'normal' | 'deload' | 'test'; }
 export interface UpdateSessionRequest { ended_at?: string; notes?: string; session_type?: string; }
 export interface CreateSetRequest { exercise_id: string; set_number: number; weight: number; reps_performed: number; rpe?: number; is_warmup?: boolean; exercise_note?: string; }
@@ -271,6 +274,8 @@ export interface SharePreview {
 @Injectable({ providedIn: 'root' })
 export class JymService {
   constructor(private http: HttpClient) {}
+
+  private readonly settings = inject(SettingsService);
 
   // Exercises
   listExercises(q?: string, mg?: string): Observable<Exercise[]> {
@@ -336,6 +341,11 @@ export class JymService {
 
   replaceRoutineItems(routineId: string, items: ReplaceItemEntry[]): Observable<RoutineItem[]> {
     return this.http.put<RoutineItem[]>(`${API_URL}/routines/${routineId}/items`, items);
+  }
+
+  /** Saves several days of one split in one transaction (a move between days). */
+  replaceSplitItems(splitId: string, routines: RoutineItemsEntry[]): Observable<RoutineItemsResult[]> {
+    return this.http.put<RoutineItemsResult[]>(`${API_URL}/splits/${splitId}/items`, { routines });
   }
 
   // Sessions
@@ -420,7 +430,9 @@ export class JymService {
 
   // CSV Export
   exportSessionsCSV(from?: string, to?: string): Observable<Blob> {
-    let params = new HttpParams();
+    // from, to and the date column are the user's days; tz is the API's
+    // fallback for an account with no timezone setting.
+    let params = new HttpParams().set('tz', this.settings.timezone());
     if (from) params = params.set('from', from);
     if (to) params = params.set('to', to);
     return this.http.get(`${API_URL}/export/sessions.csv`, { responseType: 'blob', params });

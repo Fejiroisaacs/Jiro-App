@@ -15,16 +15,19 @@ export function timeAgo(iso: string, now = Date.now()): string {
 /**
  * For date-only values (a weigh-in has a day, not a time): compares calendar
  * days, so today's entry reads "today" rather than "11h ago" from UTC midnight.
+ * `today` is the user's day key (todayKey in their settings zone).
  */
-export function daysAgo(dateOnly: string, now = new Date()): string {
-  const [y, m, d] = dateOnly.slice(0, 10).split('-').map(Number);
-  const day = new Date(y, m - 1, d);
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const days = Math.round((today.getTime() - day.getTime()) / 86400000);
+export function daysAgo(dateOnly: string, today: string): string {
+  const toUtc = (key: string) => {
+    const [y, m, d] = key.slice(0, 10).split('-').map(Number);
+    return Date.UTC(y, m - 1, d);
+  };
+  const day = toUtc(dateOnly);
+  const days = Math.round((toUtc(today) - day) / 86400000);
   if (days <= 0) return 'today';
   if (days === 1) return 'yesterday';
   if (days < 14) return `${days} days ago`;
-  return day.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  return new Date(day).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
 }
 
 /** "12 Sep" (en-GB, like the rest of the dashboard). */

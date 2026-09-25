@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/models"
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/services"
@@ -21,6 +22,70 @@ func NewLedgerHandler(svc *services.LedgerService) *LedgerHandler {
 	return &LedgerHandler{svc: svc}
 }
 
+// fail maps a ledger service error to its response. Anything it does not
+// recognise is a 500 whose detail stays in the log.
+func (h *LedgerHandler) fail(c *gin.Context, err error, action string) {
+	respond := func(status int, code, msg string) {
+		c.JSON(status, models.ErrorResponse{Error: models.ErrorDetail{Code: code, Message: msg}})
+	}
+	switch {
+	case errors.Is(err, services.ErrLedgerInvalid):
+		// The wrapped message is written for people; drop the sentinel prefix.
+		msg := strings.TrimPrefix(err.Error(), services.ErrLedgerInvalid.Error()+": ")
+		respond(http.StatusBadRequest, "VALIDATION_ERROR", msg)
+	case errors.Is(err, services.ErrAccountNotFound):
+		respond(http.StatusNotFound, "NOT_FOUND", "Account not found")
+	case errors.Is(err, services.ErrCategoryNotFound):
+		respond(http.StatusNotFound, "NOT_FOUND", "Category not found")
+	case errors.Is(err, services.ErrTransactionNotFound):
+		respond(http.StatusNotFound, "NOT_FOUND", "Transaction not found")
+	case errors.Is(err, services.ErrBudgetNotFound):
+		respond(http.StatusNotFound, "NOT_FOUND", "Budget not found")
+	case errors.Is(err, services.ErrAccountHasTransactions):
+		respond(http.StatusConflict, "ACCOUNT_HAS_TRANSACTIONS", "Account has transactions. Delete or reassign them first.")
+	case errors.Is(err, services.ErrCategoryNameTaken):
+		respond(http.StatusConflict, "CATEGORY_EXISTS", "You already have a category with that name.")
+	case errors.Is(err, services.ErrBudgetExists):
+		respond(http.StatusConflict, "BUDGET_EXISTS", "That category already has a budget for this period.")
+	default:
+		respondInternal(c, err, action)
+	}
+}
+
+func bindError(c *gin.Context, err error) {
+	c.JSON(http.StatusBadRequest, models.ErrorResponse{
+		Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()},
+	})
+}
+
+// pathID parses the :id route parameter, answering 400 itself when it is not
+// a UUID.
+func pathID(c *gin.Context, what string) (uuid.UUID, bool) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid " + what + " ID"},
+		})
+		return uuid.Nil, false
+	}
+	return id, true
+}
+
+// catchUp writes any recurring transactions that have come due before a
+// Ledger read, so the page shows them. A failure is logged and the read goes
+// ahead: the next visit catches up instead. tz is only a fallback for a
+// user with no timezone setting, as on GET /day.
+func (h *LedgerHandler) catchUp(c *gin.Context, userID uuid.UUID) {
+	n, err := h.svc.CatchUpRecurring(c.Request.Context(), userID, c.Query("tz"), time.Now())
+	if err != nil {
+		log.Error().Err(err).Str("user_id", userID.String()).Msg("ledger recurring catch-up failed")
+		return
+	}
+	if n > 0 {
+		log.Info().Int("written", n).Str("user_id", userID.String()).Msg("ledger recurring catch-up")
+	}
+}
+
 // ── Accounts ──────────────────────────────────────────────────────────────────
 
 func (h *LedgerHandler) CreateAccount(c *gin.Context) {
@@ -28,18 +93,13 @@ func (h *LedgerHandler) CreateAccount(c *gin.Context) {
 
 	var req models.CreateAccountRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()},
-		})
+		bindError(c, err)
 		return
 	}
 
 	acc, err := h.svc.CreateAccount(c.Request.Context(), userID, &req)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to create ledger account")
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to create account"},
-		})
+		h.fail(c, err, "Failed to create ledger account")
 		return
 	}
 	c.JSON(http.StatusCreated, acc)
@@ -47,13 +107,11 @@ func (h *LedgerHandler) CreateAccount(c *gin.Context) {
 
 func (h *LedgerHandler) ListAccounts(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
+	h.catchUp(c, userID)
 
 	accounts, err := h.svc.ListAccounts(c.Request.Context(), userID)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to list ledger accounts")
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to list accounts"},
-		})
+		h.fail(c, err, "Failed to list ledger accounts")
 		return
 	}
 	c.JSON(http.StatusOK, accounts)
@@ -61,27 +119,15 @@ func (h *LedgerHandler) ListAccounts(c *gin.Context) {
 
 func (h *LedgerHandler) GetAccount(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
-
-	accountID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid account ID"},
-		})
+	accountID, ok := pathID(c, "account")
+	if !ok {
 		return
 	}
+	h.catchUp(c, userID)
 
 	acc, err := h.svc.GetAccount(c.Request.Context(), userID, accountID)
 	if err != nil {
-		if errors.Is(err, services.ErrAccountNotFound) {
-			c.JSON(http.StatusNotFound, models.ErrorResponse{
-				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Account not found"},
-			})
-			return
-		}
-		log.Error().Err(err).Msg("Failed to get ledger account")
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to get account"},
-		})
+		h.fail(c, err, "Failed to get ledger account")
 		return
 	}
 	c.JSON(http.StatusOK, acc)
@@ -89,35 +135,20 @@ func (h *LedgerHandler) GetAccount(c *gin.Context) {
 
 func (h *LedgerHandler) UpdateAccount(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
-
-	accountID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid account ID"},
-		})
+	accountID, ok := pathID(c, "account")
+	if !ok {
 		return
 	}
 
 	var req models.UpdateAccountRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()},
-		})
+		bindError(c, err)
 		return
 	}
 
 	acc, err := h.svc.UpdateAccount(c.Request.Context(), userID, accountID, &req)
 	if err != nil {
-		if errors.Is(err, services.ErrAccountNotFound) {
-			c.JSON(http.StatusNotFound, models.ErrorResponse{
-				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Account not found"},
-			})
-			return
-		}
-		log.Error().Err(err).Msg("Failed to update ledger account")
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to update account"},
-		})
+		h.fail(c, err, "Failed to update ledger account")
 		return
 	}
 	c.JSON(http.StatusOK, acc)
@@ -125,33 +156,13 @@ func (h *LedgerHandler) UpdateAccount(c *gin.Context) {
 
 func (h *LedgerHandler) DeleteAccount(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
-
-	accountID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid account ID"},
-		})
+	accountID, ok := pathID(c, "account")
+	if !ok {
 		return
 	}
 
-	err = h.svc.DeleteAccount(c.Request.Context(), userID, accountID)
-	if err != nil {
-		if errors.Is(err, services.ErrAccountNotFound) {
-			c.JSON(http.StatusNotFound, models.ErrorResponse{
-				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Account not found"},
-			})
-			return
-		}
-		if errors.Is(err, services.ErrAccountHasTransactions) {
-			c.JSON(http.StatusConflict, models.ErrorResponse{
-				Error: models.ErrorDetail{Code: "ACCOUNT_HAS_TRANSACTIONS", Message: "Account has transactions. Delete or reassign them first."},
-			})
-			return
-		}
-		log.Error().Err(err).Msg("Failed to delete ledger account")
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to delete account"},
-		})
+	if err := h.svc.DeleteAccount(c.Request.Context(), userID, accountID); err != nil {
+		h.fail(c, err, "Failed to delete ledger account")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Account deleted"})
@@ -164,28 +175,13 @@ func (h *LedgerHandler) CreateTransaction(c *gin.Context) {
 
 	var req models.CreateTransactionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()},
-		})
+		bindError(c, err)
 		return
 	}
 
 	tx, err := h.svc.CreateTransaction(c.Request.Context(), userID, &req)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to create ledger transaction")
-		if errors.Is(err, services.ErrAccountNotFound) {
-			c.JSON(http.StatusNotFound, models.ErrorResponse{
-				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Account not found"},
-			})
-			return
-		}
-		if errors.Is(err, services.ErrCategoryNotFound) {
-			c.JSON(http.StatusNotFound, models.ErrorResponse{
-				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Category not found"},
-			})
-			return
-		}
-		respondInternal(c, err, "ledger request failed")
+		h.fail(c, err, "Failed to create ledger transaction")
 		return
 	}
 	c.JSON(http.StatusCreated, tx)
@@ -193,6 +189,7 @@ func (h *LedgerHandler) CreateTransaction(c *gin.Context) {
 
 func (h *LedgerHandler) ListTransactions(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
+	h.catchUp(c, userID)
 
 	page := 1
 	if p, err := strconv.Atoi(c.DefaultQuery("page", "1")); err == nil && p > 0 {
@@ -216,10 +213,7 @@ func (h *LedgerHandler) ListTransactions(c *gin.Context) {
 
 	txs, err := h.svc.ListTransactions(c.Request.Context(), userID, filters)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to list ledger transactions")
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to list transactions"},
-		})
+		h.fail(c, err, "Failed to list ledger transactions")
 		return
 	}
 	c.JSON(http.StatusOK, txs)
@@ -227,27 +221,14 @@ func (h *LedgerHandler) ListTransactions(c *gin.Context) {
 
 func (h *LedgerHandler) GetTransaction(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
-
-	txID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid transaction ID"},
-		})
+	txID, ok := pathID(c, "transaction")
+	if !ok {
 		return
 	}
 
 	tx, err := h.svc.GetTransaction(c.Request.Context(), userID, txID)
 	if err != nil {
-		if errors.Is(err, services.ErrTransactionNotFound) {
-			c.JSON(http.StatusNotFound, models.ErrorResponse{
-				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Transaction not found"},
-			})
-			return
-		}
-		log.Error().Err(err).Msg("Failed to get ledger transaction")
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to get transaction"},
-		})
+		h.fail(c, err, "Failed to get ledger transaction")
 		return
 	}
 	c.JSON(http.StatusOK, tx)
@@ -255,45 +236,36 @@ func (h *LedgerHandler) GetTransaction(c *gin.Context) {
 
 func (h *LedgerHandler) UpdateTransaction(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
-
-	txID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid transaction ID"},
-		})
+	txID, ok := pathID(c, "transaction")
+	if !ok {
 		return
 	}
 
 	var req models.UpdateTransactionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()},
-		})
+		bindError(c, err)
 		return
 	}
 
 	tx, err := h.svc.UpdateTransaction(c.Request.Context(), userID, txID, &req)
 	if err != nil {
-		if errors.Is(err, services.ErrTransactionNotFound) {
-			c.JSON(http.StatusNotFound, models.ErrorResponse{
-				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Transaction not found"},
-			})
-			return
-		}
-		log.Error().Err(err).Msg("Failed to update ledger transaction")
-		if errors.Is(err, services.ErrAccountNotFound) {
-			c.JSON(http.StatusNotFound, models.ErrorResponse{
-				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Account not found"},
-			})
-			return
-		}
-		if errors.Is(err, services.ErrCategoryNotFound) {
-			c.JSON(http.StatusNotFound, models.ErrorResponse{
-				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Category not found"},
-			})
-			return
-		}
-		respondInternal(c, err, "ledger request failed")
+		h.fail(c, err, "Failed to update ledger transaction")
+		return
+	}
+	c.JSON(http.StatusOK, tx)
+}
+
+// StopRecurring stops the series the transaction heads or was written by.
+func (h *LedgerHandler) StopRecurring(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	txID, ok := pathID(c, "transaction")
+	if !ok {
+		return
+	}
+
+	tx, err := h.svc.StopRecurring(c.Request.Context(), userID, txID)
+	if err != nil {
+		h.fail(c, err, "Failed to stop ledger series")
 		return
 	}
 	c.JSON(http.StatusOK, tx)
@@ -301,27 +273,13 @@ func (h *LedgerHandler) UpdateTransaction(c *gin.Context) {
 
 func (h *LedgerHandler) DeleteTransaction(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
-
-	txID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid transaction ID"},
-		})
+	txID, ok := pathID(c, "transaction")
+	if !ok {
 		return
 	}
 
-	err = h.svc.DeleteTransaction(c.Request.Context(), userID, txID)
-	if err != nil {
-		if errors.Is(err, services.ErrTransactionNotFound) {
-			c.JSON(http.StatusNotFound, models.ErrorResponse{
-				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Transaction not found"},
-			})
-			return
-		}
-		log.Error().Err(err).Msg("Failed to delete ledger transaction")
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to delete transaction"},
-		})
+	if err := h.svc.DeleteTransaction(c.Request.Context(), userID, txID); err != nil {
+		h.fail(c, err, "Failed to delete ledger transaction")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Transaction deleted"})
@@ -334,18 +292,13 @@ func (h *LedgerHandler) CreateCategory(c *gin.Context) {
 
 	var req models.CreateCategoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()},
-		})
+		bindError(c, err)
 		return
 	}
 
 	cat, err := h.svc.CreateCategory(c.Request.Context(), userID, &req)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to create ledger category")
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to create category"},
-		})
+		h.fail(c, err, "Failed to create ledger category")
 		return
 	}
 	c.JSON(http.StatusCreated, cat)
@@ -356,10 +309,7 @@ func (h *LedgerHandler) ListCategories(c *gin.Context) {
 
 	tree, err := h.svc.ListCategories(c.Request.Context(), userID)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to list ledger categories")
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to list categories"},
-		})
+		h.fail(c, err, "Failed to list ledger categories")
 		return
 	}
 	c.JSON(http.StatusOK, tree)
@@ -367,66 +317,52 @@ func (h *LedgerHandler) ListCategories(c *gin.Context) {
 
 func (h *LedgerHandler) UpdateCategory(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
-
-	catID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid category ID"},
-		})
+	catID, ok := pathID(c, "category")
+	if !ok {
 		return
 	}
 
 	var req models.UpdateCategoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()},
-		})
+		bindError(c, err)
 		return
 	}
 
 	cat, err := h.svc.UpdateCategory(c.Request.Context(), userID, catID, &req)
 	if err != nil {
-		if errors.Is(err, services.ErrCategoryNotFound) {
-			c.JSON(http.StatusNotFound, models.ErrorResponse{
-				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Category not found"},
-			})
-			return
-		}
-		log.Error().Err(err).Msg("Failed to update ledger category")
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to update category"},
-		})
+		h.fail(c, err, "Failed to update ledger category")
 		return
 	}
 	c.JSON(http.StatusOK, cat)
 }
 
+// DeleteCategory deletes a category. ?move_to=<category id> moves its
+// transactions to that category (same type); without it they become
+// uncategorised.
 func (h *LedgerHandler) DeleteCategory(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
-
-	catID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid category ID"},
-		})
+	catID, ok := pathID(c, "category")
+	if !ok {
 		return
 	}
-
-	err = h.svc.DeleteCategory(c.Request.Context(), userID, catID)
-	if err != nil {
-		if errors.Is(err, services.ErrCategoryNotFound) {
-			c.JSON(http.StatusNotFound, models.ErrorResponse{
-				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Category not found"},
+	var moveTo *uuid.UUID
+	if raw := c.Query("move_to"); raw != "" {
+		id, err := uuid.Parse(raw)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{
+				Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid move_to category ID"},
 			})
 			return
 		}
-		log.Error().Err(err).Msg("Failed to delete ledger category")
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to delete category"},
-		})
+		moveTo = &id
+	}
+
+	res, err := h.svc.DeleteCategory(c.Request.Context(), userID, catID, moveTo)
+	if err != nil {
+		h.fail(c, err, "Failed to delete ledger category")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "Category deleted"})
+	c.JSON(http.StatusOK, gin.H{"message": "Category deleted", "moved": res.Moved, "budgets_removed": res.BudgetsRemoved})
 }
 
 // ── Budgets ───────────────────────────────────────────────────────────────────
@@ -436,42 +372,47 @@ func (h *LedgerHandler) CreateBudget(c *gin.Context) {
 
 	var req models.CreateBudgetRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()},
-		})
+		bindError(c, err)
 		return
 	}
 
-	budget, err := h.svc.CreateBudget(c.Request.Context(), userID, &req)
+	budget, err := h.svc.CreateBudget(c.Request.Context(), userID, &req, c.Query("tz"))
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to create ledger budget")
-		if errors.Is(err, services.ErrAccountNotFound) {
-			c.JSON(http.StatusNotFound, models.ErrorResponse{
-				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Account not found"},
-			})
-			return
-		}
-		if errors.Is(err, services.ErrCategoryNotFound) {
-			c.JSON(http.StatusNotFound, models.ErrorResponse{
-				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Category not found"},
-			})
-			return
-		}
-		respondInternal(c, err, "ledger request failed")
+		h.fail(c, err, "Failed to create ledger budget")
 		return
 	}
 	c.JSON(http.StatusCreated, budget)
 }
 
+func (h *LedgerHandler) UpdateBudget(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	budgetID, ok := pathID(c, "budget")
+	if !ok {
+		return
+	}
+
+	var req models.UpdateBudgetRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		bindError(c, err)
+		return
+	}
+
+	budget, err := h.svc.UpdateBudget(c.Request.Context(), userID, budgetID, &req)
+	if err != nil {
+		h.fail(c, err, "Failed to update ledger budget")
+		return
+	}
+	c.JSON(http.StatusOK, budget)
+}
+
 func (h *LedgerHandler) ListBudgets(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
+	h.catchUp(c, userID)
 
-	budgets, err := h.svc.ListBudgets(c.Request.Context(), userID)
+	// tz is only a fallback for a user with no timezone setting, as on GET /day.
+	budgets, err := h.svc.ListBudgets(c.Request.Context(), userID, c.Query("tz"))
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to list ledger budgets")
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to list budgets"},
-		})
+		h.fail(c, err, "Failed to list ledger budgets")
 		return
 	}
 	c.JSON(http.StatusOK, budgets)
@@ -479,27 +420,13 @@ func (h *LedgerHandler) ListBudgets(c *gin.Context) {
 
 func (h *LedgerHandler) DeleteBudget(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
-
-	budgetID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid budget ID"},
-		})
+	budgetID, ok := pathID(c, "budget")
+	if !ok {
 		return
 	}
 
-	err = h.svc.DeleteBudget(c.Request.Context(), userID, budgetID)
-	if err != nil {
-		if errors.Is(err, services.ErrBudgetNotFound) {
-			c.JSON(http.StatusNotFound, models.ErrorResponse{
-				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Budget not found"},
-			})
-			return
-		}
-		log.Error().Err(err).Msg("Failed to delete ledger budget")
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to delete budget"},
-		})
+	if err := h.svc.DeleteBudget(c.Request.Context(), userID, budgetID); err != nil {
+		h.fail(c, err, "Failed to delete ledger budget")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Budget deleted"})
@@ -507,33 +434,15 @@ func (h *LedgerHandler) DeleteBudget(c *gin.Context) {
 
 // ── Summary & Net Worth ───────────────────────────────────────────────────────
 
+// GetSummary: ?month=YYYY-MM, or no month for the current one in the user's
+// timezone.
 func (h *LedgerHandler) GetSummary(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
+	h.catchUp(c, userID)
 
-	month := c.Query("month")
-	if month == "" {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "MISSING_PARAM", Message: "month query param required (YYYY-MM)"},
-		})
-		return
-	}
-
-	summary, err := h.svc.GetSummary(c.Request.Context(), userID, month)
+	summary, err := h.svc.GetSummary(c.Request.Context(), userID, c.Query("month"), c.Query("tz"))
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get ledger summary")
-		if errors.Is(err, services.ErrAccountNotFound) {
-			c.JSON(http.StatusNotFound, models.ErrorResponse{
-				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Account not found"},
-			})
-			return
-		}
-		if errors.Is(err, services.ErrCategoryNotFound) {
-			c.JSON(http.StatusNotFound, models.ErrorResponse{
-				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Category not found"},
-			})
-			return
-		}
-		respondInternal(c, err, "ledger request failed")
+		h.fail(c, err, "Failed to get ledger summary")
 		return
 	}
 	c.JSON(http.StatusOK, summary)
@@ -544,10 +453,7 @@ func (h *LedgerHandler) GetNetWorth(c *gin.Context) {
 
 	snaps, err := h.svc.ListSnapshots(c.Request.Context(), userID)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to list net worth snapshots")
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to list snapshots"},
-		})
+		h.fail(c, err, "Failed to list net worth snapshots")
 		return
 	}
 	c.JSON(http.StatusOK, snaps)
@@ -558,28 +464,13 @@ func (h *LedgerHandler) CreateSnapshot(c *gin.Context) {
 
 	var req models.CreateSnapshotRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()},
-		})
+		bindError(c, err)
 		return
 	}
 
 	snap, err := h.svc.CreateSnapshot(c.Request.Context(), userID, &req)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to create net worth snapshot")
-		if errors.Is(err, services.ErrAccountNotFound) {
-			c.JSON(http.StatusNotFound, models.ErrorResponse{
-				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Account not found"},
-			})
-			return
-		}
-		if errors.Is(err, services.ErrCategoryNotFound) {
-			c.JSON(http.StatusNotFound, models.ErrorResponse{
-				Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Category not found"},
-			})
-			return
-		}
-		respondInternal(c, err, "ledger request failed")
+		h.fail(c, err, "Failed to create net worth snapshot")
 		return
 	}
 	c.JSON(http.StatusCreated, snap)
@@ -587,6 +478,8 @@ func (h *LedgerHandler) CreateSnapshot(c *gin.Context) {
 
 // ── Comparison ────────────────────────────────────────────────────────────────
 
+// GetComparison compares period B against period A (the base); the change
+// is B - A.
 func (h *LedgerHandler) GetComparison(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 
@@ -601,13 +494,11 @@ func (h *LedgerHandler) GetComparison(c *gin.Context) {
 		})
 		return
 	}
+	h.catchUp(c, userID)
 
 	result, err := h.svc.GetComparison(c.Request.Context(), userID, aFrom, aTo, bFrom, bTo)
 	if err != nil {
-		log.Error().Err(err).Msg("Failed to get ledger comparison")
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to compute comparison"},
-		})
+		h.fail(c, err, "Failed to get ledger comparison")
 		return
 	}
 	c.JSON(http.StatusOK, result)

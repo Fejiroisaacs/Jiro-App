@@ -1,12 +1,12 @@
 import { Injectable, inject } from '@angular/core';
-import { Observable, merge, of } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
+import { EMPTY, Observable, merge, of } from 'rxjs';
+import { catchError, expand, map, reduce } from 'rxjs/operators';
 import { JymService, SessionSummary, BodyWeight } from './jym.service';
-import { JournalService, JournalStreak } from './journal.service';
+import { JournalEntry, JournalService, JournalStreak } from './journal.service';
 import { RecipeService, CookStreak, Recipe } from './recipe.service';
 import { LedgerService, LedgerAccount, LedgerSummary, BudgetWithSpend } from './ledger.service';
 import { SettingsService } from './settings.service';
-import { dayKey, todayKey } from '../utils/day';
+import { addDays, dayKey, dayStartISO, todayKey } from '../utils/day';
 
 /** A single request (or small request group) the dashboard can make. Widgets that share a source share the request. */
 export type WidgetSource =
@@ -70,11 +70,15 @@ export const RECENT_RECIPE_COUNT = 3;
 /** Days the activity strip shows, today included. */
 export const STRIP_DAYS = 14;
 
+/** Entries per request for the strip: the API's page cap. */
+const STRIP_PAGE_SIZE = 50;
+
 /**
- * Entries fetched for the strip. The API caps a page at 50; someone writing
- * more than 50 entries in 14 days sees the oldest days of the strip undercounted.
+ * The strip reads every entry in its window, a page at a time, up to this
+ * many pages (500 entries in 14 days). Past that the oldest days undercount
+ * rather than the dashboard firing an unbounded run of requests.
  */
-const STRIP_ENTRY_LIMIT = 50;
+const STRIP_MAX_PAGES = 10;
 
 @Injectable({ providedIn: 'root' })
 export class DashboardService {
@@ -119,10 +123,9 @@ export class DashboardService {
         return this.recipes.listRecipes(undefined, RECENT_RECIPE_COUNT);
       case 'ledgerAccounts':
         return this.ledger.listAccounts();
-      case 'ledgerSummary': {
-        const now = new Date();
-        return this.ledger.getSummary(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
-      }
+      case 'ledgerSummary':
+        // This month in the user's zone (YYYY-MM of today's key).
+        return this.ledger.getSummary(todayKey(this.settings.timezone()).slice(0, 7));
       case 'ledgerBudgets':
         return this.ledger.listBudgets().pipe(map(b => [...b].sort((x, y) => y.pct_used - x.pct_used).slice(0, 3)));
     }
@@ -130,18 +133,33 @@ export class DashboardService {
 
   /**
    * Entries per day for the activity strip and "Written today", cut in the
-   * user's timezone like the day view. The calendar endpoint counts UTC days,
-   * so this reads the entries themselves: everything since a day before the
-   * strip starts (days are at most 26 hours, so one spare day covers any zone).
+   * user's timezone like the day view: every entry since the strip's first
+   * day began in that zone.
    */
   private journalDays(): Observable<JournalDays> {
     const tz = this.settings.timezone();
-    const from = new Date(Date.now() - (STRIP_DAYS + 1) * 86_400_000).toISOString();
-    return this.journal.listEntries({ from, limit: STRIP_ENTRY_LIMIT }).pipe(
+    const today = todayKey(tz);
+    const from = dayStartISO(addDays(today, -(STRIP_DAYS - 1)), tz);
+    return this.entriesSince(from).pipe(
       map(entries => {
         const counts = countByDay(entries.map(e => e.created_at), tz);
-        return { counts, wroteToday: counts.has(todayKey(tz)) };
+        return { counts, wroteToday: counts.has(today) };
       }),
+    );
+  }
+
+  /**
+   * Every private entry created at or after `from`, paging by offset until
+   * X-Total-Count is reached (or STRIP_MAX_PAGES pages have been read).
+   */
+  private entriesSince(from: string): Observable<JournalEntry[]> {
+    const page = (offset: number) => this.journal.listEntriesPage({ from, limit: STRIP_PAGE_SIZE, offset });
+    return page(0).pipe(
+      expand((res, i) => {
+        const read = (i + 1) * STRIP_PAGE_SIZE;
+        return read < res.total && i + 1 < STRIP_MAX_PAGES ? page(read) : EMPTY;
+      }),
+      reduce((all, res) => all.concat(res.entries), [] as JournalEntry[]),
     );
   }
 }
