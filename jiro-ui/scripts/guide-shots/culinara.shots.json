@@ -83,18 +83,47 @@
   },
   {
     "name": "recipe-page",
-    "path": "/culinara/3e84f55c-a7a6-459c-a10b-c94bae8f5deb",
-    "waitFor": ".recipe-title"
+    "path": "/culinara",
+    "waitFor": ".recipe-card",
+    "actions": [
+      {
+        "click": {
+          "role": "link",
+          "name": "Greek Chicken Rice Bowls"
+        }
+      },
+      {
+        "wait": 300
+      }
+    ]
   },
   {
     "name": "cook-mode",
-    "path": "/culinara/3e84f55c-a7a6-459c-a10b-c94bae8f5deb/cook",
-    "waitFor": ".cook-row",
+    "path": "/culinara",
+    "waitFor": ".recipe-card",
     "viewport": {
       "width": 390,
       "height": 844
     },
     "actions": [
+      {
+        "click": {
+          "role": "link",
+          "name": "Greek Chicken Rice Bowls"
+        }
+      },
+      {
+        "wait": 300
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Start cooking"
+        }
+      },
+      {
+        "wait": 300
+      },
       {
         "click": {
           "role": "button",
@@ -106,13 +135,22 @@
   },
   {
     "name": "log-trial",
-    "path": "/culinara/3e84f55c-a7a6-459c-a10b-c94bae8f5deb",
-    "waitFor": ".recipe-title",
+    "path": "/culinara",
+    "waitFor": ".recipe-card",
     "viewport": {
       "width": 1280,
       "height": 900
     },
     "actions": [
+      {
+        "click": {
+          "role": "link",
+          "name": "Greek Chicken Rice Bowls"
+        }
+      },
+      {
+        "wait": 300
+      },
       {
         "click": {
           "role": "button",
@@ -148,9 +186,18 @@
   },
   {
     "name": "promote-trial",
-    "path": "/culinara/3e84f55c-a7a6-459c-a10b-c94bae8f5deb",
-    "waitFor": ".trial-card",
+    "path": "/culinara",
+    "waitFor": ".recipe-card",
     "actions": [
+      {
+        "click": {
+          "role": "link",
+          "name": "Greek Chicken Rice Bowls"
+        }
+      },
+      {
+        "wait": 300
+      },
       {
         "click": {
           "role": "button",
@@ -172,105 +219,21 @@
     "waitFor": ".calendar-grid",
     "actions": [
       {
-        "click": ".calendar-cell:nth-of-type(14)"
+        "click": ".calendar-cell:nth-of-type(14) .cell-add"
       },
       {
-        "fill": ".picker-search input",
+        "fill": "#planner-recipe-search",
         "value": "oat"
       },
       {
         "wait": 200
       }
     ],
-    "clip": ".picker-modal"
+    "clip": ".modal-content"
   },
   {
     "name": "grocery-list",
-    "path": "/culinara/3e84f55c-a7a6-459c-a10b-c94bae8f5deb",
-    "waitFor": ".recipe-title",
-    "actions": [
-      {
-        "click": {
-          "role": "button",
-          "name": "Add these ingredients to the grocery list"
-        }
-      },
-      {
-        "click": {
-          "role": "link",
-          "name": "Grocery List",
-          "exact": true
-        }
-      },
-      {
-        "click": {
-          "role": "button",
-          "name": "Clear all"
-        }
-      },
-      {
-        "click": {
-          "role": "button",
-          "name": "Clear list"
-        }
-      },
-      {
-        "click": {
-          "role": "link",
-          "name": "Culinara",
-          "exact": true
-        }
-      },
-      {
-        "click": {
-          "role": "link",
-          "name": "Overnight Oats with Berries"
-        }
-      },
-      {
-        "click": {
-          "role": "button",
-          "name": "Add these ingredients to the grocery list"
-        }
-      },
-      {
-        "click": {
-          "role": "link",
-          "name": "Culinara",
-          "exact": true
-        }
-      },
-      {
-        "click": {
-          "role": "link",
-          "name": "Greek Chicken Rice Bowls"
-        }
-      },
-      {
-        "click": {
-          "role": "button",
-          "name": "Add these ingredients to the grocery list"
-        }
-      },
-      {
-        "click": {
-          "role": "link",
-          "name": "Grocery List",
-          "exact": true
-        }
-      },
-      {
-        "click": {
-          "role": "checkbox",
-          "name": "Rolled oats"
-        }
-      },
-      {
-        "click": {
-          "role": "checkbox",
-          "name": "Milk"
-        }
-      }
-    ]
+    "path": "/culinara/grocery-list",
+    "waitFor": ".shop-item"
   }
 ]
