@@ -137,11 +137,14 @@ import { dayKey, todayKey } from '../../../core/utils/day';
                 <div class="detail-ex-name">{{ group.exerciseName }}</div>
                 <div class="detail-set-rows">
                   @for (set of group.sets; track set.id) {
-<div class="detail-set-row">
+<div class="detail-set-row" [class.is-warmup]="set.is_warmup">
                     <span class="ds-num">Set {{ set.set_number }}</span>
                     <span class="ds-weight">{{ settingsService.toDisplay(set.weight) | number:'1.1-1' }} {{ settingsService.unitLabel() }}</span>
                     <span class="ds-x">×</span>
                     <span class="ds-reps">{{ set.reps_performed }} reps</span>
+                    @if (set.is_warmup) {
+<span class="ds-warmup"><jiro-icon name="fire" [size]="12" />Warm-up</span>
+}
                     @if (set.is_pr) {
 <jym-pr-badge />
 }
@@ -385,6 +388,16 @@ import { dayKey, todayKey } from '../../../core/utils/day';
     .ds-x { color: var(--text-muted); }
 
     .ds-reps { color: var(--text-primary); }
+
+    .detail-set-row.is-warmup .ds-weight,
+    .detail-set-row.is-warmup .ds-reps { color: var(--text-secondary); }
+
+    .ds-warmup {
+      display: inline-flex; align-items: center; gap: 3px;
+      padding: 1px 6px; border-radius: var(--border-radius-pill);
+      background: rgba(var(--color-warning-rgb), 0.12); color: var(--text-secondary);
+      font-size: var(--font-size-xs); font-weight: 600;
+    }
 
 
 

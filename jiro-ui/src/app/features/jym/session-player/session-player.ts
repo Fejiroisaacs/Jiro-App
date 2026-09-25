@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, WritableSignal, inject, signal } from '@angular/core';
 
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -248,37 +248,30 @@ interface ExerciseBlock {
               <div class="set-row" [class.set-done]="row.saved" [class.set-warmup]="row.isWarmup">
                 <span class="set-num-cell">{{ row.setNumber }}</span>
 
-                <div class="input-wrap">
-                  <input
-                    class="set-input"
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    [(ngModel)]="row.weight"
-                    [placeholder]="row.ghostWeight || '0'"
-                    [class.has-ghost]="row.ghostWeight && !row.weight"
-                    [disabled]="row.saved" />
-                  @if (row.ghostWeight && !row.weight) {
-<span class="ghost-hint">{{ row.ghostWeight }}</span>
-}
-                </div>
+                <input
+                  class="set-input"
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  [(ngModel)]="row.weight"
+                  [placeholder]="row.ghostWeight || '0'"
+                  [class.has-ghost]="row.ghostWeight && !row.weight"
+                  [attr.aria-label]="'Set ' + row.setNumber + ' weight (' + settingsService.unitLabel() + ')'"
+                  [disabled]="row.saved" />
 
-                <div class="input-wrap">
-                  <input
-                    class="set-input"
-                    type="number"
-                    min="1"
-                    [(ngModel)]="row.reps"
-                    [placeholder]="row.ghostReps || '0'"
-                    [class.has-ghost]="row.ghostReps && !row.reps"
-                    [disabled]="row.saved" />
-                  @if (row.ghostReps && !row.reps) {
-<span class="ghost-hint">{{ row.ghostReps }}</span>
-}
-                </div>
+                <input
+                  class="set-input"
+                  type="number"
+                  min="1"
+                  [(ngModel)]="row.reps"
+                  [placeholder]="row.ghostReps || '0'"
+                  [class.has-ghost]="row.ghostReps && !row.reps"
+                  [attr.aria-label]="'Set ' + row.setNumber + ' reps'"
+                  [disabled]="row.saved" />
 
                 <input
                   class="set-input rpe-input"
+                  [attr.aria-label]="'Set ' + row.setNumber + ' RPE, 1 to 10'"
                   [class.input-error]="!!row.rpe && rpeInvalid(row.rpe)"
                   type="number"
                   min="1"
@@ -347,6 +340,10 @@ interface ExerciseBlock {
                 accept="video/mp4,video/webm,image/jpeg,image/png"
                 style="display:none"
                 (change)="onFormCheckFileChange($event, bi)">
+              @if (formCheckError().get(block.exerciseId); as fcErr) {
+                <span class="fc-error" role="alert">{{ fcErr }}</span>
+                <button type="button" class="fc-retry-btn" (click)="retryFormCheck(bi)">Retry</button>
+              }
               @if (isFormCheckUploading(block.exerciseId)) {
 <div class="fc-progress-bar">
                 <div class="fc-progress-fill" [style.width.%]="getFormCheckProgress(block.exerciseId)"></div>
@@ -783,7 +780,7 @@ interface ExerciseBlock {
     /* Set table */
     .set-header-row {
       display: grid;
-      grid-template-columns: 40px 1fr 1fr 64px 44px minmax(52px, auto);
+      grid-template-columns: 40px 1fr 1fr 64px 44px 84px;
       gap: var(--space-sm);
       padding: var(--space-xs) var(--space-lg);
       border-bottom: 1px solid var(--border-color);
@@ -798,7 +795,7 @@ interface ExerciseBlock {
 
     .set-row {
       display: grid;
-      grid-template-columns: 40px 1fr 1fr 64px 44px minmax(52px, auto);
+      grid-template-columns: 40px 1fr 1fr 64px 44px 84px;
       gap: var(--space-sm);
       align-items: center;
       padding: var(--space-xs) var(--space-lg);
@@ -827,7 +824,6 @@ interface ExerciseBlock {
 
     .set-num-cell { font-size: var(--font-size-sm); font-weight: 500; color: var(--text-muted); text-align: center; }
 
-    .input-wrap { position: relative; }
 
     .set-input {
       width: 100%; min-height: 44px; padding: 8px 10px;
@@ -843,11 +839,6 @@ interface ExerciseBlock {
 
     .set-input.has-ghost::placeholder { color: rgba(var(--color-primary-rgb), 0.55); font-style: italic; }
 
-    .ghost-hint {
-      position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
-      font-size: var(--font-size-xs); color: rgba(var(--color-primary-rgb), 0.55);
-      pointer-events: none;
-    }
 
     .rpe-input { width: 100%; }
 
@@ -859,7 +850,7 @@ interface ExerciseBlock {
       padding: 2px var(--space-lg) var(--space-xs);
     }
 
-    .action-cell { display: flex; align-items: center; justify-content: center; gap: var(--space-xs); }
+    .action-cell { display: flex; align-items: center; justify-content: flex-end; gap: 4px; min-width: 0; }
 
     .log-btn {
       width: 40px; height: 40px; border-radius: 50%;
@@ -1011,7 +1002,7 @@ interface ExerciseBlock {
     @media (max-width: 480px) {
       .set-header-row,
       .set-row {
-        grid-template-columns: 24px 1fr 1fr 44px 36px minmax(40px, auto);
+        grid-template-columns: 24px 1fr 1fr 44px 36px 72px;
         padding: var(--space-xs) var(--space-md);
         gap: 4px;
       }
@@ -1061,6 +1052,17 @@ interface ExerciseBlock {
     .fc-progress-fill {
       height: 100%; background: var(--color-primary); transition: width 0.3s;
     }
+
+    .fc-error { font-size: var(--font-size-xs); color: var(--color-danger); }
+
+    .fc-retry-btn {
+      font-size: var(--font-size-xs); font-family: inherit; font-weight: 600;
+      padding: 4px 10px; min-height: 32px; border-radius: var(--border-radius);
+      border: 1px solid var(--color-danger); background: none; color: var(--color-danger);
+      cursor: pointer;
+    }
+
+    .fc-retry-btn:hover { background: rgba(var(--color-danger-rgb), 0.08); }
 
     .fc-count {
       font-size: var(--font-size-xs); color: var(--text-secondary); white-space: nowrap;
@@ -1127,6 +1129,8 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   // Form check upload state (keyed by exerciseId)
   formCheckUploading = signal<Map<string, boolean>>(new Map());
   formCheckProgressMap = signal<Map<string, number>>(new Map());
+  formCheckError = signal<Map<string, string>>(new Map());
+  private formCheckFiles = new Map<string, File>();
   blockAttachments = signal<Map<string, SessionAttachment[]>>(new Map());
 
   // Re-sync both timers when the user returns from a locked screen
@@ -1163,6 +1167,10 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     // Load session + sets (restores mid-workout state on page refresh)
     this.jymService.getSession(this.sessionId).subscribe({
       next: session => {
+        if (session.ended_at) {
+          this.openInHistory();
+          return;
+        }
         this.startedAt = new Date(session.started_at);
         this.sessionType.set(session.session_type || 'normal');
         this.sessionNotes = session.notes || '';
@@ -1463,7 +1471,8 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
         } : b));
         this.startRestTimer();
       },
-      error: () => {
+      error: err => {
+        if (this.handleEnded(err)) return;
         this.blocks.update(bs => bs.map((b, bi) => bi === blockIndex ? {
           ...b,
           sets: b.sets.map((s, si) => si === setIndex ? { ...s, saving: false } : s),
@@ -1603,8 +1612,29 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
           },
         });
       },
-      error: () => this.finishing.set(false),
+      error: err => {
+        this.finishing.set(false);
+        this.handleEnded(err);
+      },
     });
+  }
+
+  /** A finished session opens read-only in Track's history, never as a live workout. */
+  private openInHistory() {
+    if (this.timerInterval) clearInterval(this.timerInterval);
+    this.router.navigate(['/jym/track'], {
+      queryParams: { tab: 'sessions', session: this.sessionId },
+      replaceUrl: true,
+    });
+  }
+
+  /** The API refuses writes to a finished session (e.g. finished in another tab). */
+  private handleEnded(err: unknown): boolean {
+    const code = (err as { status?: number; error?: { error?: { code?: string } } })?.error?.error?.code;
+    if (code !== 'SESSION_ENDED') return false;
+    this.toast.error('This workout was already finished.');
+    this.openInHistory();
+    return true;
   }
 
   saveBodyWeight() {
@@ -1647,7 +1677,13 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
       sets: b.sets.map((s, j) => j !== si ? s : { ...s, isWarmup: newVal }),
     }));
     if (row.id) {
-      this.jymService.updateSet(row.id, { is_warmup: newVal }).subscribe();
+      const id = row.id;
+      this.jymService.updateSet(id, { is_warmup: newVal }).subscribe({
+        next: saved => this.blocks.update(bs => bs.map((b, i) => i !== bi ? b : {
+          ...b,
+          sets: b.sets.map(s => s.id !== id ? s : { ...s, isPR: saved.is_pr }),
+        })),
+      });
     }
   }
 
@@ -1773,19 +1809,30 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   }
 
   onFormCheckFileChange(event: Event, blockIndex: number) {
-    const block = this.blocks()[blockIndex];
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
-    if (!file || !block) return;
     input.value = ''; // reset so the same file can be re-selected
+    if (file) this.uploadFormCheck(blockIndex, file);
+  }
 
+  retryFormCheck(blockIndex: number) {
+    const exId = this.blocks()[blockIndex]?.exerciseId;
+    const file = exId ? this.formCheckFiles.get(exId) : undefined;
+    if (file) this.uploadFormCheck(blockIndex, file);
+  }
+
+  private uploadFormCheck(blockIndex: number, file: File) {
+    const block = this.blocks()[blockIndex];
+    if (!block) return;
     const exId = block.exerciseId;
-    this.formCheckUploading.update(m => { const n = new Map(m); n.set(exId, true); return n; });
-    this.formCheckProgressMap.update(m => { const n = new Map(m); n.set(exId, 0); return n; });
+    this.formCheckFiles.set(exId, file);
+    setKey(this.formCheckError, exId);
+    setKey(this.formCheckUploading, exId, true);
+    setKey(this.formCheckProgressMap, exId, 0);
 
     this.uploadService.uploadSessionAttachment(
       this.sessionId, file, exId, undefined,
-      (pct) => this.formCheckProgressMap.update(m => { const n = new Map(m); n.set(exId, pct); return n; })
+      (pct) => setKey(this.formCheckProgressMap, exId, pct)
     ).subscribe({
       next: attachment => {
         this.blockAttachments.update(m => {
@@ -1793,10 +1840,12 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
           n.set(exId, [...(n.get(exId) ?? []), attachment]);
           return n;
         });
-        this.formCheckUploading.update(m => { const n = new Map(m); n.set(exId, false); return n; });
+        this.formCheckFiles.delete(exId);
+        setKey(this.formCheckUploading, exId, false);
       },
       error: () => {
-        this.formCheckUploading.update(m => { const n = new Map(m); n.set(exId, false); return n; });
+        setKey(this.formCheckUploading, exId, false);
+        setKey(this.formCheckError, exId, 'Form check upload failed.');
       },
     });
   }
@@ -1848,4 +1897,13 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
       ghostReps: String(last.reps),
     };
   }
+}
+
+/** Sets (or, with no value, removes) one key of a Map held in a signal. */
+function setKey<T>(sig: WritableSignal<Map<string, T>>, key: string, value?: T) {
+  sig.update(m => {
+    const n = new Map(m);
+    if (value === undefined) n.delete(key); else n.set(key, value);
+    return n;
+  });
 }

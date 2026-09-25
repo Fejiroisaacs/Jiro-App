@@ -2,7 +2,7 @@ import { Component, OnInit, inject, signal, input } from '@angular/core';
 
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { JymService, Split, CreateSeriesRequest } from '../../../core/services/jym.service';
+import { JymService, Split } from '../../../core/services/jym.service';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-card';
@@ -11,13 +11,14 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
+import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-series-modal';
 
 @Component({
   selector: 'app-split-list',
   standalone: true,
   imports: [
     FormsModule, JiroCardComponent, JiroButtonComponent, JiroModalComponent,
-    JiroIconComponent, JiroPageHeaderComponent, JiroEmptyStateComponent,
+    JiroIconComponent, JiroPageHeaderComponent, JiroEmptyStateComponent, JymNewSeriesModalComponent,
   ],
   template: `
     <div class="split-list">
@@ -84,7 +85,7 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
               </jiro-button>
             </div>
             <div class="btn-slot">
-              <jiro-button variant="secondary" type="button" (click)="openNewSeries(split.id)">
+              <jiro-button variant="secondary" type="button" (click)="openNewSeries(split)">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                   <polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/>
                 </svg>
@@ -114,8 +115,9 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
 <jiro-modal title="New Training Split" maxWidth="480px" (close)="showCreate.set(false)">
         <form class="create-form" (ngSubmit)="createSplit()">
           <div class="form-group">
-            <label class="form-label">Split Name</label>
+            <label class="form-label" for="new-split-name">Split Name</label>
             <input
+              id="new-split-name"
               class="form-input"
               type="text"
               [(ngModel)]="newName"
@@ -124,8 +126,9 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
               required />
           </div>
           <div class="form-group">
-            <label class="form-label">Description (optional)</label>
+            <label class="form-label" for="new-split-desc">Description (optional)</label>
             <textarea
+              id="new-split-desc"
               class="form-input form-textarea"
               [(ngModel)]="newDesc"
               name="desc"
@@ -133,8 +136,9 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
               placeholder="Brief description of this split..."></textarea>
           </div>
           <div class="form-group">
-            <label class="form-label">Tags (optional, comma-separated)</label>
+            <label class="form-label" for="new-split-tags">Tags (optional, comma-separated)</label>
             <input
+              id="new-split-tags"
               class="form-input"
               type="text"
               [(ngModel)]="newTagsRaw"
@@ -152,42 +156,9 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
 }
 
       <!-- New Series Modal -->
-      @if (showNewSeries()) {
-<jiro-modal title="Start New Series" maxWidth="480px" (close)="showNewSeries.set(false)">
-        <form class="create-form" (ngSubmit)="createSeries()">
-          <div class="form-group">
-            <label class="form-label">Series Name</label>
-            <input class="form-input" type="text" [(ngModel)]="seriesName" name="sname" placeholder="e.g. PPL Run #1" required />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Duration Type</label>
-            <div class="duration-type-group">
-              <button type="button" class="dtype-btn" [class.active]="seriesDurationType === 'weeks'" (click)="seriesDurationType = 'weeks'">Fixed Weeks</button>
-              <button type="button" class="dtype-btn" [class.active]="seriesDurationType === 'sessions'" (click)="seriesDurationType = 'sessions'">Session Count</button>
-              <button type="button" class="dtype-btn" [class.active]="seriesDurationType === 'open'" (click)="seriesDurationType = 'open'">Open-ended</button>
-            </div>
-          </div>
-          @if (seriesDurationType === 'weeks') {
-<div class="form-group">
-            <label class="form-label">Target Weeks</label>
-            <input class="form-input" type="number" min="1" [(ngModel)]="seriesTargetWeeks" name="tweeks" placeholder="e.g. 8" />
-          </div>
-}
-          @if (seriesDurationType === 'sessions') {
-<div class="form-group">
-            <label class="form-label">Target Sessions</label>
-            <input class="form-input" type="number" min="1" [(ngModel)]="seriesTargetSessions" name="tsessions" placeholder="e.g. 24" />
-          </div>
-}
-          <div class="form-actions">
-            <jiro-button variant="secondary" type="button" (click)="showNewSeries.set(false)">Cancel</jiro-button>
-            <jiro-button variant="primary" type="submit" [disabled]="savingSeries() || !seriesName.trim()">
-              {{ savingSeries() ? 'Starting...' : 'Start Series' }}
-            </jiro-button>
-          </div>
-        </form>
-      </jiro-modal>
-}
+      @if (seriesSplit(); as sp) {
+        <jym-new-series-modal [splitId]="sp.id" [defaultName]="sp.name + ' Run'" (closed)="seriesSplit.set(null)" />
+      }
 
       <!-- Start Session: choose routine modal -->
       @if (showRoutinePicker()) {
@@ -360,19 +331,6 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
 
     .routine-pick-day { font-size: var(--font-size-xs); color: var(--text-muted); }
 
-    .duration-type-group { display: flex; gap: var(--space-xs); }
-
-    .dtype-btn {
-      flex: 1; padding: var(--space-xs) var(--space-sm);
-      border: 1px solid var(--border-color); border-radius: var(--border-radius);
-      background: var(--bg-surface); color: var(--text-secondary);
-      font-size: var(--font-size-sm); cursor: pointer; transition: all 0.15s;
-    }
-
-    .dtype-btn.active {
-      border-color: var(--color-primary); background: rgba(var(--color-primary-rgb), 0.08);
-      color: var(--color-primary); font-weight: 600;
-    }
 
 
     @media (max-width: 600px) {
@@ -403,13 +361,7 @@ export class SplitListComponent implements OnInit {
   private selectedSplitId = '';
 
   // Series
-  showNewSeries = signal(false);
-  savingSeries = signal(false);
-  seriesName = '';
-  seriesDurationType: 'weeks' | 'sessions' | 'open' = 'open';
-  seriesTargetWeeks: number | null = null;
-  seriesTargetSessions: number | null = null;
-  private seriesSplitId = '';
+  seriesSplit = signal<Split | null>(null);
 
   constructor(private jymService: JymService, public router: Router) { }
 
@@ -489,32 +441,7 @@ export class SplitListComponent implements OnInit {
     });
   }
 
-  openNewSeries(splitId: string) {
-    this.seriesSplitId = splitId;
-    this.seriesName = '';
-    this.seriesDurationType = 'open';
-    this.seriesTargetWeeks = null;
-    this.seriesTargetSessions = null;
-    this.showNewSeries.set(true);
-  }
-
-  createSeries() {
-    if (!this.seriesName.trim()) return;
-    this.savingSeries.set(true);
-    const req: CreateSeriesRequest = {
-      split_id: this.seriesSplitId,
-      name: this.seriesName.trim(),
-      duration_type: this.seriesDurationType,
-      target_weeks: this.seriesDurationType === 'weeks' ? (this.seriesTargetWeeks ?? undefined) : undefined,
-      target_sessions: this.seriesDurationType === 'sessions' ? (this.seriesTargetSessions ?? undefined) : undefined,
-    };
-    this.jymService.createSeries(req).subscribe({
-      next: sr => {
-        this.savingSeries.set(false);
-        this.showNewSeries.set(false);
-        this.router.navigate(['/jym/series', sr.id]);
-      },
-      error: () => this.savingSeries.set(false),
-    });
+  openNewSeries(split: Split) {
+    this.seriesSplit.set(split);
   }
 }

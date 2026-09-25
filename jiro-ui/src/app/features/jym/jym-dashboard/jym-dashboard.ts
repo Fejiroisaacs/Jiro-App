@@ -6,7 +6,7 @@ import { JymService, Split, SplitSeriesSummary, SessionSummary, Routine } from '
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { addDays, dayKey, mondayOfKey, todayKey } from '../../../core/utils/day';
+import { addDays, dayKey, mondayOfKey, relativeDayName, todayKey } from '../../../core/utils/day';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
@@ -113,7 +113,7 @@ const DELOAD_SNOOZE_DAYS = 7;
                 <span class="mg-days"
                   [class.day-fresh]="mg.daysSinceLast <= 7"
                   [class.day-stale]="mg.daysSinceLast > 14">
-                  {{ mg.daysSinceLast === 0 ? 'Today' : mg.daysSinceLast + 'd ago' }}
+                  {{ mg.label }}
                 </span>
               </div>
 }
@@ -198,7 +198,7 @@ const DELOAD_SNOOZE_DAYS = 7;
       <div class="splits-summary">
         <div class="splits-summary-header">
           <h2 class="section-title">Your splits</h2>
-          <a routerLink="/jym/splits" class="manage-link">
+          <a routerLink="/jym/plan" class="manage-link">
             Manage splits →
           </a>
         </div>
@@ -207,7 +207,7 @@ const DELOAD_SNOOZE_DAYS = 7;
         }
         @if (!loading() && splits().length === 0) {
           <jiro-empty-state compact heading="No splits yet" message="A split organises your training week.">
-            <jiro-button size="sm" variant="secondary" routerLink="/jym/splits">Create your first split</jiro-button>
+            <jiro-button size="sm" variant="secondary" routerLink="/jym/plan">Create your first split</jiro-button>
           </jiro-empty-state>
         }
         @if (!loading() && splits().length > 0) {
@@ -227,7 +227,7 @@ const DELOAD_SNOOZE_DAYS = 7;
           </div>
 }
           @if (splits().length > 4) {
-<a routerLink="/jym/splits" class="split-chip more-chip">
+<a routerLink="/jym/plan" class="split-chip more-chip">
             +{{ splits().length - 4 }} more
           </a>
 }
@@ -633,28 +633,35 @@ export class JymDashboardComponent implements OnInit {
     return days;
   });
 
+  // Recency in the user's calendar days (settings zone): a workout late last
+  // night is "Yesterday" this morning, not "Today".
   muscleGroupStats = computed(() => {
     const sessions = this.allSessions();
-    const now = Date.now();
-    const cutoff28 = now - 28 * 86400000;
-    const mgMap = new Map<string, { lastMs: number; sessionsLast28: number }>();
+    const tz = this.settingsService.timezone();
+    const today = todayKey(tz);
+    const cutoff28 = addDays(today, -27);
+    const mgMap = new Map<string, { lastKey: string; sessionsLast28: number }>();
     for (const s of sessions) {
       if (!s.ended_at || !s.muscle_groups?.length) continue;
-      const ms = new Date(s.started_at).getTime();
+      const key = dayKey(s.started_at, tz);
       for (const mg of s.muscle_groups) {
         const cur = mgMap.get(mg);
         mgMap.set(mg, {
-          lastMs: cur ? Math.max(cur.lastMs, ms) : ms,
-          sessionsLast28: (cur?.sessionsLast28 || 0) + (ms >= cutoff28 ? 1 : 0),
+          lastKey: cur && cur.lastKey > key ? cur.lastKey : key,
+          sessionsLast28: (cur?.sessionsLast28 || 0) + (key >= cutoff28 ? 1 : 0),
         });
       }
     }
     return Array.from(mgMap.entries())
-      .map(([name, { lastMs, sessionsLast28 }]) => ({
-        name,
-        daysSinceLast: Math.floor((now - lastMs) / 86400000),
-        sessionsLast28,
-      }))
+      .map(([name, { lastKey, sessionsLast28 }]) => {
+        const daysSinceLast = daysBetween(lastKey, today);
+        return {
+          name,
+          daysSinceLast,
+          label: relativeDayName(lastKey, today) ?? `${daysSinceLast}d ago`,
+          sessionsLast28,
+        };
+      })
       .sort((a, b) => a.daysSinceLast - b.daysSinceLast);
   });
 
@@ -804,4 +811,9 @@ function readDeloadSnoozed(): boolean {
     const stamp = Number(localStorage.getItem(DELOAD_SNOOZED_KEY));
     return stamp > 0 && Date.now() - stamp < DELOAD_SNOOZE_DAYS * 86400000;
   } catch { return false; }
+}
+
+/** Whole calendar days from day key `from` to day key `to`. */
+function daysBetween(from: string, to: string): number {
+  return Math.round((Date.parse(to + 'T00:00:00Z') - Date.parse(from + 'T00:00:00Z')) / 86400000);
 }

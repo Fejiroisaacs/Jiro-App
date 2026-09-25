@@ -57,7 +57,7 @@ import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-he
 <div class="import-banner">
           <jiro-icon name="check-circle" [size]="15" />
           Split added to your account.
-          <button class="goto-btn" type="button" (click)="router.navigate(['/jym/splits'])">Go to my splits</button>
+          <button class="goto-btn" type="button" (click)="router.navigate(['/jym/plan'])">Go to my splits</button>
         </div>
 }
 

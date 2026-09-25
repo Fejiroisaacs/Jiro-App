@@ -6,7 +6,6 @@ import { JymService, ExerciseWithHistory, SetHistory, ExerciseFormCheck } from '
 import { SettingsService } from '../../../core/services/settings.service';
 import { chartTones } from '../../../shared/chart-theme';
 import { UploadService } from '../../../core/services/upload.service';
-import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { ConfirmService } from '../../../core/services/confirm.service';
@@ -22,7 +21,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
 @Component({
   selector: 'app-exercise-detail',
   standalone: true,
-  imports: [CommonModule, JiroButtonComponent, JiroIconComponent, JiroPageHeaderComponent, JymPrBadgeComponent],
+  imports: [CommonModule, JiroIconComponent, JiroPageHeaderComponent, JymPrBadgeComponent],
   template: `
     <div class="exercise-detail">
       <!-- Loading -->

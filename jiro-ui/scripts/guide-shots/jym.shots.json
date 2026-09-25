@@ -84,41 +84,6 @@
     "clip": ".modal-content"
   },
   {
-    "name": "session-sets",
-    "path": "/jym/session/cf4e0e12-4bb8-42da-97c1-295b8b50cda7",
-    "waitFor": ".ex-block",
-    "actions": [
-      {
-        "click": ".ex-block:has-text(\"Bench Press\") .add-set-btn"
-      },
-      {
-        "wait": 300
-      }
-    ],
-    "clip": ".ex-block:has-text(\"Bench Press\")",
-    "hide": [
-      ".session-bar"
-    ]
-  },
-  {
-    "name": "save-template",
-    "path": "/jym/session/cf4e0e12-4bb8-42da-97c1-295b8b50cda7",
-    "waitFor": ".ex-block",
-    "actions": [
-      {
-        "click": ".save-template-btn"
-      },
-      {
-        "wait": 300
-      },
-      {
-        "fill": ".template-name-input",
-        "value": "Push day A"
-      }
-    ],
-    "clip": ".modal-content"
-  },
-  {
     "name": "new-series",
     "path": "/jym/plan",
     "waitFor": ".split-card",
@@ -130,14 +95,14 @@
         "wait": 400
       },
       {
-        "fill": "input[name=sname]",
+        "fill": "[role=dialog] input[name=seriesName]",
         "value": "Autumn block"
       },
       {
-        "click": ".dtype-btn:has-text(\"Fixed Weeks\")"
+        "click": "[role=dialog] .dur-btn:has-text(\"Weeks\")"
       },
       {
-        "fill": "input[name=tweeks]",
+        "fill": "[role=dialog] input[name=targetWeeks]",
         "value": "8"
       }
     ],

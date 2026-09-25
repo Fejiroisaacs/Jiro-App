@@ -16,7 +16,7 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
   template: `
     <div class="discover">
       <jiro-page-header heading="Discover" subtitle="Browse public training splits from the community">
-        <button actions class="back-btn" type="button" (click)="router.navigate(['/jym/splits'])">
+        <button actions class="back-btn" type="button" (click)="router.navigate(['/jym/plan'])">
           <jiro-icon name="caret-left" [size]="14" />
           My splits
         </button>
