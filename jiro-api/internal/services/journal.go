@@ -330,42 +330,28 @@ func (s *JournalService) GetStreak(ctx context.Context, userID uuid.UUID) (*mode
 		resp.LastEntryAt = &lastAt
 	}
 
-	// Current streak
-	row := s.db.QueryRow(ctx, `
-		WITH daily AS (
-			SELECT DISTINCT DATE(created_at AT TIME ZONE 'UTC') AS day
-			FROM journal_entries
-			WHERE user_id = $1 AND group_id IS NULL
-		),
-		numbered AS (
-			SELECT day, ROW_NUMBER() OVER (ORDER BY day DESC) AS rn FROM daily
-		),
-		streaks AS (
-			SELECT day, rn, (day - (rn || ' days')::INTERVAL)::DATE AS grp FROM numbered
-		)
-		SELECT COUNT(*) FROM streaks
-		WHERE grp = (SELECT grp FROM streaks ORDER BY day DESC LIMIT 1)
-	`, userID)
-	row.Scan(&resp.CurrentStreak)
-
-	// Longest streak
-	row = s.db.QueryRow(ctx, `
-		WITH daily AS (
-			SELECT DISTINCT DATE(created_at AT TIME ZONE 'UTC') AS day
-			FROM journal_entries
-			WHERE user_id = $1 AND group_id IS NULL
-		),
-		numbered AS (
-			SELECT day, ROW_NUMBER() OVER (ORDER BY day DESC) AS rn FROM daily
-		),
-		streaks AS (
-			SELECT grp, COUNT(*) AS len
-			FROM (SELECT day, (day - (ROW_NUMBER() OVER (ORDER BY day DESC) || ' days')::INTERVAL)::DATE AS grp FROM daily) t
-			GROUP BY grp
-		)
-		SELECT COALESCE(MAX(len), 0) FROM streaks
-	`, userID)
-	row.Scan(&resp.LongestStreak)
+	// Streaks, counted over distinct UTC days the same way as the cook streak.
+	rows, err := s.db.Query(ctx,
+		`SELECT DISTINCT DATE(created_at AT TIME ZONE 'UTC')::text AS day
+		 FROM journal_entries
+		 WHERE user_id = $1 AND group_id IS NULL
+		 ORDER BY day DESC`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var days []string
+	for rows.Next() {
+		var d string
+		if err := rows.Scan(&d); err != nil {
+			return nil, err
+		}
+		days = append(days, d)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	resp.CurrentStreak, resp.LongestStreak = dayStreaks(days, time.Now())
 
 	return resp, nil
 }

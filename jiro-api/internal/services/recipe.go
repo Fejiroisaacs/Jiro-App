@@ -418,54 +418,7 @@ func (s *RecipeService) GetCookStreak(ctx context.Context, userID uuid.UUID) (*m
 		dates = append(dates, d)
 	}
 
-	if len(dates) == 0 {
-		return &models.CookStreakResponse{CurrentStreak: 0, LongestStreak: 0, TotalCookDays: 0}, nil
-	}
-
-	// dates are DESC — newest first
-	// Parse today
-	now := time.Now().UTC().Truncate(24 * time.Hour)
-	parseDate := func(s string) time.Time {
-		// date comes back as "2026-02-21" or "2026-02-21T00:00:00Z"
-		t, _ := time.Parse("2006-01-02", s[:10])
-		return t
-	}
-
-	// Current streak: count consecutive days starting from today or yesterday
-	current := 0
-	for i, ds := range dates {
-		d := parseDate(ds)
-		expected := now.AddDate(0, 0, -i)
-		if d.Equal(expected) {
-			current++
-		} else if i == 0 && d.Equal(now.AddDate(0, 0, -1)) {
-			// If latest cook was yesterday, start from yesterday
-			current = 1
-			now = now.AddDate(0, 0, -1)
-		} else {
-			break
-		}
-	}
-
-	// Longest streak
-	longest := 1
-	streak := 1
-	for i := 1; i < len(dates); i++ {
-		prev := parseDate(dates[i-1])
-		curr := parseDate(dates[i])
-		if prev.Sub(curr) == 24*time.Hour {
-			streak++
-			if streak > longest {
-				longest = streak
-			}
-		} else {
-			streak = 1
-		}
-	}
-
-	if current > longest {
-		longest = current
-	}
+	current, longest := dayStreaks(dates, time.Now())
 
 	return &models.CookStreakResponse{
 		CurrentStreak: current,
