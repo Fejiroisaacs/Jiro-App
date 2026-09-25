@@ -229,7 +229,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 				jym.PUT("/routines/:id", jymHandler.UpdateRoutine)
 				jym.DELETE("/routines/:id", jymHandler.DeleteRoutine)
 				jym.PUT("/routines/:id/items", jymHandler.ReplaceRoutineItems)
-				jym.PUT("/splits/:split_id/items", jymHandler.ReplaceSplitItems)
+				jym.PUT("/splits/:id/items", jymHandler.ReplaceSplitItems)
 
 				// Templates (standalone routines)
 				jym.GET("/templates", jymHandler.ListTemplates)

@@ -425,7 +425,7 @@ func (h *JymHandler) ReplaceRoutineItems(c *gin.Context) {
 // in one transaction (a drag between days changes two of them).
 func (h *JymHandler) ReplaceSplitItems(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
-	splitID, err := uuid.Parse(c.Param("split_id"))
+	splitID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid split ID"}})
 		return
