@@ -188,6 +188,7 @@ var demoShifts = []demoShift{
 	{sql: `UPDATE meal_plan_entries e SET created_at = e.created_at + ` + demoTS + ` FROM meal_plans p WHERE p.id = e.meal_plan_id AND p.user_id = $1`},
 	{sql: `UPDATE meal_plans SET week_start = week_start + $2::int * 7 + ` + fmt.Sprint(demoParkDays) + ` WHERE user_id = $1`, by: shiftWeeks},
 	{sql: `UPDATE meal_plans SET week_start = week_start - ` + fmt.Sprint(demoParkDays) + ` WHERE user_id = $1`, by: shiftNone},
+	{sql: `UPDATE grocery_items SET created_at = created_at + ` + demoTS + `, updated_at = updated_at + ` + demoTS + ` WHERE user_id = $1`},
 
 	// Journaly
 	{sql: `UPDATE journal_entries SET created_at = created_at + ` + demoTS + `, updated_at = updated_at + ` + demoTS + ` WHERE user_id = $1`},
