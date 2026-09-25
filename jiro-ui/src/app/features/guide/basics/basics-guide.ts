@@ -97,17 +97,18 @@ import { GUIDE } from '../shared';
         <guide-tip>Your layout is saved to your account, so it is the same on every device you sign in on.</guide-tip>
       </guide-section>
 
-      <guide-section id="set-your-preferences" title="Set your units, timezone and theme"
-        lead="Choose how Jiro shows weights, which timezone your days follow, and how it looks.">
+      <guide-section id="set-your-preferences" title="Set your units, timezone, currency and theme"
+        lead="Choose how Jiro shows weights and money, which timezone your days follow, and how it looks.">
         <guide-steps>
           <li>Open <a routerLink="/settings">Settings</a> from the bottom of the sidebar, or from <strong>Settings</strong> in the bar at the bottom of a phone.</li>
           <li>Under <strong>Preferences</strong>, pick <strong>Pounds (lbs)</strong> or <strong>Kilograms (kg)</strong> for <strong>Weight Unit</strong>. Every weight in Jym, including your body weight, is shown in that unit.</li>
-          <li>Pick your <strong>Timezone</strong>. It decides where each day starts and ends: Today, the day page, <strong>Last 14 days</strong>, your streaks and the date a new item starts on.</li>
+          <li>Pick your <strong>Timezone</strong>. It decides where each day starts and ends: Today, the day page, <strong>Last 14 days</strong>, your streaks and the date a new item starts on. Every timezone is listed with its offset from UTC; type a city in the search box above the list to find yours quickly, or select <strong>Use this device's timezone</strong>.</li>
+          <li>Pick your <strong>Currency</strong>. Every Ledger account, total and budget is shown in it. It changes how amounts are labelled, not the amounts themselves.</li>
           <li>Under <strong>Theme</strong>, turn <strong>Dark Mode</strong> on or off, and choose a <strong>Color theme</strong>: <strong>Earth</strong>, <strong>Forest</strong> or <strong>Slate</strong>.</li>
         </guide-steps>
-        <guide-shot guide="basics" name="settings-preferences" [width]="1280" [height]="472"
-          alt="The Preferences card in Settings: Weight Unit set to Pounds (lbs) and Timezone set to America/New_York." />
-        <p>Each choice saves as soon as you make it; there is no Save button. Units, timezone and colour theme are saved to your account. Dark mode is remembered on each device, so you can have it on your phone and off on your computer.</p>
+        <guide-shot guide="basics" name="settings-preferences" [width]="1280" [height]="1068"
+          alt="The Preferences card in Settings: Weight Unit set to Pounds (lbs), the Timezone search box above a list set to America/New York (UTC-04:00) with a Use this device's timezone button, and Currency set to USD (US dollar)." />
+        <p>Each choice saves as soon as you make it; there is no Save button. Units, timezone, currency and colour theme are saved to your account. If a change cannot be saved (for example, before you have verified your email), Settings says why under the choices and puts the old value back. Dark mode is remembered on each device, so you can have it on your phone and off on your computer.</p>
         <guide-tip>You can also switch dark mode from the account menu: select your name at the bottom of the sidebar, or the round button with your initial at the top right on a phone, then <strong>Dark mode</strong>.</guide-tip>
       </guide-section>
 

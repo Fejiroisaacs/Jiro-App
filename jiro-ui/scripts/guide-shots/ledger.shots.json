@@ -57,6 +57,41 @@
     "clip": ".modal-content"
   },
   {
+    "name": "repeat",
+    "path": "/ledger",
+    "waitFor": ".txn-row",
+    "viewport": {
+      "width": 1280,
+      "height": 1000
+    },
+    "actions": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Log transaction"
+        }
+      },
+      {
+        "fill": ".modal-content input[name=amount]",
+        "value": "1650"
+      },
+      {
+        "fill": ".modal-content input[name=description]",
+        "value": "Rent"
+      },
+      {
+        "click": {
+          "role": "switch",
+          "name": "Repeat"
+        }
+      },
+      {
+        "wait": 400
+      }
+    ],
+    "clip": ".modal-content"
+  },
+  {
     "name": "transfer",
     "path": "/ledger",
     "waitFor": ".txn-row",
@@ -130,6 +165,52 @@
         "wait": 400
       }
     ]
+  },
+  {
+    "name": "edit-budget",
+    "path": "/ledger/budgets",
+    "waitFor": ".budget-card",
+    "actions": [
+      {
+        "click": ".budget-card .icon-btn"
+      },
+      {
+        "wait": 400
+      }
+    ],
+    "clip": ".modal-content"
+  },
+  {
+    "name": "categories",
+    "path": "/ledger/budgets",
+    "waitFor": ".cm-row",
+    "actions": [
+      {
+        "wait": 400
+      }
+    ],
+    "clip": "ledger-category-manager",
+    "viewport": {
+      "width": 1280,
+      "height": 1000
+    }
+  },
+  {
+    "name": "delete-category",
+    "path": "/ledger/budgets",
+    "waitFor": ".cm-row",
+    "actions": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Delete Entertainment"
+        }
+      },
+      {
+        "wait": 400
+      }
+    ],
+    "clip": ".modal-content"
   },
   {
     "name": "net-worth",

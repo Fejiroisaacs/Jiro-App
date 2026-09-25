@@ -91,7 +91,7 @@ import { ToastService } from '../../core/services/toast.service';
 
           <div class="form-field">
             <label class="setting-label">Username</label>
-            <p class="text-secondary setting-desc">Lowercase letters, numbers and underscores — used in share links</p>
+            <p class="text-secondary setting-desc">Lowercase letters, numbers and underscores. Used in share links.</p>
             <jiro-input
               [(ngModel)]="username"
               [placeholder]="usernamePlaceholder"
@@ -326,7 +326,7 @@ import { ToastService } from '../../core/services/toast.service';
       margin-top: 2px;
     }
 
-    /* Your data — the copy is long, so this row wraps instead of squeezing the button */
+    /* Your data: the copy is long, so this row wraps instead of squeezing the button */
     .data-row {
       align-items: flex-start;
       flex-wrap: wrap;
