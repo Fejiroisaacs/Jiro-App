@@ -239,6 +239,8 @@ export interface UpdateSplitRequest { name?: string; description?: string; visib
 export interface CreateRoutineRequest { name: string; day_order?: number; }
 export interface UpdateRoutineRequest { name?: string; day_order?: number; }
 export interface ReplaceItemEntry { exercise_id: string; target_sets: number; target_reps: number; }
+export interface RoutineItemsEntry { routine_id: string; items: ReplaceItemEntry[]; }
+export interface RoutineItemsResult { routine_id: string; items: RoutineItem[]; }
 export interface CreateSessionRequest { routine_id?: string; series_id?: string; session_type?: 'normal' | 'deload' | 'test'; }
 export interface UpdateSessionRequest { ended_at?: string; notes?: string; session_type?: string; }
 export interface CreateSetRequest { exercise_id: string; set_number: number; weight: number; reps_performed: number; rpe?: number; is_warmup?: boolean; exercise_note?: string; }
@@ -339,6 +341,11 @@ export class JymService {
 
   replaceRoutineItems(routineId: string, items: ReplaceItemEntry[]): Observable<RoutineItem[]> {
     return this.http.put<RoutineItem[]>(`${API_URL}/routines/${routineId}/items`, items);
+  }
+
+  /** Saves several days of one split in one transaction (a move between days). */
+  replaceSplitItems(splitId: string, routines: RoutineItemsEntry[]): Observable<RoutineItemsResult[]> {
+    return this.http.put<RoutineItemsResult[]>(`${API_URL}/splits/${splitId}/items`, { routines });
   }
 
   // Sessions
