@@ -12,6 +12,8 @@ export interface User {
   display_name?: string;
   email_verified: boolean;
   is_admin: boolean;
+  /** The shared, look-only sample account behind "Try the demo". */
+  is_demo?: boolean;
   bio?: string;
   avatar_url?: string;
   settings: UserSettings;
@@ -58,6 +60,8 @@ export class AuthService {
 
   user = this.currentUser.asReadonly();
   isAuthenticated = computed(() => !!this.currentUser());
+  /** Signed in to the demo: every write is refused (403 DEMO_READ_ONLY). */
+  isDemo = computed(() => this.currentUser()?.is_demo === true);
   isInitialized = this.initialized.asReadonly();
 
   constructor(private http: HttpClient, private router: Router) {
@@ -167,6 +171,15 @@ export class AuthService {
       .pipe(tap(res => this.handleAuth(res)));
   }
 
+  /** Signs in to the shared, look-only demo account. The server creates it
+   *  on first use; afterwards this is a normal session (refresh cookie and
+   *  all), so the rest of the app needs nothing special beyond `isDemo`.
+   *  Only ever called from a click, so never during prerender. */
+  demoLogin() {
+    return this.http.post<AuthResponse>(`${API_URL}/auth/demo`, {}, { withCredentials: true })
+      .pipe(tap(res => this.handleAuth(res)));
+  }
+
   /** Emits the new session, or null if the server said the session is dead
    *  (401, auth already cleared). Errors on anything else (offline, 429, 5xx):
    *  a failure to reach the server is not a reason to sign someone out. */
@@ -193,14 +206,27 @@ export class AuthService {
     return this.refreshing$;
   }
 
-  logout() {
+  logout(redirectTo = '/login') {
     if (!this.currentUser()) return; // already logged out — prevent duplicate navigation
     this.http.post(`${API_URL}/auth/logout`, {}, { withCredentials: true }).subscribe();
     this.clearAuth();
-    this.router.navigate(['/login']);
+    this.router.navigateByUrl(redirectTo);
   }
 
   updateSettings(settings: Partial<UserSettings>) {
+    // Preferences (theme, units, timezone) save as a side effect of picking
+    // them, not from a Save button. The demo can't write, so apply them
+    // locally for this visit instead of provoking a "look-only" message the
+    // visitor never asked for. The dashboard layout has an explicit Save and
+    // still goes to the server, which refuses it with that message.
+    const user = this.currentUser();
+    if (user?.is_demo && !('dashboard' in settings)) {
+      const current = typeof user.settings === 'string' ? JSON.parse(user.settings) : (user.settings ?? {});
+      const updated: User = { ...user, settings: { ...current, ...settings } };
+      this.currentUser.set(updated);
+      writeLocal('jiro_user', JSON.stringify(updated));
+      return of(updated);
+    }
     return this.http.patch<User>(`${API_URL}/user/me`, settings)
       .pipe(tap(user => {
         this.currentUser.set(user);
@@ -273,4 +299,12 @@ export class AuthService {
     this.currentUser.set(null);
     removeLocal('jiro_user');
   }
+}
+
+/** What to show inline when "Try the demo" fails. */
+export function demoLoginErrorMessage(err: unknown): string {
+  const status = (err as { status?: number } | null)?.status;
+  if (status === 429) return 'Too many demo sign-ins from your network. Try again in a minute.';
+  if (status === 0) return 'Could not reach Jiro. Check your connection and try again.';
+  return 'The demo could not be opened right now. Try again in a minute.';
 }

@@ -120,6 +120,13 @@ import { JiroPageHeaderComponent } from '../../shared/components/jiro-page-heade
             details about your device. They are stored in Jiro's own database, not sent to an
             analytics company, and shown to administrators in the admin panel.
           </p>
+
+          <h3>The demo</h3>
+          <p>
+            "Try the demo" signs you in to a shared sample account that contains no personal data
+            and cannot be changed. Opening it records one usage event in Jiro's own log, that the
+            demo was started, and your IP address is used for rate limits like any other request.
+          </p>
         </section>
 
         <section aria-labelledby="p-why">

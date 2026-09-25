@@ -45,13 +45,14 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	}
 	ledgerService := services.NewLedgerService(db)
 	searchService := services.NewSearchService(db)
+	demoService := services.NewDemoService(db, authService)
 
 	// Rate limiter + login fail tracker
 	rl := middleware.NewRateLimiter(db)
 	loginFailTracker := middleware.NewLoginFailTracker(db)
 
 	// Handlers
-	authHandler := handlers.NewAuthHandler(authService, userService, emailService, ledgerService, loginFailTracker, cfg, db)
+	authHandler := handlers.NewAuthHandler(authService, userService, emailService, ledgerService, demoService, loginFailTracker, cfg, db)
 	ledgerHandler := handlers.NewLedgerHandler(ledgerService)
 	userHandler := handlers.NewUserHandler(userService)
 	healthHandler := handlers.NewHealthHandler(db)
@@ -108,6 +109,10 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			// Cookie-authenticated, so the only CSRF-reachable routes.
 			auth.POST("/refresh", session, middleware.RequireTrustedOrigin(cfg.CORSOrigins), authHandler.Refresh)
 			auth.POST("/logout", session, middleware.RequireTrustedOrigin(cfg.CORSOrigins), authHandler.Logout)
+			// Shared look-only demo account. Its own limit, since it is not a
+			// credential guess; the Origin check stops another site from
+			// signing a visitor in to it (and out of their own account).
+			auth.POST("/demo", middleware.RateLimitByIP(rl, "demo", 10), middleware.RequireTrustedOrigin(cfg.CORSOrigins), authHandler.Demo)
 			auth.POST("/verify-email", strict, authHandler.VerifyEmail)
 			auth.POST("/forgot-password", strict, authHandler.ForgotPassword)
 			auth.POST("/reset-password", strict, authHandler.ResetPassword)
@@ -119,10 +124,10 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 		// NoStore registered after it never runs on a rejected request.
 		protected.Use(middleware.NoStore())
 		protected.Use(middleware.AuthRequired(authService))
-		// Blocks writes from unverified accounts; admin is exempt (see its
-		// own group below) since email verification shouldn't gate the
-		// site owner's own operator tooling.
-		protected.Use(middleware.RequireVerifiedEmail(userService))
+		// Blocks writes from unverified accounts and every write from the
+		// demo account; admin is exempt (see its own group below) since email
+		// verification shouldn't gate the site owner's own operator tooling.
+		protected.Use(middleware.RequireWriteAccess(userService))
 		protected.Use(middleware.RateLimitByUser(rl, "protected", 300))
 		{
 			protected.GET("/user/me", userHandler.GetMe)

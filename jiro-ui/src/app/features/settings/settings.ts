@@ -569,7 +569,8 @@ export class SettingsComponent implements OnInit {
 
     this.authService.updateSettings(updates).subscribe({
       next: () => {
-        this.toast.success('Settings saved');
+        // On the demo the change applies for this visit only; nothing was saved.
+        if (!this.authService.isDemo()) this.toast.success('Settings saved');
       },
     });
   }

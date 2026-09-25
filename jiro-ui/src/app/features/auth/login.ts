@@ -2,7 +2,7 @@ import { Component, signal } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { AuthService } from '../../core/services/auth.service';
+import { AuthService, demoLoginErrorMessage } from '../../core/services/auth.service';
 import { JiroCardComponent } from '../../shared/components/jiro-card/jiro-card';
 import { JiroButtonComponent } from '../../shared/components/jiro-button/jiro-button';
 import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-input';
@@ -54,6 +54,15 @@ import { JiroLogoComponent } from '../../shared/components/jiro-logo/jiro-logo';
           <p class="auth-footer">
             Don't have an account? <a routerLink="/register">Create one</a>
           </p>
+          <p class="auth-demo">
+            Just looking?
+            <button type="button" class="demo-link" [disabled]="demoLoading()" [attr.aria-busy]="demoLoading() ? 'true' : null" (click)="tryDemo()">
+              {{ demoLoading() ? 'Opening the demo...' : 'Try the demo' }}
+            </button>
+          </p>
+          @if (demoError()) {
+            <p class="demo-error" role="alert">{{ demoError() }}</p>
+          }
         </jiro-card>
       </div>
     </main>
@@ -125,6 +134,34 @@ import { JiroLogoComponent } from '../../shared/components/jiro-logo/jiro-logo';
       text-decoration: underline;
       text-underline-offset: 2px;
     }
+
+    .auth-demo {
+      text-align: center;
+      margin-top: var(--space-xs);
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+
+    /* An action, so a button, dressed as the link beside it. */
+    .demo-link {
+      background: none;
+      border: none;
+      padding: 0;
+      font: inherit;
+      color: var(--color-primary);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      cursor: pointer;
+    }
+    .demo-link:hover:not(:disabled) { color: var(--color-primary-hover); }
+    .demo-link:disabled { cursor: progress; color: var(--text-secondary); }
+
+    .demo-error {
+      margin-top: var(--space-sm);
+      text-align: center;
+      font-size: var(--font-size-sm);
+      color: var(--color-danger);
+    }
   `]
 })
 export class LoginComponent {
@@ -132,6 +169,8 @@ export class LoginComponent {
   password = '';
   loading = signal(false);
   error = signal('');
+  demoLoading = signal(false);
+  demoError = signal('');
 
   private returnUrl = '/dashboard';
 
@@ -157,6 +196,19 @@ export class LoginComponent {
       error: (err) => {
         this.loading.set(false);
         this.error.set(err.error?.error?.message || 'Login failed');
+      },
+    });
+  }
+
+  tryDemo() {
+    if (this.demoLoading()) return;
+    this.demoLoading.set(true);
+    this.demoError.set('');
+    this.authService.demoLogin().subscribe({
+      next: () => this.router.navigateByUrl('/dashboard'),
+      error: (err) => {
+        this.demoLoading.set(false);
+        this.demoError.set(demoLoginErrorMessage(err));
       },
     });
   }

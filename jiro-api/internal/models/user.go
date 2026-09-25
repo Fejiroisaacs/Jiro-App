@@ -15,6 +15,7 @@ type User struct {
 	DisplayName   *string         `json:"display_name"`
 	EmailVerified bool            `json:"email_verified"`
 	IsAdmin       bool            `json:"is_admin"`
+	IsDemo        bool            `json:"is_demo"` // the shared, look-only sample account (DemoService)
 	Bio           *string         `json:"bio"`
 	AvatarUrl     *string         `json:"avatar_url"`
 	Settings      json.RawMessage `json:"settings"`

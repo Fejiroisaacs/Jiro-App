@@ -22,18 +22,20 @@ type AuthHandler struct {
 	userService   *services.UserService
 	emailService  *services.EmailService
 	ledgerService *services.LedgerService
+	demoService   *services.DemoService
 	failTracker   *middleware.LoginFailTracker
 	cfg           *config.Config
 	appBaseURL    string
 	db            *pgxpool.Pool
 }
 
-func NewAuthHandler(authService *services.AuthService, userService *services.UserService, emailService *services.EmailService, ledgerService *services.LedgerService, failTracker *middleware.LoginFailTracker, cfg *config.Config, db *pgxpool.Pool) *AuthHandler {
+func NewAuthHandler(authService *services.AuthService, userService *services.UserService, emailService *services.EmailService, ledgerService *services.LedgerService, demoService *services.DemoService, failTracker *middleware.LoginFailTracker, cfg *config.Config, db *pgxpool.Pool) *AuthHandler {
 	return &AuthHandler{
 		authService:   authService,
 		userService:   userService,
 		emailService:  emailService,
 		ledgerService: ledgerService,
+		demoService:   demoService,
 		failTracker:   failTracker,
 		cfg:           cfg,
 		appBaseURL:    cfg.AppBaseURL,
@@ -46,6 +48,15 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()},
+		})
+		return
+	}
+
+	// The demo's domain is reserved: nobody may hold demo@jiro.invalid
+	// before the demo account is first created.
+	if services.IsReservedDemoEmail(req.Email) {
+		c.JSON(http.StatusConflict, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "EMAIL_TAKEN", Message: "Email is already registered"},
 		})
 		return
 	}
@@ -160,7 +171,9 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	if !h.authService.VerifyPassword(user.PasswordHash, req.Password) {
+	// The demo has no usable password anyway; refuse it outright so it only
+	// ever starts through POST /auth/demo.
+	if user.IsDemo || !h.authService.VerifyPassword(user.PasswordHash, req.Password) {
 		h.failTracker.RecordFail(c.Request.Context(), ip)
 		c.JSON(http.StatusUnauthorized, models.ErrorResponse{
 			Error: models.ErrorDetail{Code: "INVALID_CREDENTIALS", Message: "Invalid email or password"},
@@ -188,6 +201,43 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	})
 }
 
+// Demo handles POST /auth/demo: it signs the caller in to the shared,
+// look-only demo account, creating it with its sample data on first use and
+// otherwise sliding the data's dates up to today. The response is the same as
+// Login's: an access token, the user, and a refresh cookie.
+func (h *AuthHandler) Demo(c *gin.Context) {
+	userID, err := h.demoService.Login(c.Request.Context())
+	if err != nil {
+		log.Error().Err(err).Msg("demo login failed")
+		c.JSON(http.StatusServiceUnavailable, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "DEMO_UNAVAILABLE", Message: "The demo is not available right now. Try again in a minute."},
+		})
+		return
+	}
+
+	user, err := h.userService.GetByID(c.Request.Context(), userID)
+	if err != nil {
+		respondInternal(c, err, "failed to load the demo user")
+		return
+	}
+
+	accessToken, err := h.authService.GenerateAccessToken(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to generate token"},
+		})
+		return
+	}
+
+	h.setRefreshCookie(c, userID)
+	analytics.TrackEvent(h.db, userID, "demo.start", nil)
+
+	c.JSON(http.StatusOK, models.AuthResponse{
+		AccessToken: accessToken,
+		User:        *user,
+	})
+}
+
 func (h *AuthHandler) Refresh(c *gin.Context) {
 	rawToken, err := c.Cookie("refresh_token")
 	if err != nil {
@@ -200,7 +250,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	userID, oldHash, err := h.authService.ValidateRefreshToken(c.Request.Context(), rawToken)
 	if err != nil {
 		if errors.Is(err, services.ErrTokenReused) {
-			log.Warn().Str("user_id", userID.String()).Msg("refresh token reused past its grace window; all sessions for this user were revoked")
+			log.Warn().Str("user_id", userID.String()).Msg("refresh token reused past its grace window; sessions revoked (all of them, or only this token on the demo account)")
 		}
 		c.JSON(http.StatusUnauthorized, models.ErrorResponse{
 			Error: models.ErrorDetail{Code: "INVALID_TOKEN", Message: "Invalid or expired refresh token"},
@@ -356,8 +406,9 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 	}
 
 	user, err := h.userService.GetByEmail(c.Request.Context(), req.Email)
-	if err != nil {
-		// User not found — still return 200
+	if err != nil || user.IsDemo {
+		// User not found (or the demo, whose .invalid address can't receive
+		// mail) — still return 200
 		c.JSON(http.StatusOK, gin.H{"message": "If that email is registered, you'll receive a reset link"})
 		return
 	}

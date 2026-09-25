@@ -41,7 +41,7 @@ import { AdminService, AdminUser } from '../../core/services/admin.service';
         <tbody>
           @for (u of users(); track u) {
 <tr class="user-row" (click)="router.navigate(['/admin/users', u.id])">
-            <td>{{ u.email }}</td>
+            <td>{{ u.email }} @if (u.is_demo) { <span class="badge">Demo</span> }</td>
             <td>{{ u.username ?? '—' }}</td>
             <td>
               <span class="badge" [class.verified]="u.email_verified">

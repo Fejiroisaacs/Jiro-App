@@ -198,10 +198,13 @@ func (s *AuthService) ValidateRefreshToken(ctx context.Context, rawToken string)
 	var userID uuid.UUID
 	var expiresAt time.Time
 	var usedAt *time.Time
+	var isDemo bool
 	err := s.db.QueryRow(ctx,
-		"SELECT user_id, expires_at, used_at FROM refresh_tokens WHERE token_hash = $1",
+		`SELECT rt.user_id, rt.expires_at, rt.used_at, u.is_demo
+		 FROM refresh_tokens rt JOIN users u ON u.id = rt.user_id
+		 WHERE rt.token_hash = $1`,
 		tokenHash,
-	).Scan(&userID, &expiresAt, &usedAt)
+	).Scan(&userID, &expiresAt, &usedAt, &isDemo)
 
 	if err != nil {
 		return uuid.Nil, "", ErrInvalidToken
@@ -218,7 +221,15 @@ func (s *AuthService) ValidateRefreshToken(ctx context.Context, rawToken string)
 		// explainable by a concurrent-tab race, only by a copy of the token
 		// surviving past its legitimate single use. Kill every session,
 		// including whatever the thief rotated it into.
-		s.RevokeAllUserTokens(ctx, userID)
+		//
+		// Except on the shared demo account, where "every session" means every
+		// visitor's: one visitor's stale tab would sign out everyone else. It
+		// holds nothing worth stealing and cannot write, so only this token dies.
+		if isDemo {
+			s.db.Exec(ctx, "DELETE FROM refresh_tokens WHERE token_hash = $1", tokenHash)
+		} else {
+			s.RevokeAllUserTokens(ctx, userID)
+		}
 		return userID, "", ErrTokenReused
 	}
 
