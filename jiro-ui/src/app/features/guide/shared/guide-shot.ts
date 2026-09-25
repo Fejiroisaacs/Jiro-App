@@ -1,4 +1,5 @@
-import { Component, ViewEncapsulation, computed, input, numberAttribute } from '@angular/core';
+import { Component, ViewEncapsulation, computed, inject, input, numberAttribute } from '@angular/core';
+import { SettingsService } from '../../../core/services/settings.service';
 
 /**
  * A screenshot pair from the demo, shown for the app's current theme.
@@ -12,10 +13,10 @@ import { Component, ViewEncapsulation, computed, input, numberAttribute } from '
  * Shots are captured at 2x, so the image is never shown wider than half its
  * pixel width: a small dialog stays dialog-sized instead of being blown up.
  *
- * Only the visible theme's image downloads: both are `loading="lazy"`, and
- * the browser does not fetch a lazy image that is `display: none`. The
- * `loading` attribute is static, so Angular sets it before binding `src`.
- * Same approach as the landing page.
+ * One <img> whose src follows the app's dark-mode setting, so only the
+ * active theme's image is ever requested; switching theme swaps it. (Two
+ * images with one hidden relied on the browser skipping a hidden lazy image,
+ * which it did not reliably do on long pages.)
  */
 @Component({
   selector: 'guide-shot',
@@ -23,12 +24,9 @@ import { Component, ViewEncapsulation, computed, input, numberAttribute } from '
   encapsulation: ViewEncapsulation.None,
   template: `
     <figure class="gd-shot">
-      <img class="gd-shot-img gd-shot-light" loading="lazy" decoding="async"
+      <img class="gd-shot-img" loading="lazy" decoding="async"
         [attr.width]="width()" [attr.height]="height()" [style.max-width.px]="width() / 2"
-        [alt]="alt()" [src]="base() + '-light.webp'" />
-      <img class="gd-shot-img gd-shot-dark" loading="lazy" decoding="async"
-        [attr.width]="width()" [attr.height]="height()" [style.max-width.px]="width() / 2"
-        [alt]="alt()" [src]="base() + '-dark.webp'" />
+        [alt]="alt()" [src]="src()" />
       @if (caption()) {
         <figcaption class="gd-shot-caption">{{ caption() }}</figcaption>
       }
@@ -47,11 +45,6 @@ import { Component, ViewEncapsulation, computed, input, numberAttribute } from '
       border-radius: var(--border-radius-lg);
       box-shadow: var(--shadow-md);
     }
-    /* Follow the app's own dark-mode class, not the OS setting. */
-    .gd-shot-dark { display: none; }
-    html.dark .gd-shot-light { display: none; }
-    html.dark .gd-shot-dark { display: block; }
-
     .gd-shot-caption {
       margin-top: var(--space-sm);
       font-size: var(--font-size-sm);
@@ -70,5 +63,9 @@ export class GuideShotComponent {
   readonly height = input.required({ transform: numberAttribute });
   readonly caption = input<string>('');
 
-  readonly base = computed(() => `/images/guide/${this.guide()}/${this.name()}`);
+  private readonly settings = inject(SettingsService);
+
+  /** The app's own dark-mode setting (the one behind html.dark), not the OS's. */
+  readonly src = computed(() =>
+    `/images/guide/${this.guide()}/${this.name()}-${this.settings.darkMode() ? 'dark' : 'light'}.webp`);
 }

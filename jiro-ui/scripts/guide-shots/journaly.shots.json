@@ -1,0 +1,166 @@
+[
+  {
+    "name": "new-entry",
+    "path": "/journal/new",
+    "waitFor": ".body-textarea",
+    "viewport": {
+      "width": 1280,
+      "height": 1000
+    },
+    "actions": [
+      {
+        "fill": ".title-input",
+        "value": "Long walk home"
+      },
+      {
+        "fill": ".body-textarea",
+        "value": "Took the long way back along the river after work. Cold, but clear, and I finally stopped thinking about the deadline."
+      },
+      {
+        "click": {
+          "role": "button",
+          "name": "Calm",
+          "exact": true
+        }
+      },
+      {
+        "fill": ".tag-input",
+        "value": "walks"
+      },
+      {
+        "press": "Enter"
+      },
+      {
+        "press": "Escape"
+      },
+      {
+        "wait": 400
+      }
+    ],
+    "clip": ".editor-page"
+  },
+  {
+    "name": "week-view",
+    "path": "/journal",
+    "waitFor": ".wv-grid",
+    "actions": [
+      {
+        "wait": 600
+      }
+    ],
+    "clip": "journal-week-view .wv"
+  },
+  {
+    "name": "day-popup",
+    "path": "/journal",
+    "waitFor": ".wv-grid",
+    "actions": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Open Tue 22"
+        }
+      },
+      {
+        "wait": 600
+      }
+    ],
+    "clip": "journal-day-modal .modal"
+  },
+  {
+    "name": "streak-and-mood",
+    "path": "/journal",
+    "waitFor": ".moodtrend-rows",
+    "viewport": {
+      "width": 1280,
+      "height": 445
+    },
+    "hide": [
+      "jiro-page-header",
+      "journal-week-view",
+      ".filters-row",
+      ".list-head",
+      ".entries-list",
+      "jiro-empty-state"
+    ],
+    "actions": [
+      {
+        "wait": 400
+      }
+    ]
+  },
+  {
+    "name": "entries-filtered",
+    "path": "/journal/entries?tag=training",
+    "waitFor": ".entry-row:not(.entry-row--skeleton)",
+    "viewport": {
+      "width": 1280,
+      "height": 760
+    },
+    "actions": [
+      {
+        "wait": 400
+      }
+    ]
+  },
+  {
+    "name": "new-collection",
+    "path": "/journal/collections",
+    "waitFor": ".collection-card",
+    "actions": [
+      {
+        "click": {
+          "role": "button",
+          "name": "+ New"
+        }
+      },
+      {
+        "fill": ".modal-content input >> nth=0",
+        "value": "Trips"
+      },
+      {
+        "fill": ".modal-content input >> nth=1",
+        "value": "Places I went and what I remember."
+      },
+      {
+        "wait": 400
+      }
+    ],
+    "clip": ".modal-content"
+  },
+  {
+    "name": "groups-empty",
+    "path": "/journal/groups",
+    "waitFor": ".state-box h3",
+    "viewport": {
+      "width": 1280,
+      "height": 400
+    },
+    "actions": [
+      {
+        "wait": 300
+      }
+    ]
+  },
+  {
+    "name": "new-group",
+    "path": "/journal/groups",
+    "waitFor": ".state-box h3",
+    "actions": [
+      {
+        "click": {
+          "role": "button",
+          "name": "+ New Group"
+        }
+      },
+      {
+        "fill": ".modal-content input",
+        "value": "Book club"
+      },
+      {
+        "wait": 400
+      }
+    ],
+    "clip": ".modal-content"
+  }
+]

@@ -1,0 +1,119 @@
+[
+  {
+    "name": "dashboard",
+    "path": "/dashboard",
+    "waitFor": "dash-activity-widget .act-col",
+    "actions": [
+      {
+        "wait": 600
+      }
+    ]
+  },
+  {
+    "name": "customise-dashboard",
+    "path": "/dashboard",
+    "waitFor": "main.content h1",
+    "actions": [
+      {
+        "click": {
+          "role": "button",
+          "name": "Customise"
+        }
+      }
+    ],
+    "clip": ".modal-content"
+  },
+  {
+    "name": "last-14-days",
+    "path": "/dashboard",
+    "waitFor": "dash-activity-widget .act-col",
+    "actions": [
+      {
+        "wait": 600
+      }
+    ],
+    "clip": "dash-activity-widget"
+  },
+  {
+    "name": "day-page",
+    "path": "/day",
+    "waitFor": "#day-jym",
+    "actions": [
+      {
+        "click": {
+          "role": "link",
+          "name": "Previous day"
+        }
+      },
+      {
+        "wait": 1500
+      }
+    ],
+    "clip": "app-day-page .day"
+  },
+  {
+    "name": "search",
+    "path": "/dashboard",
+    "waitFor": "main.content h1",
+    "actions": [
+      {
+        "press": "Control+k"
+      },
+      {
+        "fill": ".sp-input",
+        "value": "bench"
+      },
+      {
+        "wait": 900
+      }
+    ],
+    "clip": ".sp-panel"
+  },
+  {
+    "name": "phone-module",
+    "path": "/jym",
+    "waitFor": "nav.mobile-nav",
+    "actions": [
+      {
+        "wait": 1200
+      }
+    ],
+    "clip": "body",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    }
+  },
+  {
+    "name": "settings-preferences",
+    "path": "/settings",
+    "waitFor": "#setting-timezone",
+    "clip": "jiro-card:has(#setting-timezone) .jiro-card"
+  },
+  {
+    "name": "download-data",
+    "path": "/settings",
+    "waitFor": ".data-row",
+    "clip": "jiro-card:has(.data-row) .jiro-card"
+  },
+  {
+    "name": "send-feedback",
+    "path": "/dashboard",
+    "waitFor": "main.content h1",
+    "actions": [
+      {
+        "click": ".sidebar jiro-user-menu button"
+      },
+      {
+        "click": {
+          "role": "menuitem",
+          "name": "Send feedback"
+        }
+      },
+      {
+        "wait": 400
+      }
+    ],
+    "clip": ".modal-content"
+  }
+]
