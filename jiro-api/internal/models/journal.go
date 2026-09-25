@@ -9,16 +9,19 @@ import (
 // ─── Domain structs ────────────────────────────────────────────────────────
 
 type JournalEntry struct {
-	ID        uuid.UUID      `json:"id"`
-	UserID    uuid.UUID      `json:"user_id"`
-	GroupID   *uuid.UUID     `json:"group_id"`
-	Title     *string        `json:"title"`
-	Body      string         `json:"body"`
-	Mood      *string        `json:"mood"`
-	Tags      []string       `json:"tags"`
-	Images    []JournalImage `json:"images,omitempty"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt time.Time      `json:"updated_at"`
+	ID      uuid.UUID      `json:"id"`
+	UserID  uuid.UUID      `json:"user_id"`
+	GroupID *uuid.UUID     `json:"group_id"`
+	Title   *string        `json:"title"`
+	Body    string         `json:"body"`
+	Mood    *string        `json:"mood"`
+	Tags    []string       `json:"tags"`
+	Images  []JournalImage `json:"images,omitempty"`
+	// The author's own collections holding this entry. Only GET
+	// /entries/:id fills it, and only for the author.
+	CollectionIDs []uuid.UUID `json:"collection_ids,omitempty"`
+	CreatedAt     time.Time   `json:"created_at"`
+	UpdatedAt     time.Time   `json:"updated_at"`
 }
 
 type JournalImage struct {
@@ -72,6 +75,8 @@ type CreateJournalEntryRequest struct {
 	Mood      *string  `json:"mood"`
 	Tags      []string `json:"tags"`
 	CreatedAt *string  `json:"created_at"`
+	// Collections (the author's own) to file the new entry in.
+	CollectionIDs []uuid.UUID `json:"collection_ids"`
 }
 
 type UpdateJournalEntryRequest struct {
@@ -79,6 +84,9 @@ type UpdateJournalEntryRequest struct {
 	Body  *string  `json:"body"`
 	Mood  *string  `json:"mood"`
 	Tags  []string `json:"tags"`
+	// When present, the entry's full set of the author's collections:
+	// missing ones are left, new ones joined. Absent leaves membership alone.
+	CollectionIDs *[]uuid.UUID `json:"collection_ids"`
 }
 
 type CreateJournalGroupRequest struct {
@@ -132,6 +140,26 @@ type JournalCalendarResponse struct {
 }
 
 type JoinGroupResponse struct {
-	GroupID   uuid.UUID `json:"group_id"`
-	GroupName string    `json:"group_name"`
+	GroupID       uuid.UUID `json:"group_id"`
+	GroupName     string    `json:"group_name"`
+	AlreadyMember bool      `json:"already_member"`
+}
+
+// JournalInviteLink is a group's copyable invite link. Token is only set in
+// the response that creates it; afterwards only its hash exists.
+type JournalInviteLink struct {
+	Token     string    `json:"token,omitempty"`
+	ExpiresAt time.Time `json:"expires_at"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// JoinPreview describes what an invite token opens, before joining. GroupID
+// is only set for someone already in the group.
+type JoinPreview struct {
+	Kind          string     `json:"kind"` // "link" or "email"
+	GroupID       *uuid.UUID `json:"group_id,omitempty"`
+	GroupName     string     `json:"group_name"`
+	MemberCount   int        `json:"member_count"`
+	ExpiresAt     time.Time  `json:"expires_at"`
+	AlreadyMember bool       `json:"already_member"`
 }

@@ -119,8 +119,8 @@ import { UploadService } from '../../../core/services/upload.service';
         @if (entries().length === 0) {
 <div class="state-center">
           <h2>No entries yet</h2>
-          <p class="text-secondary">Add entries to this collection from the editor or entry cards.</p>
-          <jiro-button variant="primary" type="button" (click)="router.navigate(['/journal/new'])">Write Entry</jiro-button>
+          <p class="text-secondary">Write a new entry for it, or open an existing entry and pick this collection under Collections.</p>
+          <jiro-button variant="primary" type="button" (click)="router.navigate(['/journal/new'], { queryParams: { collection: collId } })">Write entry</jiro-button>
         </div>
 }
 
@@ -144,7 +144,7 @@ import { UploadService } from '../../../core/services/upload.service';
                   class="icon-btn danger"
                   (click)="confirmRemove(e)"
                   [disabled]="removingId() === e.id"
-                  aria-label="Remove from collection">
+                  [attr.aria-label]="'Remove ' + (e.title || 'this entry') + ' from the collection'">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                   </svg>
@@ -183,10 +183,10 @@ import { UploadService } from '../../../core/services/upload.service';
     @if (showEdit()) {
 <jiro-modal title="Edit Collection" (close)="showEdit.set(false)">
       <div class="modal-form">
-        <label class="form-label">Name</label>
-        <input type="text" class="form-control" [(ngModel)]="editName" maxlength="100" />
-        <label class="form-label" style="margin-top:var(--space-sm)">Description (optional)</label>
-        <input type="text" class="form-control" [(ngModel)]="editDesc" maxlength="255" placeholder="A brief description..." />
+        <label class="form-label" for="edit-coll-name">Name</label>
+        <input id="edit-coll-name" type="text" class="form-control" [(ngModel)]="editName" maxlength="100" />
+        <label class="form-label" for="edit-coll-desc" style="margin-top:var(--space-sm)">Description (optional)</label>
+        <input id="edit-coll-desc" type="text" class="form-control" [(ngModel)]="editDesc" maxlength="255" placeholder="A brief description..." />
       </div>
       <div class="modal-actions">
         <jiro-button variant="danger" type="button" (click)="deleteCollection()">Delete</jiro-button>
@@ -299,7 +299,11 @@ import { UploadService } from '../../../core/services/upload.service';
     .mood-chip { display: inline-flex; align-items: center; gap: 4px; font-size: var(--font-size-xs); padding: 2px 8px; background: color-mix(in srgb, var(--color-primary) 12%, transparent); color: var(--color-primary); border-radius: 99px; }
     .mood-chip svg { width: 12px; height: 12px; }
     .entry-card-actions { display: flex; gap: var(--space-xs); opacity: 0; transition: opacity 0.15s; }
-    .entry-card:hover .entry-card-actions { opacity: 1; }
+    .entry-card:hover .entry-card-actions,
+    .entry-card:focus-within .entry-card-actions { opacity: 1; }
+    /* No hover on touch screens: keep the remove control visible. */
+    @media (hover: none) { .entry-card-actions { opacity: 1; } }
+    .icon-btn { min-width: 32px; min-height: 32px; justify-content: center; }
     .icon-btn { background: none; border: none; cursor: pointer; padding: 4px; border-radius: var(--border-radius-sm); color: var(--text-secondary); display: flex; align-items: center; transition: color 0.12s, background 0.12s; }
     .icon-btn.danger:hover { color: var(--color-danger); background: color-mix(in srgb, var(--color-danger) 10%, transparent); }
     .entry-title { font-size: var(--font-size-md); font-weight: 600; margin: 0 0 var(--space-xs); }
@@ -333,7 +337,6 @@ export class JournalCollectionComponent implements OnInit {
   editDesc = '';
   saving = signal(false);
 
-  removeTarget = signal<JournalEntry | null>(null);
   removingId = signal<string | null>(null);
 
   deleting = signal(false);
@@ -441,21 +444,30 @@ export class JournalCollectionComponent implements OnInit {
     });
   }
 
-  confirmRemove(e: JournalEntry) { this.removeTarget.set(e); }
+  async confirmRemove(e: JournalEntry) {
+    const ok = await this.confirmService.confirm({
+      title: 'Remove from this collection?',
+      message: 'The entry stays in your journal; only this collection lets it go.',
+      confirmLabel: 'Remove',
+      cancelLabel: 'Keep it',
+      danger: true,
+    });
+    if (ok) this.removeEntry(e);
+  }
 
-  removeEntry() {
-    const e = this.removeTarget();
-    if (!e) return;
+  removeEntry(e: JournalEntry) {
     this.removingId.set(e.id);
     this.svc.removeEntryFromCollection(this.collId, e.id).subscribe({
       next: () => {
         this.entries.update(es => es.filter(x => x.id !== e.id));
-        this.removeTarget.set(null);
         this.removingId.set(null);
-        // Update count
         this.collection.update(c => c ? { ...c, entry_count: c.entry_count - 1 } : c);
+        this.toast.success('Removed from the collection');
       },
-      error: () => this.removingId.set(null),
+      error: () => {
+        this.removingId.set(null);
+        this.toast.error('Could not remove the entry from the collection.');
+      },
     });
   }
 

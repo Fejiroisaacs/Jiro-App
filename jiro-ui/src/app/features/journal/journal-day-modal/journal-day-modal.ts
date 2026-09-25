@@ -62,8 +62,12 @@ import { todayKey } from '../../../core/utils/day';
         <!-- Empty state -->
         @if (!entries.length) {
 <div class="empty-state">
-          <p class="text-secondary">No entries for this day.</p>
-          <jiro-button variant="primary" type="button" (click)="newEntry.emit()">Write now</jiro-button>
+          @if (isFuture()) {
+            <p class="text-secondary">This day has not happened yet. Come back on the day to write.</p>
+          } @else {
+            <p class="text-secondary">No entries for this day.</p>
+            <jiro-button variant="primary" type="button" (click)="newEntry.emit()">Write now</jiro-button>
+          }
         </div>
 }
 
@@ -122,9 +126,11 @@ import { todayKey } from '../../../core/utils/day';
           </div>
 }
 
+          @if (!isFuture()) {
           <div class="list-footer">
             <jiro-button variant="secondary" type="button" (click)="newEntry.emit()">New Entry</jiro-button>
           </div>
+          }
         </div>
 }
 
@@ -526,6 +532,11 @@ export class JournalDayModalComponent implements OnChanges {
   /** Only for a day that has happened; the day view has no future. */
   showDayLink(): boolean {
     return this.dayLink && !!this.date && this.date <= todayKey(this.settings.timezone());
+  }
+
+  /** A day after today in the user's zone: nothing to write about yet. */
+  isFuture(): boolean {
+    return !!this.date && this.date > todayKey(this.settings.timezone());
   }
 
   constructor(private svc: JournalService) {}

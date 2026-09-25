@@ -340,13 +340,18 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			// Groups
 			// Invite acceptance requires auth: the invite is bound to the
 			// redeeming user, so an anonymous caller has nobody to activate.
-			journal.POST("/groups/join", journalHandler.JoinGroup)
+			// Tokens are 256-bit, so the limit is for abuse, not guessing.
+			journal.GET("/groups/join/preview", middleware.RateLimitByUser(rl, "journal-join", 30), journalHandler.PreviewInvite)
+			journal.POST("/groups/join", middleware.RateLimitByUser(rl, "journal-join", 30), journalHandler.JoinGroup)
 			journal.POST("/groups", journalHandler.CreateGroup)
 			journal.GET("/groups", journalHandler.ListGroups)
 			journal.GET("/groups/:id", journalHandler.GetGroup)
 			journal.PUT("/groups/:id", journalHandler.UpdateGroup)
 			journal.DELETE("/groups/:id", journalHandler.DeleteGroup)
 			journal.POST("/groups/:id/invite", journalHandler.InviteMember)
+			journal.GET("/groups/:id/invite-link", journalHandler.GetInviteLink)
+			journal.POST("/groups/:id/invite-link", middleware.RateLimitByUser(rl, "journal-invite-link", 10), journalHandler.CreateInviteLink)
+			journal.DELETE("/groups/:id/invite-link", journalHandler.RevokeInviteLink)
 			journal.DELETE("/groups/:id/members/:user_id", journalHandler.RemoveMember)
 			journal.POST("/groups/:id/entries", journalHandler.CreateGroupEntry)
 			journal.GET("/groups/:id/entries", journalHandler.ListGroupEntries)

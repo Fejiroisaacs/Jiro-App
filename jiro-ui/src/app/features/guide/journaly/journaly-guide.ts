@@ -18,12 +18,12 @@ import { GUIDE } from '../shared';
           <li>Write in the box below it. If you are stuck, use <strong>Today's prompt</strong>: select the question to start writing, the arrow for another question, or the cross to hide prompts for the rest of the day.</li>
           <li>Under <strong>Mood</strong>, pick the one that fits. Select it again to clear it.</li>
           <li>Under <strong>Tags</strong>, type a tag and press <kbd>Enter</kbd> or a comma. You can add up to 10.</li>
+          <li>Under <strong>Photos</strong>, select <strong>Add</strong> to attach up to three photos. They show as thumbnails and upload when you publish.</li>
           <li>Under <strong>Collections</strong>, select any collection the entry belongs in.</li>
           <li>Select <strong>Publish</strong>. You go back to Journaly and the entry is on this week's calendar.</li>
         </guide-steps>
-        <guide-shot guide="journaly" name="new-entry" [width]="1440" [height]="1872"
-          alt="A new entry titled Long walk home, with today's writing prompt above the text, Calm picked as the mood, a walks tag, the Images and Collections sections, and a Publish button." />
-        <guide-tip>Photos are added once the entry exists. See <a routerLink="/guide/journaly" fragment="add-photos">Add photos to an entry</a>.</guide-tip>
+        <guide-shot guide="journaly" name="new-entry" [width]="1440" [height]="1900"
+          alt="A new entry titled Long walk home, with today's writing prompt above the text, Calm picked as the mood, a walks tag, the Photos section with a note that photos upload when you publish, the Collections section, and a Publish button." />
       </guide-section>
 
       <guide-section id="write-for-an-earlier-day" title="Write for an earlier day"
@@ -32,19 +32,19 @@ import { GUIDE } from '../shared';
           <li>On <a routerLink="/journal">Journaly</a>, use the arrows beside the dates to find the week.</li>
           <li>Select the <strong>+</strong> under the day.</li>
           <li>Select <strong>Write now</strong>, or <strong>New Entry</strong> if the day already has entries.</li>
-          <li>The editor shows the date beside <strong>New entry</strong>. Write as usual and select <strong>Publish</strong>.</li>
+          <li>The editor shows the date beside <strong>New entry</strong>, and the prompt is a general <strong>Writing prompt</strong> rather than today's. Write as usual and select <strong>Publish</strong>.</li>
         </guide-steps>
-        <p>The entry counts for that day everywhere: the week view, the day view and your streak.</p>
+        <p>The entry counts for that day everywhere: the week view, the day view and your streak. Days still to come have nothing to write about yet, so their window offers no <strong>Write now</strong>.</p>
       </guide-section>
 
       <guide-section id="add-photos" title="Add photos to an entry"
-        lead="Each entry can hold up to three photos.">
+        lead="Each entry can hold up to three photos, on a new entry or an old one.">
         <guide-steps>
-          <li>Publish the entry first. On a new entry, <strong>Add</strong> asks you to save before adding images.</li>
-          <li>Open the entry again, for example from <a routerLink="/journal/entries">Entries</a>.</li>
-          <li>Under <strong>Images</strong>, select <strong>Add</strong> and choose a JPEG, PNG or WebP file of up to 10 MB. It uploads straight away.</li>
-          <li>To take a photo off, select the cross on its thumbnail. Select a thumbnail to see it full size.</li>
+          <li>In the editor, under <strong>Photos</strong>, select <strong>Add</strong> and choose a JPEG, PNG or WebP file of up to 10 MB.</li>
+          <li>On a new entry, the photo waits as a thumbnail and uploads when you select <strong>Publish</strong>. On an entry you are editing, it uploads straight away.</li>
+          <li>To take a photo off, select the cross on its thumbnail. Select an uploaded thumbnail to see it full size.</li>
         </guide-steps>
+        <p>If a photo cannot upload when you publish, the entry is still saved and stays open in the editor, so you can add the photo again.</p>
       </guide-section>
 
       <guide-section id="use-the-week-view" title="Use the week view"
@@ -81,7 +81,7 @@ import { GUIDE } from '../shared';
           <li>Open <a routerLink="/journal/entries">Entries</a>. Entries are grouped by month, 20 to a page.</li>
           <li>Type in <strong>Search entries...</strong> to find words in a title or the entry itself.</li>
           <li>Choose a mood from <strong>All moods</strong> to see only entries with that mood.</li>
-          <li>Type a tag in <strong>Filter by tag...</strong>. It must match the whole tag exactly, including capitals.</li>
+          <li>Type a tag in <strong>Filter by tag...</strong>. Capitals do not matter, and the start of a tag is enough: <strong>train</strong> finds entries tagged Training.</li>
           <li>Use <strong>Prev</strong>, <strong>Next</strong> or a page number at the bottom to move through the pages.</li>
           <li>Select <strong>Clear filters</strong> to see everything again, or select an entry to open it.</li>
         </guide-steps>
@@ -95,15 +95,15 @@ import { GUIDE } from '../shared';
         <h3>Edit</h3>
         <guide-steps>
           <li>Open the entry: select it on <a routerLink="/journal/entries">Entries</a> or in the list on the Journaly tab, or select <strong>Edit Entry</strong> in the day window.</li>
-          <li>Change the title, text, mood, tags or photos.</li>
+          <li>Change the title, text, mood, tags, photos or collections.</li>
           <li>Select <strong>Save</strong>.</li>
         </guide-steps>
         <h3>Delete</h3>
         <guide-steps>
-          <li>On the <a routerLink="/journal">Journaly</a> tab, select the bin on the entry in the list below the calendar. You can also select <strong>Delete</strong> in the day window.</li>
+          <li>Open the entry in the editor and select <strong>Delete entry</strong> at the bottom. You can also select the bin on the entry in the list below the calendar on the <a routerLink="/journal">Journaly</a> tab, or <strong>Delete</strong> in the day window.</li>
           <li>Select <strong>Delete entry</strong> to confirm.</li>
         </guide-steps>
-        <p>Deleting removes the entry and its photos permanently. The editor and the Entries tab have no delete button, so find the entry's week on the Journaly tab.</p>
+        <p>Deleting removes the entry and its photos permanently.</p>
       </guide-section>
 
       <guide-section id="keep-entries-in-a-collection" title="Keep entries in a collection"
@@ -111,13 +111,13 @@ import { GUIDE } from '../shared';
         <guide-steps>
           <li>Open <a routerLink="/journal/collections">Collections</a> and select <strong>+ New</strong>.</li>
           <li>Enter a <strong>Name</strong> and, if you like, a <strong>Description</strong>, then select <strong>Create</strong>.</li>
-          <li>When you write a new entry, select the collection under <strong>Collections</strong> before you select <strong>Publish</strong>.</li>
+          <li>When you write an entry, select the collection under <strong>Collections</strong> before you select <strong>Publish</strong>. From an empty collection, <strong>Write entry</strong> starts one with the collection already picked.</li>
+          <li>To file an older entry, open it, select the collection under <strong>Collections</strong> and select <strong>Save</strong>. Select it again to take the entry out.</li>
           <li>Select a collection on the Collections tab to read its entries.</li>
         </guide-steps>
         <guide-shot guide="journaly" name="new-collection" [width]="1040" [height]="590"
           alt="The New Collection window with the name Trips, the description Places I went and what I remember, and Cancel and Create buttons." />
-        <p>Inside a collection, select <strong>Edit</strong> to rename it, change its description or <strong>Delete</strong> it. Deleting a collection keeps its entries in your journal. To add a cover, select the folder picture beside the name and choose a JPEG, PNG or WebP image of up to 5 MB.</p>
-        <guide-tip>An entry joins a collection when you publish it. Selecting a collection while editing an older entry does not add it.</guide-tip>
+        <p>Inside a collection, select the cross on an entry and confirm to take it out of the collection; the entry stays in your journal. Select <strong>Edit</strong> to rename the collection, change its description or <strong>Delete</strong> it. Deleting a collection keeps its entries in your journal. To add a cover, select the folder picture beside the name and choose a JPEG, PNG or WebP image of up to 5 MB.</p>
       </guide-section>
 
       <guide-section id="journal-with-other-people" title="Journal with other people"
@@ -128,23 +128,31 @@ import { GUIDE } from '../shared';
           <li>Enter a <strong>Group name</strong> and select <strong>Create</strong>. The group opens.</li>
         </guide-steps>
         <guide-shot guide="journaly" name="groups-empty" [width]="1600" [height]="548"
-          alt="The Groups tab with no groups yet, a + New Group button and a Create Group button." />
+          alt="The Groups page with no groups yet, a + New Group button and a Create Group button." />
         <guide-shot guide="journaly" name="new-group" [width]="1040" [height]="444"
           alt="The New Group window with the group name Book club, and Cancel and Create buttons." />
 
-        <h3>Invite someone</h3>
+        <h3>Invite with a link</h3>
         <guide-steps>
           <li>In the group, select <strong>Members</strong>. Only the person who made the group can invite.</li>
-          <li>Under <strong>Invite someone</strong>, enter the email address of their Jiro account and select <strong>Invite</strong>.</li>
-          <li>They get an email with an <strong>Accept Invite</strong> link. Until they use it, the members list shows <strong>Invite pending</strong>.</li>
+          <li>Under <strong>Invite link</strong>, select <strong>Create invite link</strong>, then <strong>Copy</strong>, and send the link however you like.</li>
+          <li>Anyone with a Jiro account who opens it while signed in can join. The link works for 7 days; the date it stops is shown under it.</li>
+        </guide-steps>
+        <p>Jiro keeps only a scrambled copy of the link, so it can show it just once. To share it again later, select <strong>Make a new link</strong>; the old one stops working. Select <strong>Turn off link</strong> to stop anyone new joining with it. People who already joined stay in the group.</p>
+
+        <h3>Invite by email</h3>
+        <guide-steps>
+          <li>In <strong>Members</strong>, under <strong>Invite by email</strong>, enter the email address of their Jiro account and select <strong>Invite</strong>.</li>
+          <li>They get an email with an <strong>Accept Invite</strong> link that only works for that address, for 7 days. Until they use it, the members list shows <strong>Invite pending</strong>.</li>
         </guide-steps>
 
         <h3>Join with an invite</h3>
         <guide-steps>
-          <li>Open the <strong>Accept Invite</strong> link in the email. It works for 7 days.</li>
-          <li>If asked, select <strong>Sign In</strong> and sign in with the email address the invite was sent to.</li>
-          <li>When you see <strong>You're in!</strong>, select <strong>Open Group</strong>.</li>
+          <li>Open the invite link. If you are signed out, select <strong>Sign in</strong>, or <strong>Create one free</strong> for a new account. Either way you come back to the invite.</li>
+          <li>Check the group name and select <strong>Join group</strong>.</li>
+          <li>When you see <strong>You're in!</strong>, select <strong>Open group</strong>.</li>
         </guide-steps>
+        <guide-tip>A new account needs its email verified before it can join, so open the link Jiro emails you first. The demo can open an invite but not join, since it is look-only.</guide-tip>
 
         <h3>Post to the group</h3>
         <guide-steps>

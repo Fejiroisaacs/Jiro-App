@@ -52,7 +52,7 @@ import { JiroLogoComponent } from '../../shared/components/jiro-logo/jiro-logo';
           </form>
 
           <p class="auth-footer">
-            Don't have an account? <a routerLink="/register">Create one</a>
+            Don't have an account? <a routerLink="/register" [queryParams]="returnQuery">Create one</a>
           </p>
           <p class="auth-demo">
             Just looking?
@@ -173,6 +173,8 @@ export class LoginComponent {
   demoError = signal('');
 
   private returnUrl = '/dashboard';
+  /** Carries ?returnUrl= over to the register link, when there is one. */
+  returnQuery: { returnUrl: string } | null = null;
 
   constructor(
     private authService: AuthService,
@@ -183,6 +185,7 @@ export class LoginComponent {
     // must not become a post-login redirect target.
     const requested = this.route.snapshot.queryParamMap.get('returnUrl') ?? '';
     this.returnUrl = requested.startsWith('/') && !requested.startsWith('//') ? requested : '/dashboard';
+    if (this.returnUrl !== '/dashboard') this.returnQuery = { returnUrl: this.returnUrl };
   }
 
   onSubmit() {
