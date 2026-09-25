@@ -548,7 +548,12 @@ Stir in the chocolate and season. Top with sour cream and green onion.`,
 		{tikka, at(-9, 23, 45), "Much better. Broiling the chicken first is the whole trick.", `[{"item":"Heavy cream","change":"back to 1/2 cup"},{"item":"Kashmiri chili","change":"added 1 tsp"}]`, 5},
 		{risotto, at(-22, 23, 30), "Used cold stock and it took forever. Rice was still a little chalky.", `[{"item":"Vegetable stock","change":"cold, straight from the carton"}]`, 3},
 		{salmon, at(-12, 23, 20), "Perfect. Pulled it at 11 minutes.", `[]`, 5},
+		{tacos, at(-13, 23, 30), "Made these to celebrate. Quick pickled onions made a big difference.", `[{"item":"Red onion","change":"quick pickled in lime"}]`, 5},
+		{bowls, at(-11, 23, 40), "Prepped four lunches. Marinated the chicken overnight this time.", `[]`, 4},
+		{oats, at(-10, 23, 15), "Half the chia, it was getting too thick by day three.", `[{"item":"Chia seeds","change":"1/2 tbsp"}]`, 4},
 		{chili, at(-3, 23, 55), "Doubled the batch and froze half.", `[{"item":"Chili powder","change":"4 tbsp"}]`, 4},
+		{bowls, at(-2, 23, 35), "Second round of prep. Added cucumber and extra feta.", `[{"item":"Feta","change":"doubled"}]`, 5},
+		{pancakes, at(-1, 23, 10), "Used the last two bananas. Froze the extras for next week.", `[]`, 4},
 	}
 
 	ds.RecipeCollections = []demoRecipeCollection{
@@ -618,6 +623,9 @@ Presentation to the leadership team on Thursday. I know the material but I keep 
 
 	add(-15, 23, 45, "", "tired", []string{"training", "sleep"}, `
 Squats felt awful today, everything was heavy. Only slept five hours. Got through it but lost a rep on the last set. Note to self: the workout is not the problem, the sleep is.`)
+
+	add(-14, 23, 15, "", "anxious", []string{"work"}, `
+Presentation is tomorrow. Ran through the slides twice after dinner and cut the part about the old reporting setup, nobody needs the history. Laying out clothes tonight so the morning is easy.`)
 
 	add(-13, 23, 40, "It went fine", "happy", []string{"work", "wins"}, `
 The presentation went well. They asked two questions I had actually prepared for. My manager stopped by afterwards to say it was clear and well paced.
