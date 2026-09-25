@@ -64,7 +64,7 @@ import { JiroPageHeaderComponent } from '../../shared/components/jiro-page-heade
             <li>
               <strong>Culinara:</strong> recipes (title, description, ingredients, instructions, tags,
               nutrition, dietary labels, image links and a cover photo), cooking trials (date, notes,
-              changes you made, rating), recipe collections and meal plans.
+              changes you made, rating), recipe collections, meal plans and your grocery list.
             </li>
             <li>
               <strong>Jym:</strong> exercises, splits, routines and templates, training series, workout
@@ -246,8 +246,8 @@ import { JiroPageHeaderComponent } from '../../shared/components/jiro-page-heade
             <dd>Whether you turned dark mode on.</dd>
             <dt><code>culinara_shopping_list</code></dt>
             <dd>
-              Your grocery list. It is kept only in this browser. It is not sent to our servers and
-              is not included in your data download.
+              A grocery list saved in this browser by an earlier version of Jiro. The next time you
+              open your grocery list it is moved to your account and removed from this browser.
             </dd>
             <dt><code>jiro_cook_checklist_</code> followed by a recipe ID</dt>
             <dd>Which ingredients and steps you ticked off in cook mode.</dd>
@@ -377,7 +377,7 @@ import { JiroPageHeaderComponent } from '../../shared/components/jiro-page-heade
               <strong>Get a copy of your data.</strong> In Settings, choose "Download my data" to get
               a JSON file with your account, Jym, Culinara, Journaly and Ledger data. Uploaded files
               appear as links rather than the files themselves. The download does not include feedback
-              you sent, your usage events or your grocery list (which lives only in your browser).
+              you sent or your usage events.
               You can ask for the rest at <mark class="todo">[CONTACT EMAIL]</mark>.
             </li>
             <li>
