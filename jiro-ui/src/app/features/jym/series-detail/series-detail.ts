@@ -1,9 +1,10 @@
-import { Component, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import { JymService, SplitSeriesDetail, ExerciseProgression, Routine } from '../../../core/services/jym.service';
+import { SettingsService } from '../../../core/services/settings.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
@@ -193,7 +194,7 @@ Chart.register(...registerables);
 }
                   </td>
                   <td>{{ s.set_count }}</td>
-                  <td>{{ s.total_volume | number:'1.0-0' }} kg</td>
+                  <td>{{ settings.toDisplay(s.total_volume) | number:'1.0-0' }} {{ settings.unitLabel() }}</td>
                 </tr>
 }
               </tbody>
@@ -413,6 +414,8 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
   private viewReady = false;
   private seriesId = '';
 
+  readonly settings = inject(SettingsService);
+
   constructor(
     private jymService: JymService,
     private route: ActivatedRoute,
@@ -460,13 +463,14 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
     if (sessions.length === 0) return;
 
     const tone = chartTones();
+    const unit = this.settings.unitLabel();
     const config: ChartConfiguration = {
       type: 'bar',
       data: {
         labels: sessions.map((_, i) => `S${i + 1}`),
         datasets: [{
-          label: 'Volume (kg)',
-          data: sessions.map(sess => sess.total_volume),
+          label: `Volume (${unit})`,
+          data: sessions.map(sess => this.settings.toDisplay(sess.total_volume)),
           backgroundColor: tone.primary,
           borderColor: tone.primary,
           borderWidth: 1,
@@ -481,13 +485,13 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
           tooltip: {
             callbacks: {
               title: (items) => `Session ${items[0].label} — ${this.formatDate(sessions[items[0].dataIndex].date)}`,
-              label: ctx => ` ${(ctx.parsed.y as number).toLocaleString()} kg total volume`,
+              label: ctx => ` ${(ctx.parsed.y as number).toLocaleString()} ${unit} total volume`,
             },
           },
         },
         scales: {
           x: { grid: { display: false }, ticks: { font: { size: 11 } } },
-          y: { grid: { color: tone.grid }, ticks: { font: { size: 11 }, color: tone.tick, callback: v => `${v} kg` } },
+          y: { grid: { color: tone.grid }, ticks: { font: { size: 11 }, color: tone.tick, callback: v => `${v} ${unit}` } },
         },
       },
     };
@@ -503,13 +507,14 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!ex || ex.points.length === 0) return;
 
     const tone = chartTones();
+    const unit = this.settings.unitLabel();
     const config: ChartConfiguration = {
       type: 'line',
       data: {
         labels: ex.points.map((_, i) => `S${i + 1}`),
         datasets: [{
-          label: 'Est. 1RM (kg)',
-          data: ex.points.map(p => p.best_est_1rm),
+          label: `Est. 1RM (${unit})`,
+          data: ex.points.map(p => this.settings.toDisplay(p.best_est_1rm)),
           borderColor: tone.primary,
           backgroundColor: tone.primaryFill,
           fill: true, tension: 0.3,
@@ -524,13 +529,13 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
           tooltip: {
             callbacks: {
               title: (items) => `Session ${items[0].label} — ${this.formatDate(ex.points[items[0].dataIndex].date)}`,
-              label: ctx => ` ${ctx.parsed.y} kg`,
+              label: ctx => ` ${ctx.parsed.y} ${unit}`,
             },
           },
         },
         scales: {
           x: { grid: { display: false }, ticks: { font: { size: 11 } } },
-          y: { grid: { color: tone.grid }, ticks: { font: { size: 11 }, color: tone.tick, callback: v => `${v} kg` } },
+          y: { grid: { color: tone.grid }, ticks: { font: { size: 11 }, color: tone.tick, callback: v => `${v} ${unit}` } },
         },
       },
     };
@@ -560,6 +565,7 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
     const labels = Array.from({ length: maxLen }, (_, i) => `S${i + 1}`);
 
     const tone = chartTones();
+    const unit = this.settings.unitLabel();
     const config: ChartConfiguration = {
       type: 'line',
       data: {
@@ -567,7 +573,7 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
         datasets: [
           {
             label: current.name,
-            data: (currentEx?.points ?? []).map(p => p.best_est_1rm),
+            data: (currentEx?.points ?? []).map(p => this.settings.toDisplay(p.best_est_1rm)),
             borderColor: tone.primary,
             backgroundColor: tone.primaryFill,
             fill: false, tension: 0.3,
@@ -575,7 +581,7 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
           },
           {
             label: other.name,
-            data: (otherEx?.points ?? []).map(p => p.best_est_1rm),
+            data: (otherEx?.points ?? []).map(p => this.settings.toDisplay(p.best_est_1rm)),
             borderColor: tone.muted,
             backgroundColor: tone.muted,
             fill: false, tension: 0.3,
@@ -589,11 +595,11 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
         maintainAspectRatio: false,
         plugins: {
           legend: { display: true, position: 'top' },
-          tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y} kg` } },
+          tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y} ${unit}` } },
         },
         scales: {
           x: { grid: { display: false }, ticks: { font: { size: 11 } } },
-          y: { grid: { color: tone.grid }, ticks: { font: { size: 11 }, color: tone.tick, callback: v => `${v} kg` } },
+          y: { grid: { color: tone.grid }, ticks: { font: { size: 11 }, color: tone.tick, callback: v => `${v} ${unit}` } },
         },
       },
     };
