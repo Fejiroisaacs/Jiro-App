@@ -1,7 +1,8 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { SettingsService } from './settings.service';
 
 export interface Recipe {
   id: string;
@@ -129,6 +130,8 @@ export interface Collection {
 export class RecipeService {
   constructor(private http: HttpClient) { }
 
+  private readonly settings = inject(SettingsService);
+
   /** Most recently edited first. `limit` (1-50) caps the list; omit it for every recipe. */
   listRecipes(search?: string, limit?: number): Observable<Recipe[]> {
     let params = new HttpParams();
@@ -174,7 +177,10 @@ export class RecipeService {
   }
 
   getCookStreak(): Observable<CookStreak> {
-    return this.http.get<CookStreak>(`${API_URL}/cook-streak`);
+    // tz: a hint the API uses only when the account has no timezone setting.
+    return this.http.get<CookStreak>(`${API_URL}/cook-streak`, {
+      params: new HttpParams().set('tz', this.settings.timezone()),
+    });
   }
 
   // ─── Collections ──────────────────────────────────

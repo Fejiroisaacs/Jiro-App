@@ -1651,19 +1651,28 @@ func csvSafe(v string) string {
 	return v
 }
 
-func (s *JymService) StreamSessionsCSV(ctx context.Context, userID uuid.UUID, from, to *time.Time, exerciseID *uuid.UUID, w io.Writer) error {
-	args := []interface{}{userID}
+// StreamSessionsCSV writes the user's sets as CSV. from and to are calendar
+// dates (only their year/month/day are used); they, and the date column, are
+// the user's calendar days in their location (settings timezone, else
+// tzHint, else UTC), the days the app shows each session under.
+func (s *JymService) StreamSessionsCSV(ctx context.Context, userID uuid.UUID, from, to *time.Time, exerciseID *uuid.UUID, tzHint string, w io.Writer) error {
+	loc, err := userLocation(ctx, s.db, userID, tzHint)
+	if err != nil {
+		return err
+	}
+	args := []interface{}{userID, loc.String()}
 	where := "WHERE s.user_id = $1"
-	p := 2
+	p := 3
 
 	if from != nil {
+		start, _ := DayWindow(from.Year(), from.Month(), from.Day(), loc)
 		where += fmt.Sprintf(" AND s.started_at >= $%d", p)
-		args = append(args, *from)
+		args = append(args, start)
 		p++
 	}
 	if to != nil {
 		// include the full end day
-		end := to.AddDate(0, 0, 1)
+		_, end := DayWindow(to.Year(), to.Month(), to.Day(), loc)
 		where += fmt.Sprintf(" AND s.started_at < $%d", p)
 		args = append(args, end)
 		p++
@@ -1675,7 +1684,7 @@ func (s *JymService) StreamSessionsCSV(ctx context.Context, userID uuid.UUID, fr
 
 	query := `
 		SELECT
-			s.started_at::date,
+			(s.started_at AT TIME ZONE $2)::date,
 			s.id,
 			COALESCE(r.name, ''),
 			e.name,

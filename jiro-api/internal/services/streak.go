@@ -2,10 +2,13 @@ package services
 
 import "time"
 
-// dayStreaks takes distinct UTC calendar days, newest first ("2006-01-02",
-// optionally with a time suffix), and returns the current streak (the run of
-// consecutive days ending today or yesterday, else 0) and the longest run.
-// Shared by the journal and cook streaks so they count days the same way.
+// dayStreaks takes distinct calendar days in the user's location, newest
+// first ("2006-01-02", optionally with a time suffix), and returns the current
+// streak (the run of consecutive days ending today or yesterday, else 0) and
+// the longest run. now must already be in that location (now.In(loc)): its
+// calendar date is "today", so a user east or west of UTC keeps their streak
+// on their own day. Shared by the journal and cook streaks so they count days
+// the same way.
 func dayStreaks(days []string, now time.Time) (current, longest int) {
 	if len(days) == 0 {
 		return 0, 0
@@ -14,7 +17,8 @@ func dayStreaks(days []string, now time.Time) (current, longest int) {
 		t, _ := time.Parse("2006-01-02", s[:10])
 		return t
 	}
-	today := now.UTC().Truncate(24 * time.Hour)
+	ty, tm, td := now.Date()
+	today := time.Date(ty, tm, td, 0, 0, 0, 0, time.UTC)
 
 	// Current streak: count consecutive days starting from today or yesterday.
 	for i, ds := range days {

@@ -10,7 +10,9 @@ import {
   MOODS,
 } from '../../../core/services/journal.service';
 import { AuthService } from '../../../core/services/auth.service';
-import { JournalWeekViewComponent, toISO, currentWeekBounds } from '../journal-week-view/journal-week-view';
+import { JournalWeekViewComponent, currentWeekBounds } from '../journal-week-view/journal-week-view';
+import { SettingsService } from '../../../core/services/settings.service';
+import { dayKey } from '../../../core/utils/day';
 import { JournalDayModalComponent } from '../journal-day-modal/journal-day-modal';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
@@ -412,14 +414,17 @@ export class JournalGroupComponent implements OnInit {
   loading = signal(true);
   loadingEntries = signal(false);
 
-  weekFrom = signal(currentWeekBounds().from);
-  weekTo = signal(currentWeekBounds().to);
+  private readonly settings = inject(SettingsService);
+
+  /** The week the calendar shows, as day keys in the viewer's zone. */
+  weekFrom = signal(currentWeekBounds(this.settings.timezone()).from);
+  weekTo = signal(currentWeekBounds(this.settings.timezone()).to);
 
   weekEntries = computed(() => {
     const from = this.weekFrom();
     const to = this.weekTo();
     return this.entries().filter(e => {
-      const key = toISO(new Date(e.created_at));
+      const key = this.dayOf(e.created_at);
       return key >= from && key <= to;
     });
   });
@@ -439,7 +444,7 @@ export class JournalGroupComponent implements OnInit {
   dayModalEntries = computed(() => {
     const date = this.dayModalDate();
     if (!date) return [];
-    return this.entries().filter(e => toISO(new Date(e.created_at)) === date);
+    return this.entries().filter(e => this.dayOf(e.created_at) === date);
   });
 
   currentUserId = computed(() => this.auth.user()?.id ?? null);
@@ -504,7 +509,12 @@ export class JournalGroupComponent implements OnInit {
 
   openEntryModal(entry: JournalEntry) {
     this.dayModalInitEntry.set(entry);
-    this.dayModalDate.set(toISO(new Date(entry.created_at)));
+    this.dayModalDate.set(this.dayOf(entry.created_at));
+  }
+
+  /** The viewer's calendar day of an instant, as the week view cuts it. */
+  private dayOf(instant: string): string {
+    return dayKey(instant, this.settings.timezone());
   }
 
   closeDayModal() {

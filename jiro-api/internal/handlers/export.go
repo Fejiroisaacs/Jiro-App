@@ -946,7 +946,7 @@ func (h *ExportHandler) gatherLedger(ctx context.Context, userID uuid.UUID) (exp
 		}
 	}
 
-	budgets, err := h.ledgerService.ListBudgets(ctx, userID)
+	budgets, err := h.ledgerService.ListBudgets(ctx, userID, "")
 	if err != nil {
 		return out, err
 	}

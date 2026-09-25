@@ -21,6 +21,16 @@ func NewMealPlanService(db *pgxpool.Pool) *MealPlanService {
 	return &MealPlanService{db: db}
 }
 
+// Today is today's calendar date (at UTC midnight) in the user's location:
+// settings timezone, else tzHint, else UTC.
+func (s *MealPlanService) Today(ctx context.Context, userID uuid.UUID, tzHint string) (time.Time, error) {
+	loc, err := userLocation(ctx, s.db, userID, tzHint)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return calendarToday(time.Now(), loc), nil
+}
+
 // GetOrCreatePlan returns the meal plan for the given week, creating it if needed.
 // weekStart must be a Monday (normalised by the handler).
 func (s *MealPlanService) GetOrCreatePlan(ctx context.Context, userID uuid.UUID, weekStart time.Time) (*models.MealPlan, error) {

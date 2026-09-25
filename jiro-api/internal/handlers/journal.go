@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/models"
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/services"
@@ -196,10 +195,11 @@ func (h *JournalHandler) DeleteEntry(c *gin.Context) {
 
 // ─── Streak & Calendar ─────────────────────────────────────────────────────
 
-// GET /journal/streak
+// GET /journal/streak?tz=<IANA> (tz is only a fallback for a user with no
+// timezone setting, as on GET /day)
 func (h *JournalHandler) GetStreak(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
-	resp, err := h.journalService.GetStreak(c.Request.Context(), userID)
+	resp, err := h.journalService.GetStreak(c.Request.Context(), userID, c.Query("tz"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to get streak"}})
 		return
@@ -207,20 +207,14 @@ func (h *JournalHandler) GetStreak(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// GET /journal/calendar?year=2026&month=2
+// GET /journal/calendar?year=2026&month=2&tz=<IANA>
+// Days are the user's calendar days; a missing or invalid year or month means
+// the current one in their zone. tz is only a fallback for a user with no
+// timezone setting.
 func (h *JournalHandler) GetCalendar(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
-	now := time.Now()
-	year, err := strconv.Atoi(c.DefaultQuery("year", strconv.Itoa(now.Year())))
-	if err != nil || year < 1970 || year > 9999 {
-		year = now.Year()
-	}
-	month, err := strconv.Atoi(c.DefaultQuery("month", strconv.Itoa(int(now.Month()))))
-	if err != nil || month < 1 || month > 12 {
-		month = int(now.Month())
-	}
-
-	resp, err := h.journalService.GetCalendar(c.Request.Context(), userID, year, month, nil)
+	year, month := calendarYearMonth(c)
+	resp, err := h.journalService.GetCalendar(c.Request.Context(), userID, year, month, nil, c.Query("tz"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to get calendar"}})
 		return
@@ -639,17 +633,8 @@ func (h *JournalHandler) GetGroupCalendar(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid group ID"}})
 		return
 	}
-	now := time.Now()
-	year, err := strconv.Atoi(c.DefaultQuery("year", strconv.Itoa(now.Year())))
-	if err != nil || year < 1970 || year > 9999 {
-		year = now.Year()
-	}
-	month, err := strconv.Atoi(c.DefaultQuery("month", strconv.Itoa(int(now.Month()))))
-	if err != nil || month < 1 || month > 12 {
-		month = int(now.Month())
-	}
-
-	resp, err := h.journalService.GetCalendar(c.Request.Context(), userID, year, month, &groupID)
+	year, month := calendarYearMonth(c)
+	resp, err := h.journalService.GetCalendar(c.Request.Context(), userID, year, month, &groupID, c.Query("tz"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to get calendar"}})
 		return
@@ -811,4 +796,17 @@ func (h *JournalHandler) RemoveEntryFromCollection(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Entry removed from collection"})
+}
+
+// calendarYearMonth reads ?year= and ?month=. A missing or invalid value is
+// 0, which the service resolves to the current year or month in the user's
+// zone (the server's clock alone cannot say which month it is for them).
+func calendarYearMonth(c *gin.Context) (year, month int) {
+	if y, err := strconv.Atoi(c.Query("year")); err == nil && y >= 1970 && y <= 9999 {
+		year = y
+	}
+	if m, err := strconv.Atoi(c.Query("month")); err == nil && m >= 1 && m <= 12 {
+		month = m
+	}
+	return year, month
 }

@@ -1,7 +1,8 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { SettingsService } from './settings.service';
 
 const API_URL = `${environment.apiUrl}/journal`;
 
@@ -151,6 +152,17 @@ export function moodLabel(value: string | null | undefined): string {
 export class JournalService {
   constructor(private http: HttpClient) { }
 
+  private readonly settings = inject(SettingsService);
+
+  /**
+   * The browser's zone as a hint for the day-based endpoints (streak,
+   * calendar). The API only uses it for an account with no timezone setting,
+   * exactly as GET /day does, so every view counts the same days.
+   */
+  private tzParams(): HttpParams {
+    return new HttpParams().set('tz', this.settings.timezone());
+  }
+
   // Entries
   createEntry(req: CreateEntryRequest): Observable<JournalEntry> {
     return this.http.post<JournalEntry>(`${API_URL}/entries`, req);
@@ -209,12 +221,12 @@ export class JournalService {
 
   // Streak & Calendar
   getStreak(): Observable<JournalStreak> {
-    return this.http.get<JournalStreak>(`${API_URL}/streak`);
+    return this.http.get<JournalStreak>(`${API_URL}/streak`, { params: this.tzParams() });
   }
 
   getCalendar(year: number, month: number): Observable<JournalCalendar> {
     return this.http.get<JournalCalendar>(`${API_URL}/calendar`, {
-      params: new HttpParams().set('year', year).set('month', month),
+      params: this.tzParams().set('year', year).set('month', month),
     });
   }
 
@@ -277,7 +289,7 @@ export class JournalService {
 
   getGroupCalendar(groupId: string, year: number, month: number): Observable<JournalCalendar> {
     return this.http.get<JournalCalendar>(`${API_URL}/groups/${groupId}/calendar`, {
-      params: new HttpParams().set('year', year).set('month', month),
+      params: this.tzParams().set('year', year).set('month', month),
     });
   }
 

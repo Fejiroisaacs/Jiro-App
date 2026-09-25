@@ -466,7 +466,8 @@ func (h *LedgerHandler) CreateBudget(c *gin.Context) {
 func (h *LedgerHandler) ListBudgets(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 
-	budgets, err := h.svc.ListBudgets(c.Request.Context(), userID)
+	// tz is only a fallback for a user with no timezone setting, as on GET /day.
+	budgets, err := h.svc.ListBudgets(c.Request.Context(), userID, c.Query("tz"))
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to list ledger budgets")
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{

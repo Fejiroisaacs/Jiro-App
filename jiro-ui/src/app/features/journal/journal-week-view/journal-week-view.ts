@@ -1,6 +1,6 @@
 import {
   Component, Input, Output, EventEmitter,
-  signal, computed, OnChanges, SimpleChanges, AfterViewInit, ElementRef,
+  signal, computed, inject, OnChanges, SimpleChanges, AfterViewInit, ElementRef,
 } from '@angular/core';
 
 import {
@@ -10,29 +10,27 @@ import {
   moodMeta,
 } from '../../../core/services/journal.service';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
+import { SettingsService } from '../../../core/services/settings.service';
+import { addDays, dayKey, dayStartISO, mondayOfKey, shortDayLabel, todayKey } from '../../../core/utils/day';
 
 // ─── Exported helpers used by parent components ──────────────────────────────
+// Weeks are Monday-to-Sunday calendar weeks of day keys in the user's zone
+// (settings, else the browser's), the same days the day view and the
+// dashboard strip use.
 
-export function toISO(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+/** This week's first and last day keys in `timeZone`. */
+export function currentWeekBounds(timeZone: string): { from: string; to: string } {
+  const from = mondayOfKey(todayKey(timeZone));
+  return { from, to: addDays(from, 6) };
 }
 
-export function getWeekStart(d: Date): Date {
-  const s = new Date(d);
-  s.setHours(0, 0, 0, 0);
-  const dow = s.getDay(); // 0 = Sun
-  s.setDate(s.getDate() + (dow === 0 ? -6 : 1 - dow)); // shift to Monday
-  return s;
-}
-
-export function currentWeekBounds(): { from: string; to: string } {
-  const s = getWeekStart(new Date());
-  const e = new Date(s);
-  e.setDate(s.getDate() + 6);
-  return { from: toISO(s), to: toISO(e) };
+/**
+ * A week of day keys as the instants the entries endpoint filters on
+ * (created_at >= from AND created_at <= to). Bare dates would be read as UTC
+ * midnights, which cut the week in the wrong place and drop Sunday entirely.
+ */
+export function weekRangeQuery(week: { from: string; to: string }, timeZone: string): { from: string; to: string } {
+  return { from: dayStartISO(week.from, timeZone), to: dayStartISO(addDays(week.to, 1), timeZone) };
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -83,14 +81,14 @@ export function currentWeekBounds(): { from: string; to: string } {
                way into a day, so there is one target per column. -->
           <div class="wv-day-hdr">
             <span class="wv-day-name">{{ dayAbbr(day) }}</span>
-            <span class="wv-day-num">{{ day.getDate() }}</span>
+            <span class="wv-day-num">{{ dayNum(day) }}</span>
           </div>
 
           <button
             class="wv-add"
             type="button"
             (click)="dayClick.emit(iso(day))"
-            [attr.aria-label]="'Open ' + dayAbbr(day) + ' ' + day.getDate()">
+            [attr.aria-label]="'Open ' + dayAbbr(day) + ' ' + dayNum(day)">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
               <line x1="12" y1="5" x2="12" y2="19"/>
               <line x1="5" y1="12" x2="19" y2="12"/>
@@ -313,6 +311,7 @@ export function currentWeekBounds(): { from: string; to: string } {
 })
 export class JournalWeekViewComponent implements OnChanges, AfterViewInit {
   constructor(private elRef: ElementRef) { }
+  private readonly settings = inject(SettingsService);
   @Input() entries: JournalEntry[] = [];
   @Input() showAuthor = false;
   @Input() memberMap: Record<string, string> = {};
@@ -325,30 +324,27 @@ export class JournalWeekViewComponent implements OnChanges, AfterViewInit {
   /** Seven placeholder columns while the week loads. */
   readonly skeletonDays = [0, 1, 2, 3, 4, 5, 6];
 
-  private _ws = signal(getWeekStart(new Date()));
+  /** Monday of the shown week, as a day key. */
+  private _ws = signal(currentWeekBounds(this.settings.timezone()).from);
   private _entries = signal<JournalEntry[]>([]);
 
+  /** The week's seven day keys, Monday first. */
   weekDays = computed(() => {
     const s = this._ws();
-    return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(s);
-      d.setDate(s.getDate() + i);
-      return d;
-    });
+    return Array.from({ length: 7 }, (_, i) => addDays(s, i));
   });
 
   weekLabel = computed(() => {
     const days = this.weekDays();
-    const sf = days[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const ef = days[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    return `${sf} – ${ef}`;
+    return `${shortDayLabel(days[0])} – ${shortDayLabel(days[6])}, ${days[6].slice(0, 4)}`;
   });
 
   entriesByDay = computed(() => {
+    const tz = this.settings.timezone();
     const map: Record<string, JournalEntry[]> = {};
-    this.weekDays().forEach(d => { map[toISO(d)] = []; });
+    this.weekDays().forEach(d => { map[d] = []; });
     for (const e of this._entries()) {
-      const key = toISO(new Date(e.created_at));
+      const key = dayKey(e.created_at, tz);
       if (key in map) map[key].push(e);
     }
     return map;
@@ -365,21 +361,17 @@ export class JournalWeekViewComponent implements OnChanges, AfterViewInit {
   }
 
   prevWeek() {
-    const s = new Date(this._ws());
-    s.setDate(s.getDate() - 7);
-    this._ws.set(s);
+    this._ws.set(addDays(this._ws(), -7));
     this.emitWeekChange();
   }
 
   nextWeek() {
-    const s = new Date(this._ws());
-    s.setDate(s.getDate() + 7);
-    this._ws.set(s);
+    this._ws.set(addDays(this._ws(), 7));
     this.emitWeekChange();
   }
 
   goToday() {
-    this._ws.set(getWeekStart(new Date()));
+    this._ws.set(currentWeekBounds(this.settings.timezone()).from);
     this.emitWeekChange();
     setTimeout(() => this.scrollToToday(), 50);
   }
@@ -394,12 +386,17 @@ export class JournalWeekViewComponent implements OnChanges, AfterViewInit {
 
   private emitWeekChange() {
     const days = this.weekDays();
-    this.weekChange.emit({ from: toISO(days[0]), to: toISO(days[6]) });
+    this.weekChange.emit({ from: days[0], to: days[6] });
   }
 
-  isToday(d: Date): boolean { return toISO(d) === toISO(new Date()); }
-  iso(d: Date): string { return toISO(d); }
-  dayAbbr(d: Date): string { return d.toLocaleDateString('en-US', { weekday: 'short' }); }
+  isToday(d: string): boolean { return d === todayKey(this.settings.timezone()); }
+  iso(d: string): string { return d; }
+  /** Day of the month, from the key itself. */
+  dayNum(d: string): number { return Number(d.slice(8, 10)); }
+  dayAbbr(d: string): string {
+    const [y, m, day] = d.split('-').map(Number);
+    return new Date(Date.UTC(y, m - 1, day)).toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
+  }
 
   /** The palette lives beside MOODS in the service; a note with no mood keeps the hairline. */
   moodColor(mood: string | null | undefined): string {

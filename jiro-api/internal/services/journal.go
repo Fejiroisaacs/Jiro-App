@@ -313,7 +313,13 @@ func (s *JournalService) DeleteEntry(ctx context.Context, userID, entryID uuid.U
 
 // ─── Streak & Calendar ─────────────────────────────────────────────────────
 
-func (s *JournalService) GetStreak(ctx context.Context, userID uuid.UUID) (*models.JournalStreakResponse, error) {
+// GetStreak counts the user's journal days in their location (settings
+// timezone, else tzHint, else UTC; see PickLocation), as GET /day does.
+func (s *JournalService) GetStreak(ctx context.Context, userID uuid.UUID, tzHint string) (*models.JournalStreakResponse, error) {
+	loc, err := userLocation(ctx, s.db, userID, tzHint)
+	if err != nil {
+		return nil, err
+	}
 	resp := &models.JournalStreakResponse{}
 
 	// Total entries
@@ -323,19 +329,19 @@ func (s *JournalService) GetStreak(ctx context.Context, userID uuid.UUID) (*mode
 
 	// Last entry
 	var lastAt time.Time
-	err := s.db.QueryRow(ctx,
+	err = s.db.QueryRow(ctx,
 		`SELECT created_at FROM journal_entries WHERE user_id = $1 AND group_id IS NULL ORDER BY created_at DESC LIMIT 1`, userID,
 	).Scan(&lastAt)
 	if err == nil {
 		resp.LastEntryAt = &lastAt
 	}
 
-	// Streaks, counted over distinct UTC days the same way as the cook streak.
+	// Streaks, counted over distinct local days the same way as the cook streak.
 	rows, err := s.db.Query(ctx,
-		`SELECT DISTINCT DATE(created_at AT TIME ZONE 'UTC')::text AS day
+		`SELECT DISTINCT DATE(created_at AT TIME ZONE $2)::text AS day
 		 FROM journal_entries
 		 WHERE user_id = $1 AND group_id IS NULL
-		 ORDER BY day DESC`, userID)
+		 ORDER BY day DESC`, userID, loc.String())
 	if err != nil {
 		return nil, err
 	}
@@ -351,38 +357,57 @@ func (s *JournalService) GetStreak(ctx context.Context, userID uuid.UUID) (*mode
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	resp.CurrentStreak, resp.LongestStreak = dayStreaks(days, time.Now())
+	resp.CurrentStreak, resp.LongestStreak = dayStreaks(days, time.Now().In(loc))
 
 	return resp, nil
 }
 
-func (s *JournalService) GetCalendar(ctx context.Context, userID uuid.UUID, year, month int, groupID *uuid.UUID) (*models.JournalCalendarResponse, error) {
+// GetCalendar returns the days of year/month that have entries, as calendar
+// days in the viewer's location (settings timezone, else tzHint, else UTC).
+// A zero year or month means the current one there. A group calendar is cut
+// in the viewer's zone too, so it matches their own week view.
+func (s *JournalService) GetCalendar(ctx context.Context, userID uuid.UUID, year, month int, groupID *uuid.UUID, tzHint string) (*models.JournalCalendarResponse, error) {
+	loc, err := userLocation(ctx, s.db, userID, tzHint)
+	if err != nil {
+		return nil, err
+	}
+	if year == 0 || month == 0 {
+		now := time.Now().In(loc)
+		if year == 0 {
+			year = now.Year()
+		}
+		if month == 0 {
+			month = int(now.Month())
+		}
+	}
+	// The month's instant range in loc: local midnight on the 1st to local
+	// midnight on the 1st of the next month.
+	start := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, loc)
+	end := start.AddDate(0, 1, 0)
+
 	var rows interface {
 		Next() bool
 		Scan(...any) error
 		Close()
 	}
-	var err error
 
 	if groupID != nil {
 		// Group calendar: entries from all active members
 		r, e := s.db.Query(ctx, `
-			SELECT DISTINCT EXTRACT(DAY FROM e.created_at AT TIME ZONE 'UTC')::INT
+			SELECT DISTINCT EXTRACT(DAY FROM e.created_at AT TIME ZONE $3)::INT
 			FROM journal_entries e
 			JOIN journal_group_members m ON m.group_id = e.group_id AND m.user_id = $1 AND m.status = 'active'
 			WHERE e.group_id = $2
-			  AND EXTRACT(YEAR FROM e.created_at AT TIME ZONE 'UTC') = $3
-			  AND EXTRACT(MONTH FROM e.created_at AT TIME ZONE 'UTC') = $4
-		`, userID, *groupID, year, month)
+			  AND e.created_at >= $4 AND e.created_at < $5
+		`, userID, *groupID, loc.String(), start, end)
 		rows, err = r, e
 	} else {
 		r, e := s.db.Query(ctx, `
-			SELECT DISTINCT EXTRACT(DAY FROM created_at AT TIME ZONE 'UTC')::INT
+			SELECT DISTINCT EXTRACT(DAY FROM created_at AT TIME ZONE $2)::INT
 			FROM journal_entries
 			WHERE user_id = $1 AND group_id IS NULL
-			  AND EXTRACT(YEAR FROM created_at AT TIME ZONE 'UTC') = $2
-			  AND EXTRACT(MONTH FROM created_at AT TIME ZONE 'UTC') = $3
-		`, userID, year, month)
+			  AND created_at >= $3 AND created_at < $4
+		`, userID, loc.String(), start, end)
 		rows, err = r, e
 	}
 	if err != nil {

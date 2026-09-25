@@ -1,10 +1,12 @@
-import { Component, OnInit, computed, signal, ElementRef } from '@angular/core';
+import { Component, OnInit, computed, inject, signal, ElementRef } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import { MealPlanService, MealPlan, MealPlanEntry, MealSlot } from '../../../core/services/meal-plan.service';
 import { RecipeService, Recipe } from '../../../core/services/recipe.service';
 import { ShoppingListComponent } from '../shopping-list/shopping-list';
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
+import { SettingsService } from '../../../core/services/settings.service';
+import { addDays, mondayOfKey, shortDayLabel, todayKey } from '../../../core/utils/day';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const SLOTS: { key: MealSlot; label: string }[] = [
@@ -13,25 +15,6 @@ const SLOTS: { key: MealSlot; label: string }[] = [
   { key: 'dinner',    label: 'Dinner'    },
   { key: 'snack',     label: 'Snack'     },
 ];
-
-function mondayOf(date: Date): Date {
-  const d = new Date(date);
-  const day = d.getDay(); // 0=Sun
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function toISODate(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-
-function addWeeks(d: Date, n: number): Date {
-  const r = new Date(d);
-  r.setDate(r.getDate() + n * 7);
-  return r;
-}
 
 @Component({
   selector: 'app-meal-planner',
@@ -427,7 +410,15 @@ export class MealPlannerComponent implements OnInit {
 
   loading = signal(true);
   plan = signal<MealPlan | null>(null);
-  currentMonday = signal(mondayOf(new Date()));
+  private readonly settings = inject(SettingsService);
+
+  /**
+   * The Monday of the shown week, as a day key. Weeks are calendar weeks in
+   * the user's zone, and the key is sent to the API as is, so no instant (and
+   * no browser-to-UTC shift) is involved: a Date at local midnight turned
+   * into an ISO string gave the Sunday before for anyone east of UTC.
+   */
+  currentMonday = signal(this.thisMonday());
   allRecipes = signal<Recipe[]>([]);
   filteredRecipes = signal<Recipe[]>([]);
   searchQuery = '';
@@ -440,24 +431,15 @@ export class MealPlannerComponent implements OnInit {
 
   weekLabel = computed(() => {
     const mon = this.currentMonday();
-    const sun = addWeeks(mon, 1);
-    sun.setDate(sun.getDate() - 1);
-    const fmt = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    return `${fmt(mon)} – ${fmt(sun)}, ${mon.getFullYear()}`;
+    return `${shortDayLabel(mon)} – ${shortDayLabel(addDays(mon, 6))}, ${mon.slice(0, 4)}`;
   });
 
   dayHeaders = computed(() => {
     const mon = this.currentMonday();
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = todayKey(this.settings.timezone());
     return DAYS.map((name, i) => {
-      const d = new Date(mon);
-      d.setDate(d.getDate() + i);
-      return {
-        name,
-        date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        isToday: d.getTime() === today.getTime(),
-      };
+      const key = addDays(mon, i);
+      return { name, date: shortDayLabel(key), isToday: key === today };
     });
   });
 
@@ -479,7 +461,7 @@ export class MealPlannerComponent implements OnInit {
 
   loadPlan(scrollToToday = false) {
     this.loading.set(true);
-    this.mealPlanService.getMealPlan(toISODate(this.currentMonday())).subscribe({
+    this.mealPlanService.getMealPlan(this.currentMonday()).subscribe({
       next: (plan) => {
         this.plan.set(plan);
         this.loading.set(false);
@@ -490,18 +472,22 @@ export class MealPlannerComponent implements OnInit {
   }
 
   prevWeek() {
-    this.currentMonday.set(addWeeks(this.currentMonday(), -1));
+    this.currentMonday.set(addDays(this.currentMonday(), -7));
     this.loadPlan();
   }
 
   nextWeek() {
-    this.currentMonday.set(addWeeks(this.currentMonday(), 1));
+    this.currentMonday.set(addDays(this.currentMonday(), 7));
     this.loadPlan();
   }
 
   goToday() {
-    this.currentMonday.set(mondayOf(new Date()));
+    this.currentMonday.set(this.thisMonday());
     this.loadPlan(true);
+  }
+
+  private thisMonday(): string {
+    return mondayOfKey(todayKey(this.settings.timezone()));
   }
 
   private scrollToToday() {

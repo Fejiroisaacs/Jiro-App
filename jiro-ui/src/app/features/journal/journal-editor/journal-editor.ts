@@ -14,7 +14,7 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
 import { UploadService } from '../../../core/services/upload.service';
 import { promptForDay, localDateKey } from '../writing-prompts';
 import { SettingsService } from '../../../core/services/settings.service';
-import { dayKey } from '../../../core/utils/day';
+import { dayKey, isDayKey, zonedNoonISO } from '../../../core/utils/day';
 
 /** Dismissing the prompt lasts the calendar day; the value is that day's date. */
 const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
@@ -678,7 +678,8 @@ export class JournalEditorComponent implements OnInit {
 
   ngOnInit() {
     this.editId = this.route.snapshot.paramMap.get('id');
-    this.forDate = this.route.snapshot.queryParamMap.get('date');
+    const forDate = this.route.snapshot.queryParamMap.get('date');
+    this.forDate = isDayKey(forDate) ? forDate : null;
     this.groupId = this.route.snapshot.queryParamMap.get('group');
     // A prompt is only useful on a blank page, never when revising an old entry.
     this.promptVisible.set(!this.editId && !promptDismissedOn(this.today));
@@ -757,7 +758,9 @@ export class JournalEditorComponent implements OnInit {
       tags: this.tags,
     };
     if (this.forDate && !this.editId) {
-      req.created_at = this.forDate + 'T12:00:00Z';
+      // Noon on the chosen day in the user's zone, so the entry lands on that
+      // day in the day view, the week view, the strip and the streak.
+      req.created_at = zonedNoonISO(this.forDate, this.settings.timezone());
     }
 
     if (this.editId) {

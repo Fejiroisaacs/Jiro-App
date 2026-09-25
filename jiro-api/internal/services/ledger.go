@@ -815,7 +815,17 @@ func (s *LedgerService) CreateBudget(ctx context.Context, userID uuid.UUID, req 
 	return budget, nil
 }
 
-func (s *LedgerService) ListBudgets(ctx context.Context, userID uuid.UUID) ([]models.BudgetWithSpend, error) {
+// ListBudgets returns the budgets with what was spent in each one's current
+// period. "Current" is cut from today in the user's location (settings
+// timezone, else tzHint, else UTC), not the database server's date, so a
+// month rolls over at the user's midnight.
+func (s *LedgerService) ListBudgets(ctx context.Context, userID uuid.UUID, tzHint string) ([]models.BudgetWithSpend, error) {
+	loc, err := userLocation(ctx, s.db, userID, tzHint)
+	if err != nil {
+		return nil, err
+	}
+	today := calendarToday(time.Now(), loc).Format(dayLayout)
+
 	// Single query: JOIN transactions for the current period using SQL date functions,
 	// eliminating the N+1 pattern of one query per budget.
 	rows, err := s.db.Query(ctx,
@@ -830,21 +840,21 @@ func (s *LedgerService) ListBudgets(ctx context.Context, userID uuid.UUID) ([]mo
 		        AND t.type        = 'expense'
 		        AND t.date BETWEEN
 		            CASE b.period
-		                WHEN 'weekly' THEN date_trunc('week',  CURRENT_DATE)::date
-		                WHEN 'yearly' THEN date_trunc('year',  CURRENT_DATE)::date
-		                ELSE               date_trunc('month', CURRENT_DATE)::date
+		                WHEN 'weekly' THEN date_trunc('week',  $2::date)::date
+		                WHEN 'yearly' THEN date_trunc('year',  $2::date)::date
+		                ELSE               date_trunc('month', $2::date)::date
 		            END
 		            AND
 		            CASE b.period
-		                WHEN 'weekly' THEN (date_trunc('week',  CURRENT_DATE) + INTERVAL '6 days')::date
-		                WHEN 'yearly' THEN (date_trunc('year',  CURRENT_DATE) + INTERVAL '1 year'  - INTERVAL '1 day')::date
-		                ELSE               (date_trunc('month', CURRENT_DATE) + INTERVAL '1 month' - INTERVAL '1 day')::date
+		                WHEN 'weekly' THEN (date_trunc('week',  $2::date) + INTERVAL '6 days')::date
+		                WHEN 'yearly' THEN (date_trunc('year',  $2::date) + INTERVAL '1 year'  - INTERVAL '1 day')::date
+		                ELSE               (date_trunc('month', $2::date) + INTERVAL '1 month' - INTERVAL '1 day')::date
 		            END
 		 WHERE b.user_id = $1
 		 GROUP BY b.id, b.user_id, b.category_id, b.amount, b.period, b.start_date,
 		          b.created_at, b.updated_at, c.name, c.color
 		 ORDER BY c.name ASC`,
-		userID,
+		userID, today,
 	)
 	if err != nil {
 		return nil, err

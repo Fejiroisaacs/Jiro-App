@@ -98,3 +98,58 @@ export function relativeDayName(key: string, today: string): 'Today' | 'Yesterda
 export function timeInZone(instant: string | Date, timeZone: string): string {
   return new Date(instant).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone });
 }
+
+/** The day key of the Monday that starts the week containing `key`. */
+export function mondayOfKey(key: string): string {
+  const dow = keyDate(key).getUTCDay(); // 0 = Sunday
+  return addDays(key, dow === 0 ? -6 : 1 - dow);
+}
+
+/** "Sep 21" for a day key; the key is already a calendar date, so no zone applies. */
+export function shortDayLabel(key: string): string {
+  return keyDate(key).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+
+const offsetFormatters = new Map<string, Intl.DateTimeFormat>();
+
+/** How far `timeZone`'s wall clock is ahead of UTC at `instant`, in ms. */
+function zoneOffsetMs(instant: number, timeZone: string): number {
+  let fmt = offsetFormatters.get(timeZone);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat('en-US', {
+      timeZone, hourCycle: 'h23',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+    });
+    offsetFormatters.set(timeZone, fmt);
+  }
+  const parts = fmt.formatToParts(new Date(instant));
+  const get = (type: string) => Number(parts.find(p => p.type === type)?.value);
+  const wall = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'));
+  return wall - Math.floor(instant / 1000) * 1000;
+}
+
+/**
+ * The UTC instant (ISO string) at which `timeZone`'s clock reads `hour`:00 on
+ * `key`. The offset is taken at a first guess and then again at the result,
+ * so a DST change between the guess and the target cannot shift it.
+ */
+function zonedHourISO(key: string, hour: number, timeZone: string): string {
+  const [y, m, d] = key.split('-').map(Number);
+  const wall = Date.UTC(y, m - 1, d, hour);
+  let instant = wall - zoneOffsetMs(wall, timeZone);
+  instant = wall - zoneOffsetMs(instant, timeZone);
+  return new Date(instant).toISOString();
+}
+
+export function zonedNoonISO(key: string, timeZone: string): string {
+  return zonedHourISO(key, 12, timeZone);
+}
+
+/**
+ * The UTC instant (ISO string) at which `key` starts in `timeZone`, for
+ * range filters on timestamps: [dayStartISO(from), dayStartISO(to + 1 day)).
+ */
+export function dayStartISO(key: string, timeZone: string): string {
+  return zonedHourISO(key, 0, timeZone);
+}

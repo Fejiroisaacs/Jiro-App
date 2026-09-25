@@ -14,7 +14,7 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
-import { dayKey } from '../../../core/utils/day';
+import { dayKey, todayKey } from '../../../core/utils/day';
 
 @Component({
   selector: 'app-session-history',
@@ -694,7 +694,7 @@ export class SessionHistoryComponent implements OnInit {
     this.exporting.set(true);
     this.jymService.exportSessionsCSV(this.exportFrom || undefined, this.exportTo || undefined).subscribe({
       next: (blob) => {
-        const date = new Date().toISOString().slice(0, 10);
+        const date = todayKey(this.settingsService.timezone());
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;

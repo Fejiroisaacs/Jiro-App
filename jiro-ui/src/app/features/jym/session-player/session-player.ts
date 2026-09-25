@@ -11,6 +11,7 @@ import {
 } from '../../../core/services/jym.service';
 import { UploadService } from '../../../core/services/upload.service';
 import { SettingsService } from '../../../core/services/settings.service';
+import { todayKey } from '../../../core/utils/day';
 import { AuthService } from '../../../core/services/auth.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
@@ -1609,7 +1610,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   saveBodyWeight() {
     if (!this.bwValue) return;
     this.bwSaving.set(true);
-    const today = new Date().toISOString().split('T')[0];
+    const today = todayKey(this.settingsService.timezone());
     this.jymService.logBodyWeight({ recorded_at: today, weight_kg: this.settingsService.toKg(this.bwValue) }).subscribe({
       next: () => { this.bwLogged.set(true); this.bwSaving.set(false); },
       error: () => this.bwSaving.set(false),

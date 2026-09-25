@@ -8,12 +8,15 @@ import {
   ElementRef,
   signal,
   computed,
+  inject,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Chart, registerables } from 'chart.js';
 import { chartTones } from '../../../shared/chart-theme';
 import { parseDateOnly } from '../shared/ledger-utils';
+import { SettingsService } from '../../../core/services/settings.service';
+import { todayKey } from '../../../core/utils/day';
 import {
   LedgerService,
   NetWorthSnapshot,
@@ -518,6 +521,8 @@ export class NetWorthPageComponent implements OnInit, AfterViewInit, OnDestroy {
   private dataLoaded = false;
   private viewReady = false;
 
+  private readonly settings = inject(SettingsService);
+
   constructor(private ledgerService: LedgerService, private zone: NgZone) {}
 
   ngOnInit() {
@@ -678,6 +683,6 @@ export class NetWorthPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private todayIso(): string {
-    return new Date().toISOString().slice(0, 10);
+    return todayKey(this.settings.timezone());
   }
 }

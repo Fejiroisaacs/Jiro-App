@@ -16,7 +16,9 @@ import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
-import { JournalWeekViewComponent, toISO, currentWeekBounds } from '../journal-week-view/journal-week-view';
+import { JournalWeekViewComponent, currentWeekBounds, weekRangeQuery } from '../journal-week-view/journal-week-view';
+import { SettingsService } from '../../../core/services/settings.service';
+import { addDays, dayKey, todayKey } from '../../../core/utils/day';
 import { MoodTrendComponent } from '../mood-trend/mood-trend';
 import { JournalDayModalComponent } from '../journal-day-modal/journal-day-modal';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
@@ -276,8 +278,10 @@ export class JournalHomeComponent implements OnInit {
   /** Last 30 days, fetched once, feeding the mood chart only. */
   recentEntries = signal<JournalEntry[]>([]);
 
-  /** The week the calendar is showing. Every fetch is bounded by it. */
-  week = signal<{ from: string; to: string }>(currentWeekBounds());
+  private readonly settings = inject(SettingsService);
+
+  /** The week the calendar is showing (day keys). Every fetch is bounded by it. */
+  week = signal<{ from: string; to: string }>(currentWeekBounds(this.settings.timezone()));
 
   searchQ = signal('');
   filterMood = signal('');
@@ -297,7 +301,7 @@ export class JournalHomeComponent implements OnInit {
     if (!this.filtering()) return this.entries();
     const { from, to } = this.week();
     return this.entries().filter(e => {
-      const day = toISO(new Date(e.created_at));
+      const day = this.dayOf(e.created_at);
       return day >= from && day <= to;
     });
   });
@@ -307,7 +311,7 @@ export class JournalHomeComponent implements OnInit {
   dayModalEntries = computed(() => {
     const date = this.dayModalDate();
     if (!date) return [];
-    return this.entries().filter(e => toISO(new Date(e.created_at)) === date);
+    return this.entries().filter(e => this.dayOf(e.created_at) === date);
   });
 
   private readonly confirmService = inject(ConfirmService);
@@ -315,6 +319,11 @@ export class JournalHomeComponent implements OnInit {
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private svc: JournalService, public router: Router) { }
+
+  /** The user's calendar day of an instant, as the week view and day view cut it. */
+  private dayOf(instant: string): string {
+    return dayKey(instant, this.settings.timezone());
+  }
 
   ngOnInit() {
     this.svc.getStreak().subscribe(s => this.streak.set(s));
@@ -324,10 +333,10 @@ export class JournalHomeComponent implements OnInit {
 
   /** The 30-day window behind the mood chart. Independent of the week. */
   private loadRecent() {
-    const to = new Date();
-    const from = new Date(to);
-    from.setDate(from.getDate() - 29);
-    this.svc.listEntries({ from: toISO(from), to: toISO(to), limit: 200 }).subscribe({
+    const tz = this.settings.timezone();
+    const today = todayKey(tz);
+    // 50 is the API's page cap; a larger limit is not honoured (it falls back to 20).
+    this.svc.listEntries({ ...weekRangeQuery({ from: addDays(today, -29), to: today }, tz), limit: 50 }).subscribe({
       next: e => this.recentEntries.set(e),
       error: () => this.recentEntries.set([]),
     });
@@ -335,15 +344,15 @@ export class JournalHomeComponent implements OnInit {
 
   loadEntries() {
     this.loadingEntries.set(true);
-    const params: ListEntriesParams = { limit: 100 };
+    // 50 is the API's page cap; a larger limit is not honoured (it falls back to 20).
+    const params: ListEntriesParams = { limit: 50 };
     if (this.searchQ().trim()) params.q = this.searchQ().trim();
     if (this.filterMood()) params.mood = this.filterMood();
     if (this.filterTag()) params.tag = this.filterTag();
     // Unfiltered, the list mirrors the calendar. Filtering within one week
     // finds almost nothing, so a filter searches the whole journal instead.
     if (!this.filtering()) {
-      params.from = this.week().from;
-      params.to = this.week().to;
+      Object.assign(params, weekRangeQuery(this.week(), this.settings.timezone()));
     }
     this.svc.listEntries(params).subscribe({
       next: e => { this.entries.set(e); this.loadingEntries.set(false); },
@@ -382,7 +391,7 @@ export class JournalHomeComponent implements OnInit {
 
   openEntryModal(entry: JournalEntry) {
     this.dayModalInitEntry.set(entry);
-    this.dayModalDate.set(toISO(new Date(entry.created_at)));
+    this.dayModalDate.set(this.dayOf(entry.created_at));
   }
 
   closeDayModal() {

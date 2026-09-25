@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import { JymService, BodyWeight } from '../../../core/services/jym.service';
 import { SettingsService } from '../../../core/services/settings.service';
+import { todayKey } from '../../../core/utils/day';
 import { chartTones } from '../../../shared/chart-theme';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
@@ -222,7 +223,8 @@ export class BodyWeightComponent implements OnInit, AfterViewInit, OnDestroy {
   loading = signal(true);
   saving = signal(false);
 
-  logDate = new Date().toISOString().split('T')[0];
+  /** Today in the user's zone; set in the constructor once settings are injected. */
+  logDate: string;
   weightValue: number | null = null;
 
   private chart: Chart | null = null;
@@ -235,7 +237,9 @@ export class BodyWeightComponent implements OnInit, AfterViewInit, OnDestroy {
   constructor(
     private jymService: JymService,
     public settingsService: SettingsService,
-  ) { }
+  ) {
+    this.logDate = todayKey(settingsService.timezone());
+  }
 
   ngOnInit() {
     this.jymService.listBodyWeights().subscribe({

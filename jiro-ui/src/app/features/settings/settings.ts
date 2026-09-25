@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { environment } from '../../../environments/environment';
 import { AuthService, UserSettings } from '../../core/services/auth.service';
 import { SettingsService, Theme } from '../../core/services/settings.service';
+import { todayKey } from '../../core/utils/day';
 import { UploadService } from '../../core/services/upload.service';
 import { JiroCardComponent } from '../../shared/components/jiro-card/jiro-card';
 import { JiroButtonComponent } from '../../shared/components/jiro-button/jiro-button';
@@ -625,7 +626,7 @@ export class SettingsComponent implements OnInit {
     this.exporting.set(true);
     this.http.get(`${environment.apiUrl}/export/account.json`, { responseType: 'blob' }).subscribe({
       next: (blob) => {
-        const date = new Date().toISOString().slice(0, 10);
+        const date = todayKey(this.settingsService.timezone());
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;

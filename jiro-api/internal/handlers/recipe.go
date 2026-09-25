@@ -301,7 +301,8 @@ func (h *RecipeHandler) Promote(c *gin.Context) {
 func (h *RecipeHandler) CookStreak(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 
-	streak, err := h.recipeService.GetCookStreak(c.Request.Context(), userID)
+	// tz is only a fallback for a user with no timezone setting, as on GET /day.
+	streak, err := h.recipeService.GetCookStreak(c.Request.Context(), userID, c.Query("tz"))
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to compute cook streak")
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{

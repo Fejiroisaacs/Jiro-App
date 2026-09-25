@@ -1,7 +1,8 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { SettingsService } from './settings.service';
 
 const API_URL = `${environment.apiUrl}/jym`;
 
@@ -272,6 +273,8 @@ export interface SharePreview {
 export class JymService {
   constructor(private http: HttpClient) {}
 
+  private readonly settings = inject(SettingsService);
+
   // Exercises
   listExercises(q?: string, mg?: string): Observable<Exercise[]> {
     let params = new HttpParams();
@@ -420,7 +423,9 @@ export class JymService {
 
   // CSV Export
   exportSessionsCSV(from?: string, to?: string): Observable<Blob> {
-    let params = new HttpParams();
+    // from, to and the date column are the user's days; tz is the API's
+    // fallback for an account with no timezone setting.
+    let params = new HttpParams().set('tz', this.settings.timezone());
     if (from) params = params.set('from', from);
     if (to) params = params.set('to', to);
     return this.http.get(`${API_URL}/export/sessions.csv`, { responseType: 'blob', params });

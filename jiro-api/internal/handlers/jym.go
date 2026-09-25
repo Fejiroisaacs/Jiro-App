@@ -875,7 +875,8 @@ func (h *JymHandler) ExportSessions(c *gin.Context) {
 	c.Header("Content-Disposition", `attachment; filename="`+filename+`"`)
 	c.Status(http.StatusOK)
 
-	if err := h.jymService.StreamSessionsCSV(c.Request.Context(), userID, from, to, exerciseID, c.Writer); err != nil {
+	// tz is only a fallback for a user with no timezone setting, as on GET /day.
+	if err := h.jymService.StreamSessionsCSV(c.Request.Context(), userID, from, to, exerciseID, c.Query("tz"), c.Writer); err != nil {
 		log.Error().Err(err).Msg("failed to stream sessions CSV")
 	}
 	analytics.TrackEvent(h.db, userID, "export.csv", nil)

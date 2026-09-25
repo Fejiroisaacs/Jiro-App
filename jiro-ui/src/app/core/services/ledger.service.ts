@@ -1,7 +1,8 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { SettingsService } from './settings.service';
 
 const API = `${environment.apiUrl}/ledger`;
 
@@ -137,6 +138,8 @@ export interface TransactionFilters {
 export class LedgerService {
   constructor(private http: HttpClient) {}
 
+  private readonly settings = inject(SettingsService);
+
   // Accounts
   createAccount(req: Partial<LedgerAccount>): Observable<LedgerAccount> {
     return this.http.post<LedgerAccount>(`${API}/accounts`, req);
@@ -199,7 +202,11 @@ export class LedgerService {
     return this.http.post<LedgerBudget>(`${API}/budgets`, req);
   }
   listBudgets(): Observable<BudgetWithSpend[]> {
-    return this.http.get<BudgetWithSpend[]>(`${API}/budgets`);
+    // The current period is cut in the user's zone; tz is the API's fallback
+    // for an account with no timezone setting.
+    return this.http.get<BudgetWithSpend[]>(`${API}/budgets`, {
+      params: new HttpParams().set('tz', this.settings.timezone()),
+    });
   }
   deleteBudget(id: string): Observable<void> {
     return this.http.delete<void>(`${API}/budgets/${id}`);

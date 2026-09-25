@@ -10,7 +10,7 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { SettingsService } from '../../../core/services/settings.service';
-import { isDayKey, todayKey } from '../../../core/utils/day';
+import { isDayKey, relativeDayName, todayKey } from '../../../core/utils/day';
 import { ToastService } from '../../../core/services/toast.service';
 import { LedgerTransactionFormComponent, TransactionPayload } from '../shared/transaction-form/ledger-transaction-form';
 import { intervalLabel, parseDateOnly, formatSignedCurrency, transactionColor } from '../shared/ledger-utils';
@@ -1112,15 +1112,9 @@ export class TransactionLogComponent implements OnInit {
 
   formatDateSeparator(dateStr: string): string {
     const d = parseDateOnly(dateStr);
-    const today = new Date();
-    const yesterday = new Date();
-    yesterday.setDate(today.getDate() - 1);
-
-    const isToday = d.toDateString() === today.toDateString();
-    const isYesterday = d.toDateString() === yesterday.toDateString();
-
-    if (isToday) return 'Today';
-    if (isYesterday) return 'Yesterday';
+    // "Today" is the user's day (settings zone), as everywhere else.
+    const rel = relativeDayName(dateStr.slice(0, 10), todayKey(this.settings.timezone()));
+    if (rel) return rel;
     return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
   }
 

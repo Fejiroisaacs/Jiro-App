@@ -6,6 +6,7 @@ import { JymService, Split, SplitSeriesSummary, SessionSummary, Routine } from '
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { addDays, dayKey, mondayOfKey, todayKey } from '../../../core/utils/day';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
@@ -607,29 +608,27 @@ export class JymDashboardComponent implements OnInit {
 
   heatmapDays = computed(() => {
     const sessions = this.allSessions();
+    // Days are the user's calendar days (settings zone), like the day view.
+    const tz = this.settingsService.timezone();
     const countByDay = new Map<string, number>();
     for (const s of sessions) {
       if (!s.ended_at) continue;
-      const key = new Date(s.started_at).toISOString().slice(0, 10);
+      const key = dayKey(s.started_at, tz);
       countByDay.set(key, (countByDay.get(key) || 0) + 1);
     }
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    const todayDow = (today.getDay() + 6) % 7;
-    const start = new Date(today);
-    start.setDate(today.getDate() - todayDow - 15 * 7);
-    const end = new Date(today);
-    end.setDate(today.getDate() + (6 - todayDow));
+    // 16 weeks, Monday to Sunday, ending with the current week.
+    const today = todayKey(tz);
+    const start = addDays(mondayOfKey(today), -15 * 7);
     const days: { date: string; count: number; label: string; future: boolean }[] = [];
-    const d = new Date(start);
-    while (d <= end) {
-      const key = d.toISOString().slice(0, 10);
+    for (let i = 0; i < 16 * 7; i++) {
+      const key = addDays(start, i);
+      const [y, m, d] = key.split('-').map(Number);
       days.push({
         date: key,
         count: countByDay.get(key) || 0,
-        label: d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }),
-        future: d > today,
+        label: new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }),
+        future: key > today,
       });
-      d.setDate(d.getDate() + 1);
     }
     return days;
   });

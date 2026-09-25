@@ -1,9 +1,11 @@
-import { Component, Input, Output, EventEmitter, OnInit, signal } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, inject, signal } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import { LedgerService, LedgerAccount, CategoryTree } from '../../../../core/services/ledger.service';
 import { JiroButtonComponent } from '../../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../../shared/components/jiro-modal/jiro-modal';
+import { SettingsService } from '../../../../core/services/settings.service';
+import { todayKey } from '../../../../core/utils/day';
 
 export interface TransactionPayload {
   type: 'income' | 'expense' | 'transfer';
@@ -267,6 +269,8 @@ export class LedgerTransactionFormComponent implements OnInit {
   catError = signal('');
   catForm = { name: '', type: 'expense' as 'expense' | 'income' };
 
+  private readonly settings = inject(SettingsService);
+
   form = {
     type: 'expense' as 'income' | 'expense' | 'transfer',
     account_id: '',
@@ -277,7 +281,7 @@ export class LedgerTransactionFormComponent implements OnInit {
     notes: '',
     is_recurring: false,
     recurrence_interval: 'monthly' as 'weekly' | 'biweekly' | 'monthly' | 'yearly',
-    date: new Date().toISOString().slice(0, 10),
+    date: todayKey(this.settings.timezone()),
   };
 
   constructor(private ledgerService: LedgerService) {}
@@ -397,7 +401,7 @@ export class LedgerTransactionFormComponent implements OnInit {
       notes: '',
       is_recurring: false,
       recurrence_interval: 'monthly' as 'weekly' | 'biweekly' | 'monthly' | 'yearly',
-      date: new Date().toISOString().slice(0, 10),
+      date: todayKey(this.settings.timezone()),
     };
   }
 }

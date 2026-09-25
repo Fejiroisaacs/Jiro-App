@@ -4,6 +4,8 @@ import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DashboardJournal, DashboardLedger, DashboardService, SourceResults, WidgetSource } from '../../core/services/dashboard.service';
 import { AuthService } from '../../core/services/auth.service';
+import { SettingsService } from '../../core/services/settings.service';
+import { longDayLabel, todayKey } from '../../core/utils/day';
 import { MODULES } from '../../core/navigation';
 import { JiroPageHeaderComponent } from '../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroButtonComponent } from '../../shared/components/jiro-button/jiro-button';
@@ -40,7 +42,7 @@ function combine<A, B, R>(a: WidgetData<A>, b: WidgetData<B>, join: (a: A, b: B)
   ],
   template: `
     <div class="dash">
-      <jiro-page-header [heading]="greeting()" [subtitle]="dateLabel">
+      <jiro-page-header [heading]="greeting()" [subtitle]="dateLabel()">
         <jiro-button actions #customiseBtn variant="secondary" (click)="openCustomise()">
           <jiro-icon name="squares-four" [size]="18" /> Customise
         </jiro-button>
@@ -152,7 +154,13 @@ export class DashboardComponent {
   readonly customising = signal(false);
   private returnFocus: HTMLElement | null = null;
 
-  readonly dateLabel = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+  private readonly settings = inject(SettingsService);
+
+  /** "Friday 25 September": today in the user's zone, the day the strip and day view call today. */
+  readonly dateLabel = computed(() => {
+    const today = todayKey(this.settings.timezone());
+    return longDayLabel(today, today);
+  });
 
   readonly greeting = computed(() => {
     const hour = new Date().getHours();

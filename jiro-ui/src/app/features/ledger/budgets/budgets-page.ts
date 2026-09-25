@@ -14,6 +14,8 @@ import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-he
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { SettingsService } from '../../../core/services/settings.service';
+import { todayKey } from '../../../core/utils/day';
 import { periodLabel, clamp, formatCurrency } from '../shared/ledger-utils';
 
 @Component({
@@ -540,6 +542,7 @@ export class BudgetsPageComponent implements OnInit {
   showAddModal = signal(false);
   private readonly confirmService = inject(ConfirmService);
   private readonly toast = inject(ToastService);
+  private readonly settings = inject(SettingsService);
 
   showCatModal = signal(false);
   catSaving = signal(false);
@@ -677,6 +680,6 @@ export class BudgetsPageComponent implements OnInit {
   }
 
   private todayIso(): string {
-    return new Date().toISOString().slice(0, 10);
+    return todayKey(this.settings.timezone());
   }
 }

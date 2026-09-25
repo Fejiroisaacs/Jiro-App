@@ -7,6 +7,7 @@ import {
   ElementRef,
   signal,
   computed,
+  inject,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -17,6 +18,8 @@ import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-car
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
+import { SettingsService } from '../../../core/services/settings.service';
+import { todayKey } from '../../../core/utils/day';
 
 Chart.register(...registerables);
 
@@ -29,12 +32,20 @@ interface DateRange {
   bTo: string;
 }
 
+/**
+ * The calendar date a Date's local fields name, as YYYY-MM-DD. The ranges
+ * below are built with local-field arithmetic, so reading them back through
+ * toISOString (UTC) would shift every bound a day early east of UTC.
+ */
 function isoDate(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-function computePresetRanges(preset: Preset): DateRange | null {
-  const now = new Date();
+/** `today` is the user's day key (settings zone), not the browser's date. */
+function computePresetRanges(preset: Preset, today: string): DateRange | null {
+  const [ty, tm, td] = today.split('-').map(Number);
+  const now = new Date(ty, tm - 1, td);
   if (preset === 'month') {
     const aFrom = isoDate(new Date(now.getFullYear(), now.getMonth(), 1));
     const aTo   = isoDate(new Date(now.getFullYear(), now.getMonth() + 1, 0));
@@ -1107,6 +1118,8 @@ export class ComparisonPageComponent implements OnInit, AfterViewInit, OnDestroy
   private dataReady  = false;
   private viewReady  = false;
 
+  private readonly settings = inject(SettingsService);
+
   constructor(private ledgerService: LedgerService) {}
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
@@ -1129,7 +1142,7 @@ export class ComparisonPageComponent implements OnInit, AfterViewInit, OnDestroy
     this.selectedPreset.set(preset);
     if (preset === 'custom') return;
 
-    const range = computePresetRanges(preset);
+    const range = computePresetRanges(preset, todayKey(this.settings.timezone()));
     if (!range) return;
     this.activeRange.set(range);
     this.fetch(range.aFrom, range.aTo, range.bFrom, range.bTo);

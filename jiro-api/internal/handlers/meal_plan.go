@@ -19,13 +19,23 @@ func NewMealPlanHandler(service *services.MealPlanService) *MealPlanHandler {
 	return &MealPlanHandler{service: service}
 }
 
-// GET /culinara/meal-plan?week=YYYY-MM-DD
+// GET /culinara/meal-plan?week=YYYY-MM-DD&tz=<IANA>
 // Returns (or creates) the meal plan for the given week.
-// If week is omitted, uses the current week's Monday.
+// If week is omitted, uses the Monday of the current week in the user's
+// timezone (tz is only a fallback for a user with no timezone setting).
 func (h *MealPlanHandler) GetOrCreate(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 
-	weekStart, err := parseWeekStart(c.Query("week"))
+	week := c.Query("week")
+	var today time.Time
+	if week == "" {
+		var err error
+		if today, err = h.service.Today(c.Request.Context(), userID, c.Query("tz")); err != nil {
+			respondInternal(c, err, "meal plan request failed")
+			return
+		}
+	}
+	weekStart, err := parseWeekStart(week, today)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "week must be YYYY-MM-DD"})
 		return
@@ -94,11 +104,12 @@ func (h *MealPlanHandler) RemoveEntry(c *gin.Context) {
 }
 
 // parseWeekStart parses a YYYY-MM-DD string and returns the Monday of that week.
-// If s is empty, returns the Monday of the current week.
-func parseWeekStart(s string) (time.Time, error) {
+// If s is empty, returns the Monday of today's week, where today is the
+// user's calendar date (see MealPlanService.Today).
+func parseWeekStart(s string, today time.Time) (time.Time, error) {
 	var t time.Time
 	if s == "" {
-		t = time.Now().UTC()
+		t = today
 	} else {
 		var err error
 		t, err = time.Parse("2006-01-02", s)
