@@ -1211,6 +1211,11 @@ func isNewPR(weight float64, reps int, isWarmup bool, bestWeight float64, bestRe
 	return weight > bestWeight || (weight == bestWeight && reps > bestReps)
 }
 
+// roundWeight rounds kg to the 2 decimals session_sets.weight keeps.
+func roundWeight(kg float64) float64 {
+	return math.Round(kg*100) / 100
+}
+
 // bestWorkingSet returns the heaviest non-warm-up weight the user has logged
 // for an exercise and the most reps done at that weight. excludeSetID and
 // before narrow it to the sets logged before a given one; pass uuid.Nil and
@@ -1261,18 +1266,21 @@ func (s *JymService) LogSet(ctx context.Context, userID, sessionID uuid.UUID, re
 	}
 
 	isWarmup := req.IsWarmup != nil && *req.IsWarmup
+	// Compare at the precision the column stores, or a lbs user's 175 lbs
+	// (79.3787 kg) never ties the 79.38 already saved.
+	weight := roundWeight(req.Weight)
 	bestWeight, bestReps, err := bestWorkingSet(ctx, s.db, userID, req.ExerciseID, uuid.Nil, nil)
 	if err != nil {
 		return nil, err
 	}
-	isPR := isNewPR(req.Weight, req.RepsPerformed, isWarmup, bestWeight, bestReps)
+	isPR := isNewPR(weight, req.RepsPerformed, isWarmup, bestWeight, bestReps)
 
 	set := &models.SessionSet{}
 	err = s.db.QueryRow(ctx,
 		`INSERT INTO session_sets (session_id, exercise_id, set_number, weight, reps_performed, rpe, is_pr, is_warmup, exercise_note)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		 RETURNING id, session_id, exercise_id, set_number, weight, reps_performed, rpe, is_pr, is_warmup, exercise_note, created_at`,
-		sessionID, req.ExerciseID, req.SetNumber, req.Weight, req.RepsPerformed, req.RPE, isPR, isWarmup, req.ExerciseNote,
+		sessionID, req.ExerciseID, req.SetNumber, weight, req.RepsPerformed, req.RPE, isPR, isWarmup, req.ExerciseNote,
 	).Scan(&set.ID, &set.SessionID, &set.ExerciseID, &set.SetNumber, &set.Weight,
 		&set.RepsPerformed, &set.RPE, &set.IsPR, &set.IsWarmup, &set.ExerciseNote, &set.CreatedAt)
 	if err != nil {

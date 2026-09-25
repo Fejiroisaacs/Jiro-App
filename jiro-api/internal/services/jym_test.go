@@ -12,6 +12,16 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+func TestRoundWeightTiesStoredValue(t *testing.T) {
+	// 175 lbs arrives as 79.3786... kg and is stored as 79.38.
+	if got := roundWeight(175 / 2.20462); got != 79.38 {
+		t.Fatalf("roundWeight(175 lbs) = %v, want 79.38", got)
+	}
+	if !isNewPR(roundWeight(175/2.20462), 6, false, 79.38, 5) {
+		t.Fatalf("175 lbs x 6 after 175 lbs x 5 should be a PR")
+	}
+}
+
 func TestIsNewPR(t *testing.T) {
 	cases := []struct {
 		name       string
