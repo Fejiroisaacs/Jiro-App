@@ -285,6 +285,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 				ledger.GET("/transactions", ledgerHandler.ListTransactions)
 				ledger.GET("/transactions/:id", ledgerHandler.GetTransaction)
 				ledger.PATCH("/transactions/:id", ledgerHandler.UpdateTransaction)
+				ledger.POST("/transactions/:id/stop-recurring", ledgerHandler.StopRecurring)
 				ledger.DELETE("/transactions/:id", ledgerHandler.DeleteTransaction)
 
 				// Categories
@@ -296,6 +297,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 				// Budgets
 				ledger.POST("/budgets", ledgerHandler.CreateBudget)
 				ledger.GET("/budgets", ledgerHandler.ListBudgets)
+				ledger.PATCH("/budgets/:id", ledgerHandler.UpdateBudget)
 				ledger.DELETE("/budgets/:id", ledgerHandler.DeleteBudget)
 
 				// Summary, Net Worth, Comparison

@@ -202,6 +202,8 @@ var demoShifts = []demoShift{
 	{sql: `UPDATE ledger_budgets SET start_date = start_date + $2::int, created_at = created_at + ` + demoTS + `, updated_at = updated_at + ` + demoTS + ` WHERE user_id = $1`},
 	{sql: `UPDATE ledger_networth_snapshots SET snapshot_date = snapshot_date + $2::int + ` + fmt.Sprint(demoParkDays) + ` WHERE user_id = $1`},
 	{sql: `UPDATE ledger_networth_snapshots SET snapshot_date = snapshot_date - ` + fmt.Sprint(demoParkDays) + ` WHERE user_id = $1`, by: shiftNone},
+	// A recurring series' next due date (the demo never writes copies itself).
+	{sql: `UPDATE ledger_transactions SET recurrence_next_date = recurrence_next_date + $2::int WHERE user_id = $1 AND recurrence_next_date IS NOT NULL`},
 }
 
 // keepFresh slides every demo date forward by the whole days since anchor
