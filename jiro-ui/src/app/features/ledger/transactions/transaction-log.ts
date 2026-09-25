@@ -1,4 +1,5 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
@@ -8,6 +9,8 @@ import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-he
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { ConfirmService } from '../../../core/services/confirm.service';
+import { SettingsService } from '../../../core/services/settings.service';
+import { isDayKey, todayKey } from '../../../core/utils/day';
 import { ToastService } from '../../../core/services/toast.service';
 import { LedgerTransactionFormComponent, TransactionPayload } from '../shared/transaction-form/ledger-transaction-form';
 import { intervalLabel, parseDateOnly, formatSignedCurrency, transactionColor } from '../shared/ledger-utils';
@@ -32,6 +35,7 @@ interface TransactionGroup {
   imports: [
     CommonModule,
     FormsModule,
+    RouterLink,
     JiroButtonComponent,
     JiroModalComponent,
     JiroIconComponent,
@@ -334,6 +338,9 @@ interface TransactionGroup {
         @if (tx.type === 'transfer') {
           <p class="field-hint">Account and amount cannot be changed on a transfer. Delete it and log it again instead.</p>
         }
+        @if (txDay(tx); as day) {
+          <a class="day-link" [routerLink]="['/day', day]">See this day</a>
+        }
         <div class="danger-row">
           <jiro-button variant="danger" size="sm" type="button" (click)="deleteTransaction(tx)">
             Delete transaction
@@ -352,6 +359,7 @@ interface TransactionGroup {
       <ledger-transaction-form
         [accounts]="accounts()"
         [saving]="saving()"
+        [initial]="addInitial()"
         submitLabel="Log transaction"
         (formSubmit)="onAddSubmit($event)"
         (formCancel)="closeAddModal()">
@@ -523,6 +531,16 @@ interface TransactionGroup {
     /* ── Transaction list ───────────────────────────────────────────────────── */
 
     .transaction-list { display: flex; flex-direction: column; }
+
+    .day-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 32px;
+      margin-top: var(--space-sm);
+      font-size: var(--font-size-sm);
+      font-weight: 600;
+      color: var(--color-primary);
+    }
 
     .date-separator {
       display: flex; align-items: center; gap: var(--space-sm);
@@ -796,6 +814,11 @@ export class TransactionLogComponent implements OnInit {
   private readonly PAGE_LIMIT = 50;
 
   private readonly confirmService = inject(ConfirmService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly settings = inject(SettingsService);
+  /** A date to pre-fill when the add dialog was opened for a given day (?new=1&date=). */
+  addInitial = signal<Partial<TransactionPayload> | null>(null);
   private readonly toast = inject(ToastService);
   readonly transactionColor = transactionColor;
 
@@ -855,6 +878,47 @@ export class TransactionLogComponent implements OnInit {
     this.loadAccounts();
     this.loadCategories();
     this.loadTransactions();
+    this.openFromUrl();
+  }
+
+  /**
+   * Deep links from the day view: ?tx=<id> opens that transaction's edit
+   * dialog, ?new=1&date=YYYY-MM-DD opens Log transaction for that day. The
+   * params are dropped when the dialog closes so a reload does not reopen it.
+   */
+  private openFromUrl() {
+    const q = this.route.snapshot.queryParamMap;
+    const txId = q.get('tx');
+    if (txId) {
+      this.ledgerService.getTransaction(txId).subscribe({
+        next: tx => this.openEditModal(tx),
+        error: () => {
+          this.clearDeepLink();
+          this.toast.error('Could not open that transaction.');
+        },
+      });
+    } else if (q.get('new') === '1') {
+      const date = q.get('date');
+      this.addInitial.set(isDayKey(date) ? { date } : null);
+      this.showAddModal.set(true);
+    }
+  }
+
+  private clearDeepLink() {
+    const q = this.route.snapshot.queryParamMap;
+    if (!q.has('tx') && !q.has('new') && !q.has('date')) return;
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { tx: null, new: null, date: null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  /** The transaction's date, when the day view can show it (not a future day). */
+  txDay(tx: LedgerTransaction): string | null {
+    const day = tx.date.slice(0, 10);
+    return day <= todayKey(this.settings.timezone()) ? day : null;
   }
 
   // ── Data loading ──────────────────────────────────────────────────────────
@@ -949,6 +1013,7 @@ export class TransactionLogComponent implements OnInit {
 
   closeEditModal() {
     this.editingTx.set(null);
+    this.clearDeepLink();
   }
 
   saveEdit(payload: TransactionPayload) {
@@ -1009,11 +1074,13 @@ export class TransactionLogComponent implements OnInit {
   // ── Add modal ─────────────────────────────────────────────────────────────
 
   openAddModal() {
+    this.addInitial.set(null);
     this.showAddModal.set(true);
   }
 
   closeAddModal() {
     this.showAddModal.set(false);
+    this.clearDeepLink();
   }
 
   onAddSubmit(payload: TransactionPayload) {

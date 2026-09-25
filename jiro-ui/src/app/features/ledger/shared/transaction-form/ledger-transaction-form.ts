@@ -68,7 +68,7 @@ export interface TransactionPayload {
         </div>
         <select class="form-input" [(ngModel)]="form.category_id" name="category_id">
           <option value="">No category</option>
-          @for (c of categoriesByType(); track c) {
+          @for (c of categoriesByType(); track c.id) {
 <option [value]="c.id">{{ c.name }}</option>
 }
         </select>
@@ -253,7 +253,7 @@ export class LedgerTransactionFormComponent implements OnInit {
   @Input() saving = false;
   @Input() error = '';
   @Input() submitLabel = 'Log transaction';
-  /** Pre-fill the form; used when editing an existing transaction. */
+  /** Pre-fill the form: an existing transaction when editing, or just a date when logging for a given day. */
   @Input() initial: Partial<TransactionPayload> | null = null;
   /** Transfers cannot change account or amount once written, so lock them. */
   @Input() lockType = false;
@@ -299,10 +299,9 @@ export class LedgerTransactionFormComponent implements OnInit {
         recurrence_interval: i.recurrence_interval ?? 'monthly',
         date: i.date ?? this.form.date,
       };
-      return;
     }
     // Auto-select first account if only one available
-    if (this.accounts.length === 1) {
+    if (!this.form.account_id && this.accounts.length === 1) {
       this.form.account_id = this.accounts[0].id;
     }
   }

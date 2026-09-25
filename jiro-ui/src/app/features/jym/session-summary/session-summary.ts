@@ -1,9 +1,10 @@
 import { Component, OnInit, ViewChild, ElementRef, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
 import { JymService } from '../../../core/services/jym.service';
 import { SettingsService } from '../../../core/services/settings.service';
+import { dayKey } from '../../../core/utils/day';
 
 // ─── Data types ────────────────────────────────────────────────────────────────
 
@@ -85,7 +86,7 @@ function capitalize(s: string): string {
 @Component({
   selector: 'app-session-summary',
   standalone: true,
-  imports: [CommonModule, JymPrBadgeComponent],
+  imports: [CommonModule, RouterLink, JymPrBadgeComponent],
   template: `
     <!-- ════════════════════════════════════════════════════════════════
          In-app view
@@ -241,6 +242,9 @@ function capitalize(s: string): string {
         </button>
         <button class="btn-done" (click)="done()">Done</button>
       </div>
+      @if (sessionDay()) {
+        <p class="day-link-row"><a class="day-link" [routerLink]="['/day', sessionDay()]">See this day</a></p>
+      }
 
     </div>
 
@@ -721,6 +725,16 @@ function capitalize(s: string): string {
 
     .btn-done:hover { opacity: 0.8; }
 
+    .day-link-row { margin: calc(-1 * var(--space-sm)) 0 var(--space-lg); text-align: center; }
+    .day-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 32px;
+      font-size: var(--font-size-sm);
+      font-weight: 600;
+      color: var(--color-primary);
+    }
+
     /* scoped override of the global .spinner: sized for a button and
        tinted from the button's own text colour */
     .spinner {
@@ -965,6 +979,8 @@ export class SessionSummaryComponent implements OnInit {
   liftHighlights = signal<LiftHighlight[]>([]);
   topLifts       = signal<LiftHighlight[]>([]);
   sharing        = signal(false);
+  /** The user's day the workout started on (now minus its duration). */
+  sessionDay     = signal('');
 
   @ViewChild('shareCard') shareCardEl!: ElementRef<HTMLDivElement>;
 
@@ -981,6 +997,8 @@ export class SessionSummaryComponent implements OnInit {
     }
     this.computeStats(state);
     this.loadPreviousBests(state);
+    const started = Date.now() - (state.durationSeconds ?? 0) * 1000;
+    this.sessionDay.set(dayKey(started, this.settings.timezone()));
   }
 
   /** Fills in each highlight's previousBest once the API responds; the page

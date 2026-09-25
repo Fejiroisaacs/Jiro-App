@@ -46,6 +46,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	ledgerService := services.NewLedgerService(db)
 	searchService := services.NewSearchService(db)
 	demoService := services.NewDemoService(db, authService)
+	dayService := services.NewDayService(db, jymService)
 
 	// Rate limiter + login fail tracker
 	rl := middleware.NewRateLimiter(db)
@@ -65,6 +66,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	journalHandler := handlers.NewJournalHandler(journalService, emailService, privateStorageService, cfg.AppBaseURL)
 	exportHandler := handlers.NewExportHandler(userService, jymService, recipeService, mealPlanService, journalService, ledgerService, db)
 	searchHandler := handlers.NewSearchHandler(searchService)
+	dayHandler := handlers.NewDayHandler(dayService)
 
 	// Routes
 	v1 := r.Group("/api/v1")
@@ -162,6 +164,9 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 
 			// Global search (4 queries per call — tighter limit: 60/min per user)
 			protected.GET("/search", middleware.RateLimitByUser(rl, "search", 60), searchHandler.Search)
+
+			// Cross-module day view (7 queries per call, read-only: 120/min per user)
+			protected.GET("/day", middleware.RateLimitByUser(rl, "day", 120), dayHandler.GetDay)
 
 			// Culinara (Recipe Module)
 			culinara := protected.Group("/culinara")

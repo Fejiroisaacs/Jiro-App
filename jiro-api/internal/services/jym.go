@@ -823,12 +823,10 @@ func (s *JymService) ListAllSessions(ctx context.Context, userID uuid.UUID) ([]m
 	return s.listSessions(ctx, userID, nil)
 }
 
-// listSessions is shared by both. A nil limit means no limit: Postgres treats
-// LIMIT NULL as LIMIT ALL, so the cap is a parameter rather than two copies of
-// the query or a string built at runtime.
-func (s *JymService) listSessions(ctx context.Context, userID uuid.UUID, limit *int) ([]models.SessionSummary, error) {
-	rows, err := s.db.Query(ctx,
-		`SELECT s.id, s.user_id, s.routine_id, s.series_id, s.session_type, s.started_at, s.ended_at, s.notes,
+// sessionSummarySelect is the one definition of a session list row: the
+// session plus its routine name, set count, PR count, volume (kg) and muscle
+// groups. Callers append a WHERE on s.* and then sessionSummaryGroup.
+const sessionSummarySelect = `SELECT s.id, s.user_id, s.routine_id, s.series_id, s.session_type, s.started_at, s.ended_at, s.notes,
 		        r.name as routine_name,
 		        COUNT(ss.id) as set_count,
 		        COUNT(ss.id) FILTER (WHERE ss.is_pr) AS pr_count,
@@ -838,18 +836,40 @@ func (s *JymService) listSessions(ctx context.Context, userID uuid.UUID, limit *
 		 LEFT JOIN routines r ON s.routine_id = r.id
 		 LEFT JOIN session_sets ss ON ss.session_id = s.id
 		 LEFT JOIN exercises e ON ss.exercise_id = e.id
-		 WHERE s.user_id = $1
-		 GROUP BY s.id, r.name
-		 ORDER BY s.started_at DESC
-		 LIMIT $2`,
+		 `
+
+const sessionSummaryGroup = ` GROUP BY s.id, r.name `
+
+// listSessions is shared by both. A nil limit means no limit: Postgres treats
+// LIMIT NULL as LIMIT ALL, so the cap is a parameter rather than two copies of
+// the query or a string built at runtime.
+func (s *JymService) listSessions(ctx context.Context, userID uuid.UUID, limit *int) ([]models.SessionSummary, error) {
+	rows, err := s.db.Query(ctx,
+		sessionSummarySelect+`WHERE s.user_id = $1`+sessionSummaryGroup+`ORDER BY s.started_at DESC LIMIT $2`,
 		userID, limit,
 	)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	return scanSessionSummaries(rows)
+}
 
-	var sessions []models.SessionSummary
+// ListSessionsBetween returns the sessions started in [from, to), oldest
+// first, with the same summary fields as ListSessions. Used by the day view.
+func (s *JymService) ListSessionsBetween(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]models.SessionSummary, error) {
+	rows, err := s.db.Query(ctx,
+		sessionSummarySelect+`WHERE s.user_id = $1 AND s.started_at >= $2 AND s.started_at < $3`+sessionSummaryGroup+`ORDER BY s.started_at ASC`,
+		userID, from, to,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return scanSessionSummaries(rows)
+}
+
+func scanSessionSummaries(rows pgx.Rows) ([]models.SessionSummary, error) {
+	defer rows.Close()
+	sessions := []models.SessionSummary{}
 	for rows.Next() {
 		var sess models.SessionSummary
 		if err := rows.Scan(
@@ -864,10 +884,7 @@ func (s *JymService) listSessions(ctx context.Context, userID uuid.UUID, limit *
 		}
 		sessions = append(sessions, sess)
 	}
-	if sessions == nil {
-		sessions = []models.SessionSummary{}
-	}
-	return sessions, nil
+	return sessions, rows.Err()
 }
 
 func (s *JymService) GetSession(ctx context.Context, userID, sessionID uuid.UUID) (*models.SessionWithSets, error) {

@@ -1,7 +1,7 @@
-import { Component, OnInit, signal, computed, viewChild, ElementRef, HostListener } from '@angular/core';
+import { Component, OnInit, signal, computed, viewChild, ElementRef, HostListener, inject } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
   JournalService,
   JournalEntry,
@@ -13,6 +13,8 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { UploadService } from '../../../core/services/upload.service';
 import { promptForDay, localDateKey } from '../writing-prompts';
+import { SettingsService } from '../../../core/services/settings.service';
+import { dayKey } from '../../../core/utils/day';
 
 /** Dismissing the prompt lasts the calendar day; the value is that day's date. */
 const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
@@ -20,7 +22,7 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
 @Component({
   selector: 'app-journal-editor',
   standalone: true,
-  imports: [FormsModule, JiroButtonComponent, JiroIconComponent],
+  imports: [FormsModule, RouterLink, JiroButtonComponent, JiroIconComponent],
   template: `
     <div class="editor-page" [class.immersive]="immersive()">
 
@@ -50,6 +52,10 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
           </jiro-button>
         </div>
       </div>
+
+      @if (!immersive() && entryDay(); as day) {
+        <a class="day-link" [routerLink]="['/day', day]">See this day</a>
+      }
 
       <!-- Loading skeleton -->
       @if (loading()) {
@@ -309,6 +315,16 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
       border-radius: 10px;
     }
     .editor-topbar-actions { flex-shrink: 0; }
+    .day-link {
+      align-self: flex-start;
+      display: inline-flex;
+      align-items: center;
+      min-height: 32px;
+      margin: calc(var(--space-md) - var(--space-xl)) 0 var(--space-md);
+      font-size: var(--font-size-sm);
+      font-weight: 600;
+      color: var(--color-primary);
+    }
 
     /* Editor body */
     .editor-body { display: flex; flex-direction: column; gap: var(--space-md); flex: 1; }
@@ -638,6 +654,13 @@ export class JournalEditorComponent implements OnInit {
 
   lightboxUrl = signal<string | null>(null);
   lightboxAlt = signal('');
+
+  private readonly settings = inject(SettingsService);
+  /** The user's day this private entry belongs to, for the day view link. */
+  readonly entryDay = computed(() => {
+    const e = this.entry();
+    return e && !e.group_id ? dayKey(e.created_at, this.settings.timezone()) : null;
+  });
 
   /** Read once, so the prompt and its dismissal agree on which day this is. */
   private readonly today = new Date();

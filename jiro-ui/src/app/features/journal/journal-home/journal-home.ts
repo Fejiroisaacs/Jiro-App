@@ -174,6 +174,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
       [date]="dayModalDate()!"
       [entries]="dayModalEntries()"
       [initialEntry]="dayModalInitEntry()"
+      [dayLink]="true"
       (close)="closeDayModal()"
       (newEntry)="onDayModalNew()"
       (editEntry)="onDayModalEdit($event)"

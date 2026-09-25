@@ -2,7 +2,7 @@ import { Component, Injector, OnInit, afterNextRender, inject, input, signal } f
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { NavigationEnd, Router } from '@angular/router';
+import { NavigationEnd, Router, RouterLink } from '@angular/router';
 import { filter } from 'rxjs';
 import { JymService, SessionSummary, SessionWithSets } from '../../../core/services/jym.service';
 import { SettingsService } from '../../../core/services/settings.service';
@@ -14,12 +14,13 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
+import { dayKey } from '../../../core/utils/day';
 
 @Component({
   selector: 'app-session-history',
   standalone: true,
   imports: [
-    CommonModule, FormsModule, JiroButtonComponent, JiroIconComponent,
+    CommonModule, FormsModule, RouterLink, JiroButtonComponent, JiroIconComponent,
     JiroPageHeaderComponent, JiroEmptyStateComponent, JymPrBadgeComponent,
   ],
   template: `
@@ -159,6 +160,8 @@ import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
 <p class="detail-notes-text text-muted" style="font-style: italic;">No notes for this session.</p>
 }
               </div>
+
+              <a class="day-link" [routerLink]="['/day', sessionDay(detail()!.started_at)]" (click)="$event.stopPropagation()">See this day</a>
 
               <!-- Attachments panel -->
               @if (detail()!.attachments.length > 0) {
@@ -385,6 +388,16 @@ import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
 
 
 
+    .day-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 32px;
+      margin-top: var(--space-sm);
+      font-size: var(--font-size-sm);
+      font-weight: 600;
+      color: var(--color-primary);
+    }
+
     .detail-notes {
       margin-top: var(--space-md);
       padding-top: var(--space-md);
@@ -576,6 +589,11 @@ export class SessionHistoryComponent implements OnInit {
     afterNextRender(() => {
       document.getElementById('session-' + id)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
     }, { injector: this.injector });
+  }
+
+  /** The user's day a session started on, for the day view link. */
+  sessionDay(startedAt: string): string {
+    return dayKey(startedAt, this.settingsService.timezone());
   }
 
   loadDetail(s: SessionSummary) {

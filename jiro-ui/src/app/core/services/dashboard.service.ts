@@ -1,10 +1,12 @@
 import { Injectable, inject } from '@angular/core';
-import { Observable, forkJoin, merge, of } from 'rxjs';
+import { Observable, merge, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import { JymService, SessionSummary, BodyWeight } from './jym.service';
 import { JournalService, JournalStreak } from './journal.service';
 import { RecipeService, CookStreak, Recipe } from './recipe.service';
 import { LedgerService, LedgerAccount, LedgerSummary, BudgetWithSpend } from './ledger.service';
+import { SettingsService } from './settings.service';
+import { dayKey, todayKey } from '../utils/day';
 
 /** A single request (or small request group) the dashboard can make. Widgets that share a source share the request. */
 export type WidgetSource =
@@ -21,14 +23,14 @@ export type WidgetSource =
 export interface DashboardJym {
   inProgress: SessionSummary | null;
   lastCompleted: SessionSummary | null;
-  /** UTC calendar dates (YYYY-MM-DD) with a completed session; the API's streaks and calendars are UTC-day based too. */
-  workoutDays: Set<string>;
+  /** Sessions started per day (YYYY-MM-DD in the user's timezone, the day view's unit), from the latest 50. */
+  workoutCounts: Map<string, number>;
   hasAny: boolean;
 }
 
 export interface JournalDays {
-  /** Calendar dates (YYYY-MM-DD, UTC-day based like the API) with an entry. */
-  days: Set<string>;
+  /** Private entries per day (YYYY-MM-DD in the user's timezone) over the strip's 14 days. */
+  counts: Map<string, number>;
   wroteToday: boolean;
 }
 
@@ -65,10 +67,14 @@ export type SourceResults = { [K in WidgetSource]?: SourceValues[K] | null };
 /** How many recipes the Recent recipes widget shows. */
 export const RECENT_RECIPE_COUNT = 3;
 
-/** UTC calendar date as YYYY-MM-DD, matching how the API counts days. */
-export function utcDateKey(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
+/** Days the activity strip shows, today included. */
+export const STRIP_DAYS = 14;
+
+/**
+ * Entries fetched for the strip. The API caps a page at 50; someone writing
+ * more than 50 entries in 14 days sees the oldest days of the strip undercounted.
+ */
+const STRIP_ENTRY_LIMIT = 50;
 
 @Injectable({ providedIn: 'root' })
 export class DashboardService {
@@ -76,6 +82,7 @@ export class DashboardService {
   private readonly journal = inject(JournalService);
   private readonly recipes = inject(RecipeService);
   private readonly ledger = inject(LedgerService);
+  private readonly settings = inject(SettingsService);
 
   /**
    * Fetches only the given sources. Emits one partial result per source as it
@@ -99,7 +106,7 @@ export class DashboardService {
   private request(key: WidgetSource): Observable<SourceValues[WidgetSource]> {
     switch (key) {
       case 'sessions':
-        return this.jym.listSessions().pipe(map(toDashboardJym));
+        return this.jym.listSessions().pipe(map(s => toDashboardJym(s, this.settings.timezone())));
       case 'journalStreak':
         return this.journal.getStreak();
       case 'journalCalendar':
@@ -122,42 +129,38 @@ export class DashboardService {
   }
 
   /**
-   * The journal calendar is keyed on UTC days; ask for the current UTC month
-   * and, early in the month, the previous one so the 14-day strip is complete.
-   * Only the current month is required; a failed previous month just leaves
-   * those days blank.
+   * Entries per day for the activity strip and "Written today", cut in the
+   * user's timezone like the day view. The calendar endpoint counts UTC days,
+   * so this reads the entries themselves: everything since a day before the
+   * strip starts (days are at most 26 hours, so one spare day covers any zone).
    */
   private journalDays(): Observable<JournalDays> {
-    const now = new Date();
-    const utcYear = now.getUTCFullYear();
-    const utcMonth = now.getUTCMonth() + 1;
-    const prev = new Date(Date.UTC(utcYear, utcMonth - 2, 1));
-    const needPrev = now.getUTCDate() < 14;
-
-    return forkJoin({
-      calThis: this.journal.getCalendar(utcYear, utcMonth),
-      calPrev: needPrev
-        ? this.journal.getCalendar(prev.getUTCFullYear(), prev.getUTCMonth() + 1).pipe(catchError(() => of(null)))
-        : of(null),
-    }).pipe(
-      map(({ calThis, calPrev }) => {
-        const days = new Set<string>();
-        const add = (year: number, month1: number, list: number[]) => {
-          for (const d of list) days.add(`${year}-${String(month1).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
-        };
-        add(calThis.year, calThis.month, calThis.days);
-        if (calPrev) add(calPrev.year, calPrev.month, calPrev.days);
-        return { days, wroteToday: calThis.days.includes(now.getUTCDate()) };
+    const tz = this.settings.timezone();
+    const from = new Date(Date.now() - (STRIP_DAYS + 1) * 86_400_000).toISOString();
+    return this.journal.listEntries({ from, limit: STRIP_ENTRY_LIMIT }).pipe(
+      map(entries => {
+        const counts = countByDay(entries.map(e => e.created_at), tz);
+        return { counts, wroteToday: counts.has(todayKey(tz)) };
       }),
     );
   }
 }
 
-function toDashboardJym(sessions: SessionSummary[]): DashboardJym {
+function countByDay(instants: string[], tz: string): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const iso of instants) {
+    const key = dayKey(iso, tz);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return counts;
+}
+
+function toDashboardJym(sessions: SessionSummary[], tz: string): DashboardJym {
   return {
     inProgress: sessions.find(s => !s.ended_at) ?? null,
     lastCompleted: sessions.find(s => !!s.ended_at) ?? null,
-    workoutDays: new Set(sessions.filter(s => !!s.ended_at).map(s => utcDateKey(new Date(s.started_at)))),
+    // Every session counts, in progress too, as it does on the day page.
+    workoutCounts: countByDay(sessions.map(s => s.started_at), tz),
     hasAny: sessions.length > 0,
   };
 }

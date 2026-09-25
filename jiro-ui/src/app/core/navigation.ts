@@ -88,6 +88,8 @@ export const JIRO_HOME_TAB: NavTab = { label: 'Jiro', route: '/dashboard', mark:
 /** The hub's own mobile bar. */
 export const HUB_TABS: NavTab[] = [
   { label: 'Home', route: '/dashboard', exact: true, mark: 'jiro' },
+  // '/day' redirects to today's /day/<date>; matched by prefix so it stays active on any day.
+  { label: 'Today', route: '/day', icon: 'calendar-blank' },
   { label: 'Guide', route: '/guide', icon: 'book-open' },
   { label: 'Settings', route: '/settings', icon: 'gear' },
 ];

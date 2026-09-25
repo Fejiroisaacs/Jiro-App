@@ -82,6 +82,10 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
             <jiro-icon name="squares-four" [size]="22" />
             @if (!collapsed()) { <span class="nav-label">Dashboard</span> }
           </a>
+          <a routerLink="/day" routerLinkActive="active" class="nav-item" [attr.aria-label]="collapsed() ? 'Today' : null">
+            <jiro-icon name="calendar-blank" [size]="22" />
+            @if (!collapsed()) { <span class="nav-label">Today</span> }
+          </a>
           <a routerLink="/guide" routerLinkActive="active" class="nav-item">
             <jiro-icon name="book-open" [size]="22" />
             @if (!collapsed()) { <span class="nav-label">Guide</span> }

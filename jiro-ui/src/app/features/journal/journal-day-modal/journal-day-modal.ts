@@ -4,15 +4,18 @@ import {
   ElementRef, Injector, afterNextRender, inject,
 } from '@angular/core';
 import { A11yModule } from '@angular/cdk/a11y';
+import { RouterLink } from '@angular/router';
 
 import { JournalEntry, JournalService, MOODS } from '../../../core/services/journal.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { isJiroModalOpen } from '../../../shared/components/jiro-modal/jiro-modal';
+import { SettingsService } from '../../../core/services/settings.service';
+import { todayKey } from '../../../core/utils/day';
 
 @Component({
   selector: 'journal-day-modal',
   standalone: true,
-  imports: [A11yModule, JiroButtonComponent],
+  imports: [A11yModule, RouterLink, JiroButtonComponent],
   template: `
     <!-- Backdrop -->
     <div class="backdrop" (click)="close.emit()" aria-hidden="true"></div>
@@ -51,6 +54,10 @@ import { isJiroModalOpen } from '../../../shared/components/jiro-modal/jiro-moda
 
       <!-- Body -->
       <div class="modal-body">
+
+        @if (showDayLink()) {
+          <a class="day-link" [routerLink]="['/day', date]">See the whole day</a>
+        }
 
         <!-- Empty state -->
         @if (!entries.length) {
@@ -264,6 +271,16 @@ import { isJiroModalOpen } from '../../../shared/components/jiro-modal/jiro-moda
       flex: 1;
       padding: var(--space-lg);
       overscroll-behavior: contain;
+    }
+
+    .day-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 32px;
+      margin-bottom: var(--space-sm);
+      font-size: var(--font-size-sm);
+      font-weight: 600;
+      color: var(--color-primary);
     }
 
     /* ── Empty state ────────────────────────────────────── */
@@ -504,6 +521,12 @@ import { isJiroModalOpen } from '../../../shared/components/jiro-modal/jiro-moda
 export class JournalDayModalComponent implements OnChanges {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
+  private readonly settings = inject(SettingsService);
+
+  /** Only for a day that has happened; the day view has no future. */
+  showDayLink(): boolean {
+    return this.dayLink && !!this.date && this.date <= todayKey(this.settings.timezone());
+  }
 
   constructor(private svc: JournalService) {}
 
@@ -527,6 +550,8 @@ export class JournalDayModalComponent implements OnChanges {
   @Input() memberMap: Record<string, string> = {};
   /** When set, only entries with this user_id show the Edit button. Null = always show. */
   @Input() ownUserId: string | null = null;
+  /** Offer a link to the cross-module day view (the user's own journal only). */
+  @Input() dayLink = false;
   @Output() close = new EventEmitter<void>();
   @Output() editEntry = new EventEmitter<string>();
   @Output() deleteEntry = new EventEmitter<string>();
