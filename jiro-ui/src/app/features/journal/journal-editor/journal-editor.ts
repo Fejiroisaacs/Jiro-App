@@ -1,4 +1,5 @@
-import { Component, OnInit, signal, computed, viewChild, ElementRef, HostListener, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, signal, computed, viewChild, ElementRef, HostListener, inject } from '@angular/core';
+import { Location } from '@angular/common';
 
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -14,7 +15,13 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
 import { UploadService } from '../../../core/services/upload.service';
 import { promptForDay, localDateKey } from '../writing-prompts';
 import { SettingsService } from '../../../core/services/settings.service';
-import { dayKey, isDayKey, zonedNoonISO } from '../../../core/utils/day';
+import { dayKey, isDayKey, todayKey, zonedNoonISO } from '../../../core/utils/day';
+import { AuthService } from '../../../core/services/auth.service';
+import { ConfirmService } from '../../../core/services/confirm.service';
+import { ToastService } from '../../../core/services/toast.service';
+
+/** A photo picked for an entry that does not exist yet; it uploads on publish. */
+interface PendingPhoto { file: File; url: string; }
 
 /** Dismissing the prompt lasts the calendar day; the value is that day's date. */
 const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
@@ -80,7 +87,7 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
         @if (promptVisible()) {
         <section class="prompt-strip" aria-label="Writing prompt">
           <div class="prompt-copy" aria-live="polite">
-            <span class="toolbar-label">Today's prompt</span>
+            <span class="toolbar-label">{{ backdated() ? 'Writing prompt' : "Today's prompt" }}</span>
             <button
               type="button"
               class="prompt-question"
@@ -109,7 +116,7 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
         <textarea
           #bodyTextarea
           class="body-textarea"
-          placeholder="What's on your mind today?"
+          [placeholder]="bodyPlaceholder()"
           [(ngModel)]="body"
           (focus)="immersive.set(true)"
           (blur)="onBodyBlur()"
@@ -161,21 +168,30 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
             </div>
           </div>
 
-          <!-- Images -->
+          <!-- Photos -->
           <div class="toolbar-section">
             <div class="img-header">
-              <span class="toolbar-label">Images ({{ images().length }}/3)</span>
-              @if (images().length < 3) {
+              <span class="toolbar-label" id="photos-label">Photos ({{ photoCount() }}/3)</span>
+              @if (photoCount() < 3) {
 <label class="img-add-btn">
-                <input type="file" accept="image/jpeg,image/png,image/webp" (change)="onFileSelected($event)" hidden [disabled]="uploading()" />
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <input
+                  type="file"
+                  class="img-file"
+                  accept="image/jpeg,image/png,image/webp"
+                  aria-label="Add a photo"
+                  (change)="onFileSelected($event)"
+                  [disabled]="uploading() || saving()" />
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                   <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                 </svg>
                 {{ uploading() ? 'Uploading...' : 'Add' }}
               </label>
 }
             </div>
-            @if (images().length > 0) {
+            @if (!editId) {
+<p class="img-hint text-secondary">Photos you add here upload when you publish.</p>
+}
+            @if (images().length > 0 || pendingPhotos().length > 0) {
 <div class="img-previews">
               @for (img of images(); track img) {
 <div class="img-thumb">
@@ -192,40 +208,47 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
                 </button>
               </div>
 }
+              @for (p of pendingPhotos(); track p.url) {
+<div class="img-thumb">
+                <img [src]="p.url" [alt]="'Photo to upload: ' + p.file.name" width="80" height="80" />
+                <button class="img-remove" (click)="removePending(p)" [disabled]="saving()" type="button" [attr.aria-label]="'Remove ' + p.file.name">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              </div>
+}
             </div>
 }
             @if (uploadError()) {
-<p class="img-hint text-secondary">{{ uploadError() }}</p>
+<p class="img-hint img-error" role="alert">{{ uploadError() }}</p>
 }
           </div>
 
           <!-- Collections -->
           @if (!editId || entry()) {
 <div class="toolbar-section">
-            <span class="toolbar-label">Collections</span>
+            <span class="toolbar-label" id="collections-label">Collections</span>
             @if (collections().length > 0) {
-<div class="coll-selector">
-              @for (c of collections(); track c) {
-<label
-               
+<div class="coll-selector" role="group" aria-labelledby="collections-label">
+              @for (c of collections(); track c.id) {
+<button
+                type="button"
                 class="coll-option"
-                [class.selected]="selectedCollections.has(c.id)">
-                <input
-                  type="checkbox"
-                  [checked]="selectedCollections.has(c.id)"
-                  (change)="toggleCollection(c.id)"
-                  hidden />
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                [class.selected]="selectedCollections().has(c.id)"
+                [attr.aria-pressed]="selectedCollections().has(c.id)"
+                (click)="toggleCollection(c.id)">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                   <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                 </svg>
                 {{ c.name }}
-              </label>
+              </button>
 }
             </div>
 }
             @if (collections().length === 0) {
 <p class="text-secondary" style="font-size:var(--font-size-xs)">
-              No collections yet.
+              No collections yet. Make one on the <a routerLink="/journal/collections">Collections</a> page.
             </p>
 }
           </div>
@@ -239,6 +262,12 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
 
         <!-- Bottom save -->
         <div class="bottom-save">
+          @if (canDelete()) {
+            <jiro-button variant="danger" type="button" [disabled]="saving() || deleting()" (click)="deleteEntry()">
+              {{ deleting() ? 'Deleting...' : 'Delete entry' }}
+            </jiro-button>
+          }
+          <span class="bottom-spacer"></span>
           <jiro-button
             variant="primary"
             type="button"
@@ -499,6 +528,7 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
     /* Images */
     .img-header { display: flex; align-items: center; justify-content: space-between; }
     .img-add-btn {
+      position: relative;
       display: flex;
       align-items: center;
       gap: 5px;
@@ -544,11 +574,20 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
       justify-content: center;
       padding: 0;
     }
-    .img-hint { font-size: var(--font-size-xs); margin-top: var(--space-xs); }
+    .img-hint { font-size: var(--font-size-xs); margin: 0; }
+    .img-error { color: var(--color-danger); }
+    .img-add-btn:focus-within { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+    .img-file {
+      position: absolute; width: 1px; height: 1px;
+      padding: 0; margin: -1px; border: 0;
+      overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+    }
 
     /* Collections */
     .coll-selector { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
     .coll-option {
+      font-family: inherit;
+      background: none;
       display: flex;
       align-items: center;
       gap: 6px;
@@ -571,7 +610,8 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
 
     .save-error { font-size: var(--font-size-sm); color: var(--color-danger); }
 
-    .bottom-save { display: flex; justify-content: flex-end; padding-bottom: var(--space-xl); }
+    .bottom-save { display: flex; align-items: center; gap: var(--space-sm); padding-bottom: var(--space-xl); }
+    .bottom-spacer { flex: 1; }
 
     /* State */
     .state-center { display: flex; justify-content: center; padding: var(--space-xl) 0; }
@@ -626,7 +666,7 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
     }
   `]
 })
-export class JournalEditorComponent implements OnInit {
+export class JournalEditorComponent implements OnInit, OnDestroy {
   moods = MOODS;
 
   editId: string | null = null;
@@ -645,17 +685,38 @@ export class JournalEditorComponent implements OnInit {
   groupId: string | null = null;
 
   images = signal<JournalImage[]>([]);
+  pendingPhotos = signal<PendingPhoto[]>([]);
+  readonly photoCount = computed(() => this.images().length + this.pendingPhotos().length);
   uploading = signal(false);
   uploadError = signal('');
   deletingImgId = signal<string | null>(null);
+  deleting = signal(false);
 
   collections = signal<JournalCollection[]>([]);
-  selectedCollections = new Set<string>();
+  selectedCollections = signal<ReadonlySet<string>>(new Set());
+  /** Until the list loads, a save must not touch membership it cannot see. */
+  private collectionsLoaded = false;
 
   lightboxUrl = signal<string | null>(null);
   lightboxAlt = signal('');
 
   private readonly settings = inject(SettingsService);
+  private readonly auth = inject(AuthService);
+  private readonly confirmService = inject(ConfirmService);
+  private readonly toast = inject(ToastService);
+  private readonly location = inject(Location);
+
+  /** Writing for a day before today, from the calendar. */
+  readonly backdated = signal(false);
+  readonly bodyPlaceholder = computed(() =>
+    this.backdated() ? 'What happened that day?' : "What's on your mind today?");
+
+  /** Only the author can delete, and only an entry that exists. */
+  readonly canDelete = computed(() => {
+    const e = this.entry();
+    return !!e && e.user_id === this.auth.user()?.id;
+  });
+
   /** The user's day this private entry belongs to, for the day view link. */
   readonly entryDay = computed(() => {
     const e = this.entry();
@@ -680,10 +741,14 @@ export class JournalEditorComponent implements OnInit {
     this.editId = this.route.snapshot.paramMap.get('id');
     const forDate = this.route.snapshot.queryParamMap.get('date');
     this.forDate = isDayKey(forDate) ? forDate : null;
+    this.backdated.set(!this.editId && !!this.forDate && this.forDate < todayKey(this.settings.timezone()));
     this.groupId = this.route.snapshot.queryParamMap.get('group');
+    // "Write entry" from an empty collection starts with that collection picked.
+    const collection = this.route.snapshot.queryParamMap.get('collection');
+    if (!this.editId && collection) this.selectedCollections.set(new Set([collection]));
     // A prompt is only useful on a blank page, never when revising an old entry.
     this.promptVisible.set(!this.editId && !promptDismissedOn(this.today));
-    this.svc.listCollections().subscribe(c => this.collections.set(c));
+    this.svc.listCollections().subscribe(c => { this.collections.set(c); this.collectionsLoaded = true; });
 
     if (this.editId) {
       this.loading.set(true);
@@ -695,6 +760,7 @@ export class JournalEditorComponent implements OnInit {
           this.mood = e.mood ?? '';
           this.tags = [...(e.tags ?? [])];
           this.images.set(e.images ?? []);
+          this.selectedCollections.set(new Set(e.collection_ids ?? []));
           this.loading.set(false);
         },
         error: () => { this.loading.set(false); this.router.navigate(['/journal']); },
@@ -725,11 +791,9 @@ export class JournalEditorComponent implements OnInit {
   removeTag(t: string) { this.tags = this.tags.filter(x => x !== t); }
 
   toggleCollection(id: string) {
-    if (this.selectedCollections.has(id)) {
-      this.selectedCollections.delete(id);
-    } else {
-      this.selectedCollections.add(id);
-    }
+    const next = new Set(this.selectedCollections());
+    if (next.has(id)) next.delete(id); else next.add(id);
+    this.selectedCollections.set(next);
   }
 
   onBodyBlur() {
@@ -751,12 +815,17 @@ export class JournalEditorComponent implements OnInit {
     this.tagDraft = '';
     this.saving.set(true);
     this.saveError.set('');
+    // Only collections that still exist, so a stale ?collection= is dropped.
+    const known = new Set(this.collections().map(c => c.id));
     const req: any = {
       title: this.title.trim() || undefined,
       body: this.body.trim(),
       mood: this.mood || undefined,
       tags: this.tags,
     };
+    if (this.collectionsLoaded) {
+      req.collection_ids = [...this.selectedCollections()].filter(id => known.has(id));
+    }
     if (this.forDate && !this.editId) {
       // Noon on the chosen day in the user's zone, so the entry lands on that
       // day in the day view, the week view, the strip and the streak.
@@ -766,36 +835,102 @@ export class JournalEditorComponent implements OnInit {
     if (this.editId) {
       this.svc.updateEntry(this.editId, req).subscribe({
         next: () => { this.saving.set(false); this.router.navigate([this.backRoute()]); },
-        error: (err: any) => { this.saving.set(false); this.saveError.set(err?.error?.message ?? 'Failed to save.'); },
-      });
-    } else if (this.groupId) {
-      this.svc.createGroupEntry(this.groupId, req).subscribe({
-        next: e => {
-          Array.from(this.selectedCollections).forEach(cid =>
-            this.svc.addEntryToCollection(cid, e.id).subscribe()
-          );
-          this.saving.set(false);
-          this.router.navigate([`/journal/groups/${this.groupId}`]);
-        },
-        error: (err: any) => { this.saving.set(false); this.saveError.set(err?.error?.message ?? 'Failed to save.'); },
+        error: (err: any) => { this.saving.set(false); this.saveError.set(errorMessage(err, 'Failed to save.')); },
       });
     } else {
-      this.svc.createEntry(req).subscribe({
-        next: e => {
-          // Add to selected collections
-          Array.from(this.selectedCollections).forEach(cid =>
-            this.svc.addEntryToCollection(cid, e.id).subscribe()
-          );
-          this.saving.set(false);
-          this.router.navigate(['/journal']);
-        },
-        error: (err: any) => { this.saving.set(false); this.saveError.set(err?.error?.message ?? 'Failed to save.'); },
+      const create = this.groupId ? this.svc.createGroupEntry(this.groupId, req) : this.svc.createEntry(req);
+      create.subscribe({
+        next: e => this.afterCreate(e),
+        error: (err: any) => { this.saving.set(false); this.saveError.set(errorMessage(err, 'Failed to save.')); },
       });
     }
   }
 
+  /**
+   * The entry exists now, so the photos picked before publishing can upload.
+   * If any fail, the editor stays open on the saved entry (as an edit) so
+   * nothing typed is lost and the photo can be added again.
+   */
+  private async afterCreate(e: JournalEntry) {
+    const pending = this.pendingPhotos();
+    let failed = 0;
+    if (pending.length) this.uploading.set(true);
+    for (const p of pending) {
+      try {
+        const img = await this.uploadFile(e.id, p.file);
+        this.images.update(imgs => [...imgs, img]);
+      } catch {
+        failed++;
+      }
+      URL.revokeObjectURL(p.url);
+    }
+    this.pendingPhotos.set([]);
+    this.uploading.set(false);
+    this.saving.set(false);
+
+    if (failed === 0) {
+      this.router.navigate([this.groupId ? `/journal/groups/${this.groupId}` : '/journal']);
+      return;
+    }
+    this.editId = e.id;
+    this.entry.set({ ...e, images: this.images() });
+    this.location.replaceState(`/journal/${e.id}/edit`);
+    this.uploadError.set(failed === 1
+      ? 'Your entry is saved, but one photo did not upload. Try adding it again.'
+      : `Your entry is saved, but ${failed} photos did not upload. Try adding them again.`);
+  }
+
+  private uploadFile(entryId: string, file: File): Promise<JournalImage> {
+    return new Promise((resolve, reject) => {
+      this.svc.presignImage(entryId, file.type, file.size).subscribe({
+        next: ({ upload_url, object_key }) => {
+          this.uploadSvc.putToStorage(upload_url, file).then(() => {
+            this.svc.confirmImage(entryId, object_key).subscribe({ next: resolve, error: reject });
+          }).catch(reject);
+        },
+        error: reject,
+      });
+    });
+  }
+
+  removePending(p: PendingPhoto) {
+    URL.revokeObjectURL(p.url);
+    this.pendingPhotos.update(ps => ps.filter(x => x !== p));
+  }
+
+  async deleteEntry() {
+    const e = this.entry();
+    if (!e) return;
+    const ok = await this.confirmService.confirm({
+      title: 'Delete this entry?',
+      message: e.group_id
+        ? 'It is removed from the group for everyone, permanently.'
+        : 'It is removed from your journal and its collections, with its photos. This cannot be undone.',
+      confirmLabel: 'Delete entry',
+      danger: true,
+    });
+    if (!ok) return;
+    this.deleting.set(true);
+    this.svc.deleteEntry(e.id).subscribe({
+      next: () => {
+        this.toast.success('Entry deleted');
+        this.router.navigate([this.backRoute()]);
+      },
+      error: () => {
+        this.deleting.set(false);
+        this.toast.error('Could not delete the entry.');
+      },
+    });
+  }
+
+  ngOnDestroy() {
+    for (const p of this.pendingPhotos()) URL.revokeObjectURL(p.url);
+  }
+
   onFileSelected(event: Event) {
-    const file = (event.target as HTMLInputElement).files?.[0];
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
     if (!file) return;
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
       this.uploadError.set('Only JPEG, PNG, and WebP images are supported.');
@@ -805,32 +940,21 @@ export class JournalEditorComponent implements OnInit {
       this.uploadError.set('Image must be 10 MB or smaller.');
       return;
     }
-    if (this.images().length >= 3) {
-      this.uploadError.set('Maximum 3 images per entry.');
-      return;
-    }
-    if (!this.editId) {
-      // Must save first to get an entry ID
-      this.uploadError.set('Please save the entry first before adding images.');
+    if (this.photoCount() >= 3) {
+      this.uploadError.set('An entry can have up to 3 photos.');
       return;
     }
     this.uploadError.set('');
+    if (!this.editId) {
+      // No entry to attach to yet: hold it and upload on publish.
+      this.pendingPhotos.update(ps => [...ps, { file, url: URL.createObjectURL(file) }]);
+      return;
+    }
     this.uploading.set(true);
-
-    this.svc.presignImage(this.editId, file.type, file.size).subscribe({
-      next: ({ upload_url, object_key }) => {
-        this.uploadSvc.putToStorage(upload_url, file).then(() => {
-          this.svc.confirmImage(this.editId!, object_key).subscribe({
-            next: img => { this.images.update(imgs => [...imgs, img]); this.uploading.set(false); },
-            error: () => { this.uploadError.set('Upload succeeded but confirmation failed.'); this.uploading.set(false); },
-          });
-        }).catch(() => { this.uploadError.set('Failed to upload image.'); this.uploading.set(false); });
-      },
-      error: () => { this.uploadError.set('Failed to start upload.'); this.uploading.set(false); },
-    });
-
-    // Reset input
-    (event.target as HTMLInputElement).value = '';
+    this.uploadFile(this.editId, file).then(
+      img => { this.images.update(imgs => [...imgs, img]); this.uploading.set(false); },
+      () => { this.uploadError.set('That photo did not upload. Try again.'); this.uploading.set(false); },
+    );
   }
 
   /**
@@ -873,6 +997,11 @@ export class JournalEditorComponent implements OnInit {
     const d = new Date(this.forDate + 'T12:00:00');
     return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
   }
+}
+
+/** The API's error message ({ error: { message } }), or the fallback. */
+function errorMessage(err: any, fallback: string): string {
+  return err?.error?.error?.message ?? fallback;
 }
 
 /**

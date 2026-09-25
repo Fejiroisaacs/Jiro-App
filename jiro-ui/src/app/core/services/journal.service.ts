@@ -26,6 +26,8 @@ export interface JournalEntry {
   mood: string | null;
   tags: string[] | null;
   images: JournalImage[] | null;
+  /** The author's own collections holding the entry; only on getEntry. */
+  collection_ids?: string[];
   created_at: string;
   updated_at: string;
 }
@@ -79,7 +81,28 @@ export interface JournalCalendar {
 export interface JoinGroupResponse {
   group_id: string;
   group_name: string;
+  already_member: boolean;
 }
+
+/** A group's copyable invite link. `token` is only present when just made. */
+export interface JournalInviteLink {
+  token?: string;
+  expires_at: string;
+  created_at: string;
+}
+
+/** What an invite token opens, read before joining. */
+export interface JoinPreview {
+  kind: 'link' | 'email';
+  group_id?: string;
+  group_name: string;
+  member_count: number;
+  expires_at: string;
+  already_member: boolean;
+}
+
+/** How long a new invite link works, as the API sets it. */
+export const INVITE_LINK_DAYS = 7;
 
 export interface CreateEntryRequest {
   title?: string;
@@ -87,6 +110,7 @@ export interface CreateEntryRequest {
   mood?: string;
   tags?: string[];
   created_at?: string;
+  collection_ids?: string[];
 }
 
 export interface UpdateEntryRequest {
@@ -94,6 +118,8 @@ export interface UpdateEntryRequest {
   body?: string;
   mood?: string | null;
   tags?: string[];
+  /** The entry's full set of collections; omit to leave membership alone. */
+  collection_ids?: string[];
 }
 
 export interface ListEntriesParams {
@@ -276,7 +302,24 @@ export class JournalService {
   }
 
   joinGroup(token: string): Observable<JoinGroupResponse> {
-    return this.http.post<JoinGroupResponse>(`${API_URL}/groups/join?token=${token}`, {});
+    return this.http.post<JoinGroupResponse>(`${API_URL}/groups/join`, {}, { params: { token } });
+  }
+
+  previewInvite(token: string): Observable<JoinPreview> {
+    return this.http.get<JoinPreview>(`${API_URL}/groups/join/preview`, { params: { token } });
+  }
+
+  getInviteLink(groupId: string): Observable<JournalInviteLink | null> {
+    return this.http.get<{ link: JournalInviteLink | null }>(`${API_URL}/groups/${groupId}/invite-link`).pipe(map(r => r.link));
+  }
+
+  /** Makes a new link; any earlier link stops working. */
+  createInviteLink(groupId: string): Observable<JournalInviteLink> {
+    return this.http.post<JournalInviteLink>(`${API_URL}/groups/${groupId}/invite-link`, {});
+  }
+
+  revokeInviteLink(groupId: string): Observable<void> {
+    return this.http.delete<void>(`${API_URL}/groups/${groupId}/invite-link`);
   }
 
   createGroupEntry(groupId: string, req: CreateEntryRequest): Observable<JournalEntry> {
