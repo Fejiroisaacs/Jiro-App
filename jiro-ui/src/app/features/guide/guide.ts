@@ -3,10 +3,11 @@ import { RouterModule } from '@angular/router';
 import { JiroMarkComponent, MarkName } from '../../shared/components/jiro-mark/jiro-mark';
 import { JiroPageHeaderComponent } from '../../shared/components/jiro-page-header/jiro-page-header';
 
-interface ModuleCard {
+interface GuideCard {
   label: string;
+  description: string;
   mark: MarkName;
-  route: string | null;
+  route: string;
 }
 
 @Component({
@@ -16,22 +17,17 @@ interface ModuleCard {
   template: `
     <div class="guide-page">
       <jiro-page-header heading="Guide" subtitle="Learn how to get the most out of Jiro" />
-      <div class="module-grid">
-        @for (m of modules; track m.label) {
-          @if (m.route) {
-            <a [routerLink]="m.route" class="module-card">
-              <jiro-mark [name]="m.mark" [size]="48" />
-              <span>{{ m.label }}</span>
+      <ul class="module-grid">
+        @for (g of guides; track g.route) {
+          <li>
+            <a [routerLink]="g.route" class="module-card">
+              <jiro-mark [name]="g.mark" [size]="48" />
+              <span class="card-label">{{ g.label }}</span>
+              <span class="card-desc">{{ g.description }}</span>
             </a>
-          } @else {
-            <div class="module-card disabled">
-              <jiro-mark [name]="m.mark" [size]="48" />
-              <span>{{ m.label }}</span>
-              <span class="soon">Soon</span>
-            </div>
-          }
+          </li>
         }
-      </div>
+      </ul>
     </div>
   `,
   styles: [`
@@ -40,61 +36,59 @@ interface ModuleCard {
     }
 
     .module-grid {
+      list-style: none;
+      margin: 0;
+      padding: 0;
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
       gap: 16px;
     }
+    .module-grid li { display: flex; }
 
     .module-card {
+      flex: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 10px;
-      padding: 20px 12px;
+      text-align: center;
+      gap: 6px;
+      padding: 20px 16px;
       background: var(--bg-surface);
       border: 1px solid var(--border-color);
       border-radius: var(--border-radius-lg);
       text-decoration: none;
       color: var(--text-primary);
-      font-size: 0.875rem;
-      font-weight: 500;
       transition: box-shadow 0.15s, border-color 0.15s;
-      cursor: pointer;
-      position: relative;
     }
+    .module-card jiro-mark { margin-bottom: 4px; }
 
-    .module-card:hover:not(.disabled) {
+    .module-card:hover {
       border-color: var(--color-primary);
       box-shadow: var(--shadow-md);
       text-decoration: none;
     }
 
-    .module-card.disabled {
-      opacity: 0.45;
-      cursor: not-allowed;
+    .card-label {
+      font-size: var(--font-size-md);
+      font-weight: 600;
     }
 
-    .soon {
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      font-size: 0.65rem;
-      font-weight: 600;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
+    .card-desc {
+      font-size: var(--font-size-sm);
       color: var(--text-secondary);
-      background: var(--bg-canvas);
-      border: 1px solid var(--border-color);
-      border-radius: 4px;
-      padding: 1px 5px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .module-card { transition: none; }
     }
   `]
 })
 export class GuideComponent {
-  modules: ModuleCard[] = [
-    { label: 'Jym',      mark: 'jym',      route: '/guide/jym' },
-    { label: 'Culinara', mark: 'culinara', route: null },
-    { label: 'Journaly', mark: 'journaly', route: null },
-    { label: 'Ledger',   mark: 'ledger',   route: null },
+  readonly guides: GuideCard[] = [
+    { label: 'Getting around Jiro', mark: 'jiro',     route: '/guide/basics',   description: 'The dashboard, search, settings and your data.' },
+    { label: 'Jym',                 mark: 'jym',      route: '/guide/jym',      description: 'Plan your training, log workouts and track progress.' },
+    { label: 'Culinara',            mark: 'culinara', route: '/guide/culinara', description: 'Save recipes, cook from them and plan meals.' },
+    { label: 'Journaly',            mark: 'journaly', route: '/guide/journaly', description: 'Write entries, look back and share with groups.' },
+    { label: 'Ledger',              mark: 'ledger',   route: '/guide/ledger',   description: 'Track accounts, spending, budgets and net worth.' },
   ];
 }

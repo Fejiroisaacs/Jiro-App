@@ -143,12 +143,34 @@ export const routes: Routes = [
         loadComponent: () => import('./features/day/day-page').then(m => m.DayPageComponent),
       },
       {
+        path: 'guide/basics',
+        title: 'Getting around Jiro',
+        data: { ...PRIVATE_PAGE },
+        loadComponent: () => import('./features/guide/basics/basics-guide').then(m => m.BasicsGuideComponent),
+      },
+      {
         path: 'guide/jym',
         title: 'Jym guide',
-        // Same component as 'jym/how-to'; point both at one URL so they do not
-        // compete as duplicates.
-        data: { ...PRIVATE_PAGE, canonical: '/jym/how-to' },
-        loadComponent: () => import('./features/guide/jym-guide').then(m => m.JymGuideComponent),
+        data: { ...PRIVATE_PAGE },
+        loadComponent: () => import('./features/guide/jym/jym-guide').then(m => m.JymGuideComponent),
+      },
+      {
+        path: 'guide/culinara',
+        title: 'Culinara guide',
+        data: { ...PRIVATE_PAGE },
+        loadComponent: () => import('./features/guide/culinara/culinara-guide').then(m => m.CulinaraGuideComponent),
+      },
+      {
+        path: 'guide/journaly',
+        title: 'Journaly guide',
+        data: { ...PRIVATE_PAGE },
+        loadComponent: () => import('./features/guide/journaly/journaly-guide').then(m => m.JournalyGuideComponent),
+      },
+      {
+        path: 'guide/ledger',
+        title: 'Ledger guide',
+        data: { ...PRIVATE_PAGE },
+        loadComponent: () => import('./features/guide/ledger/ledger-guide').then(m => m.LedgerGuideComponent),
       },
       {
         path: 'culinara',
@@ -261,12 +283,8 @@ export const routes: Routes = [
         data: { ...PRIVATE_PAGE },
         loadComponent: () => import('./features/jym/discover/discover-detail').then(m => m.DiscoverDetailComponent),
       },
-      {
-        path: 'jym/how-to',
-        title: 'How to use Jym',
-        data: { ...PRIVATE_PAGE },
-        loadComponent: () => import('./features/jym/how-to-use/how-to-use').then(m => m.HowToUseComponent),
-      },
+      // The old Jym how-to page; the guide replaced it.
+      { path: 'jym/how-to', redirectTo: '/guide/jym', pathMatch: 'full' },
       // ── Ledger ────────────────────────────────────────────────────────────
       {
         path: 'ledger',
