@@ -192,6 +192,18 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 				culinara.POST("/meal-plan/:plan_id/entries", mealPlanHandler.AddEntry)
 				culinara.DELETE("/meal-plan/entries/:entry_id", mealPlanHandler.RemoveEntry)
 
+				// Grocery list
+				culinara.GET("/grocery-list", recipeHandler.ListGroceryItems)
+				culinara.DELETE("/grocery-list", recipeHandler.ClearGroceryList)
+				culinara.DELETE("/grocery-list/checked", recipeHandler.ClearCheckedGroceryItems)
+				culinara.POST("/grocery-list/check", recipeHandler.SetGroceryChecked)
+				culinara.POST("/grocery-list/import", recipeHandler.ImportGroceryList)
+				culinara.POST("/grocery-list/items", recipeHandler.AddGroceryItem)
+				culinara.PATCH("/grocery-list/items/:id", recipeHandler.UpdateGroceryItem)
+				culinara.DELETE("/grocery-list/items/:id", recipeHandler.DeleteGroceryItem)
+				culinara.POST("/grocery-list/recipes/:recipe_id", recipeHandler.AddRecipeToGroceryList)
+				culinara.POST("/grocery-list/meal-plan/:plan_id", recipeHandler.AddMealPlanToGroceryList)
+
 				// Public toggle
 				culinara.PATCH("/recipes/:id/public", recipeHandler.SetPublicStatus)
 

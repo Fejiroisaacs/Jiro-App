@@ -203,8 +203,8 @@ type exportCulinaraData struct {
 	// Every week the account has planned, not just the current one: an export
 	// is meant to be the whole record.
 	MealPlans []exportMealPlan `json:"meal_plans"`
-	// ShoppingList lives in the browser (localStorage), not on the server, so
-	// there is nothing to read here. The key stays so the shape never changes.
+	// The grocery list. The key predates the list moving from the browser
+	// to the account (it was always empty then), so it keeps its old name.
 	ShoppingList []exportShoppingItem `json:"shopping_list"`
 }
 
@@ -263,7 +263,15 @@ type exportMealPlanEntry struct {
 }
 
 type exportShoppingItem struct {
-	Name string `json:"name"`
+	ID          uuid.UUID  `json:"id"`
+	Name        string     `json:"name"`
+	Amount      string     `json:"amount"`
+	RecipeID    *uuid.UUID `json:"recipe_id"`
+	RecipeTitle *string    `json:"recipe_title"`
+	Checked     bool       `json:"checked"`
+	Position    int        `json:"position"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
 // ── Journaly ──
@@ -746,6 +754,24 @@ func (h *ExportHandler) gatherCulinara(ctx context.Context, userID uuid.UUID) (e
 			})
 		}
 		out.MealPlans = append(out.MealPlans, ep)
+	}
+
+	groceries, err := h.recipeService.ListGroceryItems(ctx, userID)
+	if err != nil {
+		return out, err
+	}
+	for _, g := range groceries {
+		out.ShoppingList = append(out.ShoppingList, exportShoppingItem{
+			ID:          g.ID,
+			Name:        g.Item,
+			Amount:      g.Amount,
+			RecipeID:    g.RecipeID,
+			RecipeTitle: g.RecipeTitle,
+			Checked:     g.Checked,
+			Position:    g.Position,
+			CreatedAt:   g.CreatedAt,
+			UpdatedAt:   g.UpdatedAt,
+		})
 	}
 
 	return out, nil
