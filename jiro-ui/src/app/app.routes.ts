@@ -85,7 +85,7 @@ export const routes: Routes = [
         data: {
           index: true,
           description:
-            'Browse recipes Jiro cooks have chosen to publish, with the trials and ratings behind each one.',
+            'Browse recipes Jiro cooks have chosen to publish, with their ingredients and steps, and save any of them to your own library.',
           schema: 'Recipe',
         },
         loadComponent: () => import('./features/culinara/discover/discover').then(m => m.DiscoverComponent),
