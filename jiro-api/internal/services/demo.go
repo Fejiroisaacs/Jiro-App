@@ -14,29 +14,22 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// DemoEmail is the shared demo account. The .invalid TLD can never receive
-// mail, and registration refuses the whole domain (IsReservedDemoEmail).
+// DemoEmail is the shared demo account; .invalid gets no mail and registration refuses the domain.
 const DemoEmail = "demo@jiro.invalid"
 
-// demoLockKey serialises the seed and the date slide across API instances
-// (pg_advisory_xact_lock). Arbitrary, just unique to this purpose: "jirodemo".
+// demoLockKey is the advisory lock serialising the demo seed and date slide across instances.
 const demoLockKey int64 = 0x6a69726f64656d6f
 
-// demoParkDays moves a unique date column out of the way during a slide.
-// A plain UPDATE of UNIQUE(user_id, date) rows by a whole number of days or
-// weeks collides with a neighbouring row mid-statement (weekly weigh-ins
-// shifted by 7 days), so those columns are moved far out first and then
-// back. No demo row lives 100 years out.
+// demoParkDays parks UNIQUE(user_id, date) rows far out during a slide, so shifting
+// them in one UPDATE cannot collide with a neighbour mid-statement.
 const demoParkDays = 36500
 
-// IsReservedDemoEmail reports whether an address belongs to the demo's
-// domain, so nobody can register it before the demo is first seeded.
+// IsReservedDemoEmail reports whether an address is in the demo's reserved domain.
 func IsReservedDemoEmail(email string) bool {
 	return strings.HasSuffix(strings.ToLower(strings.TrimSpace(email)), "@jiro.invalid")
 }
 
-// DemoService owns the shared, look-only demo account: it creates it with
-// its sample data on first use, and keeps that data's dates recent.
+// DemoService owns the shared look-only demo account and keeps its sample data recent.
 type DemoService struct {
 	db   *pgxpool.Pool
 	auth *AuthService
@@ -46,11 +39,8 @@ func NewDemoService(db *pgxpool.Pool, auth *AuthService) *DemoService {
 	return &DemoService{db: db, auth: auth}
 }
 
-// Login returns the demo user's id, first creating the user and its sample
-// data if they do not exist yet, or else sliding the data's dates forward to
-// today (KeepFresh). Everything runs in one transaction under an advisory
-// lock, so concurrent first logins seed once and concurrent later logins
-// slide once.
+// Login returns the demo user's id, seeding it on first use or else sliding its dates to today.
+// One transaction under an advisory lock, so concurrent logins seed or slide once.
 func (s *DemoService) Login(ctx context.Context) (uuid.UUID, error) {
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
@@ -62,9 +52,7 @@ func (s *DemoService) Login(ctx context.Context) (uuid.UUID, error) {
 		return uuid.Nil, err
 	}
 
-	// The demo's today is a New York date (see demoDate), so its "yesterday"
-	// is the yesterday the day view and streaks show a New York user. The seed
-	// and the anchor take that date; keepFresh takes the instant and converts.
+	// The demo's today is a New York date (see demoDate).
 	now := time.Now()
 	today := demoDate(now)
 	var id uuid.UUID
@@ -87,8 +75,7 @@ func (s *DemoService) Login(ctx context.Context) (uuid.UUID, error) {
 		}
 	}
 
-	// Every visit mints a refresh token for the one shared account; drop the
-	// expired ones so they do not pile up.
+	// Every visit mints a refresh token; drop expired ones so they do not pile up.
 	if _, err := tx.Exec(ctx, `DELETE FROM refresh_tokens WHERE user_id = $1 AND expires_at < NOW()`, id); err != nil {
 		return uuid.Nil, err
 	}
@@ -97,8 +84,7 @@ func (s *DemoService) Login(ctx context.Context) (uuid.UUID, error) {
 }
 
 func (s *DemoService) seed(ctx context.Context, tx pgx.Tx, now time.Time) (uuid.UUID, error) {
-	// A real Argon2id hash of a random secret nobody ever sees: password
-	// login can never succeed (and the Login handler refuses the demo anyway).
+	// A real Argon2id hash of a secret nobody sees, so password login can never succeed.
 	secret := make([]byte, 32)
 	if _, err := rand.Read(secret); err != nil {
 		return uuid.Nil, err
@@ -127,10 +113,7 @@ func (s *DemoService) seed(ctx context.Context, tx pgx.Tx, now time.Time) (uuid.
 	return id, nil
 }
 
-// demoDayShift is how many whole calendar days (in the demo's timezone; the
-// anchor is stored as UTC midnight of such a date) the data must move so
-// that what was "yesterday" at anchor is yesterday again at now. Never
-// negative, so a clock step backwards does nothing.
+// demoDayShift is the whole demo-zone days to slide so yesterday stays yesterday; never negative.
 func demoDayShift(anchor, now time.Time) int {
 	days := int(demoDate(now).Sub(utcDay(anchor)).Hours() / 24)
 	if days < 0 {
@@ -139,9 +122,7 @@ func demoDayShift(anchor, now time.Time) int {
 	return days
 }
 
-// demoWeekShift is how many whole weeks the meal plan must move so its week
-// stays the current one: the number of Monday boundaries between the old
-// and the new anchor. Moving by whole weeks keeps week_start a Monday.
+// demoWeekShift counts Monday boundaries between anchors, so the meal plan week stays current.
 func demoWeekShift(oldAnchor, newAnchor time.Time) int {
 	return int(mondayOf(newAnchor).Sub(mondayOf(oldAnchor)).Hours() / (24 * 7))
 }
@@ -163,10 +144,8 @@ type demoShift struct {
 // demoTS is a timestamp column's shift by $2 whole days.
 const demoTS = "make_interval(days => $2)"
 
-// demoShifts lists every date and timestamp the demo owns, directly by
-// user_id or through its parent row. users.created_at is left alone on
-// purpose. Keep in step with the schema: a new dated table the demo writes
-// to belongs here, or its rows will age.
+// demoShifts lists every date the demo owns. A new dated table the demo writes to
+// must be added here, or its rows will age.
 var demoShifts = []demoShift{
 	// Jym
 	{sql: `UPDATE exercises SET created_at = created_at + ` + demoTS + `, updated_at = updated_at + ` + demoTS + ` WHERE user_id = $1`},
@@ -207,10 +186,7 @@ var demoShifts = []demoShift{
 	{sql: `UPDATE ledger_transactions SET recurrence_next_date = recurrence_next_date + $2::int WHERE user_id = $1 AND recurrence_next_date IS NOT NULL`},
 }
 
-// keepFresh slides every demo date forward by the whole days since anchor
-// (the meal plan by whole weeks) and moves the anchor by the same amount.
-// Rows, ids and content never change, so pages already open keep working.
-// The caller holds the demo advisory lock.
+// keepFresh slides every demo date forward by whole days since anchor; the caller holds the demo lock.
 func keepFresh(ctx context.Context, tx pgx.Tx, userID uuid.UUID, anchor, now time.Time) error {
 	days := demoDayShift(anchor, now)
 	if days == 0 {
@@ -219,9 +195,7 @@ func keepFresh(ctx context.Context, tx pgx.Tx, userID uuid.UUID, anchor, now tim
 	newAnchor := anchor.AddDate(0, 0, days)
 	weeks := demoWeekShift(anchor, newAnchor)
 
-	// GET /culinara/meal-plan creates an empty plan for any week a visitor
-	// browses to. Those would collide with the seeded plan as it moves, and
-	// hold nothing: drop them first.
+	// Drop empty plans created by browsing; they would collide with the seeded plan as it moves.
 	if _, err := tx.Exec(ctx,
 		`DELETE FROM meal_plans p WHERE p.user_id = $1
 		   AND NOT EXISTS (SELECT 1 FROM meal_plan_entries e WHERE e.meal_plan_id = p.id)`,

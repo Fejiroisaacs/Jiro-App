@@ -1,9 +1,6 @@
 /** Shared utilities for the Ledger module. Import instead of duplicating per component. */
 
-/**
- * Money in the user's one currency (SettingsService.currency): thousands
- * separators, the currency's own decimals (two for most), and a minus sign when negative.
- */
+/** Money in the user's currency, with its own decimals and a minus sign when negative. */
 export function formatCurrency(value: number, currency = 'USD'): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -36,10 +33,7 @@ export function currencySymbol(currency: string): string {
   return part?.value ?? currency;
 }
 
-/**
- * The currencies Settings offers, most used first. Any ISO 4217 code works
- * with the API; this is the list people pick from.
- */
+/** The currencies Settings offers, most used first; the API takes any ISO 4217 code. */
 export const CURRENCIES: { code: string; name: string }[] = [
   { code: 'USD', name: 'US dollar' },
   { code: 'EUR', name: 'Euro' },
@@ -67,11 +61,7 @@ export const CURRENCIES: { code: string; name: string }[] = [
   { code: 'AED', name: 'UAE dirham' },
 ];
 
-/**
- * A change between two periods as a percentage: "+12.5%", "-3.0%", or,
- * when the earlier period is zero so there is no base, "new" (something
- * appeared) or "n/a" (still nothing).
- */
+/** Period change as "+12.5%", or "new" / "n/a" when the earlier period is zero. */
 export function formatPctChange(pct: number | null, current: number): string {
   if (pct === null) return current !== 0 ? 'new' : 'n/a';
   return new Intl.NumberFormat('en-US', {
@@ -81,12 +71,7 @@ export function formatPctChange(pct: number | null, current: number): string {
   }).format(pct) + '%';
 }
 
-/**
- * Net worth from the accounts, the one rule the Accounts page and "Take
- * snapshot" share: every account counts, inactive ones too, at its real
- * signed balance. A positive balance is an asset and a negative one a
- * liability (a credit card owing money is stored negative).
- */
+/** Net worth over every account, inactive too, at its signed balance (negative is a liability). */
 export function netWorthTotals(accounts: { balance: number }[]): { assets: number; liabilities: number; net: number } {
   let assets = 0;
   let liabilities = 0;
@@ -98,11 +83,7 @@ export function netWorthTotals(accounts: { balance: number }[]): { assets: numbe
   return { assets: round(assets), liabilities: round(liabilities), net: round(assets - liabilities) };
 }
 
-/**
- * Category colours: the default categories' own palette, so a custom
- * category sits with them. The API picks the next unused one when none is
- * chosen.
- */
+/** Category colours: the default categories' palette. */
 export const CATEGORY_PALETTE: { hex: string; name: string }[] = [
   { hex: '#8D6E63', name: 'Clay' },
   { hex: '#E57373', name: 'Coral' },

@@ -20,8 +20,7 @@ func CORS(allowedOrigins []string) gin.HandlerFunc {
 			c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 			c.Header("Access-Control-Allow-Headers", "Authorization, Content-Type")
 			c.Header("Access-Control-Allow-Credentials", "true")
-			// Cross-origin JS can only read non-safelisted response headers
-			// that are exposed here (paginated lists report their total).
+			// Lets cross-origin JS read the paginated list total.
 			c.Header("Access-Control-Expose-Headers", "X-Total-Count")
 			c.Header("Access-Control-Max-Age", "86400")
 		}

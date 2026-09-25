@@ -11,16 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// The demo account's sample data. It is built once, relative to the moment
-// it is first inserted, and never rebuilt: DemoService.Login only slides its
-// dates forward afterwards (see demo.go).
-//
-// Every timestamp lands on a day strictly before the seed day (at a fixed
-// clock time), so a whole-day slide can never push anything into the
-// future. Plain dates may fall on the seed day itself. Weights are stored in
-// kg like everything else in Jym, from plate-friendly lbs values, since the
-// demo user displays lbs. Nothing here references an upload: every image
-// column stays NULL.
+// The demo account's sample data: built once, then only slid forward (see demo.go).
 
 type demoExercise struct {
 	ID          uuid.UUID
@@ -110,8 +101,7 @@ type demoMealPlanEntry struct {
 	CustomLabel string
 }
 
-// demoGroceryItem is one line of the grocery list. RecipeID nil means an
-// item typed in by hand.
+// demoGroceryItem is one grocery line; nil RecipeID means typed in by hand.
 type demoGroceryItem struct {
 	RecipeID    *uuid.UUID
 	RecipeTitle string
@@ -205,14 +195,10 @@ type demoDataset struct {
 // demoSettings is the demo user's settings column.
 const demoSettings = `{"weight_unit":"lbs","timezone":"America/New_York"}`
 
-// demoTimeZone matches demoSettings. The app cuts days in the user's
-// timezone, so the demo's "today" (for seeding and for sliding dates) is the
-// New York calendar day, not the UTC one.
+// demoTimeZone matches demoSettings; the demo's today is the New York day.
 const demoTimeZone = "America/New_York"
 
-// demoDate is t's calendar date in the demo's timezone, as UTC midnight of
-// that date (the same shape utcDay returns). Seed times are UTC hours 05-23,
-// which fall on that same calendar date in New York all year round.
+// demoDate is t's New York date as UTC midnight; seed UTC hours 05-23 stay on that date.
 func demoDate(t time.Time) time.Time {
 	loc, err := time.LoadLocation(demoTimeZone)
 	if err != nil { // tzdata is embedded (day.go), so this does not happen
@@ -227,8 +213,7 @@ func utcDay(t time.Time) time.Time {
 	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
 }
 
-// mondayOf returns the Monday starting t's week (UTC), the way the meal
-// planner's parseWeekStart does.
+// mondayOf returns the Monday starting t's week (UTC), as parseWeekStart does.
 func mondayOf(t time.Time) time.Time {
 	d := utcDay(t)
 	return d.AddDate(0, 0, -((int(d.Weekday()) + 6) % 7))
@@ -372,8 +357,7 @@ func buildDemoJym(ds *demoDataset, at func(int, int, int) time.Time, date func(i
 				if rpe > 9 {
 					rpe = 9
 				}
-				// Same rule as JymService.LogSet: heavier than ever, or the
-				// same best weight for more reps.
+				// Same PR rule as JymService.LogSet.
 				b := bests[lift.name]
 				isPR := weight > b.lbs || (weight == b.lbs && reps > b.reps)
 				if isPR {
@@ -612,9 +596,7 @@ Stir in the chocolate and season. Top with sour cream and green onion.`,
 		{r(risotto), 6, "dinner", ""},
 	}
 
-	// The grocery list: the week's two meal prep recipes added from the
-	// planner the evening before, a few things ticked off already, and two
-	// items typed in by hand.
+	// The grocery list: this week's meal prep recipes, some ticked, plus two manual items.
 	titles := map[uuid.UUID]string{}
 	ingredients := map[uuid.UUID]string{}
 	for _, rec := range ds.Recipes {

@@ -289,11 +289,7 @@ export class TrialModalComponent implements OnInit {
     }
   }
 
-  /**
-   * The instant to send for the chosen day: local noon in the user's zone, so
-   * the trial counts on that day everywhere (day view, cook streak). An edit
-   * that leaves the day alone sends the stored instant back unchanged.
-   */
+  /** Local noon on the chosen day in the user's zone; an unchanged day sends the stored instant back. */
   private dateCookedFor(trial: RecipeTrial | null): string | undefined {
     if (!this.dateCookedStr) return undefined;
     if (trial?.date_cooked && this.dateCookedStr === this.originalDay) return trial.date_cooked;

@@ -7,18 +7,7 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
 import { JiroMarkComponent, MarkName } from '../../../shared/components/jiro-mark/jiro-mark';
 import { GuideSectionComponent } from './guide-section';
 
-/**
- * The layout every guide uses: back link, mark, h1, one-line intro, and a
- * contents list built from the `guide-section`s projected into it.
- *
- *   <guide-page heading="Jym guide" mark="jym" intro="Plan your training, log workouts and track progress.">
- *     <guide-section id="log-a-workout" title="Log a workout">...</guide-section>
- *   </guide-page>
- *
- * Also holds the shared reading styles for guide content (paragraphs, lists,
- * links, kbd), which is why it is not view-encapsulated: every selector is
- * scoped under `guide-page`.
- */
+/** Guide layout with a contents list from its guide-sections; unencapsulated, so styles are scoped to guide-page. */
 @Component({
   selector: 'guide-page',
   standalone: true,
@@ -118,8 +107,7 @@ import { GuideSectionComponent } from './guide-section';
     .gd-toc-list li::marker { color: var(--text-muted); }
     .gd-toc-list a { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
 
-    /* Reading styles for guide content. Text keeps a comfortable line
-       length; screenshots may use the full page width. */
+    /* Reading styles: text keeps a comfortable line length; screenshots may go full width. */
     guide-page .gd-body p,
     guide-page .gd-body > ul,
     guide-page .gd-section > ul,
@@ -174,10 +162,7 @@ export class GuidePageComponent {
   readonly path = inject(Location).path().split(/[?#]/)[0];
 
   constructor() {
-    // Arriving on /guide/x#section: the section did not exist when the browser
-    // looked for it, so scroll there once it has rendered. A later hash change
-    // on this page is a router navigation, and the app scrolls to the top on
-    // every NavigationEnd; this subscriber runs after that one.
+    // On arrival at #section, scroll once it renders; this runs after the app's scroll-to-top on NavigationEnd.
     afterNextRender(() => this.scrollToHash());
     inject(Router).events.pipe(
       filter(e => e instanceof NavigationEnd),

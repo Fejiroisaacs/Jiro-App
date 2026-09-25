@@ -1,10 +1,4 @@
-/**
- * Calendar-day helpers in the user's own timezone. A "day key" is a calendar
- * date as YYYY-MM-DD, the same string the day view puts in its URL and the
- * API's GET /day takes. Every helper that turns an instant into a day takes
- * the IANA zone explicitly, so the dashboard strip and the day page (and the
- * API, which cuts days in the settings zone too) always agree.
- */
+/** Calendar-day helpers in the user's timezone; a day key is YYYY-MM-DD, as in /day URLs and GET /day. */
 
 const DAY_KEY = /^(\d{4})-(\d{2})-(\d{2})$/;
 
@@ -70,10 +64,7 @@ function keyDate(key: string): Date {
   return new Date(Date.UTC(y, m - 1, d));
 }
 
-/**
- * "Wednesday 23 September", with the year added when it is not `today`'s
- * year. Built from parts so no locale inserts a comma.
- */
+/** "Wednesday 23 September", plus the year when not `today`'s; built from parts so no locale adds a comma. */
 export function longDayLabel(key: string, today: string): string {
   const date = keyDate(key);
   const weekday = date.toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' });
@@ -129,11 +120,7 @@ function zoneOffsetMs(instant: number, timeZone: string): number {
   return wall - Math.floor(instant / 1000) * 1000;
 }
 
-/**
- * The UTC instant (ISO string) at which `timeZone`'s clock reads `hour`:00 on
- * `key`. The offset is taken at a first guess and then again at the result,
- * so a DST change between the guess and the target cannot shift it.
- */
+/** UTC instant (ISO) when `timeZone` reads `hour`:00 on `key`; the offset is re-checked so DST can't shift it. */
 function zonedHourISO(key: string, hour: number, timeZone: string): string {
   const [y, m, d] = key.split('-').map(Number);
   const wall = Date.UTC(y, m - 1, d, hour);
@@ -146,10 +133,7 @@ export function zonedNoonISO(key: string, timeZone: string): string {
   return zonedHourISO(key, 12, timeZone);
 }
 
-/**
- * The UTC instant (ISO string) at which `key` starts in `timeZone`, for
- * range filters on timestamps: [dayStartISO(from), dayStartISO(to + 1 day)).
- */
+/** UTC instant (ISO) when `key` starts in `timeZone`, for [dayStartISO(from), dayStartISO(to + 1)) ranges. */
 export function dayStartISO(key: string, timeZone: string): string {
   return zonedHourISO(key, 0, timeZone);
 }

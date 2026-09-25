@@ -479,8 +479,7 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
     }
     .verify-banner-close:hover { color: var(--text-primary); background: rgba(var(--color-primary-rgb), 0.1); }
 
-    /* Shown on every page of the demo, so it stays one slim row where it
-       fits and wraps the button under the text where it does not. */
+    /* The demo banner: one slim row where it fits, wrapping the button where it does not. */
     .demo-bar {
       display: flex;
       flex-wrap: wrap;

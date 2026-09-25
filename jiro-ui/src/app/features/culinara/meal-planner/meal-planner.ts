@@ -415,12 +415,7 @@ export class MealPlannerComponent implements OnInit {
   plan = signal<MealPlan | null>(null);
   private readonly settings = inject(SettingsService);
 
-  /**
-   * The Monday of the shown week, as a day key. Weeks are calendar weeks in
-   * the user's zone, and the key is sent to the API as is, so no instant (and
-   * no browser-to-UTC shift) is involved: a Date at local midnight turned
-   * into an ISO string gave the Sunday before for anyone east of UTC.
-   */
+  /** Monday of the shown week as a day key in the user's zone, sent as is (no UTC shift). */
   currentMonday = signal(this.thisMonday());
   allRecipes = signal<Recipe[]>([]);
   filteredRecipes = signal<Recipe[]>([]);

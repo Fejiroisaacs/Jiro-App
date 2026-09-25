@@ -1,21 +1,10 @@
--- Recurring transactions become real. A series is its first transaction
--- (the "head", is_recurring = true). recurrence_next_date is the next date
--- the series is due; NULL means it is not repeating (stopped, or never was).
--- Each occurrence Ledger writes points back at its head through
--- recurrence_source_id. recurrence_day (already present) holds the day of
--- the month a monthly or yearly series falls on, so a series that starts on
--- the 31st lands on the last day of shorter months without drifting.
---
--- Additive only: two nullable columns and two indexes. jiro_app already
--- holds table-level grants on ledger_transactions, which cover new columns.
+-- Real recurring series: a head has recurrence_next_date; copies point back via recurrence_source_id.
 
 ALTER TABLE ledger_transactions
   ADD COLUMN IF NOT EXISTS recurrence_next_date DATE,
   ADD COLUMN IF NOT EXISTS recurrence_source_id UUID REFERENCES ledger_transactions(id) ON DELETE SET NULL;
 
--- One occurrence per series per date: this is what makes the lazy catch-up
--- idempotent even if two requests race past the row lock. A transfer writes
--- two rows per occurrence, so only its source leg (the negative one) counts.
+-- One occurrence per series per date (source leg only), so racing catch-ups stay idempotent.
 CREATE UNIQUE INDEX IF NOT EXISTS ledger_txn_recurrence_occurrence
   ON ledger_transactions (recurrence_source_id, date)
   WHERE recurrence_source_id IS NOT NULL AND NOT (type = 'transfer' AND amount > 0);
@@ -25,10 +14,7 @@ CREATE INDEX IF NOT EXISTS ledger_txn_recurrence_due
   ON ledger_transactions (user_id, recurrence_next_date)
   WHERE recurrence_next_date IS NOT NULL;
 
--- Existing data. Until now "recurring" was only a flag, and people flagged
--- each month's copy by hand, so one real series can be several flagged rows.
--- Group them (same account, kind, description, interval and transfer target),
--- keep the latest as the head, and clear the flag on the older copies.
+-- Existing flagged copies: group each series, keep the latest as head, unflag the rest.
 WITH ranked AS (
   SELECT id,
          row_number() OVER (
@@ -58,9 +44,7 @@ WHERE is_recurring
   AND recurrence_interval IN ('monthly', 'yearly')
   AND NOT (type = 'transfer' AND amount > 0);
 
--- Activate each head from the day this runs: its next date is the first
--- scheduled date on or after today. Nothing is back-filled for the months
--- before this migration, since people have been entering those by hand.
+-- Arm each head from today; earlier months are not back-filled.
 UPDATE ledger_transactions t
 SET recurrence_next_date = t.date + (7 * GREATEST(1, CEIL((CURRENT_DATE - t.date)::numeric / 7)))::int
 WHERE t.is_recurring AND t.recurrence_interval = 'weekly'

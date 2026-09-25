@@ -19,9 +19,7 @@ type GroceryItem struct {
 	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
-// GroceryList is what every grocery endpoint that changes the list returns:
-// the whole list afterwards, plus how many items the call added and how many
-// it skipped as already on the list.
+// GroceryList is the whole list after a change, plus how many items were added and skipped.
 type GroceryList struct {
 	Items   []GroceryItem `json:"items"`
 	Added   int           `json:"added"`
@@ -37,15 +35,13 @@ type UpdateGroceryItemRequest struct {
 	Checked *bool `json:"checked" binding:"required"`
 }
 
-// SetGroceryCheckedRequest checks (or unchecks) several items at once: the
-// given ids, or every item when ids is empty.
+// SetGroceryCheckedRequest checks or unchecks the given ids, or every item when ids is empty.
 type SetGroceryCheckedRequest struct {
 	IDs     []uuid.UUID `json:"ids" binding:"max=1000"`
 	Checked bool        `json:"checked"`
 }
 
-// ImportGroceryItem is one item of a grocery list kept in the browser before
-// the list moved to the account.
+// ImportGroceryItem is one item of a grocery list kept in the browser.
 type ImportGroceryItem struct {
 	Item        string `json:"item" binding:"max=200"`
 	Amount      string `json:"amount" binding:"max=100"`

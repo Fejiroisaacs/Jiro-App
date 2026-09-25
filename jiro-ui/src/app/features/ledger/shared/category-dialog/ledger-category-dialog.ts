@@ -7,11 +7,7 @@ import { CATEGORY_PALETTE } from '../ledger-utils';
 
 let dialogSeq = 0;
 
-/**
- * New category, or rename and recolour an existing one. The type is chosen
- * once, at creation: moving a category between income and expense would
- * misfile its transactions. Emits the saved category.
- */
+/** New category, or rename and recolour one; the type is fixed at creation so transactions aren't misfiled. */
 @Component({
   selector: 'ledger-category-dialog',
   standalone: true,

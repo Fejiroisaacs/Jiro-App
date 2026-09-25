@@ -180,11 +180,7 @@ export class JournalService {
 
   private readonly settings = inject(SettingsService);
 
-  /**
-   * The browser's zone as a hint for the day-based endpoints (streak,
-   * calendar). The API only uses it for an account with no timezone setting,
-   * exactly as GET /day does, so every view counts the same days.
-   */
+  /** Browser zone hint for day-based endpoints; the API uses it only when the account has no timezone. */
   private tzParams(): HttpParams {
     return new HttpParams().set('tz', this.settings.timezone());
   }
@@ -206,12 +202,7 @@ export class JournalService {
     return this.http.get<JournalEntry[]>(`${API_URL}/entries`, { params: p });
   }
 
-  /**
-   * One page of entries plus the number matching the filters, read from the
-   * X-Total-Count header. Without the header the total is a lower bound
-   * (what this page proves exists), so a pager never offers a page that
-   * cannot be shown.
-   */
+  /** One page plus X-Total-Count; without the header the total is a lower bound. */
   listEntriesPage(params: ListEntriesParams = {}): Observable<{ entries: JournalEntry[]; total: number }> {
     let p = new HttpParams();
     if (params.q) p = p.set('q', params.q);

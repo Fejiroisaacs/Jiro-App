@@ -23,12 +23,7 @@ type LoadState =
 
 const SLOT_LABELS: Record<string, string> = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snack' };
 
-/**
- * One of the user's days across all four modules (/day/:date). The date is
- * the URL, so the arrows push history and Back works; /day, an invalid date
- * or a future one is replaced with today. Days are cut in the settings
- * timezone, the same one the API and the dashboard strip use.
- */
+/** One of the user's days across all modules (/day/:date); arrows push history, bad dates become today. */
 @Component({
   selector: 'app-day-page',
   standalone: true,
@@ -477,10 +472,7 @@ export class DayPageComponent {
 
   retry() { this.retry$.next(); }
 
-  /**
-   * The control that moved the day can vanish (Today, or Next on reaching
-   * today); when focus falls to the body, put it on the heading instead.
-   */
+  /** If the control that moved the day vanished and focus fell to body, focus the heading. */
   private afterDayChange() {
     afterNextRender(() => {
       const active = document.activeElement;
@@ -489,8 +481,7 @@ export class DayPageComponent {
   }
 
   sessionLink(s: SessionSummary): { path: unknown[]; query: Record<string, string> | null } {
-    // Completed sessions open read-only in history; the player would restart
-    // its timer (same rule as global search).
+    // Completed sessions open read-only in history; the player would restart its timer.
     return s.ended_at
       ? { path: ['/jym/track'], query: { tab: 'sessions', session: s.id } }
       : { path: ['/jym/session', s.id], query: null };

@@ -152,8 +152,7 @@ export class RegisterComponent {
   passwordMismatch = signal(false);
   usernameError = signal('');
 
-  /** Where to go once registered: a same-origin path from ?returnUrl=
-   *  (as login reads it, e.g. a group invite), else the dashboard. */
+  /** A same-origin ?returnUrl= path (e.g. a group invite), else the dashboard. */
   private returnUrl = '/dashboard';
   /** Carries ?returnUrl= over to the sign-in link, when there is one. */
   returnQuery: { returnUrl: string } | null = null;

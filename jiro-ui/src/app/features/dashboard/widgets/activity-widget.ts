@@ -91,9 +91,7 @@ interface ActivityDay {
     .act-day { font-size: 10px; color: var(--text-muted); }
     .act-col--today .act-day { color: var(--color-primary); font-weight: 700; }
 
-    /* Phones: 14 columns would be ~17px taps. Two rows of 7 (last week over
-       this week) keep every day at a comfortable width; 14 is exactly two
-       weeks, so each column holds the same weekday in both rows. */
+    /* Phones: two rows of 7 (last week over this week) instead of 14 tiny columns. */
     @media (max-width: 600px) {
       .act-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); row-gap: var(--space-sm); }
       .act-col { padding: 4px 0; }
@@ -109,8 +107,7 @@ export class ActivityWidgetComponent {
 
   private readonly settings = inject(SettingsService);
 
-  // Days are the user's calendar days (settings timezone), the same ones the
-  // day view and GET /day use, so each column opens exactly what it counts.
+  // Days are the user's calendar days, the same as the day view and GET /day.
   readonly days = computed<ActivityDay[]>(() => {
     const d = this.data();
     const today = todayKey(this.settings.timezone());

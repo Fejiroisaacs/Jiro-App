@@ -430,8 +430,7 @@ export class JymService {
 
   // CSV Export
   exportSessionsCSV(from?: string, to?: string): Observable<Blob> {
-    // from, to and the date column are the user's days; tz is the API's
-    // fallback for an account with no timezone setting.
+    // from, to and date are the user's days; tz is the API's fallback when the account has no timezone.
     let params = new HttpParams().set('tz', this.settings.timezone());
     if (from) params = params.set('from', from);
     if (to) params = params.set('to', to);

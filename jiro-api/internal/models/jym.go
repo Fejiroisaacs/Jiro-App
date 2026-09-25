@@ -171,8 +171,7 @@ type RoutineItemsEntry struct {
 	Items     []ReplaceItemEntry `json:"items" binding:"max=100,dive"`
 }
 
-// ReplaceSplitItemsRequest saves several days of one split atomically, e.g.
-// the source and target day when an exercise is dragged between them.
+// ReplaceSplitItemsRequest saves several days of one split atomically.
 type ReplaceSplitItemsRequest struct {
 	Routines []RoutineItemsEntry `json:"routines" binding:"required,min=1,max=50,dive"`
 }

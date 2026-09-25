@@ -890,11 +890,7 @@ export class TransactionLogComponent implements OnInit {
     this.openFromUrl();
   }
 
-  /**
-   * Deep links from the day view: ?tx=<id> opens that transaction's edit
-   * dialog, ?new=1&date=YYYY-MM-DD opens Log transaction for that day. The
-   * params are dropped when the dialog closes so a reload does not reopen it.
-   */
+  /** Day view deep links (?tx=<id>, ?new=1&date=); cleared on close so a reload doesn't reopen the dialog. */
   private openFromUrl() {
     const q = this.route.snapshot.queryParamMap;
     const txId = q.get('tx');
@@ -1062,8 +1058,7 @@ export class TransactionLogComponent implements OnInit {
         this.saving.set(false);
         this.closeEditModal();
         this.toast.success('Transaction saved');
-        // Its date or account may have moved it; the list order and the
-        // other rows of a series come from the server.
+        // Its date or account may have moved it; order and series rows come from the server.
         this.loadTransactions();
       },
       error: err => {
@@ -1132,8 +1127,7 @@ export class TransactionLogComponent implements OnInit {
         this.saving.set(false);
         this.closeAddModal();
         this.toast.success('Transaction logged');
-        // Reload rather than prepend: a back-dated repeating transaction
-        // brings its copies with it, and the list stays in date order.
+        // Reload rather than prepend: a back-dated repeat brings its copies, and order stays by date.
         this.loadAccounts();
         this.loadTransactions();
       },

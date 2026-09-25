@@ -127,9 +127,7 @@ export const routes: Routes = [
         data: { ...PRIVATE_PAGE },
         loadComponent: () => import('./features/guide/guide').then(m => m.GuideComponent),
       },
-      // One of the user's days across all four modules. Bare /day, a bad date
-      // and a future one are all replaced with today by the page itself, since
-      // "today" depends on the signed-in user's timezone.
+      // The page itself replaces /day, bad and future dates with today (in the user's timezone).
       {
         path: 'day',
         title: 'Day',

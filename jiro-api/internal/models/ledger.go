@@ -7,9 +7,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// OptionalUUID tells a field that was left out of a PATCH body apart from one
-// sent as null: Set is false when absent, and Value is nil for an explicit
-// null (clear it).
+// OptionalUUID tells an absent PATCH field (Set false) from an explicit null (Value nil).
 type OptionalUUID struct {
 	Set   bool
 	Value *uuid.UUID
@@ -48,8 +46,7 @@ type AccountWithTransactions struct {
 	RecentTransactions []LedgerTransaction `json:"recent_transactions"`
 }
 
-// CreateAccountRequest has no currency: every account uses the user's one
-// currency (settings.currency). The column is still written, from settings.
+// CreateAccountRequest has no currency: accounts use the user's settings.currency.
 type CreateAccountRequest struct {
 	Name    string  `json:"name" binding:"required"`
 	Type    string  `json:"type" binding:"required,oneof=checking savings credit investment cash"`
@@ -87,8 +84,7 @@ type CreateCategoryRequest struct {
 	ParentID *uuid.UUID `json:"parent_id"`
 }
 
-// UpdateCategoryRequest renames or recolours. The type is fixed: moving a
-// category between income and expense would misfile its transactions.
+// UpdateCategoryRequest renames or recolours; the type is fixed so transactions stay filed correctly.
 type UpdateCategoryRequest struct {
 	Name  *string `json:"name"`
 	Color *string `json:"color"`
@@ -110,8 +106,7 @@ type LedgerTransaction struct {
 	RecurrenceInterval  *string    `json:"recurrence_interval"`
 	RecurrenceDay       *int       `json:"recurrence_day"`
 	TransferToAccountID *uuid.UUID `json:"transfer_to_account_id"`
-	// RecurrenceNextDate is set on an active series head: the next date
-	// Ledger will write a copy on. Nil when the row is not a live series.
+	// RecurrenceNextDate is the next date an active series head is due; nil otherwise.
 	RecurrenceNextDate *time.Time `json:"recurrence_next_date"`
 	// RecurrenceSourceID is set on a copy Ledger wrote: the series head.
 	RecurrenceSourceID *uuid.UUID `json:"recurrence_source_id"`
@@ -120,9 +115,7 @@ type LedgerTransaction struct {
 	// Joined fields for display
 	CategoryName  *string `json:"category_name,omitempty"`
 	CategoryColor *string `json:"category_color,omitempty"`
-	// SeriesInterval and SeriesNextDate describe the series this row belongs
-	// to (its own for a head, its head's for a copy); nil when it has none or
-	// the series has stopped.
+	// SeriesInterval and SeriesNextDate describe this row's live series (its own or its head's), else nil.
 	SeriesInterval *string    `json:"series_interval"`
 	SeriesNextDate *time.Time `json:"series_next_date"`
 }
@@ -140,9 +133,7 @@ type CreateTransactionRequest struct {
 	TransferToAccountID *uuid.UUID `json:"transfer_to_account_id"`
 }
 
-// UpdateTransactionRequest: every field is optional and a field left out is
-// left alone. category_id may be sent as null to uncategorise; notes as ""
-// to clear them. The type cannot change.
+// UpdateTransactionRequest: omitted fields are left alone; null category_id or "" notes clears them.
 type UpdateTransactionRequest struct {
 	AccountID           *uuid.UUID   `json:"account_id"`
 	TransferToAccountID *uuid.UUID   `json:"transfer_to_account_id"`
@@ -193,8 +184,7 @@ type CreateBudgetRequest struct {
 	CategoryID uuid.UUID `json:"category_id" binding:"required"`
 	Amount     float64   `json:"amount" binding:"required,gt=0"`
 	Period     string    `json:"period" binding:"required,oneof=monthly weekly yearly"`
-	// StartDate is optional and unused by the spend maths (a budget always
-	// covers the current period); it defaults to today in the user's zone.
+	// StartDate is optional and unused by the spend maths; defaults to the user's today.
 	StartDate string `json:"start_date"` // YYYY-MM-DD
 }
 
@@ -235,9 +225,7 @@ type ComparisonPeriod struct {
 	To   string `json:"to"`
 }
 
-// ComparisonValue compares period B against period A (the base): Delta is
-// B - A, DeltaPct is that change as a share of |A|, and nil when A is zero
-// (no base to measure against).
+// ComparisonValue compares B against base A: Delta is B - A; DeltaPct is nil when A is zero.
 type ComparisonValue struct {
 	A        float64  `json:"a"`
 	B        float64  `json:"b"`
@@ -251,8 +239,7 @@ type ComparisonSummary struct {
 	Net      ComparisonValue `json:"net"`
 }
 
-// ComparisonCategory is one category's income or spending in each period,
-// as a positive amount. CategoryID is nil for uncategorised transactions.
+// ComparisonCategory is one category's positive amount per period; CategoryID nil means uncategorised.
 type ComparisonCategory struct {
 	CategoryID *uuid.UUID `json:"category_id"`
 	Name       string     `json:"name"`

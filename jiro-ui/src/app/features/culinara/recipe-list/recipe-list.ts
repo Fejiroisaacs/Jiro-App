@@ -98,8 +98,7 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
       </div>
 }
 
-      <!-- Collection filter. Shown with no collections too, so the first one
-           can be made here and not only from the New Recipe form. -->
+      <!-- Collection filter, shown with no collections too so the first one can be made here. -->
       @if (collectionsLoaded()) {
         <div class="collection-filter" role="group" aria-label="Collections">
           @if (collections().length > 0) {

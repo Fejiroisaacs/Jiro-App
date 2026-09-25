@@ -18,11 +18,7 @@ export interface GroceryItem {
   updated_at: string;
 }
 
-/**
- * The whole list after a change, plus what the change did. Adding an item
- * that is already on the list from the same recipe (or typed by hand, for a
- * manual item) is skipped, not duplicated.
- */
+/** The list after a change; re-adding an item from the same source is skipped, not duplicated. */
 export interface GroceryList {
   items: GroceryItem[];
   added: number;
@@ -91,10 +87,7 @@ export class GroceryService {
     return this.http.delete<GroceryList>(API);
   }
 
-  /**
-   * A list saved in this browser before the list moved to the account, or
-   * null when there is none. Anything unreadable counts as none.
-   */
+  /** The pre-account list saved in this browser, or null (unreadable counts as none). */
   readLegacyList(): LegacyItem[] | null {
     try {
       const raw = localStorage.getItem(LEGACY_STORAGE_KEY);
@@ -114,10 +107,7 @@ export class GroceryService {
     }
   }
 
-  /**
-   * Uploads the browser's old list. The server only takes it into an empty
-   * list, so a second tab or device cannot import it twice.
-   */
+  /** Uploads the old browser list; the server only takes it into an empty list, so it can't import twice. */
   importLegacy(items: LegacyItem[]): Observable<GroceryList> {
     const clean = items
       .filter(i => typeof i?.item === 'string' && i.item.trim() !== '')

@@ -7,12 +7,7 @@ import { JiroIconComponent } from '../../../../shared/components/jiro-icon/jiro-
 import { JiroModalComponent } from '../../../../shared/components/jiro-modal/jiro-modal';
 import { LedgerCategoryDialogComponent } from '../category-dialog/ledger-category-dialog';
 
-/**
- * Your categories, expense then income, each by name: add, rename, recolour
- * and delete. Deleting asks where its transactions go: another category of
- * the same type, or Uncategorised. Emits `changed` after any edit, since
- * budgets show category names and colours.
- */
+/** Add, rename, recolour and delete categories; emits `changed` after any edit (budgets show them). */
 @Component({
   selector: 'ledger-category-manager',
   standalone: true,

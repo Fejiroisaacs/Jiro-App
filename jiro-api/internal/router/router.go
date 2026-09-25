@@ -111,8 +111,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 			// Cookie-authenticated, so the only CSRF-reachable routes.
 			auth.POST("/refresh", session, middleware.RequireTrustedOrigin(cfg.CORSOrigins), authHandler.Refresh)
 			auth.POST("/logout", session, middleware.RequireTrustedOrigin(cfg.CORSOrigins), authHandler.Logout)
-			// Shared look-only demo account. Its own limit, since it is not a
-			// credential guess; the Origin check stops another site from
+			// Shared look-only demo, with its own rate limit. The Origin check stops another site
 			// signing a visitor in to it (and out of their own account).
 			auth.POST("/demo", middleware.RateLimitByIP(rl, "demo", 10), middleware.RequireTrustedOrigin(cfg.CORSOrigins), authHandler.Demo)
 			auth.POST("/verify-email", strict, authHandler.VerifyEmail)
@@ -126,9 +125,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 		// NoStore registered after it never runs on a rejected request.
 		protected.Use(middleware.NoStore())
 		protected.Use(middleware.AuthRequired(authService))
-		// Blocks writes from unverified accounts and every write from the
-		// demo account; admin is exempt (see its own group below) since email
-		// verification shouldn't gate the site owner's own operator tooling.
+		// Blocks unverified and demo writes; admin is exempt (its own group below).
 		protected.Use(middleware.RequireWriteAccess(userService))
 		protected.Use(middleware.RateLimitByUser(rl, "protected", 300))
 		{

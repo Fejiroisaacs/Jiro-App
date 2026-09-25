@@ -17,10 +17,7 @@ interface GroceryGroup {
 /** Heading for items typed in by hand. */
 const MANUAL_GROUP = 'Added by hand';
 
-/**
- * The grocery list, saved to the account. Items are grouped under the
- * recipe they came from, in the order they were added.
- */
+/** The account's grocery list, grouped by source recipe in the order added. */
 @Component({
   selector: 'app-shopping-list',
   standalone: true,
@@ -180,8 +177,7 @@ const MANUAL_GROUP = 'Added by hand';
 
     .empty-state p { max-width: 44ch; }
 
-    /* A link that looks like the primary button: it navigates, so it is an
-       <a>, and there is only one element to focus. */
+    /* A link styled as the primary button, since it navigates. */
     .browse-link {
       display: inline-flex;
       align-items: center;
@@ -369,12 +365,7 @@ export class ShoppingListComponent implements OnInit {
     });
   }
 
-  /**
-   * Once per browser: a list saved here before the list moved to the
-   * account is uploaded when the account's list is empty, then removed from
-   * the browser. When the account already has a list, that list wins and the
-   * old browser copy is dropped. The look-only demo never touches it.
-   */
+  /** Once per browser: the old local list fills an empty account list, then is dropped either way (not on the demo). */
   private migrateLegacyOr(serverItems: GroceryItem[]) {
     const legacy = this.auth.isDemo() ? null : this.grocery.readLegacyList();
     if (!legacy) {

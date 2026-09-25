@@ -73,11 +73,7 @@ export const STRIP_DAYS = 14;
 /** Entries per request for the strip: the API's page cap. */
 const STRIP_PAGE_SIZE = 50;
 
-/**
- * The strip reads every entry in its window, a page at a time, up to this
- * many pages (500 entries in 14 days). Past that the oldest days undercount
- * rather than the dashboard firing an unbounded run of requests.
- */
+/** Page cap for the strip (500 entries in 14 days); past it the oldest days undercount. */
 const STRIP_MAX_PAGES = 10;
 
 @Injectable({ providedIn: 'root' })
@@ -131,11 +127,7 @@ export class DashboardService {
     }
   }
 
-  /**
-   * Entries per day for the activity strip and "Written today", cut in the
-   * user's timezone like the day view: every entry since the strip's first
-   * day began in that zone.
-   */
+  /** Entries per day for the strip and "Written today", cut in the user's timezone. */
   private journalDays(): Observable<JournalDays> {
     const tz = this.settings.timezone();
     const today = todayKey(tz);
@@ -148,10 +140,7 @@ export class DashboardService {
     );
   }
 
-  /**
-   * Every private entry created at or after `from`, paging by offset until
-   * X-Total-Count is reached (or STRIP_MAX_PAGES pages have been read).
-   */
+  /** Private entries since `from`, paged until X-Total-Count or STRIP_MAX_PAGES. */
   private entriesSince(from: string): Observable<JournalEntry[]> {
     const page = (offset: number) => this.journal.listEntriesPage({ from, limit: STRIP_PAGE_SIZE, offset });
     return page(0).pipe(

@@ -827,8 +827,7 @@ export class JournalEditorComponent implements OnInit, OnDestroy {
       req.collection_ids = [...this.selectedCollections()].filter(id => known.has(id));
     }
     if (this.forDate && !this.editId) {
-      // Noon on the chosen day in the user's zone, so the entry lands on that
-      // day in the day view, the week view, the strip and the streak.
+      // Noon on the chosen day in the user's zone, so the entry lands on that day everywhere.
       req.created_at = zonedNoonISO(this.forDate, this.settings.timezone());
     }
 
@@ -846,11 +845,7 @@ export class JournalEditorComponent implements OnInit, OnDestroy {
     }
   }
 
-  /**
-   * The entry exists now, so the photos picked before publishing can upload.
-   * If any fail, the editor stays open on the saved entry (as an edit) so
-   * nothing typed is lost and the photo can be added again.
-   */
+  /** Uploads photos picked before publishing; on failure the editor stays on the saved entry so nothing is lost. */
   private async afterCreate(e: JournalEntry) {
     const pending = this.pendingPhotos();
     let failed = 0;

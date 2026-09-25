@@ -42,8 +42,7 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
             </p>
             <div class="l-hero-actions">
               <a routerLink="/register" class="l-btn l-btn--primary">Get started</a>
-              <!-- The demo signs in through the API, so it needs JavaScript;
-                   before hydration the click simply does nothing yet. -->
+              <!-- The demo signs in through the API, so before hydration the click does nothing yet. -->
               <button type="button" class="l-btn l-btn--secondary" [disabled]="demoLoading()"
                       [attr.aria-busy]="demoLoading() ? 'true' : null" (click)="tryDemo()">
                 @if (demoLoading()) { <span class="spinner spinner--sm l-btn-spinner" aria-hidden="true"></span> }
@@ -53,9 +52,7 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
             @if (demoError()) {
               <p class="l-hero-error" role="alert">{{ demoError() }}</p>
             }
-            <!-- A real href, so this works without JavaScript and is reachable
-                 by keyboard. The handler only upgrades the jump to a smooth
-                 scroll; preventDefault is conditional on that. -->
+            <!-- A real href, so it works without JavaScript; the handler only upgrades it to a smooth scroll. -->
             <a href="#modules" class="l-hero-more" (click)="scrollToModules($event)">
               Explore modules <jiro-icon name="caret-down" [size]="14" />
             </a>

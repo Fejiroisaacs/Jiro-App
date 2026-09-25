@@ -633,8 +633,7 @@ export class JymDashboardComponent implements OnInit {
     return days;
   });
 
-  // Recency in the user's calendar days (settings zone): a workout late last
-  // night is "Yesterday" this morning, not "Today".
+  // Recency in the user's calendar days: last night's workout is "Yesterday" this morning.
   muscleGroupStats = computed(() => {
     const sessions = this.allSessions();
     const tz = this.settingsService.timezone();

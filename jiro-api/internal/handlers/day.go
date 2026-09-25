@@ -19,9 +19,7 @@ func NewDayHandler(svc *services.DayService) *DayHandler {
 	return &DayHandler{svc: svc}
 }
 
-// GetDay handles GET /day?date=YYYY-MM-DD&tz=<IANA> (date omitted: today in
-// the user's timezone; tz is only a fallback for a user with no timezone
-// setting). Read-only; 400 for a malformed or future date.
+// GetDay handles GET /day?date=YYYY-MM-DD&tz=<IANA>; date defaults to the user's today.
 func (h *DayHandler) GetDay(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 

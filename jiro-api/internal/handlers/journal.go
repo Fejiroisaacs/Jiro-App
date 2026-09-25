@@ -102,8 +102,7 @@ func (h *JournalHandler) ListEntries(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to list entries"}})
 		return
 	}
-	// The body stays a bare array for existing callers; the total matching
-	// the filters travels in a header for paginated views.
+	// The body stays a bare array; the total matching the filters goes in a header.
 	c.Header("X-Total-Count", strconv.Itoa(total))
 	c.JSON(http.StatusOK, entries)
 }
@@ -195,8 +194,7 @@ func (h *JournalHandler) DeleteEntry(c *gin.Context) {
 
 // ─── Streak & Calendar ─────────────────────────────────────────────────────
 
-// GET /journal/streak?tz=<IANA> (tz is only a fallback for a user with no
-// timezone setting, as on GET /day)
+// GetStreak handles GET /journal/streak?tz=<IANA> (tz is a fallback for users with no timezone).
 func (h *JournalHandler) GetStreak(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 	resp, err := h.journalService.GetStreak(c.Request.Context(), userID, c.Query("tz"))
@@ -207,10 +205,7 @@ func (h *JournalHandler) GetStreak(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// GET /journal/calendar?year=2026&month=2&tz=<IANA>
-// Days are the user's calendar days; a missing or invalid year or month means
-// the current one in their zone. tz is only a fallback for a user with no
-// timezone setting.
+// GetCalendar handles GET /journal/calendar?year=&month=&tz=, in the user's calendar days.
 func (h *JournalHandler) GetCalendar(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 	year, month := calendarYearMonth(c)
@@ -548,9 +543,7 @@ func (h *JournalHandler) RemoveMember(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Member removed"})
 }
 
-// POST /journal/groups/join?token=xxx
-// Redeems an emailed invite (for its own address only) or a copyable link
-// (for any signed-in account, until it expires or is turned off).
+// JoinGroup handles POST /journal/groups/join?token=: an emailed invite (its address only) or a link.
 func (h *JournalHandler) JoinGroup(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 	rawToken := c.Query("token")
@@ -800,9 +793,7 @@ func (h *JournalHandler) RemoveEntryFromCollection(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Entry removed from collection"})
 }
 
-// calendarYearMonth reads ?year= and ?month=. A missing or invalid value is
-// 0, which the service resolves to the current year or month in the user's
-// zone (the server's clock alone cannot say which month it is for them).
+// calendarYearMonth reads ?year= and ?month=; 0 means the current one in the user's zone.
 func calendarYearMonth(c *gin.Context) (year, month int) {
 	if y, err := strconv.Atoi(c.Query("year")); err == nil && y >= 1970 && y <= 9999 {
 		year = y

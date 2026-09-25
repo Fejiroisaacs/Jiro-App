@@ -6,14 +6,11 @@ import (
 	"github.com/google/uuid"
 )
 
-// DayResponse is everything the user logged on one of their own calendar
-// days, across all four modules. Every list is always present (empty, never
-// null) so the client can render each section without guarding.
+// DayResponse is everything the user logged on one calendar day; lists are never null.
 type DayResponse struct {
 	// Date is the calendar day, YYYY-MM-DD, in Timezone.
 	Date string `json:"date"`
-	// Timezone is the IANA zone the day was cut in: the user's setting; when
-	// that is missing or unknown, the request's tz hint; else "UTC".
+	// Timezone is the IANA zone the day was cut in (setting, else tz hint, else UTC).
 	Timezone string      `json:"timezone"`
 	IsToday  bool        `json:"is_today"`
 	Jym      DayJym      `json:"jym"`
@@ -75,15 +72,12 @@ type DayJournalEntry struct {
 
 type DayLedger struct {
 	Transactions []DayTransaction `json:"transactions"`
-	// Spent is the sum of expenses (positive); Income the sum of income.
-	// Transfers count toward neither.
+	// Spent sums expenses (positive), Income sums income; transfers count toward neither.
 	Spent  float64 `json:"spent"`
 	Income float64 `json:"income"`
 }
 
-// DayTransaction is one transaction dated that day. Amount carries its
-// stored sign (expenses negative). A transfer is listed once, by its
-// outgoing leg.
+// DayTransaction is one transaction that day, signed as stored; a transfer appears once, by its outgoing leg.
 type DayTransaction struct {
 	ID                    uuid.UUID  `json:"id"`
 	Type                  string     `json:"type"`

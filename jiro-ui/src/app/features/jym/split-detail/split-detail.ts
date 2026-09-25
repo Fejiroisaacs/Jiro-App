@@ -867,8 +867,7 @@ export class SplitDetailComponent implements OnInit {
       return;
     }
 
-    // Moving between days changes two days. Save both in one request so the
-    // exercise can never end up on both (or neither) after a reload.
+    // Save both days in one request so the exercise can't end up on both or neither.
     const prevItems = [...lists[prevIdx].items];
     const currItems = [...lists[currIdx].items];
     const [moved] = prevItems.splice(event.previousIndex, 1);

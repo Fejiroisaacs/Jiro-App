@@ -175,12 +175,7 @@ export class LedgerService {
 
   private readonly settings = inject(SettingsService);
 
-  /**
-   * The user's zone, the API's fallback for an account with no timezone
-   * setting (as on GET /day). Sent by the reads that cut days (budgets,
-   * summary) and by the reads that first add any recurring transactions
-   * that have come due (accounts, transactions, summary, budgets, compare).
-   */
+  /** The user's zone, the API's fallback for an account with no timezone setting. */
   private tz(params = new HttpParams()): HttpParams {
     return params.set('tz', this.settings.timezone());
   }

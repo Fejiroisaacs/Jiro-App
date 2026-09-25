@@ -1138,9 +1138,7 @@ type MobileTab = 'recipe' | 'trials';
       position: relative;
       width: 40px; height: 22px;
       border: none; border-radius: 11px;
-      /* Off: a muted track, not the border colour, which all but vanished
-         against the surface in dark mode. The thumb is the surface colour,
-         so it contrasts with the track in either theme. */
+      /* Off: a muted track (the border colour vanished in dark mode); the surface-coloured thumb contrasts. */
       background: var(--text-muted);
       cursor: pointer;
       transition: background 0.2s;

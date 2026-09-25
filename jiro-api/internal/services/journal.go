@@ -141,15 +141,7 @@ func (s *JournalService) GetEntry(ctx context.Context, userID, entryID uuid.UUID
 	return entry, nil
 }
 
-// journalEntryFilter builds the WHERE clause and positional args shared by
-// ListEntries' page query and its count query. It returns the index of the
-// next free placeholder so the caller can append LIMIT/OFFSET.
-//
-// q is escaped with escapeLike so % and _ match literally; Postgres's default
-// LIKE escape character is backslash, matching the search service.
-//
-// tag matches case-insensitively as a prefix of any of the entry's tags, so
-// "train" finds "Training" while the filter box is still being typed in.
+// journalEntryFilter builds the WHERE and args shared by ListEntries' queries, plus the next placeholder index.
 func journalEntryFilter(userID uuid.UUID, mood, tag, q, from, to string) (string, []any, int) {
 	args := []any{userID}
 	where := `WHERE e.user_id = $1 AND e.group_id IS NULL`
@@ -183,9 +175,7 @@ func journalEntryFilter(userID uuid.UUID, mood, tag, q, from, to string) (string
 	return where, args, i
 }
 
-// ListEntries returns one page of the user's personal entries, newest first,
-// plus the total number of entries matching the filters. The total comes from
-// a separate COUNT so it is still correct when offset is past the last row.
+// ListEntries returns one page of the user's entries, newest first, and the total matching the filters.
 func (s *JournalService) ListEntries(ctx context.Context, userID uuid.UUID, mood, tag, q, from, to string, limit, offset int) ([]models.JournalEntry, int, error) {
 	where, args, i := journalEntryFilter(userID, mood, tag, q, from, to)
 
@@ -300,8 +290,7 @@ func (s *JournalService) UpdateEntry(ctx context.Context, userID, entryID uuid.U
 	return entry, nil
 }
 
-// tagPrefixPattern is the ILIKE pattern for a tag filter: the tag, trimmed
-// and with any leading # dropped, matched literally as a prefix.
+// tagPrefixPattern is the ILIKE pattern matching a tag (trimmed, no leading #) as a literal prefix.
 func tagPrefixPattern(tag string) string {
 	tag = strings.TrimPrefix(strings.TrimSpace(tag), "#")
 	return escapeLike(tag) + "%"
@@ -330,9 +319,8 @@ func (s *JournalService) entryCollectionIDs(ctx context.Context, userID, entryID
 	return ids, rows.Err()
 }
 
-// addEntryToCollections files an entry the caller has already checked is
-// userID's into those of ids that are userID's collections; others are
-// ignored, like an id that no longer exists.
+// addEntryToCollections files the entry into those ids that are userID's collections.
+// The caller must already have checked the entry is userID's.
 func (s *JournalService) addEntryToCollections(ctx context.Context, userID, entryID uuid.UUID, ids []uuid.UUID) error {
 	_, err := s.db.Exec(ctx, `
 		INSERT INTO journal_collection_entries (collection_id, entry_id)
@@ -342,9 +330,7 @@ func (s *JournalService) addEntryToCollections(ctx context.Context, userID, entr
 	return err
 }
 
-// setEntryCollections makes ids the entry's full set of userID's collections:
-// it leaves the ones not listed and joins the new ones. Other users'
-// collections are never touched.
+// setEntryCollections makes ids the entry's full set of userID's collections; others' are never touched.
 func (s *JournalService) setEntryCollections(ctx context.Context, userID, entryID uuid.UUID, ids []uuid.UUID) error {
 	if ids == nil {
 		ids = []uuid.UUID{}
@@ -404,8 +390,7 @@ func (s *JournalService) DeleteEntry(ctx context.Context, userID, entryID uuid.U
 
 // ─── Streak & Calendar ─────────────────────────────────────────────────────
 
-// GetStreak counts the user's journal days in their location (settings
-// timezone, else tzHint, else UTC; see PickLocation), as GET /day does.
+// GetStreak counts the user's journal days in their location (see PickLocation).
 func (s *JournalService) GetStreak(ctx context.Context, userID uuid.UUID, tzHint string) (*models.JournalStreakResponse, error) {
 	loc, err := userLocation(ctx, s.db, userID, tzHint)
 	if err != nil {
@@ -453,10 +438,7 @@ func (s *JournalService) GetStreak(ctx context.Context, userID uuid.UUID, tzHint
 	return resp, nil
 }
 
-// GetCalendar returns the days of year/month that have entries, as calendar
-// days in the viewer's location (settings timezone, else tzHint, else UTC).
-// A zero year or month means the current one there. A group calendar is cut
-// in the viewer's zone too, so it matches their own week view.
+// GetCalendar returns the days of year/month with entries in the viewer's zone; 0 means current.
 func (s *JournalService) GetCalendar(ctx context.Context, userID uuid.UUID, year, month int, groupID *uuid.UUID, tzHint string) (*models.JournalCalendarResponse, error) {
 	loc, err := userLocation(ctx, s.db, userID, tzHint)
 	if err != nil {
@@ -471,8 +453,7 @@ func (s *JournalService) GetCalendar(ctx context.Context, userID uuid.UUID, year
 			month = int(now.Month())
 		}
 	}
-	// The month's instant range in loc: local midnight on the 1st to local
-	// midnight on the 1st of the next month.
+	// The month's instant range in loc.
 	start := time.Date(year, time.Month(month), 1, 0, 0, 0, 0, loc)
 	end := start.AddDate(0, 1, 0)
 

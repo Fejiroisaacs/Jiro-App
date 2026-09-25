@@ -717,8 +717,7 @@ export class JournalGroupComponent implements OnInit {
       await navigator.clipboard.writeText(url);
       this.toast.success('Invite link copied');
     } catch {
-      // No clipboard access (older browser, insecure context): select it so
-      // the owner can copy it themselves.
+      // No clipboard access: select the link so the owner can copy it.
       input.focus();
       input.select();
       this.toast.error('Could not copy. The link is selected; copy it from there.');

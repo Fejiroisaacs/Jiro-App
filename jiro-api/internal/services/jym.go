@@ -654,10 +654,7 @@ func (s *JymService) ReplaceRoutineItems(ctx context.Context, userID, routineID 
 	return s.listRoutineItems(ctx, routineID)
 }
 
-// ReplaceSplitItems replaces the items of several days of one split in a
-// single transaction. Moving an exercise from one day to another touches two
-// routines; saving them one request at a time could leave the exercise on
-// both days (or neither) if the second save failed.
+// ReplaceSplitItems replaces several days' items of one split in a single transaction, so a move is atomic.
 func (s *JymService) ReplaceSplitItems(ctx context.Context, userID, splitID uuid.UUID, entries []models.RoutineItemsEntry) ([]models.RoutineItemsResult, error) {
 	var owns bool
 	if err := s.db.QueryRow(ctx,
@@ -727,8 +724,7 @@ func (s *JymService) checkItemExercises(ctx context.Context, userID uuid.UUID, i
 	return nil
 }
 
-// replaceItemsTx swaps a routine's items for the given list, in order.
-// Zero targets fall back to 3 sets of 8.
+// replaceItemsTx swaps a routine's items for the list, in order; zero targets default to 3 sets of 8.
 func replaceItemsTx(ctx context.Context, tx pgx.Tx, routineID uuid.UUID, items []models.ReplaceItemEntry) error {
 	if _, err := tx.Exec(ctx, `DELETE FROM routine_items WHERE routine_id = $1`, routineID); err != nil {
 		return err
@@ -898,9 +894,7 @@ func (s *JymService) ListAllSessions(ctx context.Context, userID uuid.UUID) ([]m
 	return s.listSessions(ctx, userID, nil)
 }
 
-// sessionSummarySelect is the one definition of a session list row: the
-// session plus its routine name, set count, PR count, volume (kg) and muscle
-// groups. Callers append a WHERE on s.* and then sessionSummaryGroup.
+// sessionSummarySelect is a session list row; callers append a WHERE on s.* then sessionSummaryGroup.
 const sessionSummarySelect = `SELECT s.id, s.user_id, s.routine_id, s.series_id, s.session_type, s.started_at, s.ended_at, s.notes,
 		        r.name as routine_name,
 		        COUNT(ss.id) as set_count,
@@ -915,9 +909,7 @@ const sessionSummarySelect = `SELECT s.id, s.user_id, s.routine_id, s.series_id,
 
 const sessionSummaryGroup = ` GROUP BY s.id, r.name `
 
-// listSessions is shared by both. A nil limit means no limit: Postgres treats
-// LIMIT NULL as LIMIT ALL, so the cap is a parameter rather than two copies of
-// the query or a string built at runtime.
+// listSessions is shared by both; a nil limit binds LIMIT NULL, which Postgres treats as no limit.
 func (s *JymService) listSessions(ctx context.Context, userID uuid.UUID, limit *int) ([]models.SessionSummary, error) {
 	rows, err := s.db.Query(ctx,
 		sessionSummarySelect+`WHERE s.user_id = $1`+sessionSummaryGroup+`ORDER BY s.started_at DESC LIMIT $2`,
@@ -929,8 +921,7 @@ func (s *JymService) listSessions(ctx context.Context, userID uuid.UUID, limit *
 	return scanSessionSummaries(rows)
 }
 
-// ListSessionsBetween returns the sessions started in [from, to), oldest
-// first, with the same summary fields as ListSessions. Used by the day view.
+// ListSessionsBetween returns sessions started in [from, to), oldest first.
 func (s *JymService) ListSessionsBetween(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]models.SessionSummary, error) {
 	rows, err := s.db.Query(ctx,
 		sessionSummarySelect+`WHERE s.user_id = $1 AND s.started_at >= $2 AND s.started_at < $3`+sessionSummaryGroup+`ORDER BY s.started_at ASC`,
@@ -1108,9 +1099,7 @@ func (s *JymService) ListFormChecks(ctx context.Context, userID, exerciseID uuid
 	return result, nil
 }
 
-// UpdateSession changes a session's notes or type, and finishes it when
-// EndedAt is set. A session finishes once: finishing an ended one is
-// ErrSessionEnded, so a stale tab cannot move the end time.
+// UpdateSession edits notes or type and finishes the session once; finishing again is ErrSessionEnded.
 func (s *JymService) UpdateSession(ctx context.Context, userID, sessionID uuid.UUID, req *models.UpdateSessionRequest) (*models.Session, error) {
 	sess := &models.Session{}
 	err := s.db.QueryRow(ctx,
@@ -1201,9 +1190,7 @@ func (s *JymService) GetSessionAttachmentKeys(ctx context.Context, userID, sessi
 
 // ─── Sets ─────────────────────────────────────────────────────────────────────
 
-// isNewPR reports whether a set beats the best non-warm-up set before it: a
-// strictly heavier weight, or the same weight for more reps. A warm-up is
-// never a PR, whatever it weighs.
+// isNewPR reports whether a working set beats the best weight, or ties it with more reps.
 func isNewPR(weight float64, reps int, isWarmup bool, bestWeight float64, bestReps int) bool {
 	if isWarmup {
 		return false
@@ -1216,10 +1203,7 @@ func roundWeight(kg float64) float64 {
 	return math.Round(kg*100) / 100
 }
 
-// bestWorkingSet returns the heaviest non-warm-up weight the user has logged
-// for an exercise and the most reps done at that weight. excludeSetID and
-// before narrow it to the sets logged before a given one; pass uuid.Nil and
-// nil for all history. Zeroes when there is no history.
+// bestWorkingSet returns the best non-warm-up weight and its reps; excludeSetID and before narrow it.
 func bestWorkingSet(ctx context.Context, q interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }, userID, exerciseID, excludeSetID uuid.UUID, before *time.Time) (float64, int, error) {
@@ -1266,8 +1250,7 @@ func (s *JymService) LogSet(ctx context.Context, userID, sessionID uuid.UUID, re
 	}
 
 	isWarmup := req.IsWarmup != nil && *req.IsWarmup
-	// Compare at the precision the column stores, or a lbs user's 175 lbs
-	// (79.3787 kg) never ties the 79.38 already saved.
+	// Compare at the column's precision, or 175 lbs never ties the 79.38 kg saved.
 	weight := roundWeight(req.Weight)
 	bestWeight, bestReps, err := bestWorkingSet(ctx, s.db, userID, req.ExerciseID, uuid.Nil, nil)
 	if err != nil {
@@ -1289,9 +1272,7 @@ func (s *JymService) LogSet(ctx context.Context, userID, sessionID uuid.UUID, re
 	return set, nil
 }
 
-// UpdateSet edits a logged set. When the weight, reps or warm-up flag change,
-// the PR flag is worked out again against the sets logged before it, so
-// marking a PR set as a warm-up takes its badge away.
+// UpdateSet edits a logged set, recomputing its PR flag when weight, reps or warm-up change.
 func (s *JymService) UpdateSet(ctx context.Context, userID, setID uuid.UUID, req *models.UpdateSetRequest) (*models.SessionSet, error) {
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
@@ -1791,10 +1772,7 @@ func csvSafe(v string) string {
 	return v
 }
 
-// StreamSessionsCSV writes the user's sets as CSV. from and to are calendar
-// dates (only their year/month/day are used); they, and the date column, are
-// the user's calendar days in their location (settings timezone, else
-// tzHint, else UTC), the days the app shows each session under.
+// StreamSessionsCSV writes the user's sets as CSV; from, to and dates are the user's calendar days.
 func (s *JymService) StreamSessionsCSV(ctx context.Context, userID uuid.UUID, from, to *time.Time, exerciseID *uuid.UUID, tzHint string, w io.Writer) error {
 	loc, err := userLocation(ctx, s.db, userID, tzHint)
 	if err != nil {

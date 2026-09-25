@@ -9,10 +9,7 @@ type Duration = 'open' | 'weeks' | 'sessions';
 
 let seq = 0;
 
-/**
- * "Start series" dialog, shared by Plan's split cards and the split page so
- * both ask the same question in the same words. Creates the series and opens it.
- */
+/** "Start series" dialog shared by Plan's split cards and the split page; creates and opens the series. */
 @Component({
   selector: 'jym-new-series-modal',
   standalone: true,

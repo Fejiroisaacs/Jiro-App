@@ -131,10 +131,7 @@ export class JiroModalComponent implements AfterViewInit, OnDestroy {
     openModals.push(this);
   }
 
-  // cdkTrapFocusAutoCapture moves focus to [cdkFocusInitial] or the first
-  // tabbable element, and hands it back to the opener on destroy. This runs
-  // after it: honour a consumer's autofocus, and fall back to the dialog
-  // itself when it has nothing tabbable.
+  // Runs after cdkTrapFocusAutoCapture: honour a consumer's autofocus, else focus the dialog if nothing is tabbable.
   ngAfterViewInit() {
     afterNextRender(() => {
       const dialog = this.dialog().nativeElement;

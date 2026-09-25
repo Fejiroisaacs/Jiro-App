@@ -676,12 +676,7 @@ export class SettingsComponent implements OnInit {
     });
   }
 
-  /**
-   * Saves one preference. The app only applies it once the server has
-   * accepted it (AuthService updates the user on success); if the server
-   * refuses (an unverified email, a bad value, no connection), the control
-   * goes back to the saved value and the reason is shown.
-   */
+  /** Saves one preference; applied only once the server accepts it, else the control reverts and shows why. */
   private save(updates: Partial<UserSettings>, revert: () => void) {
     this.prefError.set(null);
     this.authService.updateSettings(updates).subscribe({

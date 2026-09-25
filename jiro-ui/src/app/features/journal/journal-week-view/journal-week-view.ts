@@ -14,9 +14,7 @@ import { SettingsService } from '../../../core/services/settings.service';
 import { addDays, dayKey, dayStartISO, mondayOfKey, shortDayLabel, todayKey } from '../../../core/utils/day';
 
 // ─── Exported helpers used by parent components ──────────────────────────────
-// Weeks are Monday-to-Sunday calendar weeks of day keys in the user's zone
-// (settings, else the browser's), the same days the day view and the
-// dashboard strip use.
+// Weeks are Monday-to-Sunday day keys in the user's zone, as in the day view.
 
 /** This week's first and last day keys in `timeZone`. */
 export function currentWeekBounds(timeZone: string): { from: string; to: string } {
@@ -24,11 +22,7 @@ export function currentWeekBounds(timeZone: string): { from: string; to: string 
   return { from, to: addDays(from, 6) };
 }
 
-/**
- * A week of day keys as the instants the entries endpoint filters on
- * (created_at >= from AND created_at <= to). Bare dates would be read as UTC
- * midnights, which cut the week in the wrong place and drop Sunday entirely.
- */
+/** A week of day keys as instants for the entries filter; bare dates would be UTC and drop Sunday. */
 export function weekRangeQuery(week: { from: string; to: string }, timeZone: string): { from: string; to: string } {
   return { from: dayStartISO(week.from, timeZone), to: dayStartISO(addDays(week.to, 1), timeZone) };
 }

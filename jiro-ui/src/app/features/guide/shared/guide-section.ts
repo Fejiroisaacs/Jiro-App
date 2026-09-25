@@ -1,17 +1,6 @@
 import { Component, ViewEncapsulation, input } from '@angular/core';
 
-/**
- * One task in a guide, such as "Log a workout". Renders the h2 and an optional
- * lead line; everything inside it is the guide's own content (paragraphs,
- * `guide-steps`, `guide-shot`, `guide-tip`).
- *
- *   <guide-section id="log-a-workout" title="Log a workout" lead="Start a session and record each set.">
- *     ...
- *   </guide-section>
- *
- * `id` is the anchor the contents list links to, so keep it stable and
- * lowercase-with-dashes. The parent `guide-page` picks up every section.
- */
+/** One guide task: h2 plus optional lead; `id` is the contents anchor, so keep it stable. */
 @Component({
   selector: 'guide-section',
   standalone: true,

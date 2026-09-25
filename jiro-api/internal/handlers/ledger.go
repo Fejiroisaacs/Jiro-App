@@ -22,8 +22,7 @@ func NewLedgerHandler(svc *services.LedgerService) *LedgerHandler {
 	return &LedgerHandler{svc: svc}
 }
 
-// fail maps a ledger service error to its response. Anything it does not
-// recognise is a 500 whose detail stays in the log.
+// fail maps a ledger service error to its response; anything unknown is a logged 500.
 func (h *LedgerHandler) fail(c *gin.Context, err error, action string) {
 	respond := func(status int, code, msg string) {
 		c.JSON(status, models.ErrorResponse{Error: models.ErrorDetail{Code: code, Message: msg}})
@@ -58,8 +57,7 @@ func bindError(c *gin.Context, err error) {
 	})
 }
 
-// pathID parses the :id route parameter, answering 400 itself when it is not
-// a UUID.
+// pathID parses the :id param, answering 400 itself when it is not a UUID.
 func pathID(c *gin.Context, what string) (uuid.UUID, bool) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -71,10 +69,7 @@ func pathID(c *gin.Context, what string) (uuid.UUID, bool) {
 	return id, true
 }
 
-// catchUp writes any recurring transactions that have come due before a
-// Ledger read, so the page shows them. A failure is logged and the read goes
-// ahead: the next visit catches up instead. tz is only a fallback for a
-// user with no timezone setting, as on GET /day.
+// catchUp writes recurring transactions due before a Ledger read; a failure is only logged.
 func (h *LedgerHandler) catchUp(c *gin.Context, userID uuid.UUID) {
 	n, err := h.svc.CatchUpRecurring(c.Request.Context(), userID, c.Query("tz"), time.Now())
 	if err != nil {
@@ -336,9 +331,7 @@ func (h *LedgerHandler) UpdateCategory(c *gin.Context) {
 	c.JSON(http.StatusOK, cat)
 }
 
-// DeleteCategory deletes a category. ?move_to=<category id> moves its
-// transactions to that category (same type); without it they become
-// uncategorised.
+// DeleteCategory deletes a category; ?move_to=<id> moves its transactions there, else uncategorised.
 func (h *LedgerHandler) DeleteCategory(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 	catID, ok := pathID(c, "category")
@@ -434,8 +427,7 @@ func (h *LedgerHandler) DeleteBudget(c *gin.Context) {
 
 // ── Summary & Net Worth ───────────────────────────────────────────────────────
 
-// GetSummary: ?month=YYYY-MM, or no month for the current one in the user's
-// timezone.
+// GetSummary handles ?month=YYYY-MM, defaulting to the current month in the user's timezone.
 func (h *LedgerHandler) GetSummary(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 	h.catchUp(c, userID)
@@ -478,8 +470,7 @@ func (h *LedgerHandler) CreateSnapshot(c *gin.Context) {
 
 // ── Comparison ────────────────────────────────────────────────────────────────
 
-// GetComparison compares period B against period A (the base); the change
-// is B - A.
+// GetComparison compares period B against base period A; the change is B - A.
 func (h *LedgerHandler) GetComparison(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 

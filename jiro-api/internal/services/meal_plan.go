@@ -20,8 +20,7 @@ var (
 	ErrInvalidRecipeID    = errors.New("invalid recipe_id")
 )
 
-// mealPlanLabelMaxLen caps a custom label such as "Dinner out" (the column
-// allows 255; a slot chip shows far less).
+// mealPlanLabelMaxLen caps a custom label such as "Dinner out".
 const mealPlanLabelMaxLen = 80
 
 type MealPlanService struct {
@@ -32,8 +31,7 @@ func NewMealPlanService(db *pgxpool.Pool) *MealPlanService {
 	return &MealPlanService{db: db}
 }
 
-// Today is today's calendar date (at UTC midnight) in the user's location:
-// settings timezone, else tzHint, else UTC.
+// Today is the user's calendar date (at UTC midnight): settings timezone, else tzHint, else UTC.
 func (s *MealPlanService) Today(ctx context.Context, userID uuid.UUID, tzHint string) (time.Time, error) {
 	loc, err := userLocation(ctx, s.db, userID, tzHint)
 	if err != nil {
@@ -182,8 +180,7 @@ func (s *MealPlanService) AddEntry(ctx context.Context, userID uuid.UUID, planID
 		return nil, ErrNotOwner
 	}
 
-	// A custom label is free text in place of a recipe ("Dinner out").
-	// Blank means none; whitespace is tidied the way it will be shown.
+	// A custom label replaces a recipe ("Dinner out"); blank means none.
 	var label *string
 	if req.CustomLabel != nil {
 		if l := strings.Join(strings.Fields(*req.CustomLabel), " "); l != "" {

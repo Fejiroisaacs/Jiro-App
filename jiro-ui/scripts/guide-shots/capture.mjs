@@ -1,11 +1,4 @@
-// Captures the screenshots for one guide from the demo account, in light and dark.
-//
-//   node scripts/guide-shots/capture.mjs <guide> [name...]
-//
-// Reads scripts/guide-shots/<guide>.shots.json, writes PNGs to
-// scripts/guide-shots/.raw/<guide>/<name>-{light,dark}.png. Then run to-webp.py.
-// Needs the API on :8080, ng serve on :4200, and the global playwright-cli.
-// See README.md in this folder for the shot list format.
+// Usage: node scripts/guide-shots/capture.mjs <guide> [name...]; see README.md.
 
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
@@ -70,8 +63,7 @@ if (!selected.length) {
 const outDir = resolve(HERE, '.raw', guide).replace(/\\/g, '/');
 mkdirSync(outDir, { recursive: true });
 
-// The runner below is serialised into the run-code script, so it must be
-// self-contained: playwright-cli's sandbox has no require, fetch or setTimeout.
+// Serialised into playwright-cli's sandbox: no require, fetch or setTimeout.
 async function runner(page, config) {
   const { shots, outDir, baseUrl } = config;
   const HIDE_CSS = [
@@ -138,10 +130,7 @@ async function runner(page, config) {
         }
         await settle();
 
-        // The app scrolls inside <body>, so shoot the viewport, clipped to the
-        // element (or the main content area, which leaves out the sidebar).
-        // The default is shot where the page is scrolled to (the top, unless a
-        // "scroll" action moved it), minus the phone top bar and bottom bar.
+        // The app scrolls inside <body>: shoot the viewport clipped to the element, or main minus the phone bars.
         const target = p.locator(shot.clip || 'main.content').first();
         if (shot.clip) {
           await target.scrollIntoViewIfNeeded();

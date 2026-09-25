@@ -178,8 +178,7 @@ interface ExerciseBlock {
         <!-- Exercise blocks -->
         @for (block of blocks(); track block; let bi = $index) {
 <div class="ex-block">
-          <!-- The whole header toggles on click; the name button is its keyboard and
-               screen reader handle (its click bubbles up here). Delete stops propagation. -->
+          <!-- The header toggles on click; the name button is its keyboard handle (its click bubbles up). -->
           <div class="block-header" [class.block-open]="!isCollapsed(bi)" (click)="toggleBlock(bi)">
             <div class="block-title">
               <h2><button type="button" class="block-toggle" [attr.aria-expanded]="!isCollapsed(bi)" [attr.aria-controls]="'block-body-' + bi">{{ block.exerciseName }}</button></h2>

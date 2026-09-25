@@ -85,8 +85,7 @@ import { todayKey } from '../../../core/utils/day';
               @if (e.mood) {
 <span class="mood-chip">{{ moodLabel(e.mood) }}</span>
 }
-              <!-- The card is clickable anywhere; this button is its keyboard and
-                   screen-reader handle, kept outside the Delete button's subtree. -->
+              <!-- The card clicks anywhere; this button is its keyboard handle, outside Delete's subtree. -->
               <button type="button" class="entry-time card-open" [attr.aria-label]="openLabel(e)">{{ formatTime(e.created_at) }}</button>
             </div>
             @if (e.title) {
@@ -541,11 +540,7 @@ export class JournalDayModalComponent implements OnChanges {
 
   constructor(private svc: JournalService) {}
 
-  /**
-   * The list and the open entry replace each other, so the focused control
-   * can vanish and drop focus to <body>. After the swap, focus the nth match
-   * of `selector` unless focus is still inside the dialog.
-   */
+  /** After the list/entry swap, focus the nth `selector` match unless focus is still in the dialog. */
   private keepFocus(selector: string, nth = 0) {
     afterNextRender(() => {
       const root = this.host.nativeElement;

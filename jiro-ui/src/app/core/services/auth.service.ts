@@ -173,10 +173,7 @@ export class AuthService {
       .pipe(tap(res => this.handleAuth(res)));
   }
 
-  /** Signs in to the shared, look-only demo account. The server creates it
-   *  on first use; afterwards this is a normal session (refresh cookie and
-   *  all), so the rest of the app needs nothing special beyond `isDemo`.
-   *  Only ever called from a click, so never during prerender. */
+  /** Signs in to the shared look-only demo; only called from a click, so never during prerender. */
   demoLogin() {
     return this.http.post<AuthResponse>(`${API_URL}/auth/demo`, {}, { withCredentials: true })
       .pipe(tap(res => this.handleAuth(res)));
@@ -216,11 +213,7 @@ export class AuthService {
   }
 
   updateSettings(settings: Partial<UserSettings>) {
-    // Preferences (theme, units, timezone) save as a side effect of picking
-    // them, not from a Save button. The demo can't write, so apply them
-    // locally for this visit instead of provoking a "look-only" message the
-    // visitor never asked for. The dashboard layout has an explicit Save and
-    // still goes to the server, which refuses it with that message.
+    // The demo can't write, so auto-saved preferences apply locally instead of raising a look-only toast.
     const user = this.currentUser();
     if (user?.is_demo && !('dashboard' in settings)) {
       const current = typeof user.settings === 'string' ? JSON.parse(user.settings) : (user.settings ?? {});

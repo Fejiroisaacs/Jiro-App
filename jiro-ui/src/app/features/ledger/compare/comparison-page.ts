@@ -33,21 +33,13 @@ interface DateRange {
   bTo: string;
 }
 
-/**
- * The calendar date a Date's local fields name, as YYYY-MM-DD. The ranges
- * below are built with local-field arithmetic, so reading them back through
- * toISOString (UTC) would shift every bound a day early east of UTC.
- */
+/** A Date's local calendar date as YYYY-MM-DD; toISOString would shift it a day early east of UTC. */
 function isoDate(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-/**
- * The preset's two periods. A is the previous period (the base) and B the
- * current one, so the change (B - A) reads naturally: up means the current
- * period is higher. `today` is the user's day key (settings zone).
- */
+/** The preset's periods: A the previous (base), B the current, so a rise in B - A means higher now. */
 export function computePresetRanges(preset: Preset, today: string): DateRange | null {
   const [ty, tm, td] = today.split('-').map(Number);
   const now = new Date(ty, tm - 1, td);

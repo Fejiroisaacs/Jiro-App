@@ -16,8 +16,7 @@ import (
 // InviteLinkTTL is how long a copyable group invite link works.
 const InviteLinkTTL = 7 * 24 * time.Hour
 
-// newInviteToken returns a fresh unguessable token (256 random bits, hex) and
-// the hash that is stored in its place.
+// newInviteToken returns a random 256-bit hex token and the hash stored in its place.
 func newInviteToken() (raw, hash string, err error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
@@ -27,22 +26,18 @@ func newInviteToken() (raw, hash string, err error) {
 	return raw, hashInviteToken(raw), nil
 }
 
-// hashInviteToken is the stored form of an invite token: hex SHA-256, the
-// same as email invites, refresh and reset tokens. A 256-bit random token
-// needs no slow hash; a leaked table still gives no working link.
+// hashInviteToken is the stored form of an invite token: hex SHA-256, like the other tokens.
 func hashInviteToken(raw string) string {
 	h := sha256.Sum256([]byte(raw))
 	return hex.EncodeToString(h[:])
 }
 
-// inviteLinkUsable reports whether a link admits anyone at now: it has not
-// been revoked and has not reached its expiry.
+// inviteLinkUsable reports whether a link is neither revoked nor expired at now.
 func inviteLinkUsable(expiresAt time.Time, revokedAt *time.Time, now time.Time) bool {
 	return revokedAt == nil && now.Before(expiresAt)
 }
 
-// requireGroupOwner returns ErrJournalGroupNotFound for a missing group and
-// ErrNotOwner for anyone but its owner.
+// requireGroupOwner returns ErrJournalGroupNotFound or ErrNotOwner unless userID owns the group.
 func (s *JournalService) requireGroupOwner(ctx context.Context, userID, groupID uuid.UUID) error {
 	var ownerID uuid.UUID
 	if err := s.db.QueryRow(ctx, `SELECT owner_id FROM journal_groups WHERE id = $1`, groupID).Scan(&ownerID); err != nil {
@@ -57,9 +52,7 @@ func (s *JournalService) requireGroupOwner(ctx context.Context, userID, groupID 
 	return nil
 }
 
-// CreateInviteLink makes a new link for the owner's group, revoking any link
-// still active, so a group has at most one working link. The raw token is
-// only ever in this return value.
+// CreateInviteLink makes the group's one working link, revoking any other; the raw token is returned only here.
 func (s *JournalService) CreateInviteLink(ctx context.Context, ownerID, groupID uuid.UUID) (*models.JournalInviteLink, error) {
 	if err := s.requireGroupOwner(ctx, ownerID, groupID); err != nil {
 		return nil, err
@@ -95,8 +88,7 @@ func (s *JournalService) CreateInviteLink(ctx context.Context, ownerID, groupID 
 	return link, nil
 }
 
-// GetInviteLink returns the owner's group's working link, without its token,
-// or nil when there is none.
+// GetInviteLink returns the group's working link without its token, or nil.
 func (s *JournalService) GetInviteLink(ctx context.Context, ownerID, groupID uuid.UUID) (*models.JournalInviteLink, error) {
 	if err := s.requireGroupOwner(ctx, ownerID, groupID); err != nil {
 		return nil, err
@@ -116,8 +108,7 @@ func (s *JournalService) GetInviteLink(ctx context.Context, ownerID, groupID uui
 	return link, nil
 }
 
-// RevokeInviteLink stops the owner's group's link from working. Revoking
-// when there is no link is not an error.
+// RevokeInviteLink stops the group's link; revoking with no link is not an error.
 func (s *JournalService) RevokeInviteLink(ctx context.Context, ownerID, groupID uuid.UUID) error {
 	if err := s.requireGroupOwner(ctx, ownerID, groupID); err != nil {
 		return err
@@ -135,8 +126,7 @@ type inviteLinkRow struct {
 	revokedAt *time.Time
 }
 
-// usableInviteLink finds the link a raw token opens, or ErrInvalidToken when
-// it is unknown, expired or revoked (the three are not told apart).
+// usableInviteLink finds a token's link, or ErrInvalidToken for unknown, expired and revoked alike.
 func (s *JournalService) usableInviteLink(ctx context.Context, rawToken string) (*inviteLinkRow, error) {
 	var l inviteLinkRow
 	err := s.db.QueryRow(ctx,
@@ -155,9 +145,7 @@ func (s *JournalService) usableInviteLink(ctx context.Context, rawToken string) 
 	return &l, nil
 }
 
-// acceptInviteLink adds userID to the link's group as an active member. A
-// link is not used up: it admits everyone who holds it until it expires or
-// is revoked. Joining a group one is already in is a no-op.
+// acceptInviteLink adds userID to the link's group; a link is reusable until it expires or is revoked.
 func (s *JournalService) acceptInviteLink(ctx context.Context, rawToken string, userID uuid.UUID) (*models.JoinGroupResponse, error) {
 	l, err := s.usableInviteLink(ctx, rawToken)
 	if err != nil {
@@ -174,8 +162,7 @@ func (s *JournalService) acceptInviteLink(ctx context.Context, rawToken string, 
 		resp.AlreadyMember = true
 		return resp, nil
 	}
-	// A pending row (from an emailed invite) becomes active; otherwise a new
-	// membership, attributed to whoever made the link.
+	// A pending emailed-invite row becomes active; otherwise insert, credited to the link's maker.
 	if _, err := s.db.Exec(ctx,
 		`INSERT INTO journal_group_members (group_id, user_id, invited_by, status, joined_at)
 		 VALUES ($1, $2, $3, 'active', NOW())
@@ -187,10 +174,7 @@ func (s *JournalService) acceptInviteLink(ctx context.Context, rawToken string, 
 	return resp, nil
 }
 
-// PreviewInvite says which group a token opens, for the join page to show
-// before the user commits. It is a read, so the look-only demo can see it.
-// An emailed invite for a different address reports ErrInviteEmailMismatch
-// up front rather than on the join.
+// PreviewInvite says which group a token opens; an emailed invite for another address is ErrInviteEmailMismatch.
 func (s *JournalService) PreviewInvite(ctx context.Context, rawToken string, userID uuid.UUID) (*models.JoinPreview, error) {
 	p := &models.JoinPreview{}
 	var groupID uuid.UUID

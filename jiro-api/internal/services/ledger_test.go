@@ -72,8 +72,7 @@ func TestAdvanceRecurrence(t *testing.T) {
 }
 
 func TestMonthlyNeverDrifts(t *testing.T) {
-	// Anchored on the 31st: the short months take their last day, and the
-	// long months get the 31st back.
+	// Anchored on the 31st: short months take their last day, long ones get the 31st back.
 	want := []string{"2026-01-31", "2026-02-28", "2026-03-31", "2026-04-30", "2026-05-31", "2026-06-30", "2026-07-31"}
 	d := day(want[0])
 	got := []string{d.Format(dayLayout)}
@@ -121,9 +120,7 @@ func TestDueOccurrencesCatchUp(t *testing.T) {
 	}
 }
 
-// Running the catch-up again with the next date it returned finds nothing:
-// the sequence is idempotent at the date level (the database adds the row
-// lock and the unique index on top).
+// A second catch-up from the returned next date finds nothing.
 func TestDueOccurrencesIdempotent(t *testing.T) {
 	today := day("2026-09-25")
 	first, next := dueOccurrences(day("2026-05-31"), today, "monthly", 31, maxCatchUpPerSeries)
@@ -297,8 +294,7 @@ func TestPickCategoryColor(t *testing.T) {
 	if got := pickCategoryColor(nil); got != categoryPalette[0] {
 		t.Errorf("first colour = %s, want %s", got, categoryPalette[0])
 	}
-	// The defaults use the whole palette but for one: the free one is picked,
-	// matched case-insensitively.
+	// The defaults use all but one palette colour; that one is picked, case-insensitively.
 	used := []string{}
 	for _, c := range categoryPalette {
 		if c != "#4DB6AC" {

@@ -26,9 +26,7 @@ var (
 	ErrTransactionNotFound    = errors.New("transaction not found")
 	ErrLedgerNotOwner         = errors.New("you do not own this resource")
 
-	// ErrLedgerInvalid wraps every request the ledger refuses as malformed;
-	// the handler maps it to 400 and shows the message, so messages must be
-	// safe to return.
+	// ErrLedgerInvalid marks a malformed request (400); its message is shown, so keep it safe to return.
 	ErrLedgerInvalid = errors.New("invalid ledger request")
 	// ErrCategoryNameTaken: the user already has a category with that name (409).
 	ErrCategoryNameTaken = errors.New("category name taken")
@@ -48,8 +46,7 @@ func NewLedgerService(db *pgxpool.Pool) *LedgerService {
 	return &LedgerService{db: db}
 }
 
-// categoryPalette is the colours a category can take: the default
-// categories' own colours, so a custom category sits with them.
+// categoryPalette is the colours a category can take, matching the defaults.
 var categoryPalette = []string{
 	"#8D6E63", "#E57373", "#64B5F6", "#81C784", "#FFD54F", "#F48FB1", "#90A4AE",
 	"#CE93D8", "#BCAAA4", "#66BB6A", "#4DB6AC", "#FFA726", "#AB47BC", "#78909C",
@@ -57,8 +54,7 @@ var categoryPalette = []string{
 
 var colorPattern = regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`)
 
-// pickCategoryColor is the first palette colour none of the user's
-// categories uses yet, or, once all are taken, the palette in turn.
+// pickCategoryColor is the first unused palette colour, cycling once all are taken.
 func pickCategoryColor(used []string) string {
 	taken := make(map[string]bool, len(used))
 	for _, c := range used {
@@ -135,8 +131,7 @@ func (s *LedgerService) SeedDefaultCategories(ctx context.Context, userID uuid.U
 
 // ── Accounts ──────────────────────────────────────────────────────────────────
 
-// userCurrency is the one currency every account and total of this user is
-// in (settings.currency, USD by default).
+// userCurrency is the user's one currency (settings.currency, USD by default).
 func (s *LedgerService) userCurrency(ctx context.Context, userID uuid.UUID) (string, error) {
 	var cur string
 	err := s.db.QueryRow(ctx,
@@ -146,8 +141,7 @@ func (s *LedgerService) userCurrency(ctx context.Context, userID uuid.UUID) (str
 }
 
 func (s *LedgerService) CreateAccount(ctx context.Context, userID uuid.UUID, req *models.CreateAccountRequest) (*models.LedgerAccount, error) {
-	// The column is kept in step with the user's currency, but nothing reads
-	// it for display any more: every amount is shown in settings.currency.
+	// The column is kept in step, but every amount displays in settings.currency.
 	currency, err := s.userCurrency(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -209,8 +203,7 @@ func (s *LedgerService) GetAccount(ctx context.Context, userID, accountID uuid.U
 		return nil, err
 	}
 
-	// Both legs of a transfer can belong here; this account's own leg is the
-	// one whose sign says whether money came in or went out.
+	// This account's own transfer leg is the one whose sign gives the direction.
 	acc.RecentTransactions, err = s.queryTransactions(ctx,
 		txnSelect+` WHERE t.account_id = $1 AND t.user_id = $2
 		 ORDER BY t.date DESC, t.created_at DESC LIMIT 10`,
@@ -329,8 +322,7 @@ func (s *LedgerService) CreateCategory(ctx context.Context, userID uuid.UUID, re
 	return cat, nil
 }
 
-// ListCategories returns the user's categories as a tree, in one stable
-// order everywhere: expense before income, then by name (case-insensitive).
+// ListCategories returns the user's category tree: expense before income, then by name.
 func (s *LedgerService) ListCategories(ctx context.Context, userID uuid.UUID) ([]models.CategoryTree, error) {
 	rows, err := s.db.Query(ctx,
 		`SELECT id, user_id, name, type, color, parent_id, created_at
@@ -357,8 +349,7 @@ func (s *LedgerService) ListCategories(ctx context.Context, userID uuid.UUID) ([
 	return buildCategoryTree(all), nil
 }
 
-// buildCategoryTree nests children under their parents, keeping the input
-// order for both. A child whose parent is missing is listed as a root.
+// buildCategoryTree nests children under parents in input order; orphans become roots.
 func buildCategoryTree(all []models.LedgerCategory) []models.CategoryTree {
 	index := map[uuid.UUID]int{}
 	result := []models.CategoryTree{}
@@ -419,10 +410,7 @@ func (s *LedgerService) UpdateCategory(ctx context.Context, userID, catID uuid.U
 	return cat, nil
 }
 
-// checkCategoryMove is the delete rule: a category's transactions move to
-// the chosen target, which must be a different category of the same type
-// (income stays income), or to no category at all (target nil, shown as
-// "Uncategorised").
+// checkCategoryMove allows moving to another category of the same type, or to none (target nil).
 func checkCategoryMove(deleted models.LedgerCategory, target *models.LedgerCategory) error {
 	if target == nil {
 		return nil
@@ -442,9 +430,7 @@ type CategoryDeleteResult struct {
 	BudgetsRemoved int64 `json:"budgets_removed"`
 }
 
-// DeleteCategory deletes one of the user's categories. Its transactions move
-// to moveTo (nil: uncategorised), all in one transaction; its budgets go
-// with it, and any subcategories become top-level.
+// DeleteCategory deletes a category in one transaction, moving its transactions to moveTo (nil: uncategorised).
 func (s *LedgerService) DeleteCategory(ctx context.Context, userID, catID uuid.UUID, moveTo *uuid.UUID) (*CategoryDeleteResult, error) {
 	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
@@ -519,9 +505,7 @@ func signedAmount(txType string, absAmount float64) float64 {
 	return absAmount
 }
 
-// txnSelect reads a transaction with its category and the series it belongs
-// to (its own when it is a head, its head's when Ledger wrote it). Callers
-// append WHERE / ORDER BY; the scan order is scanTxn's.
+// txnSelect reads a transaction with its category and series, in scanTxn's order; callers append WHERE / ORDER BY.
 const txnSelect = `
 	SELECT t.id, t.user_id, t.account_id, t.category_id, t.type, t.amount,
 	       t.description, t.notes, t.date, t.is_recurring, t.recurrence_interval,
@@ -635,10 +619,7 @@ type recurrence struct {
 	next     *time.Time
 }
 
-// newRecurrence arms a series that starts on start: the anchor day is the
-// start's day of the month, and the first copy is due on the first scheduled
-// date after max(start, lastCopy). lastCopy is the latest copy already
-// written for it (zero if none), so re-arming a series never repeats a date.
+// newRecurrence arms a series from start; the first copy is after max(start, lastCopy), so no date repeats.
 func newRecurrence(start time.Time, interval string, lastCopy time.Time) recurrence {
 	anchor := start.Day()
 	after := start
@@ -776,10 +757,7 @@ func (s *LedgerService) createTransfer(ctx context.Context, userID uuid.UUID, re
 	return s.GetTransaction(ctx, userID, id)
 }
 
-// ListTransactions lists the user's transactions, newest first. A transfer
-// is two rows (one per account) but is listed once, by its source leg,
-// whose account and transfer_to_account_id give the direction; filtering by
-// an account matches a transfer on either side.
+// ListTransactions lists transactions newest first; a transfer appears once, by its source leg.
 func (s *LedgerService) ListTransactions(ctx context.Context, userID uuid.UUID, f models.TransactionFilters) ([]models.LedgerTransaction, error) {
 	query := txnSelect + `
 		WHERE t.user_id = $1 AND NOT (t.type = 'transfer' AND t.amount > 0)`
@@ -853,11 +831,7 @@ type queryRower interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
-// transferPartner finds the other leg of a transfer: the row on the other
-// account, pointing back, on the same date, for the opposite amount. Among
-// identical pairs (the same transfer logged twice) it prefers the one from
-// the same series and written closest in time; any of them would do, since
-// they are interchangeable. Nil when the other leg is gone.
+// transferPartner finds a transfer's other leg (same date, opposite amount), or nil when gone.
 func transferPartner(ctx context.Context, q queryRower, userID uuid.UUID, leg *models.LedgerTransaction) (*models.LedgerTransaction, error) {
 	if leg.Type != "transfer" || leg.TransferToAccountID == nil {
 		return nil, nil
@@ -881,10 +855,7 @@ func transferPartner(ctx context.Context, q queryRower, userID uuid.UUID, leg *m
 	return &p, nil
 }
 
-// resolveRecurrence works out a transaction's recurring columns after an
-// edit. Turning it off stops the series. Turning it on, or changing the
-// interval or the date of a live series, re-arms it after the last copy
-// already written. A copy Ledger wrote cannot start a series of its own.
+// resolveRecurrence works out the recurring columns after an edit; a Ledger-written copy cannot start a series.
 func (s *LedgerService) resolveRecurrence(ctx context.Context, existing *models.LedgerTransaction, req *models.UpdateTransactionRequest, newDate time.Time) (recurrence, error) {
 	current := recurrence{
 		on: existing.IsRecurring, interval: existing.RecurrenceInterval,
@@ -931,9 +902,7 @@ func (s *LedgerService) resolveRecurrence(ctx context.Context, existing *models.
 	return newRecurrence(newDate, interval, lastCopy), nil
 }
 
-// UpdateTransaction applies an edit. Every field round-trips: account,
-// category, amount, description, notes, date and recurrence, and for a
-// transfer both accounts. Balances move with it in one transaction.
+// UpdateTransaction applies an edit and moves balances with it, in one transaction.
 func (s *LedgerService) UpdateTransaction(ctx context.Context, userID, txID uuid.UUID, req *models.UpdateTransactionRequest) (*models.LedgerTransaction, error) {
 	existing, err := s.GetTransaction(ctx, userID, txID)
 	if err != nil {
@@ -1029,9 +998,7 @@ func (s *LedgerService) UpdateTransaction(ctx context.Context, userID, txID uuid
 	return s.GetTransaction(ctx, userID, txID)
 }
 
-// updateTransfer edits both legs of a transfer together: the accounts on
-// either side, the amount, the date, the text and the series (which lives on
-// the source leg). Opened from either leg, it works from the source.
+// updateTransfer edits both legs of a transfer together, working from the source leg.
 func (s *LedgerService) updateTransfer(ctx context.Context, userID uuid.UUID, existing *models.LedgerTransaction, req *models.UpdateTransactionRequest) (*models.LedgerTransaction, error) {
 	src := existing
 	if existing.Amount > 0 {
@@ -1166,9 +1133,7 @@ func (s *LedgerService) updateTransfer(ctx context.Context, userID uuid.UUID, ex
 	return s.GetTransaction(ctx, userID, src.ID)
 }
 
-// StopRecurring stops the series a transaction belongs to: the one it heads,
-// or the one that wrote it. Copies already written stay. Returns the
-// transaction as it now reads.
+// StopRecurring stops the series a transaction heads or came from; copies already written stay.
 func (s *LedgerService) StopRecurring(ctx context.Context, userID, txID uuid.UUID) (*models.LedgerTransaction, error) {
 	t, err := s.GetTransaction(ctx, userID, txID)
 	if err != nil {
@@ -1304,10 +1269,7 @@ func (s *LedgerService) UpdateBudget(ctx context.Context, userID, budgetID uuid.
 	return budget, nil
 }
 
-// ListBudgets returns the budgets with what was spent in each one's current
-// period. "Current" is cut from today in the user's location (settings
-// timezone, else tzHint, else UTC), not the database server's date, so a
-// month rolls over at the user's midnight.
+// ListBudgets returns budgets with spend in their current period, cut at the user's midnight.
 func (s *LedgerService) ListBudgets(ctx context.Context, userID uuid.UUID, tzHint string) ([]models.BudgetWithSpend, error) {
 	loc, err := userLocation(ctx, s.db, userID, tzHint)
 	if err != nil {
@@ -1430,8 +1392,7 @@ func (s *LedgerService) ListSnapshots(ctx context.Context, userID uuid.UUID) ([]
 
 // ── Summary ───────────────────────────────────────────────────────────────────
 
-// GetSummary totals income and spending for month (YYYY-MM). An empty month
-// means the current one in the user's timezone (settings, else tzHint).
+// GetSummary totals income and spending for month (YYYY-MM; empty for the user's current month).
 func (s *LedgerService) GetSummary(ctx context.Context, userID uuid.UUID, month, tzHint string) (*models.LedgerSummary, error) {
 	if month == "" {
 		loc, err := userLocation(ctx, s.db, userID, tzHint)
@@ -1478,9 +1439,7 @@ func (s *LedgerService) GetSummary(ctx context.Context, userID uuid.UUID, month,
 
 func round2(v float64) float64 { return math.Round(v*100) / 100 }
 
-// compareValues compares period B with period A, the base: Delta is B - A,
-// so it is positive when B is higher; DeltaPct is the change as a share of
-// |A|, nil when A is zero (there is no base, so no percentage).
+// compareValues returns Delta B - A and DeltaPct as a share of |A|, nil when A is zero.
 func compareValues(a, b float64) models.ComparisonValue {
 	a, b = round2(a), round2(b)
 	v := models.ComparisonValue{A: a, B: b, Delta: round2(b - a)}
@@ -1491,8 +1450,7 @@ func compareValues(a, b float64) models.ComparisonValue {
 	return v
 }
 
-// comparisonRow is one category's (or the uncategorised rest's) income or
-// spending in each period, as positive amounts.
+// comparisonRow is one category's positive income or spending in each period.
 type comparisonRow struct {
 	categoryID *uuid.UUID
 	name       string
@@ -1501,9 +1459,7 @@ type comparisonRow struct {
 	a, b       float64
 }
 
-// buildComparison turns the per-category rows into the response: the totals
-// by type, and the categories ordered by the size of their change, then by
-// type and name so equal changes keep one order.
+// buildComparison totals by type and orders categories by size of change, then type and name.
 func buildComparison(rows []comparisonRow) (models.ComparisonSummary, []models.ComparisonCategory) {
 	var aIncome, bIncome, aExpenses, bExpenses float64
 	cats := make([]models.ComparisonCategory, 0, len(rows))
@@ -1538,9 +1494,7 @@ func buildComparison(rows []comparisonRow) (models.ComparisonSummary, []models.C
 	}, cats
 }
 
-// GetComparison compares period B with period A (the base). The Compare
-// page's presets pass the previous period as A and the current one as B, so
-// a positive change means "higher now than before".
+// GetComparison compares period B with base period A; positive means higher in B.
 func (s *LedgerService) GetComparison(ctx context.Context, userID uuid.UUID, aFrom, aTo, bFrom, bTo string) (*models.ComparisonResponse, error) {
 	for _, pair := range [][2]string{{aFrom, aTo}, {bFrom, bTo}} {
 		from, err := parseLedgerDate(pair[0])

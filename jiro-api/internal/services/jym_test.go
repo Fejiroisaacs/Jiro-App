@@ -52,9 +52,7 @@ func TestIsNewPR(t *testing.T) {
 	}
 }
 
-// testJymDB connects to a real database when JIRO_TEST_DATABASE_URL is set
-// (the app role is enough) and creates a throwaway user that is deleted,
-// with everything it owns, when the test ends.
+// testJymDB uses JIRO_TEST_DATABASE_URL and a throwaway user deleted when the test ends.
 func testJymDB(t *testing.T) (*JymService, uuid.UUID) {
 	t.Helper()
 	url := os.Getenv("JIRO_TEST_DATABASE_URL")
@@ -165,8 +163,7 @@ func TestWarmupIsNeverPR(t *testing.T) {
 		t.Fatalf("warm-up at a new top weight was marked a PR")
 	}
 
-	// Marking the PR set as a warm-up takes the badge away; unmarking it
-	// earns it back.
+	// Marking the PR set a warm-up takes the badge away; unmarking earns it back.
 	upd, err := svc.UpdateSet(ctx, userID, work.ID, &models.UpdateSetRequest{IsWarmup: &warm})
 	if err != nil {
 		t.Fatalf("mark as warm-up: %v", err)

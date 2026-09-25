@@ -386,8 +386,7 @@ export class JournalEntriesComponent {
   });
 
   constructor() {
-    // Keep the text boxes in step with the URL (Back/Forward, shared links,
-    // Clear filters) without trampling what is being typed.
+    // Sync the text boxes with the URL without trampling what is being typed.
     effect(() => {
       const q = this.q();
       untracked(() => { if (this.searchInput().trim() !== q) this.searchInput.set(q); });
@@ -415,8 +414,7 @@ export class JournalEntriesComponent {
       distinctUntilChanged((a, b) =>
         a.page === b.page && a.q === b.q && a.mood === b.mood && a.tag === b.tag && a.nonce === b.nonce),
       tap(() => this.state.set({ status: 'loading' })),
-      // switchMap drops the in-flight request when the page or a filter
-      // changes, so a slow earlier response can never overwrite a later one.
+      // switchMap cancels the in-flight request, so a slow earlier response can't overwrite a later one.
       switchMap(req => {
         const params: ListEntriesParams = {
           limit: ENTRIES_PAGE_SIZE,
@@ -438,8 +436,7 @@ export class JournalEntriesComponent {
       }
       this.total.set(res.total);
 
-      // Past the end (entries deleted since, or a hand-edited URL): go to
-      // the real last page instead of showing an empty one.
+      // Past the end: go to the real last page instead of an empty one.
       const last = Math.max(1, Math.ceil(res.total / ENTRIES_PAGE_SIZE));
       if (req.page > last) {
         this.setParams({ page: last > 1 ? last : null }, true);
@@ -449,8 +446,7 @@ export class JournalEntriesComponent {
       this.state.set({ status: 'ready', entries: res.entries, total: res.total, req });
 
       if (lastLoadedPage !== null && lastLoadedPage !== req.page) {
-        // The app scrolls inside <body>, not the window, so scroll the
-        // element itself. Wait a frame for the new rows to render.
+        // The app scrolls inside <body>, not the window; wait a frame for the new rows.
         requestAnimationFrame(() => {
           const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
           this.listTop()?.nativeElement.scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : 'smooth' });

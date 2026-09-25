@@ -1,8 +1,6 @@
 package handlers
 
-// Grocery list endpoints (Culinara). Every call that changes the list
-// returns the whole list afterwards (models.GroceryList), so the page never
-// has to reconcile a partial update.
+// Grocery list endpoints (Culinara). Every write returns the whole list.
 
 import (
 	"errors"
@@ -109,9 +107,7 @@ func (h *RecipeHandler) AddMealPlanToGroceryList(c *gin.Context) {
 	c.JSON(http.StatusOK, list)
 }
 
-// POST /culinara/grocery-list/import  {items: [{item, amount, recipe_title, checked}]}
-// One-off upload of a list kept in the browser; adds nothing when the
-// account already has a list.
+// ImportGroceryList handles POST /culinara/grocery-list/import: a one-off browser upload, no-op if a list exists.
 func (h *RecipeHandler) ImportGroceryList(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 	var req models.ImportGroceryRequest
@@ -147,8 +143,7 @@ func (h *RecipeHandler) UpdateGroceryItem(c *gin.Context) {
 	c.JSON(http.StatusOK, item)
 }
 
-// POST /culinara/grocery-list/check  {ids?, checked}
-// Checks (or unchecks) the given items, or every item when ids is empty.
+// SetGroceryChecked handles POST /culinara/grocery-list/check for the given ids, or every item when empty.
 func (h *RecipeHandler) SetGroceryChecked(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 	var req models.SetGroceryCheckedRequest
