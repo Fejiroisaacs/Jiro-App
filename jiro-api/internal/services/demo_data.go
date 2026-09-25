@@ -192,6 +192,23 @@ type demoDataset struct {
 // demoSettings is the demo user's settings column.
 const demoSettings = `{"weight_unit":"lbs","timezone":"America/New_York"}`
 
+// demoTimeZone matches demoSettings. The app cuts days in the user's
+// timezone, so the demo's "today" (for seeding and for sliding dates) is the
+// New York calendar day, not the UTC one.
+const demoTimeZone = "America/New_York"
+
+// demoDate is t's calendar date in the demo's timezone, as UTC midnight of
+// that date (the same shape utcDay returns). Seed times are UTC hours 05-23,
+// which fall on that same calendar date in New York all year round.
+func demoDate(t time.Time) time.Time {
+	loc, err := time.LoadLocation(demoTimeZone)
+	if err != nil { // tzdata is embedded (day.go), so this does not happen
+		return utcDay(t)
+	}
+	y, m, d := t.In(loc).Date()
+	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+}
+
 func utcDay(t time.Time) time.Time {
 	t = t.UTC()
 	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
@@ -274,14 +291,14 @@ func buildDemoJym(ds *demoDataset, at func(int, int, int) time.Time, date func(i
 	for di, day := range days {
 		routineIDs[di] = uuid.New()
 		ds.Routines = append(ds.Routines, demoRoutine{
-			ID: routineIDs[di], Name: day.name, DayOrder: di + 1, CreatedAt: at(-44, 1, 12+di),
+			ID: routineIDs[di], Name: day.name, DayOrder: di + 1, CreatedAt: at(-44, 21, 12+di),
 		})
 		for li, lift := range day.lifts {
 			id := uuid.New()
 			exerciseIDs[lift.name] = id
 			ds.Exercises = append(ds.Exercises, demoExercise{
 				ID: id, Name: lift.name, MuscleGroup: lift.muscle, Notes: lift.notes,
-				CreatedAt: at(-44, 0, 40+len(ds.Exercises)),
+				CreatedAt: at(-44, 20, 40+len(ds.Exercises)),
 			})
 			ds.RoutineItems = append(ds.RoutineItems, demoRoutineItem{
 				RoutineID: routineIDs[di], ExerciseID: id, TargetSets: lift.sets, TargetReps: lift.reps, OrderIndex: li,
@@ -599,7 +616,7 @@ Started the new push pull legs program today. Kept the weights lighter than I wa
 
 Goal for the next six weeks: bench 175 and a clean 285 deadlift for five.`)
 
-	add(-31, 1, 40, "", "tired", []string{"sleep", "work"}, `
+	add(-31, 22, 40, "", "tired", []string{"sleep", "work"}, `
 Long day. The quarterly review ran two hours over and I ate lunch at 4. Skipped the evening walk. Going to bed early and not looking at my phone.`)
 
 	add(-29, 23, 30, "Sunday reset", "calm", []string{"routine", "cooking"}, `
@@ -607,7 +624,7 @@ Did the whole Sunday thing: laundry, groceries, meal prepped the Greek chicken b
 
 Nice to start the week with the fridge already full.`)
 
-	add(-26, 0, 15, "", "stressed", []string{"work", "money"}, `
+	add(-26, 21, 15, "", "stressed", []string{"work", "money"}, `
 Car needs new brakes, $480. Not the end of the world but it wipes out what I had set aside for the month. Moving the concert money back into savings to make up for it.`)
 
 	add(-22, 23, 50, "Risotto attempt", "happy", []string{"cooking"}, `
@@ -618,7 +635,7 @@ Sam said it was good, which is either true or kind.`)
 	add(-19, 23, 5, "", "grateful", []string{"friends"}, `
 Priya came over and we talked until midnight. It has been way too long since I just sat and talked with someone without checking the time. Want to do that more.`)
 
-	add(-17, 1, 20, "", "anxious", []string{"work"}, `
+	add(-17, 22, 20, "", "anxious", []string{"work"}, `
 Presentation to the leadership team on Thursday. I know the material but I keep rehearsing the opening in my head. Wrote out the first two minutes word for word so I can stop thinking about it.`)
 
 	add(-15, 23, 45, "", "tired", []string{"training", "sleep"}, `
@@ -643,7 +660,7 @@ Plan: cook on Wednesdays instead of ordering.`)
 	add(-3, 23, 35, "", "grateful", []string{"family", "cooking"}, `
 Big pot of turkey chili, froze half of it for the busy weeks. Mom called to ask for the recipe, which has never happened before.`)
 
-	add(-2, 0, 50, "", "calm", []string{"routine"}, `
+	add(-2, 21, 50, "", "calm", []string{"routine"}, `
 Quiet evening. Read for an hour, went to bed at 10:30. More days like this, please.`)
 
 	add(-1, 23, 20, "Six weeks done", "happy", []string{"training", "wins"}, `
