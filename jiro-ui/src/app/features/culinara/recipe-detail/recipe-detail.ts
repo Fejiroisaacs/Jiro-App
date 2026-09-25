@@ -2,7 +2,7 @@ import { Component, OnInit, computed, inject, signal, HostListener, ElementRef }
 import { ConfirmService } from '../../../core/services/confirm.service';
 
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { ShoppingListComponent } from '../shopping-list/shopping-list';
+import { GroceryService, groceryAddedMessage } from '../../../core/services/grocery.service';
 import {
   RecipeService,
   Recipe,
@@ -154,10 +154,14 @@ type MobileTab = 'recipe' | 'trials';
             <!-- Public toggle -->
             <div class="public-toggle-row">
               <div class="public-toggle-info">
-                <span class="public-toggle-label">Share publicly</span>
+                <span class="public-toggle-label" id="public-toggle-label">Share publicly</span>
                 <span class="public-toggle-sub">Visible to anyone in Discover</span>
               </div>
               <button
+                type="button"
+                role="switch"
+                aria-labelledby="public-toggle-label"
+                [attr.aria-checked]="isPublic()"
                 class="toggle-switch"
                 [class.toggle-switch--on]="isPublic()"
                 [disabled]="publicToggling()"
@@ -1134,7 +1138,10 @@ type MobileTab = 'recipe' | 'trials';
       position: relative;
       width: 40px; height: 22px;
       border: none; border-radius: 11px;
-      background: var(--border-color);
+      /* Off: a muted track, not the border colour, which all but vanished
+         against the surface in dark mode. The thumb is the surface colour,
+         so it contrasts with the track in either theme. */
+      background: var(--text-muted);
       cursor: pointer;
       transition: background 0.2s;
       flex-shrink: 0;
@@ -1414,6 +1421,7 @@ export class RecipeDetailComponent implements OnInit {
 
   private readonly confirmService = inject(ConfirmService);
   private readonly toast = inject(ToastService);
+  private readonly grocery = inject(GroceryService);
 
   async deleteTrial(trial: RecipeTrial) {
     const ok = await this.confirmService.confirm({
@@ -1455,9 +1463,12 @@ export class RecipeDetailComponent implements OnInit {
   addToGrocery() {
     const r = this.recipe();
     if (!r?.base_ingredients?.length) return;
-    ShoppingListComponent.addRecipe(r.title, r.base_ingredients);
     // A toast, not an inline chip: the effect lands on the grocery page.
-    this.toast.success(`Ingredients added to your grocery list`);
+    // Adding the recipe again skips what is already on the list.
+    this.grocery.addRecipe(r.id).subscribe({
+      next: (res) => this.toast.success(groceryAddedMessage(res.added, res.skipped)),
+      error: () => this.toast.error('Could not add to your grocery list'),
+    });
   }
 
   shareRecipe() {
