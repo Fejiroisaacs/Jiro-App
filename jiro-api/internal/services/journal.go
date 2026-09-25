@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -83,6 +82,11 @@ func (s *JournalService) CreateEntry(ctx context.Context, userID uuid.UUID, grou
 		return nil, err
 	}
 	entry.Images = []models.JournalImage{}
+	if len(req.CollectionIDs) > 0 {
+		if err := s.addEntryToCollections(ctx, userID, entry.ID, req.CollectionIDs); err != nil {
+			return nil, err
+		}
+	}
 	return entry, nil
 }
 
@@ -127,6 +131,13 @@ func (s *JournalService) GetEntry(ctx context.Context, userID, entryID uuid.UUID
 
 	images, _ := s.listImages(ctx, entryID)
 	entry.Images = images
+	if entry.UserID == userID {
+		ids, err := s.entryCollectionIDs(ctx, userID, entryID)
+		if err != nil {
+			return nil, err
+		}
+		entry.CollectionIDs = ids
+	}
 	return entry, nil
 }
 
@@ -136,6 +147,9 @@ func (s *JournalService) GetEntry(ctx context.Context, userID, entryID uuid.UUID
 //
 // q is escaped with escapeLike so % and _ match literally; Postgres's default
 // LIKE escape character is backslash, matching the search service.
+//
+// tag matches case-insensitively as a prefix of any of the entry's tags, so
+// "train" finds "Training" while the filter box is still being typed in.
 func journalEntryFilter(userID uuid.UUID, mood, tag, q, from, to string) (string, []any, int) {
 	args := []any{userID}
 	where := `WHERE e.user_id = $1 AND e.group_id IS NULL`
@@ -147,8 +161,8 @@ func journalEntryFilter(userID uuid.UUID, mood, tag, q, from, to string) (string
 		i++
 	}
 	if tag != "" {
-		where += fmt.Sprintf(` AND $%d = ANY(e.tags)`, i)
-		args = append(args, tag)
+		where += fmt.Sprintf(` AND EXISTS (SELECT 1 FROM unnest(e.tags) AS t(tag) WHERE t.tag ILIKE $%d)`, i)
+		args = append(args, tagPrefixPattern(tag))
 		i++
 	}
 	if q != "" {
@@ -275,9 +289,86 @@ func (s *JournalService) UpdateEntry(ctx context.Context, userID, entryID uuid.U
 		return nil, err
 	}
 
+	if req.CollectionIDs != nil {
+		if err := s.setEntryCollections(ctx, userID, entryID, *req.CollectionIDs); err != nil {
+			return nil, err
+		}
+	}
+
 	images, _ := s.listImages(ctx, entryID)
 	entry.Images = images
 	return entry, nil
+}
+
+// tagPrefixPattern is the ILIKE pattern for a tag filter: the tag, trimmed
+// and with any leading # dropped, matched literally as a prefix.
+func tagPrefixPattern(tag string) string {
+	tag = strings.TrimPrefix(strings.TrimSpace(tag), "#")
+	return escapeLike(tag) + "%"
+}
+
+// entryCollectionIDs lists userID's own collections that hold the entry.
+func (s *JournalService) entryCollectionIDs(ctx context.Context, userID, entryID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := s.db.Query(ctx, `
+		SELECT ce.collection_id
+		FROM journal_collection_entries ce
+		JOIN journal_collections c ON c.id = ce.collection_id
+		WHERE ce.entry_id = $1 AND c.user_id = $2
+		ORDER BY c.name`, entryID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	ids := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+// addEntryToCollections files an entry the caller has already checked is
+// userID's into those of ids that are userID's collections; others are
+// ignored, like an id that no longer exists.
+func (s *JournalService) addEntryToCollections(ctx context.Context, userID, entryID uuid.UUID, ids []uuid.UUID) error {
+	_, err := s.db.Exec(ctx, `
+		INSERT INTO journal_collection_entries (collection_id, entry_id)
+		SELECT c.id, $2 FROM journal_collections c
+		WHERE c.user_id = $1 AND c.id = ANY($3::uuid[])
+		ON CONFLICT DO NOTHING`, userID, entryID, ids)
+	return err
+}
+
+// setEntryCollections makes ids the entry's full set of userID's collections:
+// it leaves the ones not listed and joins the new ones. Other users'
+// collections are never touched.
+func (s *JournalService) setEntryCollections(ctx context.Context, userID, entryID uuid.UUID, ids []uuid.UUID) error {
+	if ids == nil {
+		ids = []uuid.UUID{}
+	}
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM journal_collection_entries ce
+		USING journal_collections c
+		WHERE ce.collection_id = c.id AND c.user_id = $1 AND ce.entry_id = $2
+		  AND NOT (ce.collection_id = ANY($3::uuid[]))`, userID, entryID, ids); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO journal_collection_entries (collection_id, entry_id)
+		SELECT c.id, $2 FROM journal_collections c
+		WHERE c.user_id = $1 AND c.id = ANY($3::uuid[])
+		ON CONFLICT DO NOTHING`, userID, entryID, ids); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 func (s *JournalService) DeleteEntry(ctx context.Context, userID, entryID uuid.UUID) ([]string, error) {
@@ -671,13 +762,10 @@ func (s *JournalService) LookupUserByEmail(ctx context.Context, email string) (u
 }
 
 func (s *JournalService) CreateGroupInvite(ctx context.Context, groupID uuid.UUID, email string) (rawToken string, err error) {
-	raw := make([]byte, 32)
-	if _, err := rand.Read(raw); err != nil {
+	rawToken, tokenHash, err := newInviteToken()
+	if err != nil {
 		return "", err
 	}
-	rawToken = hex.EncodeToString(raw)
-	hash := sha256.Sum256([]byte(rawToken))
-	tokenHash := hex.EncodeToString(hash[:])
 	expiresAt := time.Now().Add(7 * 24 * time.Hour)
 
 	_, err = s.db.Exec(ctx,
@@ -708,8 +796,7 @@ func (s *JournalService) IsMember(ctx context.Context, groupID, userID uuid.UUID
 // AcceptInvite redeems an invite for userID only. The invite is bound to the
 // address it was sent to; it is not a key that admits every pending member.
 func (s *JournalService) AcceptInvite(ctx context.Context, rawToken string, userID uuid.UUID) (*models.JoinGroupResponse, error) {
-	hash := sha256.Sum256([]byte(rawToken))
-	tokenHash := hex.EncodeToString(hash[:])
+	tokenHash := hashInviteToken(rawToken)
 
 	var inviteID, groupID uuid.UUID
 	var inviteEmail string
@@ -719,7 +806,8 @@ func (s *JournalService) AcceptInvite(ctx context.Context, rawToken string, user
 	).Scan(&inviteID, &groupID, &inviteEmail, &expiresAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrInvalidToken
+			// Not an emailed invite; it may be a copyable link.
+			return s.acceptInviteLink(ctx, rawToken, userID)
 		}
 		return nil, err
 	}
@@ -733,7 +821,7 @@ func (s *JournalService) AcceptInvite(ctx context.Context, rawToken string, user
 	if err := s.db.QueryRow(ctx, `SELECT email FROM users WHERE id = $1`, userID).Scan(&userEmail); err != nil {
 		return nil, err
 	}
-	if !strings.EqualFold(strings.TrimSpace(userEmail), strings.TrimSpace(inviteEmail)) {
+	if !emailsMatch(userEmail, inviteEmail) {
 		return nil, ErrInviteEmailMismatch
 	}
 
@@ -764,6 +852,11 @@ func (s *JournalService) AcceptInvite(ctx context.Context, rawToken string, user
 	s.db.QueryRow(ctx, `SELECT name FROM journal_groups WHERE id = $1`, groupID).Scan(&groupName)
 
 	return &models.JoinGroupResponse{GroupID: groupID, GroupName: groupName}, nil
+}
+
+// emailsMatch compares addresses the way an emailed invite is bound to one.
+func emailsMatch(a, b string) bool {
+	return strings.EqualFold(strings.TrimSpace(a), strings.TrimSpace(b))
 }
 
 // ─── Group entries ─────────────────────────────────────────────────────────

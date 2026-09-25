@@ -548,7 +548,9 @@ func (h *JournalHandler) RemoveMember(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Member removed"})
 }
 
-// POST /journal/groups/join?token=xxx  (public route)
+// POST /journal/groups/join?token=xxx
+// Redeems an emailed invite (for its own address only) or a copyable link
+// (for any signed-in account, until it expires or is turned off).
 func (h *JournalHandler) JoinGroup(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 	rawToken := c.Query("token")
@@ -560,7 +562,7 @@ func (h *JournalHandler) JoinGroup(c *gin.Context) {
 	resp, err := h.journalService.AcceptInvite(c.Request.Context(), rawToken, userID)
 	if err != nil {
 		if err == services.ErrInvalidToken {
-			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_TOKEN", Message: "Invite link is invalid or has expired"}})
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_TOKEN", Message: invalidInviteMessage}})
 			return
 		}
 		if err == services.ErrInviteEmailMismatch {
