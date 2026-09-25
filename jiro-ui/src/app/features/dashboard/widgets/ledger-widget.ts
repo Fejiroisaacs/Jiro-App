@@ -1,4 +1,5 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, inject, input } from '@angular/core';
+import { SettingsService } from '../../../core/services/settings.service';
 import { RouterLink } from '@angular/router';
 import { DashboardLedger } from '../../../core/services/dashboard.service';
 import { formatCurrency, formatSignedCurrency } from '../../ledger/shared/ledger-utils';
@@ -105,8 +106,11 @@ export class LedgerWidgetComponent {
   readonly def = WIDGET_BY_ID.get('ledger_month')!;
   readonly state = computed(() => widgetState(this.data()));
 
-  money(v: number): string { return formatCurrency(v); }
-  signed(v: number): string { return formatSignedCurrency(v); }
+  private readonly settings = inject(SettingsService);
+
+  /** Amounts in the user's one currency (Settings). */
+  money(v: number): string { return formatCurrency(v, this.settings.currency()); }
+  signed(v: number): string { return formatSignedCurrency(v, this.settings.currency()); }
   pct(v: number): number { return Math.round(v); }
   clampPct(v: number): number { return Math.max(0, Math.min(100, v)); }
 }

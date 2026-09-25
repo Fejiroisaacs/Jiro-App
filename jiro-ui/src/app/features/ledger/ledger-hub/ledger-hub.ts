@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import {
@@ -14,7 +14,10 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { LedgerTransactionFormComponent, TransactionPayload } from '../shared/transaction-form/ledger-transaction-form';
-import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hexWithAlpha } from '../shared/ledger-utils';
+import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hexWithAlpha, parseDateOnly } from '../shared/ledger-utils';
+import { SettingsService } from '../../../core/services/settings.service';
+import { ToastService } from '../../../core/services/toast.service';
+import { todayKey } from '../../../core/utils/day';
 
 @Component({
   selector: 'app-ledger-hub',
@@ -33,7 +36,7 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
     <div class="ledger-hub">
 
       <!-- ── Page Header ── -->
-      <jiro-page-header heading="Ledger" [subtitle]="currentMonthLabel + ' overview'">
+      <jiro-page-header heading="Ledger" [subtitle]="currentMonthLabel() + ' overview'">
         <jiro-button actions type="button" (click)="openAddTransaction()">
           <jiro-icon name="plus" [size]="14" />
           Log transaction
@@ -62,29 +65,26 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
 
 
         <!-- Monthly Summary Bar -->
-        <div class="summary-bar">
+        <section class="summary-bar" [attr.aria-label]="currentMonthLabel() + ' summary'">
           <div class="summary-item">
             <span class="summary-label">Income</span>
-            <span class="summary-value income">{{ formatCurrency(summary()?.income ?? 0) }}</span>
+            <span class="summary-value income">{{ money(summary()?.income ?? 0) }}</span>
           </div>
-          <div class="summary-divider"></div>
           <div class="summary-item">
             <span class="summary-label">Expenses</span>
-            <span class="summary-value expense">{{ formatCurrency(summary()?.expenses ?? 0) }}</span>
+            <span class="summary-value expense">{{ money(summary()?.expenses ?? 0) }}</span>
           </div>
-          <div class="summary-divider"></div>
           <div class="summary-item">
             <span class="summary-label">Net</span>
             <span class="summary-value" [class.income]="(summary()?.net ?? 0) >= 0" [class.expense]="(summary()?.net ?? 0) < 0">
-              {{ formatCurrency(summary()?.net ?? 0) }}
+              {{ money(summary()?.net ?? 0) }}
             </span>
           </div>
-          <div class="summary-divider"></div>
           <div class="summary-item">
-            <span class="summary-label">Savings Rate</span>
+            <span class="summary-label">Savings rate</span>
             <span class="summary-value savings">{{ formatPct(summary()?.savings_rate ?? 0) }}</span>
           </div>
-        </div>
+        </section>
 
         <!-- ── Two-column body ── -->
         <div class="hub-body">
@@ -93,7 +93,7 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
           <div class="hub-left">
             <div class="section-header">
               <h2 class="section-title">Budgets</h2>
-              <a routerLink="/ledger/budgets" class="section-link">Manage →</a>
+              <a routerLink="/ledger/budgets" class="section-link">Manage budgets</a>
             </div>
 
             <!-- Budgets empty -->
@@ -108,10 +108,10 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
             <!-- Budgets grid (desktop) / horizontal scroll (mobile) -->
             @if (budgets().length > 0) {
 <div class="budgets-grid">
-              @for (b of budgets(); track b) {
+              @for (b of budgets(); track b.id) {
 <div class="budget-card">
                 <div class="budget-card-top">
-                  <span class="budget-cat-dot" [style.background]="b.category_color || 'var(--text-muted)'"></span>
+                  <span class="budget-cat-dot" aria-hidden="true" [style.background]="b.category_color || 'var(--text-muted)'"></span>
                   <span class="budget-cat-name">{{ b.category_name }}</span>
                   <span class="budget-pct" [class.pct-ok]="b.pct_used < 80" [class.pct-warn]="b.pct_used >= 80 && b.pct_used < 100" [class.pct-over]="b.pct_used >= 100">
                     {{ b.pct_used | number:'1.0-0' }}%
@@ -126,8 +126,8 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
                   </div>
                 </div>
                 <div class="budget-amounts">
-                  <span class="text-secondary">{{ formatCurrency(b.spent) }} spent</span>
-                  <span class="text-muted">of {{ formatCurrency(b.amount) }}</span>
+                  <span class="text-secondary">{{ money(b.spent) }} spent</span>
+                  <span class="text-muted">of {{ money(b.amount) }}</span>
                 </div>
               </div>
 }
@@ -138,14 +138,14 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
           <!-- Right: Recent Transactions -->
           <div class="hub-right">
             <div class="section-header">
-              <h2 class="section-title">Recent Transactions</h2>
-              <a routerLink="/ledger/transactions" class="section-link">All →</a>
+              <h2 class="section-title">Recent transactions</h2>
+              <a routerLink="/ledger/transactions" class="section-link">All transactions</a>
             </div>
 
             <!-- Transactions empty -->
             @if (transactions().length === 0) {
 <div class="mini-empty">
-              <jiro-empty-state compact heading="Nothing logged this month" message="Your recent transactions show up here.">
+              <jiro-empty-state compact heading="No transactions yet" message="Your ten latest transactions show up here.">
                 <jiro-button size="sm" variant="secondary" type="button" (click)="openAddTransaction()">Log a transaction</jiro-button>
               </jiro-empty-state>
             </div>
@@ -153,26 +153,31 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
 
             <!-- Transactions list -->
             @if (transactions().length > 0) {
-<div class="txn-list">
-              @for (t of transactions(); track t) {
-<div class="txn-row">
-                <div class="txn-left">
-                  <span class="txn-desc">{{ t.description || 'Untitled' }}</span>
-                  @if (t.category_name) {
-<span class="cat-chip" [style.background]="hexWithAlpha(t.category_color, 0.12)" [style.color]="t.category_color || 'var(--text-muted)'">
-                    {{ t.category_name }}
-                  </span>
-}
-                </div>
-                <div class="txn-right">
-                  <span class="txn-amount" [class.amount-pos]="t.type === 'income'" [class.amount-neg]="t.type === 'expense'">
-                    {{ formatSignedCurrency(t.amount, 'USD', t.type === 'transfer' ? 'never' : 'exceptZero') }}
-                  </span>
-                  <span class="txn-date text-muted">{{ formatDate(t.date) }}</span>
-                </div>
-              </div>
-}
-            </div>
+<ul class="txn-list">
+              @for (t of transactions(); track t.id) {
+                <li>
+                  <!-- Opens the transaction in the full list, ready to edit. -->
+                  <a class="txn-row" routerLink="/ledger/transactions" [queryParams]="{ tx: t.id }">
+                    <span class="txn-left">
+                      <span class="txn-desc">{{ t.description || 'Untitled' }}</span>
+                      @if (t.type === 'transfer') {
+                        <span class="txn-sub">{{ transferLabel(t) }}</span>
+                      } @else if (t.category_name) {
+                        <span class="cat-chip" [style.background]="hexWithAlpha(t.category_color, 0.12)" [style.color]="t.category_color || 'var(--text-muted)'">
+                          {{ t.category_name }}
+                        </span>
+                      }
+                    </span>
+                    <span class="txn-right">
+                      <span class="txn-amount" [class.amount-pos]="t.type === 'income'" [class.amount-neg]="t.type === 'expense'">
+                        {{ signed(t) }}
+                      </span>
+                      <span class="txn-date text-muted">{{ formatDate(t.date) }}</span>
+                    </span>
+                  </a>
+                </li>
+              }
+            </ul>
 }
           </div>
 
@@ -206,16 +211,14 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
 
     /* ── Summary Bar ── */
     .summary-bar {
-      display: flex;
-      align-items: center;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       background: var(--bg-surface);
       border: 1px solid var(--border-color);
       border-radius: var(--border-radius-lg);
-      padding: var(--space-lg) var(--space-xl);
+      padding: var(--space-lg) var(--space-md);
       margin-bottom: var(--space-xl);
-      gap: 0;
       box-shadow: var(--shadow-sm);
-      overflow-x: auto;
     }
 
     .summary-item {
@@ -223,10 +226,12 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
       flex-direction: column;
       align-items: center;
       gap: var(--space-xs);
-      flex: 1;
-      min-width: 100px;
+      min-width: 0;
       padding: 0 var(--space-md);
+      text-align: center;
     }
+
+    .summary-item + .summary-item { border-left: 1px solid var(--border-color); }
 
     .summary-label {
       font-size: var(--font-size-xs);
@@ -241,7 +246,8 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
       font-size: var(--font-size-xl);
       font-weight: 700;
       color: var(--text-primary);
-      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+      overflow-wrap: anywhere;
     }
 
     .summary-value.income { color: var(--color-accent); }
@@ -250,20 +256,16 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
 
     .summary-value.savings { color: var(--color-primary); }
 
-    .summary-divider {
-      width: 1px;
-      height: 40px;
-      background: var(--border-color);
-      flex-shrink: 0;
-    }
 
     /* ── Hub body ── */
     .hub-body {
       display: grid;
-      grid-template-columns: 60% 1fr;
+      grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
       gap: var(--space-xl);
       align-items: start;
     }
+
+    .hub-left, .hub-right { min-width: 0; }
 
     /* ── Section header ── */
     .section-header {
@@ -367,6 +369,9 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
 
     /* ── Transactions list ── */
     .txn-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
       display: flex;
       flex-direction: column;
       background: var(--bg-surface);
@@ -382,10 +387,22 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
       justify-content: space-between;
       gap: var(--space-md);
       padding: var(--space-md) var(--space-lg);
-      border-bottom: 1px solid var(--border-color);
+      color: inherit;
+      text-decoration: none;
+      min-height: 56px;
     }
 
-    .txn-row:last-child { border-bottom: none; }
+    .txn-list li + li .txn-row { border-top: 1px solid var(--border-color); }
+    .txn-row:hover { background: var(--bg-canvas); }
+    .txn-row:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+
+    .txn-sub {
+      font-size: var(--font-size-xs);
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
 
     .txn-left {
       display: flex;
@@ -409,7 +426,11 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
       font-weight: 600;
       padding: 2px 8px;
       border-radius: 10px;
+      max-width: 100%;
       width: max-content;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .txn-right {
@@ -461,33 +482,26 @@ import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hex
     /* ── Responsive ── */
     @media (max-width: 768px) {
 
+      /* Two by two on a phone, so every figure has room. */
       .summary-bar {
-        padding: var(--space-md) var(--space-lg);
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        row-gap: var(--space-md);
+        padding: var(--space-md) var(--space-sm);
         margin-bottom: var(--space-lg);
       }
+      .summary-item + .summary-item { border-left: none; }
+      .summary-item:nth-child(even) { border-left: 1px solid var(--border-color); }
 
       .summary-value { font-size: var(--font-size-lg); }
 
       .hub-body {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
         gap: var(--space-lg);
       }
 
-      /* Mobile budgets: horizontal scroll */
-      .budgets-grid {
-        display: flex;
-        overflow-x: auto;
-        gap: 12px;
-        padding-bottom: var(--space-sm);
-        scrollbar-width: none;
-      }
+      .budgets-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
 
-      .budgets-grid::-webkit-scrollbar { display: none; }
-
-      .budget-card {
-        min-width: 180px;
-        flex-shrink: 0;
-      }
+      .txn-row { padding: var(--space-sm) var(--space-md); }
 
     }
 
@@ -504,11 +518,14 @@ export class LedgerHubComponent implements OnInit {
   txnSaving = signal(false);
   txnError = signal('');
 
-  readonly currentMonth = new Date().toISOString().slice(0, 7);
-  readonly currentMonthLabel = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+  private readonly settings = inject(SettingsService);
+  private readonly toast = inject(ToastService);
 
-  readonly formatCurrency = formatCurrency;
-  readonly formatSignedCurrency = formatSignedCurrency;
+  /** This month in the user's timezone (settings), as YYYY-MM: the API's summary month. */
+  readonly currentMonth = computed(() => todayKey(this.settings.timezone()).slice(0, 7));
+  readonly currentMonthLabel = computed(() =>
+    parseDateOnly(this.currentMonth() + '-01').toLocaleString('en-US', { month: 'long', year: 'numeric' }));
+
   readonly formatDate = formatDate;
   readonly formatPct = formatPct;
   readonly clamp = clamp;
@@ -531,7 +548,7 @@ export class LedgerHubComponent implements OnInit {
       error: () => this.loading.set(false),
     });
 
-    this.ledgerService.getSummary(this.currentMonth).subscribe({
+    this.ledgerService.getSummary(this.currentMonth()).subscribe({
       next: (data) => this.summary.set(data),
       error: () => {},
     });
@@ -564,12 +581,27 @@ export class LedgerHubComponent implements OnInit {
       next: () => {
         this.txnSaving.set(false);
         this.showTxnModal.set(false);
+        this.toast.success('Transaction logged');
         this.loadAll();
       },
-      error: () => {
+      error: err => {
         this.txnSaving.set(false);
-        this.txnError.set('Failed to save transaction. Please try again.');
+        this.txnError.set(err?.error?.error?.message ?? 'Failed to save transaction. Please try again.');
       },
     });
+  }
+
+  money(v: number): string {
+    return formatCurrency(v, this.settings.currency());
+  }
+
+  signed(t: LedgerTransaction): string {
+    return formatSignedCurrency(t.amount, this.settings.currency(), t.type === 'transfer' ? 'never' : 'exceptZero');
+  }
+
+  /** "Checking → Savings": a transfer is listed once, with its direction. */
+  transferLabel(t: LedgerTransaction): string {
+    const name = (id: string | null) => this.accounts().find(a => a.id === id)?.name;
+    return `${name(t.account_id) ?? 'Unknown account'} → ${name(t.transfer_to_account_id) ?? 'a deleted account'}`;
   }
 }

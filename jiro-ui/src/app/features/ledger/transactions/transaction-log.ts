@@ -21,6 +21,7 @@ import {
   CategoryTree,
   LedgerCategory,
   TransactionFilters,
+  TransactionUpdate,
 } from '../../../core/services/ledger.service';
 
 interface TransactionGroup {
@@ -241,73 +242,65 @@ interface TransactionGroup {
           </div>
 
           <!-- Transaction rows -->
-          @for (tx of group.transactions; track tx) {
-<div
-           
-            class="tx-row"
-            (click)="openEditModal(tx)">
+          <!-- Each row is a button that opens the transaction for editing. -->
+          @for (tx of group.transactions; track tx.id) {
+            <button type="button" class="tx-row" (click)="openEditModal(tx)">
 
-            <!-- Left side: category color bar + details -->
-            <div class="tx-left">
-              <div
-                class="tx-type-bar"
-                [style.background]="tx.category_color || transactionColor(tx.type)">
-              </div>
-              <div class="tx-details">
-                <div class="tx-description">
-                  {{ tx.description }}
-                  <!-- Recurring badge -->
-                  @if (tx.is_recurring) {
-<span class="recurring-badge">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                      <path d="M17 1l4 4-4 4"/>
-                      <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-                      <path d="M7 23l-4-4 4-4"/>
-                      <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
-                    </svg>
-                    {{ intervalLabel(tx.recurrence_interval) }}
+              <!-- Left side: category color bar + details -->
+              <span class="tx-left">
+                <span
+                  class="tx-type-bar"
+                  aria-hidden="true"
+                  [style.background]="tx.category_color || transactionColor(tx.type)">
+                </span>
+                <span class="tx-details">
+                  <span class="tx-description">
+                    <span class="tx-desc-text">{{ tx.description || 'Untitled' }}</span>
+                    @if (tx.series_interval) {
+                      <span class="recurring-badge">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                          <path d="M17 1l4 4-4 4"/>
+                          <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+                          <path d="M7 23l-4-4 4-4"/>
+                          <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+                        </svg>
+                        {{ intervalLabel(tx.series_interval) }}
+                      </span>
+                    }
                   </span>
-}
-                </div>
-                <div class="tx-meta">
-                  @if (tx.category_name) {
-<span
-                   
-                    class="category-chip"
-                    [style.background]="(tx.category_color || 'var(--text-muted)') + '22'"
-                    [style.color]="tx.category_color || 'var(--text-muted)'"
-                    [style.border-color]="(tx.category_color || 'var(--text-muted)') + '55'">
-                    {{ tx.category_name }}
+                  <span class="tx-meta">
+                    @if (tx.category_name) {
+                      <span
+                        class="category-chip"
+                        [style.background]="(tx.category_color || 'var(--text-muted)') + '22'"
+                        [style.color]="tx.category_color || 'var(--text-muted)'"
+                        [style.border-color]="(tx.category_color || 'var(--text-muted)') + '55'">
+                        {{ tx.category_name }}
+                      </span>
+                    }
+                    @if (tx.type === 'transfer') {
+                      <span class="account-name transfer-indicator">{{ transferLabel(tx) }}</span>
+                    } @else {
+                      <span class="account-name">{{ getAccountName(tx.account_id) }}</span>
+                    }
                   </span>
-}
-                  <span class="account-name">{{ getAccountName(tx.account_id) }}</span>
-                  @if (tx.type === 'transfer' && tx.transfer_to_account_id) {
-<span class="transfer-indicator">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                      <line x1="5" y1="12" x2="19" y2="12"/>
-                      <polyline points="12,5 19,12 12,19"/>
-                    </svg>
-                    {{ getAccountName(tx.transfer_to_account_id) }}
-                  </span>
-}
-                </div>
-              </div>
-            </div>
+                </span>
+              </span>
 
-            <!-- Right side: amount + date + chevron -->
-            <div class="tx-right">
-              <div
-                class="tx-amount"
-                [style.color]="transactionColor(tx.type)">
-                {{ formatAmount(tx.amount, tx.type) }}
-              </div>
-              <div class="tx-date-small">{{ formatDateShort(tx.date) }}</div>
-              <svg class="tx-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <polyline points="9,18 15,12 9,6"/>
-              </svg>
-            </div>
-          </div>
-}
+              <!-- Right side: amount + date + chevron -->
+              <span class="tx-right">
+                <span
+                  class="tx-amount"
+                  [style.color]="transactionColor(tx.type)">
+                  {{ formatAmount(tx.amount, tx.type) }}
+                </span>
+                <span class="tx-date-small">{{ formatDateShort(tx.date) }}</span>
+                <svg class="tx-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <polyline points="9,18 15,12 9,6"/>
+                </svg>
+              </span>
+            </button>
+          }
         
 }
 
@@ -329,15 +322,15 @@ interface TransactionGroup {
         <ledger-transaction-form
           [accounts]="accounts()"
           [saving]="saving()"
+          [error]="formError()"
           [initial]="editInitial()"
+          [source]="tx"
           [lockType]="true"
           submitLabel="Save changes"
           (formSubmit)="saveEdit($event)"
+          (stopSeries)="stopSeries(tx)"
           (formCancel)="closeEditModal()">
         </ledger-transaction-form>
-        @if (tx.type === 'transfer') {
-          <p class="field-hint">Account and amount cannot be changed on a transfer. Delete it and log it again instead.</p>
-        }
         @if (txDay(tx); as day) {
           <a class="day-link" [routerLink]="['/day', day]">See this day</a>
         }
@@ -359,6 +352,7 @@ interface TransactionGroup {
       <ledger-transaction-form
         [accounts]="accounts()"
         [saving]="saving()"
+        [error]="formError()"
         [initial]="addInitial()"
         submitLabel="Log transaction"
         (formSubmit)="onAddSubmit($event)"
@@ -564,6 +558,7 @@ interface TransactionGroup {
 
     .tx-row {
       display: flex; align-items: center; justify-content: space-between;
+      width: 100%;
       padding: var(--space-sm) var(--space-md);
       background: var(--bg-surface);
       border: 1px solid var(--border-color);
@@ -573,11 +568,19 @@ interface TransactionGroup {
       transition: border-color 0.15s, box-shadow 0.15s;
       gap: var(--space-md);
       min-height: 60px;
+      font: inherit;
+      color: inherit;
+      text-align: left;
     }
 
     .tx-row:hover {
       border-color: var(--color-primary);
       box-shadow: var(--shadow-sm);
+    }
+
+    .tx-row:focus-visible {
+      outline: 2px solid var(--color-primary);
+      outline-offset: 2px;
     }
 
     .tx-left {
@@ -586,17 +589,23 @@ interface TransactionGroup {
     }
 
     .tx-type-bar {
+      display: block;
       width: 4px; height: 36px;
       border-radius: 2px; flex-shrink: 0;
     }
 
-    .tx-details { flex: 1; min-width: 0; }
+    .tx-details { display: block; flex: 1; min-width: 0; }
 
     .tx-description {
       font-size: var(--font-size-md); font-weight: 600;
       color: var(--text-primary);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       display: flex; align-items: center; gap: var(--space-xs);
+      min-width: 0;
+    }
+
+    .tx-desc-text {
+      min-width: 0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
 
     .recurring-badge {
@@ -623,12 +632,7 @@ interface TransactionGroup {
 
     .account-name {
       font-size: var(--font-size-xs); color: var(--text-muted);
-      white-space: nowrap;
-    }
-
-    .transfer-indicator {
-      display: flex; align-items: center; gap: 3px;
-      font-size: var(--font-size-xs); color: var(--color-info);
+      min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
 
     .tx-right {
@@ -637,11 +641,13 @@ interface TransactionGroup {
     }
 
     .tx-amount {
+      display: block;
       font-size: var(--font-size-md); font-weight: 700;
       white-space: nowrap;
     }
 
     .tx-date-small {
+      display: block;
       font-size: var(--font-size-xs); color: var(--text-muted);
     }
 
@@ -788,6 +794,8 @@ export class TransactionLogComponent implements OnInit {
   mobileFiltersOpen = signal(false);
   showAddModal = signal(false);
   editingTx = signal<LedgerTransaction | null>(null);
+  /** Why the open dialog's save failed, from the API when it says. */
+  formError = signal('');
 
   // ── Flat category list derived from tree ──────────────────────────────────
   flatCategories = computed<LedgerCategory[]>(() => {
@@ -848,8 +856,9 @@ export class TransactionLogComponent implements OnInit {
       amount: Math.abs(tx.amount),
       description: tx.description,
       notes: tx.notes,
-      is_recurring: tx.is_recurring,
-      recurrence_interval: tx.recurrence_interval as TransactionPayload['recurrence_interval'],
+      // Only a live series head repeats; a stopped one opens with Repeat off.
+      is_recurring: tx.is_recurring && !!tx.recurrence_next_date,
+      recurrence_interval: tx.recurrence_interval ?? 'monthly',
       date: tx.date.slice(0, 10),
     };
   });
@@ -1008,46 +1017,76 @@ export class TransactionLogComponent implements OnInit {
   // ── Edit modal ────────────────────────────────────────────────────────────
 
   openEditModal(tx: LedgerTransaction) {
+    this.formError.set('');
     this.editingTx.set(tx);
   }
 
   closeEditModal() {
     this.editingTx.set(null);
+    this.formError.set('');
     this.clearDeepLink();
   }
 
+  /** The API's reason when it gave one, else a generic line. */
+  private reason(err: unknown, fallback: string): string {
+    return (err as { error?: { error?: { message?: string } } })?.error?.error?.message ?? fallback;
+  }
+
+  /** Every field of the form goes back: account(s), category, amount, text, date and repeat. */
   saveEdit(payload: TransactionPayload) {
     const tx = this.editingTx();
     if (!tx) return;
     this.saving.set(true);
+    this.formError.set('');
 
-    const req: Partial<LedgerTransaction> = {
+    const req: TransactionUpdate = {
+      account_id: payload.account_id,
+      amount: payload.amount,
       description: payload.description,
-      notes: payload.notes || null,
+      notes: payload.notes ?? '',
       date: payload.date,
-      is_recurring: payload.is_recurring,
-      recurrence_interval: payload.is_recurring ? payload.recurrence_interval : null,
     };
-
-    // A transfer writes two rows, so its account and amount are fixed once logged.
-    if (tx.type !== 'transfer') {
+    if (tx.type === 'transfer') {
+      req.transfer_to_account_id = payload.transfer_to_account_id ?? undefined;
+    } else {
       req.category_id = payload.category_id || null;
-      req.amount = payload.amount;
+    }
+    // A copy Ledger added cannot start a series of its own; leave its repeat alone.
+    if (!(tx.recurrence_source_id && !tx.is_recurring)) {
+      req.is_recurring = payload.is_recurring;
+      req.recurrence_interval = payload.is_recurring ? payload.recurrence_interval ?? 'monthly' : null;
     }
 
     this.ledgerService.updateTransaction(tx.id, req).subscribe({
-      next: updated => {
-        this.allTransactions.update(list =>
-          list.map(t => t.id === updated.id ? updated : t)
-        );
+      next: () => {
         this.saving.set(false);
         this.closeEditModal();
         this.toast.success('Transaction saved');
+        // Its date or account may have moved it; the list order and the
+        // other rows of a series come from the server.
+        this.loadTransactions();
       },
-      error: () => {
+      error: err => {
         this.saving.set(false);
-        this.toast.error('Could not save the transaction.');
+        this.formError.set(this.reason(err, 'Could not save the transaction. Please try again.'));
       },
+    });
+  }
+
+  async stopSeries(tx: LedgerTransaction) {
+    const ok = await this.confirmService.confirm({
+      title: 'Stop repeating?',
+      message: 'Ledger stops adding this transaction. The ones already added stay in your ledger.',
+      confirmLabel: 'Stop repeating',
+    });
+    if (!ok) return;
+    this.ledgerService.stopRecurring(tx.id).subscribe({
+      next: () => {
+        this.closeEditModal();
+        this.toast.success('It will not repeat any more');
+        this.loadTransactions();
+      },
+      error: err => this.formError.set(this.reason(err, 'Could not stop the series. Please try again.')),
     });
   }
 
@@ -1075,39 +1114,57 @@ export class TransactionLogComponent implements OnInit {
 
   openAddModal() {
     this.addInitial.set(null);
+    this.formError.set('');
     this.showAddModal.set(true);
   }
 
   closeAddModal() {
     this.showAddModal.set(false);
+    this.formError.set('');
     this.clearDeepLink();
   }
 
   onAddSubmit(payload: TransactionPayload) {
     this.saving.set(true);
+    this.formError.set('');
     this.ledgerService.createTransaction(payload).subscribe({
-      next: created => {
-        this.allTransactions.update(list => [created, ...list]);
+      next: () => {
         this.saving.set(false);
         this.closeAddModal();
+        this.toast.success('Transaction logged');
+        // Reload rather than prepend: a back-dated repeating transaction
+        // brings its copies with it, and the list stays in date order.
+        this.loadAccounts();
+        this.loadTransactions();
       },
-      error: () => this.saving.set(false),
+      error: err => {
+        this.saving.set(false);
+        this.formError.set(this.reason(err, 'Could not save the transaction. Please try again.'));
+      },
     });
   }
 
   // ── Display helpers ───────────────────────────────────────────────────────
 
   formatAmount(amount: number, type: string): string {
-    if (type === 'transfer') return formatSignedCurrency(amount, 'USD', 'never');
+    const currency = this.settings.currency();
+    if (type === 'transfer') return formatSignedCurrency(amount, currency, 'never');
     // Stored sign is authoritative (expenses are negative); normalise by type
     // in case an older row was stored unsigned.
     const signed = type === 'expense' ? -Math.abs(amount) : Math.abs(amount);
-    return formatSignedCurrency(signed);
+    return formatSignedCurrency(signed, currency);
   }
 
   getAccountName(accountId: string | null): string {
     if (!accountId) return '';
     return this.accounts().find(a => a.id === accountId)?.name ?? '';
+  }
+
+  /** "Checking → Savings": a transfer is listed once, from its source side. */
+  transferLabel(tx: LedgerTransaction): string {
+    const from = this.getAccountName(tx.account_id) || 'Unknown account';
+    const to = this.getAccountName(tx.transfer_to_account_id) || 'a deleted account';
+    return `${from} → ${to}`;
   }
 
   formatDateSeparator(dateStr: string): string {
@@ -1128,7 +1185,7 @@ export class TransactionLogComponent implements OnInit {
       if (tx.type === 'expense') return sum - Math.abs(tx.amount);
       return sum;
     }, 0);
-    return formatSignedCurrency(net);
+    return formatSignedCurrency(net, this.settings.currency());
   }
 
   getGroupTotalColor(group: TransactionGroup): string {

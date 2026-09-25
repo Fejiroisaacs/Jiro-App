@@ -1,11 +1,12 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, computed, inject, signal, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 
 import { FormsModule } from '@angular/forms';
 import { environment } from '../../../environments/environment';
 import { AuthService, UserSettings } from '../../core/services/auth.service';
 import { SettingsService, Theme } from '../../core/services/settings.service';
-import { todayKey } from '../../core/utils/day';
+import { resolveTimeZone, todayKey } from '../../core/utils/day';
+import { CURRENCIES } from '../ledger/shared/ledger-utils';
 import { UploadService } from '../../core/services/upload.service';
 import { JiroCardComponent } from '../../shared/components/jiro-card/jiro-card';
 import { JiroButtonComponent } from '../../shared/components/jiro-button/jiro-button';
@@ -90,7 +91,7 @@ import { ToastService } from '../../core/services/toast.service';
 
           <div class="form-field">
             <label class="setting-label">Username</label>
-            <p class="text-secondary setting-desc">Lowercase letters, numbers and underscores — used in share links</p>
+            <p class="text-secondary setting-desc">Lowercase letters, numbers and underscores. Used in share links.</p>
             <jiro-input
               [(ngModel)]="username"
               [placeholder]="usernamePlaceholder"
@@ -128,23 +129,66 @@ import { ToastService } from '../../core/services/toast.service';
             <label class="setting-label" for="setting-weight-unit">Weight Unit</label>
             <p class="text-secondary setting-desc">Used across all fitness tracking</p>
           </div>
-          <select id="setting-weight-unit" [(ngModel)]="weightUnit" (change)="save()" class="jiro-select">
+          <select id="setting-weight-unit" [ngModel]="weightUnit" (ngModelChange)="pickWeightUnit($event)" class="jiro-select">
             <option value="lbs">Pounds (lbs)</option>
             <option value="kg">Kilograms (kg)</option>
           </select>
         </div>
 
-        <div class="setting-row">
+        <div class="setting-row setting-row-stack">
           <div>
             <label class="setting-label" for="setting-timezone">Timezone</label>
-            <p class="text-secondary setting-desc">Used for reminder scheduling</p>
+            <p class="text-secondary setting-desc" id="setting-timezone-desc">
+              Decides where each of your days begins and ends: what counts as Today, the day view,
+              your streaks, and the date new entries start on.
+            </p>
           </div>
-          <select id="setting-timezone" [(ngModel)]="timezone" (change)="save()" class="jiro-select">
-            @for (tz of commonTimezones; track tz) {
-<option [value]="tz">{{ tz }}</option>
-}
+          <div class="tz-picker">
+            <label class="sr-only" for="setting-timezone-search">Search timezones</label>
+            <input
+              id="setting-timezone-search"
+              type="search"
+              class="jiro-select tz-search"
+              placeholder="Search, e.g. Lagos or New York"
+              aria-controls="setting-timezone"
+              [value]="tzQuery()"
+              (input)="tzQuery.set($any($event.target).value)" />
+            <select
+              id="setting-timezone"
+              class="jiro-select tz-select"
+              aria-describedby="setting-timezone-desc setting-timezone-count"
+              [ngModel]="timezone"
+              (ngModelChange)="pickTimezone($event)">
+              @for (tz of filteredZones(); track tz) {
+                <option [value]="tz">{{ zoneLabel(tz) }}</option>
+              }
+            </select>
+            <p class="text-secondary setting-desc" id="setting-timezone-count" aria-live="polite">
+              {{ filteredZones().length === allZones.length ? allZones.length + ' timezones' : filteredZones().length + ' matching' }}
+            </p>
+            @if (deviceZone !== timezone) {
+              <jiro-button variant="secondary" size="sm" type="button" (click)="pickTimezone(deviceZone)">
+                Use this device's timezone ({{ deviceZone }})
+              </jiro-button>
+            }
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div>
+            <label class="setting-label" for="setting-currency">Currency</label>
+            <p class="text-secondary setting-desc">Every Ledger account, total and budget is shown in it. It changes how amounts are labelled, not the amounts themselves.</p>
+          </div>
+          <select id="setting-currency" [ngModel]="currency" (ngModelChange)="pickCurrency($event)" class="jiro-select">
+            @for (c of currencies(); track c.code) {
+              <option [value]="c.code">{{ c.code }} ({{ c.name }})</option>
+            }
           </select>
         </div>
+
+        @if (prefError()) {
+          <p class="pref-error" role="alert">{{ prefError() }}</p>
+        }
       </jiro-card>
 
       <!-- Theme -->
@@ -282,7 +326,7 @@ import { ToastService } from '../../core/services/toast.service';
       margin-top: 2px;
     }
 
-    /* Your data — the copy is long, so this row wraps instead of squeezing the button */
+    /* Your data: the copy is long, so this row wraps instead of squeezing the button */
     .data-row {
       align-items: flex-start;
       flex-wrap: wrap;
@@ -373,6 +417,11 @@ import { ToastService } from '../../core/services/toast.service';
     .jiro-select:focus {
       border-color: var(--color-primary);
     }
+
+    .setting-row-stack { flex-direction: column; align-items: stretch; gap: var(--space-sm); }
+    .tz-picker { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-xs); }
+    .tz-search, .tz-select { width: 100%; max-width: 420px; min-height: 40px; font-family: inherit; }
+    .pref-error { margin: var(--space-sm) 0 0; font-size: var(--font-size-sm); color: var(--color-danger); }
 
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(8px); }
@@ -500,6 +549,9 @@ export class SettingsComponent implements OnInit {
   private readonly toast = inject(ToastService);
   weightUnit = 'lbs';
   timezone = 'America/New_York';
+  currency = 'USD';
+  /** Why the last preference save was refused, from the server. */
+  prefError = signal<string | null>(null);
 
   // Profile fields
   displayName = '';
@@ -523,20 +575,38 @@ export class SettingsComponent implements OnInit {
     { value: 'slate', label: 'Slate', color: '#475B70' },
   ];
 
-  commonTimezones = [
-    'America/New_York',
-    'America/Chicago',
-    'America/Denver',
-    'America/Los_Angeles',
-    'America/Toronto',
-    'Europe/London',
-    'Europe/Berlin',
-    'Europe/Paris',
-    'Asia/Tokyo',
-    'Asia/Shanghai',
-    'Australia/Sydney',
-    'Pacific/Auckland',
-  ];
+  /** This browser's zone, for the "Use this device's timezone" shortcut. */
+  readonly deviceZone = resolveTimeZone(null);
+
+  /** Every IANA zone the browser knows, plus UTC and the current one if missing. */
+  readonly allZones: string[] = (() => {
+    let zones: string[] = [];
+    try {
+      zones = (Intl as unknown as { supportedValuesOf(k: string): string[] }).supportedValuesOf('timeZone');
+    } catch {
+      zones = [];
+    }
+    return Array.from(new Set(['UTC', ...zones, this.deviceZone])).sort((a, b) => a.localeCompare(b));
+  })();
+
+  tzQuery = signal('');
+  private tzCurrent = signal(this.timezone);
+
+  /** Zones matching the search (spaces match underscores); the chosen one always stays listed. */
+  filteredZones = computed(() => {
+    const q = this.tzQuery().trim().toLowerCase().replace(/\s+/g, '_');
+    const current = this.tzCurrent();
+    const zones = [...this.allZones];
+    if (!zones.includes(current)) zones.unshift(current);
+    if (!q) return zones;
+    return zones.filter(z => z === current || z.toLowerCase().includes(q));
+  });
+
+  private currencyCurrent = signal(this.currency);
+  currencies = computed(() => {
+    const cur = this.currencyCurrent();
+    return CURRENCIES.some(c => c.code === cur) ? CURRENCIES : [{ code: cur, name: cur }, ...CURRENCIES];
+  });
 
   constructor(public authService: AuthService, public settingsService: SettingsService, private uploadService: UploadService) {}
 
@@ -546,8 +616,12 @@ export class SettingsComponent implements OnInit {
       const s = typeof user.settings === 'string' ? JSON.parse(user.settings) : user.settings;
       this.settings.set(s);
       this.weightUnit = s.weight_unit || 'lbs';
-      this.timezone = s.timezone || 'America/New_York';
+      this.currency = s.currency || 'USD';
     }
+    // The zone the app actually uses (the setting, else this device's).
+    this.timezone = this.settingsService.timezone();
+    this.tzCurrent.set(this.timezone);
+    this.currencyCurrent.set(this.currency);
     if (user) {
       this.displayName = user.display_name ?? '';
       this.username = user.username ?? '';
@@ -556,22 +630,72 @@ export class SettingsComponent implements OnInit {
     }
   }
 
-  selectTheme(theme: string) {
-    this.settings.update(s => ({ ...s, theme }));
-    this.save();
+  /** "Europe/London (UTC+01:00)": the zone with its offset now. */
+  zoneLabel(tz: string): string {
+    try {
+      const part = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'longOffset' })
+        .formatToParts(new Date())
+        .find(p => p.type === 'timeZoneName')?.value;
+      const offset = !part || part === 'GMT' ? 'UTC' : part.replace('GMT', 'UTC');
+      return `${tz.replace(/_/g, ' ')} (${offset})`;
+    } catch {
+      return tz;
+    }
   }
 
-  save() {
-    const updates: Partial<UserSettings> = {
-      theme: this.settings().theme,
-      weight_unit: this.weightUnit,
-      timezone: this.timezone,
-    };
+  selectTheme(theme: string) {
+    const previous = this.settings().theme;
+    this.settings.update(s => ({ ...s, theme }));
+    this.save({ theme }, () => this.settings.update(s => ({ ...s, theme: previous })));
+  }
 
+  pickWeightUnit(unit: string) {
+    const previous = this.weightUnit;
+    this.weightUnit = unit;
+    this.save({ weight_unit: unit }, () => (this.weightUnit = previous));
+  }
+
+  pickTimezone(tz: string) {
+    if (!tz || tz === this.timezone) return;
+    const previous = this.timezone;
+    this.timezone = tz;
+    this.tzCurrent.set(tz);
+    this.save({ timezone: tz }, () => {
+      this.timezone = previous;
+      this.tzCurrent.set(previous);
+    });
+  }
+
+  pickCurrency(code: string) {
+    const previous = this.currency;
+    this.currency = code;
+    this.currencyCurrent.set(code);
+    this.save({ currency: code }, () => {
+      this.currency = previous;
+      this.currencyCurrent.set(previous);
+    });
+  }
+
+  /**
+   * Saves one preference. The app only applies it once the server has
+   * accepted it (AuthService updates the user on success); if the server
+   * refuses (an unverified email, a bad value, no connection), the control
+   * goes back to the saved value and the reason is shown.
+   */
+  private save(updates: Partial<UserSettings>, revert: () => void) {
+    this.prefError.set(null);
     this.authService.updateSettings(updates).subscribe({
       next: () => {
         // On the demo the change applies for this visit only; nothing was saved.
         if (!this.authService.isDemo()) this.toast.success('Settings saved');
+      },
+      error: (err) => {
+        revert();
+        const msg = err?.status === 0
+          ? 'Could not reach the server, so the change was not saved. Check your connection and try again.'
+          : err?.error?.error?.message ?? 'The change was not saved. Please try again.';
+        this.prefError.set(msg);
+        this.toast.error(msg);
       },
     });
   }

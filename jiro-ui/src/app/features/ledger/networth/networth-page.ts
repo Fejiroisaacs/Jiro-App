@@ -14,13 +14,12 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Chart, registerables } from 'chart.js';
 import { chartTones } from '../../../shared/chart-theme';
-import { parseDateOnly } from '../shared/ledger-utils';
+import { currencySymbol, formatCurrency, formatSignedCurrency, netWorthTotals, parseDateOnly } from '../shared/ledger-utils';
 import { SettingsService } from '../../../core/services/settings.service';
 import { todayKey } from '../../../core/utils/day';
 import {
   LedgerService,
   NetWorthSnapshot,
-  LedgerAccount,
 } from '../../../core/services/ledger.service';
 import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-card';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
@@ -89,7 +88,7 @@ Chart.register(...registerables);
                   </svg>
                   Assets
                 </span>
-                <span class="side-value assets">\${{ latestSnapshot()!.assets_total | number:'1.2-2' }}</span>
+                <span class="side-value assets">{{ money(latestSnapshot()!.assets_total) }}</span>
               </div>
               <div class="side-stat">
                 <span class="side-label">
@@ -98,7 +97,7 @@ Chart.register(...registerables);
                   </svg>
                   Liabilities
                 </span>
-                <span class="side-value liabilities">\${{ latestSnapshot()!.liabilities_total | number:'1.2-2' }}</span>
+                <span class="side-value liabilities">{{ money(latestSnapshot()!.liabilities_total) }}</span>
               </div>
             </div>
           </div>
@@ -116,7 +115,7 @@ Chart.register(...registerables);
         <div class="snapshot-list-section">
           <h2 class="section-heading">Snapshot History</h2>
           <div class="snapshot-list">
-            @for (snap of displayedSnapshots(); track snap) {
+            @for (snap of displayedSnapshots(); track snap.id) {
 <div class="snapshot-row">
               <div class="snap-date">{{ formatDate(snap.snapshot_date) }}</div>
               <div class="snap-values">
@@ -126,16 +125,16 @@ Chart.register(...registerables);
                     class="snap-value networth"
                     [class.positive]="snap.net_worth >= 0"
                     [class.negative]="snap.net_worth < 0">
-                    {{ snap.net_worth >= 0 ? '+' : '' }}\${{ snap.net_worth | number:'1.2-2' }}
+                    {{ signed(snap.net_worth) }}
                   </span>
                 </div>
                 <div class="snap-stat">
                   <span class="snap-label">Assets</span>
-                  <span class="snap-value">\${{ snap.assets_total | number:'1.2-2' }}</span>
+                  <span class="snap-value">{{ money(snap.assets_total) }}</span>
                 </div>
                 <div class="snap-stat">
                   <span class="snap-label">Liabilities</span>
-                  <span class="snap-value liabilities">\${{ snap.liabilities_total | number:'1.2-2' }}</span>
+                  <span class="snap-value liabilities">{{ money(snap.liabilities_total) }}</span>
                 </div>
               </div>
             </div>
@@ -160,9 +159,15 @@ Chart.register(...registerables);
         @if (!loadingAccounts()) {
 <form class="modal-form" (ngSubmit)="submitSnapshot()">
 
+          <p class="snap-help">
+            Filled in from your accounts: every account, inactive ones too, at its current balance,
+            the same totals as the Accounts page. Change them if you hold something Ledger does not track.
+          </p>
+
           <div class="form-group">
-            <label class="form-label">Snapshot Date</label>
+            <label class="form-label" for="snap-date">Snapshot date</label>
             <input
+              id="snap-date"
               class="form-input"
               type="date"
               [(ngModel)]="snapDate"
@@ -171,8 +176,9 @@ Chart.register(...registerables);
           </div>
 
           <div class="form-group">
-            <label class="form-label">Total Assets ($)</label>
+            <label class="form-label" for="snap-assets">Total assets ({{ symbol() }})</label>
             <input
+              id="snap-assets"
               class="form-input"
               type="number"
               [(ngModel)]="snapAssets"
@@ -184,8 +190,9 @@ Chart.register(...registerables);
           </div>
 
           <div class="form-group">
-            <label class="form-label">Total Liabilities ($)</label>
+            <label class="form-label" for="snap-liabilities">Total liabilities ({{ symbol() }})</label>
             <input
+              id="snap-liabilities"
               class="form-input"
               type="number"
               [(ngModel)]="snapLiabilities"
@@ -198,10 +205,8 @@ Chart.register(...registerables);
 
           <!-- Net worth preview -->
           <div class="networth-preview" [class.positive]="netWorthPreview >= 0" [class.negative]="netWorthPreview < 0">
-            <span class="preview-label">Computed Net Worth</span>
-            <span class="preview-value">
-              {{ netWorthPreview >= 0 ? '' : '-' }}\${{ absNetWorthPreview | number:'1.2-2' }}
-            </span>
+            <span class="preview-label">Net worth</span>
+            <span class="preview-value">{{ money(netWorthPreview) }}</span>
           </div>
 
           <div class="form-actions">
@@ -419,6 +424,8 @@ Chart.register(...registerables);
       font-size: var(--font-size-sm);
     }
 
+    .snap-help { font-size: var(--font-size-sm); color: var(--text-secondary); margin: 0; line-height: 1.5; }
+
     .modal-form { display: flex; flex-direction: column; gap: var(--space-md); }
 
     .form-group { display: flex; flex-direction: column; gap: var(--space-xs); margin-bottom: var(--space-sm); }
@@ -513,8 +520,14 @@ export class NetWorthPageComponent implements OnInit, AfterViewInit, OnDestroy {
     return (this.snapAssets ?? 0) - (this.snapLiabilities ?? 0);
   }
 
-  get absNetWorthPreview(): number {
-    return Math.abs(this.netWorthPreview);
+  readonly symbol = computed(() => currencySymbol(this.settings.currency()));
+
+  money(v: number): string {
+    return formatCurrency(v, this.settings.currency());
+  }
+
+  signed(v: number): string {
+    return formatSignedCurrency(v, this.settings.currency());
   }
 
   private chart: Chart | null = null;
@@ -555,16 +568,10 @@ export class NetWorthPageComponent implements OnInit, AfterViewInit, OnDestroy {
     this.loadingAccounts.set(true);
     this.ledgerService.listAccounts().subscribe({
       next: accounts => {
-        const assetTypes: LedgerAccount['type'][] = ['checking', 'savings', 'investment', 'cash'];
-        const assetsSum = accounts
-          .filter(a => assetTypes.includes(a.type) && a.balance > 0 && a.is_active)
-          .reduce((sum, a) => sum + a.balance, 0);
-        const liabilitiesSum = accounts
-          .filter(a => a.type === 'credit' && a.is_active)
-          .reduce((sum, a) => sum + Math.abs(a.balance), 0);
-
-        this.snapAssets = Math.round(assetsSum * 100) / 100;
-        this.snapLiabilities = Math.round(liabilitiesSum * 100) / 100;
+        // The Accounts page's rule: every account, at its signed balance.
+        const totals = netWorthTotals(accounts);
+        this.snapAssets = totals.assets;
+        this.snapLiabilities = totals.liabilities;
         this.loadingAccounts.set(false);
       },
       error: () => this.loadingAccounts.set(false),
@@ -604,11 +611,7 @@ export class NetWorthPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   formatNetWorth(value: number): string {
-    const abs = Math.abs(value).toLocaleString('en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-    return value < 0 ? `-$${abs}` : `$${abs}`;
+    return this.money(value);
   }
 
   private maybeDrawChart() {
@@ -657,7 +660,7 @@ export class NetWorthPageComponent implements OnInit, AfterViewInit, OnDestroy {
             legend: { display: false },
             tooltip: {
               callbacks: {
-                label: ctx => ` $${(ctx.parsed.y as number).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                label: ctx => ` ${this.money(ctx.parsed.y as number)}`,
               },
             },
           },
@@ -673,7 +676,7 @@ export class NetWorthPageComponent implements OnInit, AfterViewInit, OnDestroy {
               ticks: {
                 font: { size: 11 },
                 color: tone.tick,
-                callback: v => `$${Number(v).toLocaleString()}`,
+                callback: v => new Intl.NumberFormat('en-US', { style: 'currency', currency: this.settings.currency(), maximumFractionDigits: 0 }).format(Number(v)),
               },
             },
           },

@@ -38,10 +38,11 @@ let shellSeq = 0;
       <section class="ws" [attr.aria-labelledby]="titleId" [attr.aria-busy]="state() === 'loading' ? 'true' : null">
         <div class="ws-head">
           <jiro-mark [name]="def().mark" [size]="32" />
-          <h2 class="ws-title" [id]="titleId">
+          <!-- Named "Ledger, This month" for screen readers; no hidden comma in the text
+               (a visually hidden span surfaced as a stray "LEDGER , This month"). -->
+          <h2 class="ws-title" [id]="titleId" [attr.aria-label]="def().subtitle ? def().name + ', ' + def().subtitle : null">
             <span class="ws-name">{{ def().name }}</span>
             @if (def().subtitle) {
-              <span class="sr-only">, </span>
               <span class="ws-sub">{{ def().subtitle }}</span>
             }
           </h2>

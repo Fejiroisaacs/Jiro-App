@@ -16,7 +16,8 @@ import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-he
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { formatCurrency, formatSignedCurrency, formatDate, hexWithAlpha } from '../shared/ledger-utils';
+import { SettingsService } from '../../../core/services/settings.service';
+import { currencySymbol, formatCurrency, formatSignedCurrency, formatDate, hexWithAlpha, netWorthTotals } from '../shared/ledger-utils';
 
 type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
 
@@ -138,9 +139,8 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
                   <span class="acct-balance"
                     [class.balance-asset]="account.type !== 'credit'"
                     [class.balance-liability]="account.type === 'credit'">
-                    {{ formatCurrency(account.balance, account.currency) }}
+                    {{ money(account.balance) }}
                   </span>
-                  <span class="acct-currency">{{ account.currency }}</span>
                 </div>
               </div>
 
@@ -180,11 +180,13 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
 }
               @if (!detailLoading() && (selectedAccountDetail()?.recent_transactions?.length ?? 0) > 0) {
 <div class="detail-txn-list">
-                @for (t of selectedAccountDetail()!.recent_transactions; track t) {
+                @for (t of selectedAccountDetail()!.recent_transactions; track t.id) {
 <div class="detail-txn-row">
                   <div class="detail-txn-left">
                     <span class="detail-txn-desc">{{ t.description || 'Untitled' }}</span>
-                    @if (t.category_name) {
+                    @if (t.type === 'transfer') {
+                      <span class="detail-txn-sub">{{ transferLabel(t) }}</span>
+                    } @else if (t.category_name) {
 <span class="cat-chip"
                       [style.background]="hexWithAlpha(t.category_color, 0.12)"
                       [style.color]="t.category_color || 'var(--text-muted)'">
@@ -193,10 +195,11 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
 }
                   </div>
                   <div class="detail-txn-right">
+                    <!-- Signed for this account: a transfer out is minus, one in is plus. -->
                     <span class="detail-txn-amount"
                       [class.amount-pos]="t.type === 'income'"
                       [class.amount-neg]="t.type === 'expense'">
-                      {{ formatSignedCurrency(t.amount, account.currency, t.type === 'transfer' ? 'never' : 'exceptZero') }}
+                      {{ signed(t.amount) }}
                     </span>
                     <span class="detail-txn-date text-muted">{{ formatDate(t.date) }}</span>
                   </div>
@@ -211,27 +214,28 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
 }
         </div>
 
-        <!-- ── Net Worth Bar ── -->
-        <div class="net-worth-bar">
+        <!-- ── Net Worth Bar: every account, inactive too, at its signed balance ── -->
+        <section class="net-worth-bar" aria-label="Net worth from your accounts">
           <div class="nw-item">
             <span class="nw-label">Assets</span>
-            <span class="nw-value nw-asset">{{ formatCurrency(totalAssets()) }}</span>
+            <span class="nw-value nw-asset">{{ money(totals().assets) }}</span>
           </div>
-          <span class="nw-op">-</span>
+          <span class="nw-op" aria-hidden="true">-</span>
           <div class="nw-item">
             <span class="nw-label">Liabilities</span>
-            <span class="nw-value nw-liability">{{ formatCurrency(totalLiabilities()) }}</span>
+            <span class="nw-value nw-liability">{{ money(totals().liabilities) }}</span>
           </div>
-          <span class="nw-op">=</span>
+          <span class="nw-op" aria-hidden="true">=</span>
           <div class="nw-item">
-            <span class="nw-label">Net Worth</span>
+            <span class="nw-label">Net worth</span>
             <span class="nw-value"
-              [class.nw-pos]="netWorth() >= 0"
-              [class.nw-neg]="netWorth() < 0">
-              {{ formatCurrency(netWorth()) }}
+              [class.nw-pos]="totals().net >= 0"
+              [class.nw-neg]="totals().net < 0">
+              {{ money(totals().net) }}
             </span>
           </div>
-        </div>
+        </section>
+        <p class="nw-note">Every account counts, inactive ones too: a positive balance is an asset, a negative one (such as a card you owe on) a liability. Take snapshot on Net worth uses the same totals.</p>
 
       
 }
@@ -241,8 +245,9 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
 <jiro-modal title="Add Account" maxWidth="480px" (close)="closeAddModal()">
         <form class="modal-form" (ngSubmit)="submitAddAccount()">
           <div class="form-group">
-            <label class="form-label">Account Name</label>
+            <label class="form-label" for="acct-add-name">Account name</label>
             <input
+              id="acct-add-name"
               class="form-input"
               type="text"
               [(ngModel)]="addForm.name"
@@ -251,8 +256,8 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
               required />
           </div>
           <div class="form-group">
-            <label class="form-label">Type</label>
-            <select class="form-input" [(ngModel)]="addForm.type" name="type" required>
+            <label class="form-label" for="acct-add-type">Type</label>
+            <select id="acct-add-type" class="form-input" [(ngModel)]="addForm.type" name="type" required>
               <option value="checking">Checking</option>
               <option value="savings">Savings</option>
               <option value="credit">Credit Card</option>
@@ -261,24 +266,20 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
             </select>
           </div>
           <div class="form-group">
-            <label class="form-label">Currency</label>
+            <label class="form-label" for="acct-add-balance">Opening balance ({{ symbol() }})</label>
             <input
-              class="form-input"
-              type="text"
-              [(ngModel)]="addForm.currency"
-              name="currency"
-              placeholder="USD"
-              maxlength="3" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Opening Balance</label>
-            <input
+              id="acct-add-balance"
               class="form-input"
               type="number"
               step="0.01"
+              inputmode="decimal"
+              aria-describedby="acct-add-balance-hint"
               [(ngModel)]="addForm.balance"
               name="balance"
               placeholder="0.00" />
+            <p class="field-hint" id="acct-add-balance-hint">
+              For a card or loan you owe on, enter a negative amount. Amounts are in {{ currency() }}, your currency in Settings.
+            </p>
           </div>
           @if (addError()) {
 <p class="form-error">{{ addError() }}</p>
@@ -298,8 +299,9 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
 <jiro-modal title="Edit Account" maxWidth="480px" (close)="closeEditModal()">
         <form class="modal-form" (ngSubmit)="submitEditAccount()">
           <div class="form-group">
-            <label class="form-label">Account Name</label>
+            <label class="form-label" for="acct-edit-name">Account name</label>
             <input
+              id="acct-edit-name"
               class="form-input"
               type="text"
               [(ngModel)]="editForm.name"
@@ -308,8 +310,8 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
               required />
           </div>
           <div class="form-group">
-            <label class="form-label">Type</label>
-            <select class="form-input" [(ngModel)]="editForm.type" name="type">
+            <label class="form-label" for="acct-edit-type">Type</label>
+            <select id="acct-edit-type" class="form-input" [(ngModel)]="editForm.type" name="type">
               <option value="checking">Checking</option>
               <option value="savings">Savings</option>
               <option value="credit">Credit Card</option>
@@ -319,15 +321,20 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
           </div>
           <div class="form-group">
             <div class="toggle-row">
-              <span class="form-label">Active</span>
+              <span class="form-label" id="acct-edit-active">Active</span>
               <button
                 type="button"
                 class="toggle-btn"
+                role="switch"
+                aria-labelledby="acct-edit-active"
+                aria-describedby="acct-edit-active-hint"
+                [attr.aria-checked]="editForm.is_active"
                 [class.toggle-on]="editForm.is_active"
                 (click)="editForm.is_active = !editForm.is_active">
                 <span class="toggle-knob"></span>
               </button>
             </div>
+            <p class="field-hint" id="acct-edit-active-hint">An inactive account keeps its history and still counts toward net worth.</p>
           </div>
           @if (editError()) {
 <p class="form-error">{{ editError() }}</p>
@@ -442,6 +449,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
     .acct-name {
       font-size: var(--font-size-lg);
       font-weight: 600;
+      overflow-wrap: anywhere;
     }
 
     .acct-balance-row {
@@ -453,14 +461,23 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
     .acct-balance {
       font-size: var(--font-size-2xl);
       font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      overflow-wrap: anywhere;
     }
 
     .balance-asset { color: var(--color-accent); }
     .balance-liability { color: var(--color-danger); }
 
-    .acct-currency {
-      font-size: var(--font-size-sm);
+    .field-hint { font-size: var(--font-size-xs); color: var(--text-muted); margin: 0; line-height: 1.5; }
+
+    .nw-note { font-size: var(--font-size-xs); color: var(--text-muted); margin: var(--space-sm) 0 0; line-height: 1.5; }
+
+    .detail-txn-sub {
+      font-size: var(--font-size-xs);
       color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     /* ── Card action buttons ── */
@@ -578,6 +595,10 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
       padding: 2px 8px;
       border-radius: 10px;
       width: max-content;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .detail-txn-right {
@@ -726,7 +747,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
     @media (max-width: 768px) {
 
       .accounts-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
       }
 
       .net-worth-bar {
@@ -740,8 +761,9 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
   `],
 })
 export class AccountsPageComponent implements OnInit {
-  readonly formatCurrency = formatCurrency;
-  readonly formatSignedCurrency = formatSignedCurrency;
+  private readonly settings = inject(SettingsService);
+  readonly currency = this.settings.currency;
+  readonly symbol = computed(() => currencySymbol(this.settings.currency()));
   readonly formatDate = formatDate;
   readonly hexWithAlpha = hexWithAlpha;
 
@@ -752,29 +774,16 @@ export class AccountsPageComponent implements OnInit {
   selectedAccountDetail = signal<AccountWithTransactions | null>(null);
   detailLoading = signal(false);
 
-  // Computed net worth
-  totalAssets = computed(() =>
-    this.accounts()
-      .filter((a) => a.type !== 'credit')
-      .reduce((sum, a) => sum + a.balance, 0)
-  );
-
-  totalLiabilities = computed(() =>
-    this.accounts()
-      .filter((a) => a.type === 'credit')
-      .reduce((sum, a) => sum + Math.abs(a.balance), 0)
-  );
-
-  netWorth = computed(() => this.totalAssets() - this.totalLiabilities());
+  /** Net worth from every account (inactive too) at its signed balance; the snapshot uses the same rule. */
+  totals = computed(() => netWorthTotals(this.accounts()));
 
   // Add modal
   showAddModal = signal(false);
   addSaving = signal(false);
   addError = signal('');
-  addForm: { name: string; type: AccountType; currency: string; balance: number } = {
+  addForm: { name: string; type: AccountType; balance: number } = {
     name: '',
     type: 'checking',
-    currency: 'USD',
     balance: 0,
   };
 
@@ -835,7 +844,7 @@ export class AccountsPageComponent implements OnInit {
 
   // ── Add ──
   openAddAccount() {
-    this.addForm = { name: '', type: 'checking', currency: 'USD', balance: 0 };
+    this.addForm = { name: '', type: 'checking', balance: 0 };
     this.addError.set('');
     this.showAddModal.set(true);
   }
@@ -853,7 +862,6 @@ export class AccountsPageComponent implements OnInit {
       .createAccount({
         name: this.addForm.name.trim(),
         type: this.addForm.type,
-        currency: this.addForm.currency.toUpperCase() || 'USD',
         balance: this.addForm.balance ?? 0,
       })
       .subscribe({
@@ -862,9 +870,9 @@ export class AccountsPageComponent implements OnInit {
           this.showAddModal.set(false);
           this.loadAccounts();
         },
-        error: () => {
+        error: (err) => {
           this.addSaving.set(false);
-          this.addError.set('Failed to create account. Please try again.');
+          this.addError.set(err?.error?.error?.message ?? 'Failed to create account. Please try again.');
         },
       });
   }
@@ -905,9 +913,9 @@ export class AccountsPageComponent implements OnInit {
           this.editingAccountId.set(null);
           this.loadAccounts();
         },
-        error: () => {
+        error: (err) => {
           this.editSaving.set(false);
-          this.editError.set('Failed to update account. Please try again.');
+          this.editError.set(err?.error?.error?.message ?? 'Failed to update account. Please try again.');
         },
       });
   }
@@ -940,6 +948,20 @@ export class AccountsPageComponent implements OnInit {
         this.toast.error('Could not delete the account. It may still have transactions linked to it.');
       },
     });
+  }
+
+  money(v: number): string {
+    return formatCurrency(v, this.settings.currency());
+  }
+
+  signed(v: number): string {
+    return formatSignedCurrency(v, this.settings.currency());
+  }
+
+  /** From this account's side: "To Savings" for money out, "From Checking" for money in. */
+  transferLabel(t: LedgerTransaction): string {
+    const other = this.accounts().find(a => a.id === t.transfer_to_account_id)?.name ?? 'a deleted account';
+    return t.amount < 0 ? `Transfer to ${other}` : `Transfer from ${other}`;
   }
 
   formatAccountType(type: AccountType): string {

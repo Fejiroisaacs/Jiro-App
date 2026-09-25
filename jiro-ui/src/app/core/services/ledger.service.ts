@@ -13,6 +13,7 @@ export interface LedgerAccount {
   user_id: string;
   name: string;
   type: 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
+  /** Legacy column: every amount is shown in the user's one currency (SettingsService.currency). */
   currency: string;
   balance: number;
   is_active: boolean;
@@ -38,6 +39,13 @@ export interface CategoryTree extends LedgerCategory {
   children: LedgerCategory[];
 }
 
+export interface CategoryDeleteResult {
+  moved: number;
+  budgets_removed: number;
+}
+
+export type RecurrenceInterval = 'weekly' | 'biweekly' | 'monthly' | 'yearly';
+
 export interface LedgerTransaction {
   id: string;
   user_id: string;
@@ -48,14 +56,35 @@ export interface LedgerTransaction {
   description: string;
   notes: string | null;
   date: string;
+  /** True on the transaction that heads a repeating series. */
   is_recurring: boolean;
-  recurrence_interval: 'weekly' | 'biweekly' | 'monthly' | 'yearly' | null;
+  recurrence_interval: RecurrenceInterval | null;
   recurrence_day: number | null;
   transfer_to_account_id: string | null;
+  /** Head of a live series: the next date Ledger adds a copy on. */
+  recurrence_next_date: string | null;
+  /** A copy Ledger added: the id of the series' head. */
+  recurrence_source_id: string | null;
   created_at: string;
   updated_at: string;
   category_name?: string | null;
   category_color?: string | null;
+  /** The series this row belongs to (its own, or its head's); null when none or stopped. */
+  series_interval: RecurrenceInterval | null;
+  series_next_date: string | null;
+}
+
+/** An edit: fields left out stay as they are; category_id null uncategorises, notes '' clears. */
+export interface TransactionUpdate {
+  account_id?: string;
+  transfer_to_account_id?: string;
+  category_id?: string | null;
+  amount?: number;
+  description?: string;
+  notes?: string;
+  date?: string;
+  is_recurring?: boolean;
+  recurrence_interval?: RecurrenceInterval | null;
 }
 
 export interface LedgerBudget {
@@ -94,11 +123,25 @@ export interface LedgerSummary {
   savings_rate: number;
 }
 
+/** Period B against period A (the base): delta = b - a; delta_pct is null when a is 0. */
 export interface ComparisonValue {
   a: number;
   b: number;
   delta: number;
-  delta_pct: number;
+  delta_pct: number | null;
+}
+
+/** One category's income or spending in each period, as positive amounts. */
+export interface ComparisonCategory {
+  /** null for uncategorised transactions. */
+  category_id: string | null;
+  name: string;
+  type: 'income' | 'expense';
+  color: string | null;
+  a: number;
+  b: number;
+  delta: number;
+  delta_pct: number | null;
 }
 
 export interface ComparisonResponse {
@@ -109,15 +152,7 @@ export interface ComparisonResponse {
     expenses: ComparisonValue;
     net: ComparisonValue;
   };
-  categories: {
-    category_id: string;
-    name: string;
-    color: string | null;
-    a: number;
-    b: number;
-    delta: number;
-    delta_pct: number;
-  }[];
+  categories: ComparisonCategory[];
 }
 
 export interface TransactionFilters {
@@ -140,15 +175,25 @@ export class LedgerService {
 
   private readonly settings = inject(SettingsService);
 
+  /**
+   * The user's zone, the API's fallback for an account with no timezone
+   * setting (as on GET /day). Sent by the reads that cut days (budgets,
+   * summary) and by the reads that first add any recurring transactions
+   * that have come due (accounts, transactions, summary, budgets, compare).
+   */
+  private tz(params = new HttpParams()): HttpParams {
+    return params.set('tz', this.settings.timezone());
+  }
+
   // Accounts
-  createAccount(req: Partial<LedgerAccount>): Observable<LedgerAccount> {
+  createAccount(req: { name: string; type: LedgerAccount['type']; balance: number }): Observable<LedgerAccount> {
     return this.http.post<LedgerAccount>(`${API}/accounts`, req);
   }
   listAccounts(): Observable<LedgerAccount[]> {
-    return this.http.get<LedgerAccount[]>(`${API}/accounts`);
+    return this.http.get<LedgerAccount[]>(`${API}/accounts`, { params: this.tz() });
   }
   getAccount(id: string): Observable<AccountWithTransactions> {
-    return this.http.get<AccountWithTransactions>(`${API}/accounts/${id}`);
+    return this.http.get<AccountWithTransactions>(`${API}/accounts/${id}`, { params: this.tz() });
   }
   updateAccount(id: string, req: Partial<LedgerAccount>): Observable<LedgerAccount> {
     return this.http.patch<LedgerAccount>(`${API}/accounts/${id}`, req);
@@ -158,17 +203,20 @@ export class LedgerService {
   }
 
   // Categories
-  createCategory(req: Partial<LedgerCategory>): Observable<LedgerCategory> {
+  createCategory(req: { name: string; type: 'income' | 'expense'; color?: string }): Observable<LedgerCategory> {
     return this.http.post<LedgerCategory>(`${API}/categories`, req);
   }
   listCategories(): Observable<CategoryTree[]> {
     return this.http.get<CategoryTree[]>(`${API}/categories`);
   }
-  updateCategory(id: string, req: Partial<LedgerCategory>): Observable<LedgerCategory> {
+  updateCategory(id: string, req: { name?: string; color?: string }): Observable<LedgerCategory> {
     return this.http.patch<LedgerCategory>(`${API}/categories/${id}`, req);
   }
-  deleteCategory(id: string): Observable<void> {
-    return this.http.delete<void>(`${API}/categories/${id}`);
+  /** Deletes a category; its transactions move to moveTo (same type) or become uncategorised. */
+  deleteCategory(id: string, moveTo: string | null = null): Observable<CategoryDeleteResult> {
+    let params = new HttpParams();
+    if (moveTo) params = params.set('move_to', moveTo);
+    return this.http.delete<CategoryDeleteResult>(`${API}/categories/${id}`, { params });
   }
 
   // Transactions
@@ -176,7 +224,7 @@ export class LedgerService {
     return this.http.post<LedgerTransaction>(`${API}/transactions`, req);
   }
   listTransactions(filters: TransactionFilters = {}): Observable<LedgerTransaction[]> {
-    let params = new HttpParams();
+    let params = this.tz();
     if (filters.from) params = params.set('from', filters.from);
     if (filters.to) params = params.set('to', filters.to);
     if (filters.account_id) params = params.set('account_id', filters.account_id);
@@ -190,31 +238,36 @@ export class LedgerService {
   getTransaction(id: string): Observable<LedgerTransaction> {
     return this.http.get<LedgerTransaction>(`${API}/transactions/${id}`);
   }
-  updateTransaction(id: string, req: Partial<LedgerTransaction>): Observable<LedgerTransaction> {
+  updateTransaction(id: string, req: TransactionUpdate): Observable<LedgerTransaction> {
     return this.http.patch<LedgerTransaction>(`${API}/transactions/${id}`, req);
+  }
+  /** Stops the series this transaction heads or was added by. Copies already added stay. */
+  stopRecurring(id: string): Observable<LedgerTransaction> {
+    return this.http.post<LedgerTransaction>(`${API}/transactions/${id}/stop-recurring`, {});
   }
   deleteTransaction(id: string): Observable<void> {
     return this.http.delete<void>(`${API}/transactions/${id}`);
   }
 
   // Budgets
-  createBudget(req: Partial<LedgerBudget> & { start_date: string }): Observable<LedgerBudget> {
-    return this.http.post<LedgerBudget>(`${API}/budgets`, req);
+  createBudget(req: { category_id: string; amount: number; period: LedgerBudget['period'] }): Observable<LedgerBudget> {
+    return this.http.post<LedgerBudget>(`${API}/budgets`, req, { params: this.tz() });
+  }
+  updateBudget(id: string, req: { amount?: number; period?: LedgerBudget['period'] }): Observable<LedgerBudget> {
+    return this.http.patch<LedgerBudget>(`${API}/budgets/${id}`, req);
   }
   listBudgets(): Observable<BudgetWithSpend[]> {
-    // The current period is cut in the user's zone; tz is the API's fallback
-    // for an account with no timezone setting.
-    return this.http.get<BudgetWithSpend[]>(`${API}/budgets`, {
-      params: new HttpParams().set('tz', this.settings.timezone()),
-    });
+    // The current period is cut in the user's zone.
+    return this.http.get<BudgetWithSpend[]>(`${API}/budgets`, { params: this.tz() });
   }
   deleteBudget(id: string): Observable<void> {
     return this.http.delete<void>(`${API}/budgets/${id}`);
   }
 
   // Summary
+  /** month is YYYY-MM: the user's month (todayKey(settings.timezone()).slice(0, 7)), not the browser's UTC one. */
   getSummary(month: string): Observable<LedgerSummary> {
-    return this.http.get<LedgerSummary>(`${API}/summary`, { params: { month } });
+    return this.http.get<LedgerSummary>(`${API}/summary`, { params: this.tz().set('month', month) });
   }
 
   // Net Worth
@@ -225,9 +278,9 @@ export class LedgerService {
     return this.http.post<NetWorthSnapshot>(`${API}/networth/snapshot`, req);
   }
 
-  // Comparison
+  // Comparison: period B against period A (the base).
   getComparison(aFrom: string, aTo: string, bFrom: string, bTo: string): Observable<ComparisonResponse> {
-    const params = new HttpParams()
+    const params = this.tz()
       .set('period_a_from', aFrom)
       .set('period_a_to', aTo)
       .set('period_b_from', bFrom)
