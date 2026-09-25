@@ -219,6 +219,28 @@ func TestDemoDatasetReferences(t *testing.T) {
 		}
 	}
 
+	if len(ds.GroceryItems) == 0 {
+		t.Errorf("the demo has no grocery list")
+	}
+	groceryKeys := map[string]bool{}
+	for _, g := range ds.GroceryItems {
+		if g.RecipeID != nil && !recipes[*g.RecipeID] {
+			t.Errorf("grocery item %q references a missing recipe", g.Item)
+		}
+		if (g.RecipeID == nil) != (g.RecipeTitle == "") {
+			t.Errorf("grocery item %q: a recipe item needs its title, a manual one none", g.Item)
+		}
+		source := groceryManualSource
+		if g.RecipeID != nil {
+			source = groceryRecipeSource(*g.RecipeID)
+		}
+		k := source + "|" + normalizeIngredientName(g.Item)
+		if groceryKeys[k] {
+			t.Errorf("duplicate grocery item %q (UNIQUE(user_id, source_key, name_key))", g.Item)
+		}
+		groceryKeys[k] = true
+	}
+
 	entries := map[uuid.UUID]bool{}
 	moods := map[string]bool{"happy": true, "grateful": true, "energised": true, "calm": true, "tired": true, "sad": true, "anxious": true, "stressed": true}
 	for _, e := range ds.JournalEntries {
@@ -325,6 +347,9 @@ func TestDemoDatasetDatesRelativeToNow(t *testing.T) {
 	for _, c := range ds.RecipeCollections {
 		checkTS("recipe collection", c.CreatedAt)
 	}
+	for _, g := range ds.GroceryItems {
+		checkTS("grocery item", g.CreatedAt)
+	}
 	for _, e := range ds.JournalEntries {
 		checkTS("journal entry", e.CreatedAt)
 	}
@@ -382,6 +407,9 @@ func TestDemoDatasetCopy(t *testing.T) {
 	}
 	for _, e := range ds.MealPlanEntries {
 		texts = append(texts, e.CustomLabel)
+	}
+	for _, g := range ds.GroceryItems {
+		texts = append(texts, g.Item, g.Amount)
 	}
 	for _, e := range ds.JournalEntries {
 		texts = append(texts, e.Title, e.Body)

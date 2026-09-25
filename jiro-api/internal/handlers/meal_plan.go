@@ -67,6 +67,10 @@ func (h *MealPlanHandler) AddEntry(c *gin.Context) {
 
 	entry, err := h.service.AddEntry(c.Request.Context(), userID, planID, &req)
 	if err != nil {
+		if errors.Is(err, services.ErrMealPlanEntryEmpty) || errors.Is(err, services.ErrInvalidRecipeID) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		if errors.Is(err, services.ErrNotOwner) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 			return

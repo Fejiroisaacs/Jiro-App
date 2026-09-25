@@ -1,6 +1,7 @@
 package services
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"strings"
@@ -109,6 +110,17 @@ type demoMealPlanEntry struct {
 	CustomLabel string
 }
 
+// demoGroceryItem is one line of the grocery list. RecipeID nil means an
+// item typed in by hand.
+type demoGroceryItem struct {
+	RecipeID    *uuid.UUID
+	RecipeTitle string
+	Item        string
+	Amount      string
+	Checked     bool
+	CreatedAt   time.Time
+}
+
 type demoJournalEntry struct {
 	ID        uuid.UUID
 	Title     string
@@ -177,6 +189,7 @@ type demoDataset struct {
 	MealPlanID        uuid.UUID
 	MealPlanWeek      string // Monday of the seed week
 	MealPlanEntries   []demoMealPlanEntry
+	GroceryItems      []demoGroceryItem
 
 	JournalEntries      []demoJournalEntry
 	JournalCollectionID uuid.UUID
@@ -598,6 +611,33 @@ Stir in the chocolate and season. Top with sour cream and green onion.`,
 		{r(chili), 5, "dinner", ""},
 		{r(risotto), 6, "dinner", ""},
 	}
+
+	// The grocery list: the week's two meal prep recipes added from the
+	// planner the evening before, a few things ticked off already, and two
+	// items typed in by hand.
+	titles := map[uuid.UUID]string{}
+	ingredients := map[uuid.UUID]string{}
+	for _, rec := range ds.Recipes {
+		titles[rec.ID] = rec.Title
+		ingredients[rec.ID] = rec.Ingredients
+	}
+	checked := map[string]bool{"Rolled oats": true, "Milk": true, "Jasmine rice": true}
+	listAt := at(-1, 21, 30)
+	for _, rid := range []uuid.UUID{oats, bowls} {
+		var ing []demoIngredient
+		_ = json.Unmarshal([]byte(ingredients[rid]), &ing)
+		for _, in := range ing {
+			ds.GroceryItems = append(ds.GroceryItems, demoGroceryItem{
+				RecipeID: r(rid), RecipeTitle: titles[rid], Item: in.Item, Amount: in.Amount,
+				Checked: checked[in.Item], CreatedAt: listAt.Add(time.Duration(len(ds.GroceryItems)) * time.Second),
+			})
+		}
+	}
+	for _, m := range []struct{ item, amount string }{{"Coffee beans", "1 bag"}, {"Paper towels", ""}} {
+		ds.GroceryItems = append(ds.GroceryItems, demoGroceryItem{
+			Item: m.item, Amount: m.amount, CreatedAt: at(-1, 21, 45).Add(time.Duration(len(ds.GroceryItems)) * time.Second),
+		})
+	}
 }
 
 // ─── Journaly ────────────────────────────────────────────────────────────────
@@ -903,6 +943,15 @@ func (ds *demoDataset) queue(b *pgx.Batch, userID uuid.UUID) {
 	for i, e := range ds.MealPlanEntries {
 		b.Queue(`INSERT INTO meal_plan_entries (meal_plan_id, recipe_id, day_of_week, meal_slot, custom_label, position, created_at) VALUES ($1,$2,$3,$4,$5,0,$6)`,
 			ds.MealPlanID, e.RecipeID, e.DayOfWeek, e.Slot, nullIfEmpty(e.CustomLabel), planCreated.Add(time.Duration(i)*time.Minute))
+	}
+	for i, g := range ds.GroceryItems {
+		source := groceryManualSource
+		if g.RecipeID != nil {
+			source = groceryRecipeSource(*g.RecipeID)
+		}
+		b.Queue(`INSERT INTO grocery_items (user_id, item, amount, recipe_id, recipe_title, source_key, name_key, checked, position, created_at, updated_at)
+		         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$10)`,
+			userID, g.Item, g.Amount, g.RecipeID, nullIfEmpty(g.RecipeTitle), source, normalizeIngredientName(g.Item), g.Checked, i, g.CreatedAt)
 	}
 
 	for _, e := range ds.JournalEntries {

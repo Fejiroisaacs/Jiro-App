@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/models"
@@ -373,17 +374,27 @@ func applyModifications(base, mods json.RawMessage) json.RawMessage {
 		return base
 	}
 
-	// Build a map for fast lookup
+	// Names match ignoring case and surrounding or repeated whitespace, so a
+	// trial's "feta" updates the recipe's "Feta" instead of adding a second
+	// feta. The recipe keeps its own spelling of the name.
 	idx := make(map[string]int)
 	for i, ing := range ingredients {
-		idx[ing.Item] = i
+		key := normalizeIngredientName(ing.Item)
+		if _, dup := idx[key]; !dup {
+			idx[key] = i
+		}
 	}
 
 	for _, mod := range modifications {
-		if i, exists := idx[mod.Item]; exists {
+		key := normalizeIngredientName(mod.Item)
+		if key == "" {
+			continue
+		}
+		if i, exists := idx[key]; exists {
 			ingredients[i].Amount = mod.Change
 		} else {
-			ingredients = append(ingredients, Ingredient{Item: mod.Item, Amount: mod.Change})
+			ingredients = append(ingredients, Ingredient{Item: strings.TrimSpace(mod.Item), Amount: mod.Change})
+			idx[key] = len(ingredients) - 1
 		}
 	}
 

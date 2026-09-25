@@ -51,7 +51,7 @@ export const MODULES: ModuleNav[] = [
       { label: 'Culinara', route: '/culinara', exact: true, mark: 'culinara' },
       { label: 'Discover', route: '/culinara/discover', icon: 'magnifying-glass' },
       { label: 'Meal Planner', mobileLabel: 'Planner', route: '/culinara/meal-planner', icon: 'calendar-blank' },
-      { label: 'Grocery List', mobileLabel: 'Grocery', route: '/culinara/shopping', icon: 'basket' },
+      { label: 'Grocery List', mobileLabel: 'Grocery', route: '/culinara/grocery-list', icon: 'basket' },
     ],
   },
   {
