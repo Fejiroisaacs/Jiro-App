@@ -119,6 +119,8 @@
   --color-warning: #8A6237;
   --color-warning-rgb: 138, 98, 55;
   --color-info: #475B70;
+  /* Primary as text on a primary tint; mixed toward the text colour in dark mode for AA. */
+  --color-primary-text: var(--color-primary);
   /* Data palette: categories, muscle groups, moods. Fills and marks; chip text uses --text-primary on a tint. */
   --data-1: #A8563F;
   --data-2: #5E7040;
@@ -304,6 +306,7 @@ html.dark {
   --color-warning: #D2A468;
   --color-warning-rgb: 210, 164, 104;
   --color-info: #8FAAC6;
+  --color-primary-text: color-mix(in srgb, var(--color-primary) 75%, var(--text-primary));
   --data-1: #D98B72;
   --data-2: #9DB079;
   --data-3: #D8AE62;
