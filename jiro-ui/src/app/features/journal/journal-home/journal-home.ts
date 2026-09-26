@@ -10,7 +10,6 @@ import {
   MOODS,
   moodColor as moodColorFor,
   moodLabel as moodLabelFor,
-  moodMeta,
 } from '../../../core/services/journal.service';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
@@ -442,7 +441,6 @@ export class JournalHomeComponent implements OnInit {
     return body.length > 180 ? body.slice(0, 180) + '...' : body;
   }
 
-  moodIcon(value: string): string { return moodMeta(value)?.icon ?? ''; }
   moodLabel(value: string): string { return moodLabelFor(value); }
   moodColor(value: string): string { return moodColorFor(value); }
 }

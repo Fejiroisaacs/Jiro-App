@@ -7,10 +7,12 @@ import {
   JournalCollection,
   JournalEntry,
   MOODS,
+  moodMeta,
 } from '../../../core/services/journal.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
-import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { IconName } from '../../../shared/icons/icons.generated';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { UploadService } from '../../../core/services/upload.service';
@@ -18,7 +20,7 @@ import { UploadService } from '../../../core/services/upload.service';
 @Component({
   selector: 'app-journal-collection',
   standalone: true,
-  imports: [FormsModule, RouterLink, JiroButtonComponent, JiroModalComponent, SafeHtmlPipe],
+  imports: [FormsModule, RouterLink, JiroButtonComponent, JiroModalComponent, JiroIconComponent],
   template: `
     <div class="collection-page">
 
@@ -136,7 +138,7 @@ import { UploadService } from '../../../core/services/upload.service';
               <div class="entry-meta">
                 <span class="entry-date">{{ formatDate(e.created_at) }}</span>
                 @if (e.mood) {
-<span class="mood-chip"><span [innerHTML]="moodIcon(e.mood) | safeHtml"></span> {{ moodLabel(e.mood) }}</span>
+<span class="mood-chip"><jiro-icon [name]="moodIcon(e.mood)" /> {{ moodLabel(e.mood) }}</span>
 }
               </div>
               <div class="entry-card-actions" (click)="$event.stopPropagation()">
@@ -297,7 +299,6 @@ import { UploadService } from '../../../core/services/upload.service';
     .entry-meta { display: flex; align-items: center; gap: var(--space-sm); }
     .entry-date { font-size: var(--font-size-xs); color: var(--text-secondary); }
     .mood-chip { display: inline-flex; align-items: center; gap: 4px; font-size: var(--font-size-xs); padding: 2px 8px; background: color-mix(in srgb, var(--color-primary) 12%, transparent); color: var(--color-primary); border-radius: 99px; }
-    .mood-chip svg { width: 12px; height: 12px; }
     .entry-card-actions { display: flex; gap: var(--space-xs); opacity: 0; transition: opacity 0.15s; }
     .entry-card:hover .entry-card-actions,
     .entry-card:focus-within .entry-card-actions { opacity: 1; }
@@ -497,6 +498,6 @@ export class JournalCollectionComponent implements OnInit {
     return body.length > 180 ? body.slice(0, 180) + '...' : body;
   }
 
-  moodIcon(value: string): string { return MOODS.find(m => m.value === value)?.icon ?? ''; }
+  moodIcon(value: string): IconName { return moodMeta(value)?.icon ?? 'smiley'; }
   moodLabel(value: string): string { return MOODS.find(m => m.value === value)?.label ?? value; }
 }

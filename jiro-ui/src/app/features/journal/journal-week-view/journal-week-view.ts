@@ -7,7 +7,6 @@ import {
   JournalEntry,
   moodColor as moodColorFor,
   moodLabel as moodLabelFor,
-  moodMeta,
 } from '../../../core/services/journal.service';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { SettingsService } from '../../../core/services/settings.service';
@@ -395,10 +394,6 @@ export class JournalWeekViewComponent implements OnChanges, AfterViewInit {
   /** The palette lives beside MOODS in the service; a note with no mood keeps the hairline. */
   moodColor(mood: string | null | undefined): string {
     return mood ? moodColorFor(mood) : 'var(--border-color)';
-  }
-
-  moodIcon(mood: string): string {
-    return moodMeta(mood)?.icon ?? '';
   }
 
   moodLabel(mood: string): string {

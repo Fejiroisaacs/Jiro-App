@@ -59,4 +59,10 @@ export const ICON_LIST = [
   'x-circle',
   'star',
   'star:fill',
+  // journal moods
+  'smiley',
+  'smiley-sad',
+  'heart',
+  'lightning',
+  'cloud',
 ] as const;

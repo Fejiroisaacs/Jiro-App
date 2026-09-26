@@ -9,7 +9,8 @@ import {
   JournalEntry,
   JournalInviteLink,
   INVITE_LINK_DAYS,
-  MOODS,
+  moodMeta,
+  moodLabel as moodLabelFor,
 } from '../../../core/services/journal.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { JournalWeekViewComponent, currentWeekBounds } from '../journal-week-view/journal-week-view';
@@ -18,14 +19,15 @@ import { dayKey } from '../../../core/utils/day';
 import { JournalDayModalComponent } from '../journal-day-modal/journal-day-modal';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
-import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { IconName } from '../../../shared/icons/icons.generated';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
 
 @Component({
   selector: 'app-journal-group',
   standalone: true,
-  imports: [FormsModule, RouterLink, JournalWeekViewComponent, JournalDayModalComponent, JiroButtonComponent, JiroModalComponent, SafeHtmlPipe],
+  imports: [FormsModule, RouterLink, JournalWeekViewComponent, JournalDayModalComponent, JiroButtonComponent, JiroModalComponent, JiroIconComponent],
   template: `
     <div class="group-page">
 
@@ -121,7 +123,7 @@ import { ToastService } from '../../../core/services/toast.service';
                 <span class="entry-date text-secondary">{{ formatDate(e.created_at) }}</span>
               </div>
               @if (e.mood) {
-<span class="mood-chip" [innerHTML]="moodIcon(e.mood) | safeHtml"></span>
+<span class="mood-chip"><jiro-icon [name]="moodIcon(e.mood)" [label]="moodLabel(e.mood)" /></span>
 }
               <!-- Edit/delete for own entries -->
               @if (isOwnEntry(e)) {
@@ -827,7 +829,11 @@ export class JournalGroupComponent implements OnInit {
     return new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
-  moodIcon(value: string): string {
-    return MOODS.find(m => m.value === value)?.icon ?? '';
+  moodIcon(value: string): IconName {
+    return moodMeta(value)?.icon ?? 'smiley';
+  }
+
+  moodLabel(value: string): string {
+    return moodLabelFor(value);
   }
 }
