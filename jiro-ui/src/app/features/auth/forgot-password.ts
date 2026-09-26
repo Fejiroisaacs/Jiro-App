@@ -6,11 +6,12 @@ import { AuthService } from '../../core/services/auth.service';
 import { JiroButtonComponent } from '../../shared/components/jiro-button/jiro-button';
 import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-input';
 import { JiroLogoComponent } from '../../shared/components/jiro-logo/jiro-logo';
+import { JiroIconComponent } from '../../shared/components/jiro-icon/jiro-icon';
 
 @Component({
   selector: 'app-forgot-password',
   standalone: true,
-  imports: [FormsModule, RouterLink, JiroButtonComponent, JiroInputComponent, JiroLogoComponent],
+  imports: [FormsModule, RouterLink, JiroButtonComponent, JiroInputComponent, JiroLogoComponent, JiroIconComponent],
   template: `
     <main class="auth-page">
       <jiro-logo class="auth-logo" [size]="40" />
@@ -21,13 +22,10 @@ import { JiroLogoComponent } from '../../shared/components/jiro-logo/jiro-logo';
         @if (sent()) {
 <div>
           <div class="success-box">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-              <polyline points="22 4 12 14.01 9 11.01"/>
-            </svg>
+            <jiro-icon name="check-circle" [size]="40" />
             <p>Check your inbox! If that email is registered you'll receive a reset link shortly.</p>
           </div>
-          <a routerLink="/login" class="back-link">← Back to login</a>
+          <a routerLink="/login" class="back-link"><jiro-icon name="arrow-left" [size]="16" /> Back to login</a>
         </div>
 } @else {
 
@@ -49,7 +47,7 @@ import { JiroLogoComponent } from '../../shared/components/jiro-logo/jiro-logo';
             {{ loading() ? 'Sending...' : 'Send reset link' }}
           </jiro-button>
 
-          <a routerLink="/login" class="back-link">← Back to login</a>
+          <a routerLink="/login" class="back-link"><jiro-icon name="arrow-left" [size]="16" /> Back to login</a>
         
 }
 
@@ -59,7 +57,7 @@ import { JiroLogoComponent } from '../../shared/components/jiro-logo/jiro-logo';
   `,
   styles: [`
     .auth-page {
-      min-height: 100vh;
+      min-height: 100dvh;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -121,7 +119,10 @@ import { JiroLogoComponent } from '../../shared/components/jiro-logo/jiro-logo';
     }
 
     .back-link {
-      display: block;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-xs);
       margin-top: var(--space-lg);
       text-align: center;
       font-size: var(--font-size-sm);
