@@ -87,7 +87,5 @@ export const ICON_LIST = [
   'play:fill',
   'prohibit',
   'pulse',
-  'trend-down',
-  'trend-up',
   'video-camera',
 ] as const;
