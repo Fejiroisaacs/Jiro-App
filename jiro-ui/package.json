@@ -50,6 +50,6 @@
     "@phosphor-icons/core": "^2.1.1",
     "@types/express": "^5.0.1",
     "@types/node": "^20.17.19",
-    "typescript": "~5.9.2"
+    "typescript": "~7.0.2"
   }
 }
