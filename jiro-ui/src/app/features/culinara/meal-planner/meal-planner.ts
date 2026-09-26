@@ -18,26 +18,24 @@ const SLOTS: { key: MealSlot; label: string }[] = [
   { key: 'dinner',    label: 'Dinner'    },
   { key: 'snack',     label: 'Snack'     },
 ];
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 
 @Component({
   selector: 'app-meal-planner',
   standalone: true,
-  imports: [FormsModule, JiroPageHeaderComponent, JiroModalComponent, JiroButtonComponent],
+  imports: [JiroSkeletonComponent, JiroIconComponent, FormsModule, JiroPageHeaderComponent, JiroModalComponent, JiroButtonComponent],
   template: `
     <div class="planner-page">
       <!-- Header -->
       <jiro-page-header heading="Meal planner" [subtitle]="weekLabel()">
         <div actions class="header-actions">
-          <button class="nav-btn" type="button" (click)="prevWeek()" aria-label="Previous week">‹ Prev</button>
+          <button class="nav-btn" type="button" (click)="prevWeek()" aria-label="Previous week"><jiro-icon name="caret-left" [size]="14" /> Prev</button>
           <button class="nav-btn today-btn" type="button" (click)="goToday()">Today</button>
-          <button class="nav-btn" type="button" (click)="nextWeek()" aria-label="Next week">Next ›</button>
+          <button class="nav-btn" type="button" (click)="nextWeek()" aria-label="Next week">Next <jiro-icon name="caret-right" [size]="14" /></button>
           <button class="grocery-btn" type="button" (click)="addAllToGrocery()" title="Add all planned recipes to grocery list"
             aria-label="Add every planned recipe to the grocery list" [disabled]="groceryBusy()" [attr.aria-busy]="groceryBusy() ? 'true' : null">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
-              <line x1="3" y1="6" x2="21" y2="6"/>
-              <path d="M16 10a4 4 0 0 1-8 0"/>
-            </svg>
+            <jiro-icon name="basket" [size]="14" />
             Add to grocery list
           </button>
         </div>
@@ -45,8 +43,9 @@ const SLOTS: { key: MealSlot; label: string }[] = [
 
       <!-- Loading -->
       @if (loading()) {
-<div class="state-loading" aria-busy="true">
-        <div class="spinner"></div>
+<div class="calendar-wrap sk-calendar" role="status" aria-label="Loading meal plan">
+        <jiro-skeleton height="44px" />
+        <jiro-skeleton [lines]="4" height="84px" />
       </div>
 }
 
@@ -73,15 +72,13 @@ const SLOTS: { key: MealSlot; label: string }[] = [
                   <div class="entry-chip" [class.entry-chip--note]="!entry.recipe_id">
                     <span class="chip-title">{{ entryName(entry) }}</span>
                     <button class="chip-remove" type="button" (click)="removeEntry(entry)" title="Remove from this day"
-                      [attr.aria-label]="'Remove ' + entryName(entry) + ' from ' + slot.label + ', ' + dayLabel(dow)">×</button>
+                      [attr.aria-label]="'Remove ' + entryName(entry) + ' from ' + slot.label + ', ' + dayLabel(dow)"><jiro-icon name="x" [size]="12" /></button>
                   </div>
                 }
                 <!-- The rest of the box is one button, so a slot is reachable by keyboard. -->
                 <button class="cell-add" type="button" (click)="openPicker(dow, slot.key)"
                   [attr.aria-label]="'Add to ' + slot.label + ', ' + dayLabel(dow)">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                  </svg>
+                  <jiro-icon name="plus" [size]="12" />
                 </button>
               </div>
             }
@@ -138,9 +135,8 @@ const SLOTS: { key: MealSlot; label: string }[] = [
   `,
   styles: [`
     .planner-page {
-      padding: var(--space-lg);
       max-width: 1200px;
-      margin: 0 auto;
+      width: 100%;
     }
 
 
@@ -156,6 +152,9 @@ const SLOTS: { key: MealSlot; label: string }[] = [
     }
 
     .nav-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
       padding: 6px 14px;
       background: var(--bg-surface);
       border: 1px solid var(--border-color);
@@ -187,15 +186,7 @@ const SLOTS: { key: MealSlot; label: string }[] = [
     .grocery-btn:hover { opacity: 0.88; }
     .grocery-btn:disabled { opacity: 0.6; cursor: progress; }
 
-    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
-    .spinner {
-      width: 32px;
-      height: 32px;
-      border: 3px solid var(--border-color);
-      border-top-color: var(--color-primary);
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-    }
+    .sk-calendar { padding: var(--space-md); display: flex; flex-direction: column; gap: var(--space-sm); }
 
     /* Calendar */
     .calendar-wrap {
@@ -276,9 +267,9 @@ const SLOTS: { key: MealSlot; label: string }[] = [
       cursor: pointer;
       font: inherit;
     }
-    .cell-add svg { opacity: 0; transition: opacity 0.12s; }
-    .calendar-cell:hover .cell-add svg,
-    .cell-add:focus-visible svg { opacity: 1; }
+    .cell-add jiro-icon { opacity: 0; transition: opacity 0.12s; }
+    .calendar-cell:hover .cell-add jiro-icon,
+    .cell-add:focus-visible jiro-icon { opacity: 1; }
     .cell-add:hover { border-color: var(--border-color); }
     .cell-add:focus-visible {
       outline: 2px solid var(--color-primary);
@@ -314,6 +305,9 @@ const SLOTS: { key: MealSlot; label: string }[] = [
     }
 
     .chip-remove {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       flex-shrink: 0;
       min-width: 20px;
       min-height: 20px;
@@ -398,10 +392,7 @@ const SLOTS: { key: MealSlot; label: string }[] = [
     .pr-title { font-size: var(--font-size-sm); font-weight: 500; color: var(--text-primary); }
     .pr-tags { font-size: var(--font-size-xs); color: var(--text-muted); }
 
-    @keyframes spin { to { transform: rotate(360deg); } }
-
     @media (max-width: 767px) {
-      .planner-page { padding: var(--space-md); }
       .page-header { flex-direction: column; align-items: stretch; }
       .header-actions { justify-content: space-between; }
     }
@@ -432,7 +423,7 @@ export class MealPlannerComponent implements OnInit {
 
   weekLabel = computed(() => {
     const mon = this.currentMonday();
-    return `${shortDayLabel(mon)} – ${shortDayLabel(addDays(mon, 6))}, ${mon.slice(0, 4)}`;
+    return `${shortDayLabel(mon)} to ${shortDayLabel(addDays(mon, 6))}, ${mon.slice(0, 4)}`;
   });
 
   dayHeaders = computed(() => {
@@ -496,7 +487,8 @@ export class MealPlannerComponent implements OnInit {
     const todayCol: HTMLElement | null = this.elRef.nativeElement.querySelector('.day-header.today');
     if (wrap && todayCol) {
       // Scroll so today's column is visible just after the sticky slot label (90px)
-      wrap.scrollTo({ left: todayCol.offsetLeft - 90, behavior: 'smooth' });
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      wrap.scrollTo({ left: todayCol.offsetLeft - 90, behavior: reduce ? 'auto' : 'smooth' });
     }
   }
 

@@ -12,11 +12,12 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
 import { RecipeFormComponent } from '../recipe-form/recipe-form';
 
 type SortKey = 'newest' | 'trials' | 'rating' | 'az';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 
 @Component({
   selector: 'app-recipe-list',
   standalone: true,
-  imports: [
+  imports: [JiroSkeletonComponent, 
     FormsModule,
     JiroCardComponent,
     JiroButtonComponent,
@@ -34,7 +35,7 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
           @if (cookStreak()?.current_streak) {
 <div class="streak-badge">
             <span class="streak-flame">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+              <jiro-icon name="fire" [size]="18" />
             </span>
             <div class="streak-info">
               <span class="streak-num">{{ cookStreak()!.current_streak }}</span>
@@ -116,7 +117,7 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
               [class.collection-chip--active]="activeCollection() === col.id"
               [attr.aria-pressed]="activeCollection() === col.id"
               (click)="activeCollection.set(activeCollection() === col.id ? null : col.id)">
-              <svg class="folder-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> {{ col.name }}
+              <jiro-icon name="folder" [size]="12" class="folder-icon" /> {{ col.name }}
               @if (col.recipe_count) {
                 <span class="col-count" [attr.aria-label]="col.recipe_count + (col.recipe_count === 1 ? ' recipe' : ' recipes')">{{ col.recipe_count }}</span>
               }
@@ -143,7 +144,7 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
                 [(ngModel)]="newCollectionName"
                 placeholder="Collection name"
                 (keydown.escape)="cancelNewCollection()" />
-              <button type="submit" class="new-collection-save" aria-label="Create collection" title="Create collection">✓</button>
+              <button type="submit" class="new-collection-save" aria-label="Create collection" title="Create collection"><jiro-icon name="check" [size]="14" /></button>
             </form>
           }
         </div>
@@ -151,7 +152,16 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
 
       <!-- Loading -->
       @if (loading()) {
-        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+        <div class="recipe-grid" role="status" aria-label="Loading recipes">
+          @for (i of [1, 2, 3, 4, 5, 6]; track i) {
+            <div class="sk-card">
+              <jiro-skeleton height="160px" />
+              <jiro-skeleton width="30%" height="12px" />
+              <jiro-skeleton width="75%" height="20px" />
+              <jiro-skeleton [lines]="2" height="12px" />
+            </div>
+          }
+        </div>
       }
 
       <!-- Empty state -->
@@ -189,7 +199,7 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
 <div class="recipe-meta">
               @if (recipe.latest_rating != null) {
 <span class="rating">
-                <span class="star" aria-hidden="true">★</span>
+                <jiro-icon name="star:fill" [size]="14" class="star" />
                 <span class="sr-only">Rated </span><span>{{ recipe.latest_rating }}</span><span class="sr-only"> out of 5.</span>
               </span>
 }
@@ -352,7 +362,11 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
       color: var(--color-primary);
     }
 
-    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
+    .sk-card {
+      display: flex; flex-direction: column; gap: var(--space-sm);
+      padding: var(--space-md); border: 1px solid var(--border-color);
+      border-radius: var(--border-radius-lg); background: var(--bg-surface);
+    }
 
 
     .recipe-grid {
@@ -409,7 +423,6 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
 
     .star {
       color: var(--color-warning);
-      font-size: 14px;
     }
 
     .recipe-title {
@@ -437,7 +450,7 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
       font-size: var(--font-size-xs);
       padding: 2px 8px;
       background: rgba(var(--color-primary-rgb), 0.08);
-      color: var(--color-primary);
+      color: color-mix(in srgb, var(--color-primary) 75%, var(--text-primary));
       border-radius: 10px;
       font-weight: 500;
     }
@@ -463,10 +476,6 @@ type SortKey = 'newest' | 'trials' | 'rating' | 'az';
     .last-cooked {
       font-size: var(--font-size-xs);
       color: var(--text-muted);
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
     }
 
     .header-right {
