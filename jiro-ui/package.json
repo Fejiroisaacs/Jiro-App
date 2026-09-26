@@ -45,7 +45,7 @@
   },
   "devDependencies": {
     "@angular/build": "^21.2.2",
-    "@angular/cli": "^21.2.2",
+    "@angular/cli": "^22.2.0",
     "@angular/compiler-cli": "^21.2.23",
     "@phosphor-icons/core": "^2.1.1",
     "@types/express": "^5.0.1",
