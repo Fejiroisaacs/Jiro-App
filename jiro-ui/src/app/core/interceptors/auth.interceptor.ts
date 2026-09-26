@@ -3,8 +3,16 @@ import { inject } from '@angular/core';
 import { catchError, switchMap, throwError, EMPTY } from 'rxjs';
 import { AuthService } from '../services/auth.service';
 import { ToastService } from '../services/toast.service';
+import { environment } from '../../../environments/environment';
+
+const API_PREFIX = `${environment.apiUrl}/`;
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
+  // The token is for our API only: never send it to storage, CDNs or any other host.
+  if (!req.url.startsWith(API_PREFIX)) {
+    return next(req);
+  }
+
   const authService = inject(AuthService);
   const toast = inject(ToastService);
   const token = authService.getToken();
