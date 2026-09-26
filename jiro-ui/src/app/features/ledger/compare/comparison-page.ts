@@ -18,6 +18,8 @@ import { formatCurrency, formatPctChange, formatSignedCurrency, parseDateOnly } 
 import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-card';
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { SettingsService } from '../../../core/services/settings.service';
 import { todayKey } from '../../../core/utils/day';
@@ -93,7 +95,7 @@ type SortColumn = 'name' | 'a' | 'b' | 'delta' | 'delta_pct';
   standalone: true,
   imports: [
     CommonModule, FormsModule, JiroCardComponent, JiroButtonComponent,
-    JiroPageHeaderComponent, JiroEmptyStateComponent,
+    JiroPageHeaderComponent, JiroEmptyStateComponent, JiroSkeletonComponent, JiroIconComponent,
   ],
   template: `
     <div class="comparison-page">
@@ -187,7 +189,21 @@ type SortColumn = 'name' | 'a' | 'b' | 'delta' | 'delta_pct';
 
       <!-- ── Loading ── -->
       @if (loading()) {
-        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+        <div class="results-body" aria-hidden="true">
+          <div class="summary-grid">
+            @for (i of [0, 1, 2]; track i) {
+              <jiro-card>
+                <div class="summary-card">
+                  <jiro-skeleton height="14px" width="50%" />
+                  <jiro-skeleton [lines]="2" height="18px" />
+                  <jiro-skeleton height="12px" width="70%" />
+                </div>
+              </jiro-card>
+            }
+          </div>
+          <jiro-skeleton height="260px" />
+        </div>
+        <span class="sr-only" role="status">Loading the comparison</span>
       }
 
       <!-- ── Empty / No data state ── -->
@@ -277,9 +293,7 @@ type SortColumn = 'name' | 'a' | 'b' | 'delta' | 'delta_pct';
                       <th scope="col" [class.th-num]="col.key !== 'name'" [attr.aria-sort]="ariaSort(col.key)">
                         <button type="button" class="sort-btn" (click)="toggleSort(col.key)">
                           {{ col.label }}
-                          <svg class="sort-icon" [class.active-col]="sortColumn() === col.key" [class.dir-asc]="sortColumn() === col.key && sortDir() === 'asc'" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                            <polyline points="6,9 12,15 18,9"/>
-                          </svg>
+                          <jiro-icon name="caret-down" [size]="10" class="sort-icon" [class.active-col]="sortColumn() === col.key" [class.dir-asc]="sortColumn() === col.key && sortDir() === 'asc'" />
                         </button>
                       </th>
                     }
@@ -426,7 +440,7 @@ type SortColumn = 'name' | 'a' | 'b' | 'delta' | 'delta_pct';
     .preset-btn.active {
       background: var(--color-primary);
       border-color: var(--color-primary);
-      color: white;
+      color: var(--text-on-primary);
       font-weight: 600;
     }
 
@@ -527,7 +541,6 @@ type SortColumn = 'name' | 'a' | 'b' | 'delta' | 'delta_pct';
     .custom-apply { display: flex; justify-content: flex-end; }
 
     /* ── State messages ── */
-    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
 
 
 
@@ -613,8 +626,8 @@ type SortColumn = 'name' | 'a' | 'b' | 'delta' | 'delta_pct';
     }
 
     .delta-negative {
-      background: rgba(var(--color-danger-rgb), 0.12);
-      color: var(--color-danger);
+      background: rgba(var(--color-danger-rgb), 0.08);
+      color: var(--color-negative);
     }
 
     .delta-neutral {
@@ -814,8 +827,8 @@ type SortColumn = 'name' | 'a' | 'b' | 'delta' | 'delta_pct';
     }
 
     .delta-badge.delta-negative {
-      background: rgba(var(--color-danger-rgb), 0.12);
-      color: var(--color-danger);
+      background: rgba(var(--color-danger-rgb), 0.08);
+      color: var(--color-negative);
     }
 
     .delta-badge.delta-neutral {

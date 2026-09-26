@@ -13,6 +13,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { LedgerTransactionFormComponent, TransactionPayload } from '../shared/transaction-form/ledger-transaction-form';
 import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hexWithAlpha, parseDateOnly } from '../shared/ledger-utils';
 import { SettingsService } from '../../../core/services/settings.service';
@@ -30,6 +31,7 @@ import { todayKey } from '../../../core/utils/day';
     JiroIconComponent,
     JiroPageHeaderComponent,
     JiroEmptyStateComponent,
+    JiroSkeletonComponent,
     LedgerTransactionFormComponent,
   ],
   template: `
@@ -45,7 +47,27 @@ import { todayKey } from '../../../core/utils/day';
 
       <!-- ── Loading ── -->
       @if (loading()) {
-        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+        <div class="ledger-skeleton" aria-hidden="true">
+          <div class="summary-bar">
+            @for (i of [0, 1, 2, 3]; track i) {
+              <div class="summary-item">
+                <jiro-skeleton height="12px" width="64px" />
+                <jiro-skeleton height="26px" width="96px" />
+              </div>
+            }
+          </div>
+          <div class="hub-body">
+            <div class="sk-col">
+              <jiro-skeleton height="20px" width="120px" />
+              <jiro-skeleton [lines]="3" height="72px" />
+            </div>
+            <div class="sk-col">
+              <jiro-skeleton height="20px" width="180px" />
+              <jiro-skeleton [lines]="5" height="44px" />
+            </div>
+          </div>
+        </div>
+        <span class="sr-only" role="status">Loading your ledger</span>
       }
 
       <!-- ── No Accounts Empty State ── -->
@@ -472,8 +494,8 @@ import { todayKey } from '../../../core/utils/day';
 
 
 
-    /* ── Spinner ── */
-    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
+    /* ── Loading ── */
+    .sk-col { display: flex; flex-direction: column; gap: var(--space-md); min-width: 0; }
 
 
     /* ── FAB ── */
@@ -599,9 +621,9 @@ export class LedgerHubComponent implements OnInit {
     return formatSignedCurrency(t.amount, this.settings.currency(), t.type === 'transfer' ? 'never' : 'exceptZero');
   }
 
-  /** "Checking → Savings": a transfer is listed once, with its direction. */
+  /** "Checking to Savings": a transfer is listed once, with its direction. */
   transferLabel(t: LedgerTransaction): string {
     const name = (id: string | null) => this.accounts().find(a => a.id === id)?.name;
-    return `${name(t.account_id) ?? 'Unknown account'} → ${name(t.transfer_to_account_id) ?? 'a deleted account'}`;
+    return `${name(t.account_id) ?? 'Unknown account'} to ${name(t.transfer_to_account_id) ?? 'a deleted account'}`;
   }
 }
