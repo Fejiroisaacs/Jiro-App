@@ -9,6 +9,7 @@ import {
   moodLabel as moodLabelFor,
 } from '../../../core/services/journal.service';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { SettingsService } from '../../../core/services/settings.service';
 import { addDays, dayKey, dayStartISO, mondayOfKey, shortDayLabel, todayKey } from '../../../core/utils/day';
 
@@ -31,16 +32,14 @@ export function weekRangeQuery(week: { from: string; to: string }, timeZone: str
 @Component({
   selector: 'journal-week-view',
   standalone: true,
-  imports: [JiroSkeletonComponent],
+  imports: [JiroSkeletonComponent, JiroIconComponent],
   template: `
     <div class="wv">
 
       <!-- Navigation header -->
       <div class="wv-nav">
         <button class="wv-nav-btn" (click)="prevWeek()" aria-label="Previous week">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="15,18 9,12 15,6"/>
-          </svg>
+          <jiro-icon name="caret-left" [size]="16" />
         </button>
 
         <div class="wv-center">
@@ -49,9 +48,7 @@ export function weekRangeQuery(week: { from: string; to: string }, timeZone: str
         </div>
 
         <button class="wv-nav-btn" (click)="nextWeek()" aria-label="Next week">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="9,18 15,12 9,6"/>
-          </svg>
+          <jiro-icon name="caret-right" [size]="16" />
         </button>
       </div>
 
@@ -82,10 +79,7 @@ export function weekRangeQuery(week: { from: string; to: string }, timeZone: str
             type="button"
             (click)="dayClick.emit(iso(day))"
             [attr.aria-label]="'Open ' + dayAbbr(day) + ' ' + dayNum(day)">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-              <line x1="12" y1="5" x2="12" y2="19"/>
-              <line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
+            <jiro-icon name="plus" [size]="11" />
           </button>
 
           <!-- Sticky notes -->
@@ -165,9 +159,8 @@ export function weekRangeQuery(week: { from: string; to: string }, timeZone: str
       border: none;
       cursor: pointer;
       padding: 0;
-      opacity: 0.8;
     }
-    .wv-today:hover { opacity: 1; text-decoration: underline; }
+    .wv-today:hover { text-decoration: underline; }
 
     /* ── Days grid ───────────────────────────────────────── */
     .wv-grid {
@@ -239,8 +232,8 @@ export function weekRangeQuery(week: { from: string; to: string }, timeZone: str
       word-break: break-word;
     }
     .wv-note:hover {
-      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
-      transform: translateY(-1px);
+      box-shadow: var(--shadow-sm);
+      transform: translate(-1px, -1px);
     }
     .wv-note-author {
       font-size: 0.6rem;
@@ -329,7 +322,7 @@ export class JournalWeekViewComponent implements OnChanges, AfterViewInit {
 
   weekLabel = computed(() => {
     const days = this.weekDays();
-    return `${shortDayLabel(days[0])} – ${shortDayLabel(days[6])}, ${days[6].slice(0, 4)}`;
+    return `${shortDayLabel(days[0])} to ${shortDayLabel(days[6])}, ${days[6].slice(0, 4)}`;
   });
 
   entriesByDay = computed(() => {
@@ -373,7 +366,8 @@ export class JournalWeekViewComponent implements OnChanges, AfterViewInit {
     const grid: HTMLElement | null = this.elRef.nativeElement.querySelector('.wv-grid');
     const todayCol: HTMLElement | null = this.elRef.nativeElement.querySelector('.wv-day--today');
     if (grid && todayCol) {
-      grid.scrollTo({ left: todayCol.offsetLeft - 16, behavior: 'smooth' });
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      grid.scrollTo({ left: todayCol.offsetLeft - 16, behavior: reduce ? 'auto' : 'smooth' });
     }
   }
 

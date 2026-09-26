@@ -6,11 +6,13 @@ import { JournalService, JournalCollection } from '../../../core/services/journa
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 
 @Component({
   selector: 'app-journal-collections-list',
   standalone: true,
-  imports: [FormsModule, RouterLink, JiroPageHeaderComponent, JiroButtonComponent, JiroModalComponent],
+  imports: [FormsModule, RouterLink, JiroPageHeaderComponent, JiroButtonComponent, JiroModalComponent, JiroIconComponent, JiroSkeletonComponent],
   template: `
     <div class="collections-page">
 
@@ -20,19 +22,30 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 
       <div class="section-row">
         <h2 class="section-title">Your collections</h2>
-        <jiro-button variant="secondary" type="button" (click)="showCreate.set(true)">+ New</jiro-button>
+        @if (!loading() && collections().length > 0) {
+          <jiro-button variant="secondary" type="button" (click)="showCreate.set(true)"><jiro-icon name="plus" [size]="14" /> New</jiro-button>
+        }
       </div>
 
       @if (loading()) {
-<div class="state-box">
-        <span class="spinner"></span>
+<div class="collections-grid" aria-hidden="true">
+        @for (i of [0, 1, 2]; track i) {
+          <div class="collection-card collection-card--skeleton">
+            <div class="collection-cover"></div>
+            <div class="collection-body">
+              <jiro-skeleton height="16px" width="60%" />
+              <jiro-skeleton height="12px" width="40%" />
+            </div>
+          </div>
+        }
       </div>
+      <span class="sr-only" role="status">Loading collections</span>
 }
 
       @if (!loading() && collections().length === 0) {
 <div class="state-box">
         <h3>No collections yet</h3>
-        <p class="text-secondary">Group related entries into collections — travel, family moments, and more.</p>
+        <p class="text-secondary">Group related entries into collections: travel, family moments, and more.</p>
         <jiro-button variant="primary" type="button" (click)="showCreate.set(true)">Create Collection</jiro-button>
       </div>
 }
@@ -89,7 +102,6 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
     .section-title { font-size: var(--font-size-lg); font-weight: 600; margin: 0; }
 
     .state-box { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--space-sm); padding: var(--space-xl) 0; }
-    .state-box .spinner { margin: 0 auto; }
 
     .collections-grid {
       display: grid;
@@ -101,7 +113,10 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
       border-radius: var(--border-radius); overflow: hidden;
       cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s;
     }
-    .collection-card:hover { border-color: var(--color-primary); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .collection-card:hover { border-color: var(--color-primary); box-shadow: var(--shadow-sm); }
+    .collection-card--skeleton { cursor: default; }
+    .collection-card--skeleton:hover { border-color: var(--border-color); box-shadow: none; }
+    .collection-card--skeleton .collection-body { display: flex; flex-direction: column; gap: var(--space-xs); }
     .collection-cover {
       height: 100px;
       background: color-mix(in srgb, var(--color-primary) 12%, transparent);

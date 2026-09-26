@@ -20,6 +20,7 @@ import { JournalDayModalComponent } from '../journal-day-modal/journal-day-modal
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { IconName } from '../../../shared/icons/icons.generated';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
@@ -27,7 +28,7 @@ import { ToastService } from '../../../core/services/toast.service';
 @Component({
   selector: 'app-journal-group',
   standalone: true,
-  imports: [FormsModule, RouterLink, JournalWeekViewComponent, JournalDayModalComponent, JiroButtonComponent, JiroModalComponent, JiroIconComponent],
+  imports: [FormsModule, RouterLink, JournalWeekViewComponent, JournalDayModalComponent, JiroButtonComponent, JiroModalComponent, JiroIconComponent, JiroSkeletonComponent],
   template: `
     <div class="group-page">
 
@@ -35,9 +36,7 @@ import { ToastService } from '../../../core/services/toast.service';
       <div class="page-header">
         <div class="header-left">
           <a routerLink="/journal/groups" class="back-link">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="15,18 9,12 15,6"/>
-            </svg>
+            <jiro-icon name="caret-left" [size]="16" />
             Groups
           </a>
           @if (group()) {
@@ -53,14 +52,11 @@ import { ToastService } from '../../../core/services/toast.service';
         @if (group()) {
 <div class="header-actions">
           <jiro-button variant="secondary" type="button" (click)="openMembers()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
+            <jiro-icon name="users" [size]="14" />
             Members
           </jiro-button>
           <jiro-button variant="primary" type="button" (click)="writeEntry()">
-            + Write
+            <jiro-icon name="plus" [size]="14" /> Write
           </jiro-button>
         </div>
 }
@@ -68,10 +64,17 @@ import { ToastService } from '../../../core/services/toast.service';
 
       <!-- Loading -->
       @if (loading()) {
-<div class="state-center">
-        <span class="spinner"></span>
-        <p>Loading group...</p>
+<div class="group-loading" aria-hidden="true">
+        <div class="group-header-info">
+          <div class="group-avatar-lg"></div>
+          <div class="sk-stack">
+            <jiro-skeleton height="24px" width="180px" />
+            <jiro-skeleton height="12px" width="80px" />
+          </div>
+        </div>
+        <jiro-skeleton height="120px" />
       </div>
+      <span class="sr-only" role="status">Loading group</span>
 }
 
       <!-- Not found -->
@@ -99,8 +102,16 @@ import { ToastService } from '../../../core/services/toast.service';
 
         <!-- Feed: entries for current week -->
         @if (loadingEntries()) {
-<div class="state-center">
-          <span class="spinner"></span>
+<div class="entries-feed" aria-hidden="true">
+          @for (i of [0, 1]; track i) {
+            <div class="entry-card sk-stack">
+              <div class="entry-author">
+                <div class="author-avatar"></div>
+                <jiro-skeleton height="14px" width="120px" />
+              </div>
+              <jiro-skeleton [lines]="3" height="14px" />
+            </div>
+          }
         </div>
 }
 
@@ -129,15 +140,10 @@ import { ToastService } from '../../../core/services/toast.service';
               @if (isOwnEntry(e)) {
 <div class="entry-actions">
                 <button class="icon-btn" (click)="router.navigate(['/journal', e.id, 'edit'])" aria-label="Edit">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                  </svg>
+                  <jiro-icon name="pencil-simple" [size]="13" />
                 </button>
                 <button class="icon-btn danger" type="button" (click)="deleteEntry(e)" aria-label="Delete this entry">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                  </svg>
+                  <jiro-icon name="trash" [size]="13" />
                 </button>
               </div>
 }
@@ -212,9 +218,7 @@ import { ToastService } from '../../../core/services/toast.service';
             (click)="removeMember(m)"
             [attr.aria-label]="removeLabel(m)"
             [disabled]="removingMemberId() === m.user_id">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
+            <jiro-icon name="x" [size]="13" />
           </button>
 }
         </div>
@@ -354,6 +358,8 @@ import { ToastService } from '../../../core/services/toast.service';
     .header-actions { display: flex; gap: var(--space-sm); flex-shrink: 0; }
 
     /* State */
+    .group-loading { display: flex; flex-direction: column; gap: var(--space-lg); }
+    .sk-stack { display: flex; flex-direction: column; gap: var(--space-sm); }
     .state-center { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--space-sm); padding: var(--space-xl) 0; }
 
     /* Feed */
@@ -447,10 +453,10 @@ import { ToastService } from '../../../core/services/toast.service';
 
     /* Lightbox */
     .lightbox {
-      position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); z-index: var(--z-overlay);
+      position: fixed; inset: 0; background: var(--scrim); z-index: var(--z-overlay);
       display: flex; align-items: center; justify-content: center; cursor: zoom-out;
     }
-    .lightbox img { max-width: 90vw; max-height: 90vh; object-fit: contain; border-radius: var(--border-radius); }
+    .lightbox img { max-width: 90vw; max-height: 90dvh; object-fit: contain; border-radius: var(--border-radius); }
 
     @media (max-width: 600px) {
       .page-header { flex-direction: column; }
