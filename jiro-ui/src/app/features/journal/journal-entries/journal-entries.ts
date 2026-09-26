@@ -243,7 +243,7 @@ interface MonthGroup { key: string; label: string; entries: JournalEntry[]; }
       color: inherit; text-decoration: none;
       transition: border-color 0.15s, box-shadow 0.15s;
     }
-    a.entry-row:hover { border-color: var(--color-primary); box-shadow: 0 2px 8px rgba(0,0,0,0.06); text-decoration: none; }
+    a.entry-row:hover { border-color: var(--color-primary); box-shadow: var(--shadow-sm); text-decoration: none; }
     a.entry-row:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
     .entry-row--skeleton { display: flex; flex-direction: column; gap: var(--space-sm); }
 

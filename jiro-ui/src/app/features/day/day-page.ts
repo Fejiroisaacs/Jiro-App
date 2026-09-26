@@ -487,15 +487,16 @@ export class DayPageComponent {
       : { path: ['/jym/session', s.id], query: null };
   }
 
+  /** "7:30 AM · 45 min, 12 sets, 3,400 kg": one middle dot after the time, commas after that. */
   sessionMeta(s: SessionSummary): string {
-    const parts = [this.time(s.started_at)];
+    const parts: string[] = [];
     if (s.ended_at) {
       const mins = Math.max(1, Math.round((new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()) / 60000));
       parts.push(mins < 60 ? `${mins} min` : `${Math.floor(mins / 60)} h ${mins % 60} min`);
     }
     parts.push(this.plural(s.set_count, 'set', 'sets'));
     if (s.total_volume > 0) parts.push(`${Math.round(this.settings.toDisplay(s.total_volume)).toLocaleString('en-US')} ${this.settings.unitLabel()}`);
-    return parts.join(' · ');
+    return `${this.time(s.started_at)} · ${parts.join(', ')}`;
   }
 
   weight(kg: number): string {

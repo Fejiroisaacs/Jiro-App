@@ -125,11 +125,7 @@ interface TransactionGroup {
       <!-- ── Mobile Filter Toggle ────────────────────────────────────────────── -->
       <div class="mobile-filter-header">
         <button class="mobile-filter-toggle" type="button" [attr.aria-expanded]="mobileFiltersOpen()" (click)="mobileFiltersOpen.set(!mobileFiltersOpen())">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <line x1="4" y1="6" x2="20" y2="6"/>
-            <line x1="8" y1="12" x2="16" y2="12"/>
-            <line x1="10" y1="18" x2="14" y2="18"/>
-          </svg>
+          <jiro-icon name="funnel-simple" [size]="14" />
           Filters
           @if (activeFilterCount() > 0) {
 <span class="filter-badge">{{ activeFilterCount() }}</span>
@@ -258,12 +254,7 @@ interface TransactionGroup {
                     <span class="tx-desc-text">{{ tx.description || 'Untitled' }}</span>
                     @if (tx.series_interval) {
                       <span class="recurring-badge">
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                          <path d="M17 1l4 4-4 4"/>
-                          <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-                          <path d="M7 23l-4-4 4-4"/>
-                          <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
-                        </svg>
+                        <jiro-icon name="repeat" [size]="10" />
                         {{ intervalLabel(tx.series_interval) }}
                       </span>
                     }
@@ -295,9 +286,7 @@ interface TransactionGroup {
                   {{ formatAmount(tx.amount, tx.type) }}
                 </span>
                 <span class="tx-date-small">{{ formatDateShort(tx.date) }}</span>
-                <svg class="tx-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                  <polyline points="9,18 15,12 9,6"/>
-                </svg>
+                <jiro-icon name="caret-right" [size]="14" class="tx-chevron" />
               </span>
             </button>
           }
@@ -777,8 +766,6 @@ interface TransactionGroup {
 
       .type-btn { padding: 6px 8px; font-size: var(--font-size-xs); min-height: 44px; }
     }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
   `],
 })
 export class TransactionLogComponent implements OnInit {
@@ -1154,11 +1141,11 @@ export class TransactionLogComponent implements OnInit {
     return this.accounts().find(a => a.id === accountId)?.name ?? '';
   }
 
-  /** "Checking → Savings": a transfer is listed once, from its source side. */
+  /** "Checking to Savings": a transfer is listed once, from its source side. */
   transferLabel(tx: LedgerTransaction): string {
     const from = this.getAccountName(tx.account_id) || 'Unknown account';
     const to = this.getAccountName(tx.transfer_to_account_id) || 'a deleted account';
-    return `${from} → ${to}`;
+    return `${from} to ${to}`;
   }
 
   formatDateSeparator(dateStr: string): string {

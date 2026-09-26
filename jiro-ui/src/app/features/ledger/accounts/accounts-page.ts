@@ -14,6 +14,7 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
 import { JiroMenuComponent, JiroMenuItem } from '../../../shared/components/jiro-menu/jiro-menu';
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { SettingsService } from '../../../core/services/settings.service';
@@ -33,6 +34,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
     JiroMenuComponent,
     JiroPageHeaderComponent,
     JiroEmptyStateComponent,
+    JiroSkeletonComponent,
   ],
   template: `
     <div class="accounts-page">
@@ -47,7 +49,18 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
 
       <!-- ── Loading ── -->
       @if (loading()) {
-        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+        <div class="accounts-grid" aria-hidden="true">
+          @for (i of [0, 1, 2]; track i) {
+            <jiro-card>
+              <div class="acct-card sk-stack">
+                <jiro-skeleton height="40px" width="40px" />
+                <jiro-skeleton height="16px" width="60%" />
+                <jiro-skeleton height="28px" width="45%" />
+              </div>
+            </jiro-card>
+          }
+        </div>
+        <span class="sr-only" role="status">Loading accounts</span>
       }
 
       <!-- ── Empty State ── -->
@@ -77,48 +90,27 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
 
                     <!-- Checking: bank -->
                     @case ('checking') {
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <line x1="3" y1="22" x2="21" y2="22"/>
-                      <rect x="2" y="8" width="20" height="14"/>
-                      <path d="M12 2L2 8h20L12 2z"/>
-                      <rect x="9" y="12" width="2" height="6"/>
-                      <rect x="13" y="12" width="2" height="6"/>
-                    </svg>
+<jiro-icon name="bank" [size]="20" />
 }
 
                     <!-- Savings: piggy bank -->
                     @case ('savings') {
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M19 11c0 4.4-3.6 8-8 8s-8-3.6-8-8 3.6-8 8-8c1 0 2 .2 2.9.5"/>
-                      <path d="M19 11h2l1 3-2 1"/>
-                      <circle cx="9" cy="11" r="1" fill="currentColor"/>
-                      <path d="M7 19v2M13 19v2"/>
-                    </svg>
+<jiro-icon name="piggy-bank" [size]="20" />
 }
 
                     <!-- Credit: credit card -->
                     @case ('credit') {
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <rect x="1" y="4" width="22" height="16" rx="2"/>
-                      <line x1="1" y1="10" x2="23" y2="10"/>
-                    </svg>
+<jiro-icon name="credit-card" [size]="20" />
 }
 
                     <!-- Investment: trending up -->
                     @case ('investment') {
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
-                      <polyline points="17 6 23 6 23 12"/>
-                    </svg>
+<jiro-icon name="trend-up" [size]="20" />
 }
 
                     <!-- Cash: banknotes -->
                     @default {
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <rect x="1" y="6" width="22" height="12" rx="2"/>
-                      <circle cx="12" cy="12" r="3"/>
-                      <path d="M5 12h.01M19 12h.01"/>
-                    </svg>
+<jiro-icon name="money" [size]="20" />
 }
                   }
 
@@ -169,9 +161,10 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
                 <span class="detail-title">Recent transactions</span>
               </div>
               @if (detailLoading()) {
-<div class="detail-loading">
-                <span class="spinner spinner--sm"></span>
+<div class="detail-loading" aria-hidden="true">
+                <jiro-skeleton [lines]="3" height="36px" />
               </div>
+              <span class="sr-only" role="status">Loading recent transactions</span>
 }
               @if (!detailLoading() && selectedAccountDetail()?.recent_transactions?.length === 0) {
 <div class="detail-empty">
@@ -375,7 +368,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
 
     /* ── Loading ── */
 
-    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
+    .sk-stack { display: flex; flex-direction: column; gap: var(--space-sm); }
 
     /* ── Accounts grid ── */
     .accounts-grid {
@@ -544,11 +537,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
       letter-spacing: 0.5px;
     }
 
-    .detail-loading {
-      display: flex;
-      justify-content: center;
-      padding: var(--space-lg);
-    }
+    .detail-loading { padding: var(--space-sm) 0; }
 
     .detail-empty {
       text-align: center;

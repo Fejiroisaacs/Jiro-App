@@ -12,6 +12,7 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { SettingsService } from '../../../core/services/settings.service';
@@ -25,7 +26,7 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
   standalone: true,
   imports: [
     CommonModule, FormsModule, JiroCardComponent, JiroButtonComponent, JiroModalComponent,
-    JiroIconComponent, JiroPageHeaderComponent, JiroEmptyStateComponent,
+    JiroIconComponent, JiroPageHeaderComponent, JiroEmptyStateComponent, JiroSkeletonComponent,
     LedgerCategoryDialogComponent, LedgerCategoryManagerComponent,
   ],
   template: `
@@ -41,7 +42,18 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
 
       <!-- Loading -->
       @if (loading()) {
-        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+        <div class="budgets-grid" aria-hidden="true">
+          @for (i of [0, 1, 2, 3]; track i) {
+            <jiro-card>
+              <div class="sk-stack">
+                <jiro-skeleton height="18px" width="50%" />
+                <jiro-skeleton height="10px" />
+                <jiro-skeleton height="12px" width="40%" />
+              </div>
+            </jiro-card>
+          }
+        </div>
+        <span class="sr-only" role="status">Loading budgets</span>
       }
 
       <!-- Summary bar -->
@@ -128,9 +140,7 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
 }
             @if (budget.remaining < 0) {
 <span class="remaining-over">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-              </svg>
+              <jiro-icon name="warning-circle" [size]="12" />
               Over budget by {{ money(-budget.remaining) }}
             </span>
 }
@@ -164,7 +174,7 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
           <div class="form-group">
             <div class="label-row">
               <label class="form-label" for="budget-add-category">Category</label>
-              <button type="button" class="new-cat-btn" (click)="showCatDialog.set(true)">+ New category</button>
+              <button type="button" class="new-cat-btn" (click)="showCatDialog.set(true)"><jiro-icon name="plus" [size]="14" /> New category</button>
             </div>
             <select id="budget-add-category" class="form-input" [(ngModel)]="newCategoryId" name="category" required>
               <option value="" disabled>Select a category...</option>
@@ -317,7 +327,7 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
     }
 
     /* ── State messages ── */
-    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
+    .sk-stack { display: flex; flex-direction: column; gap: var(--space-sm); }
 
 
     /* ── Empty state ── */
@@ -467,6 +477,7 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
     }
 
     .new-cat-btn {
+      display: inline-flex; align-items: center; gap: 4px;
       background: none;
       border: none;
       padding: 8px 0;

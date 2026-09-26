@@ -12,6 +12,7 @@ import {
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { IconName } from '../../../shared/icons/icons.generated';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
@@ -20,7 +21,7 @@ import { UploadService } from '../../../core/services/upload.service';
 @Component({
   selector: 'app-journal-collection',
   standalone: true,
-  imports: [FormsModule, RouterLink, JiroButtonComponent, JiroModalComponent, JiroIconComponent],
+  imports: [FormsModule, RouterLink, JiroButtonComponent, JiroModalComponent, JiroIconComponent, JiroSkeletonComponent],
   template: `
     <div class="collection-page">
 
@@ -28,9 +29,7 @@ import { UploadService } from '../../../core/services/upload.service';
       <div class="page-header">
         <div class="header-left">
           <a routerLink="/journal" class="back-link">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="15,18 9,12 15,6"/>
-            </svg>
+            <jiro-icon name="caret-left" [size]="16" />
             Journaly
           </a>
           @if (collection()) {
@@ -42,9 +41,7 @@ import { UploadService } from '../../../core/services/upload.service';
 }
               </div>
               <label class="cover-change">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>
-                </svg>
+                <jiro-icon name="camera" [size]="14" class="cover-change-icon" />
                 <input
                   type="file"
                   class="cover-file"
@@ -68,9 +65,7 @@ import { UploadService } from '../../../core/services/upload.service';
                 [disabled]="coverBusy()"
                 aria-label="Remove cover image"
                 (click)="removeCover()">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
-                </svg>
+                <jiro-icon name="trash" [size]="15" />
               </button>
             </div>
 }
@@ -87,10 +82,7 @@ import { UploadService } from '../../../core/services/upload.service';
         @if (collection()) {
 <div class="header-actions">
           <jiro-button variant="secondary" type="button" (click)="openEdit()">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-            </svg>
+            <jiro-icon name="pencil-simple" [size]="13" />
             Edit
           </jiro-button>
         </div>
@@ -99,9 +91,16 @@ import { UploadService } from '../../../core/services/upload.service';
 
       <!-- Loading -->
       @if (loading()) {
-<div class="state-center">
-        <span class="spinner"></span>
+<div class="entries-list" aria-hidden="true">
+        @for (i of [0, 1, 2]; track i) {
+          <div class="entry-card entry-card--skeleton">
+            <jiro-skeleton height="12px" width="96px" />
+            <jiro-skeleton height="18px" width="45%" />
+            <jiro-skeleton [lines]="2" height="13px" />
+          </div>
+        }
       </div>
+      <span class="sr-only" role="status">Loading collection</span>
 }
 
       <!-- Not found -->
@@ -147,9 +146,7 @@ import { UploadService } from '../../../core/services/upload.service';
                   (click)="confirmRemove(e)"
                   [disabled]="removingId() === e.id"
                   [attr.aria-label]="'Remove ' + (e.title || 'this entry') + ' from the collection'">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                  </svg>
+                  <jiro-icon name="x" [size]="14" />
                 </button>
               </div>
             </div>
@@ -165,10 +162,7 @@ import { UploadService } from '../../../core/services/upload.service';
               </div>
               @if (e.images?.length) {
 <span class="img-badge">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
-                  <polyline points="21,15 16,10 5,21"/>
-                </svg>
+                <jiro-icon name="image" [size]="12" />
                 {{ e.images?.length }}
               </span>
 }
@@ -239,7 +233,7 @@ import { UploadService } from '../../../core/services/upload.service';
       border-radius: var(--border-radius);
       cursor: pointer;
     }
-    .cover-change svg {
+    .cover-change-icon {
       display: block; padding: 3px; box-sizing: content-box;
       color: var(--text-secondary);
       background: var(--bg-canvas);
@@ -247,8 +241,8 @@ import { UploadService } from '../../../core/services/upload.service';
       border-radius: var(--border-radius-sm);
       transition: color 0.15s, border-color 0.15s;
     }
-    .coll-cover-wrap:hover .cover-change svg,
-    .cover-change:focus-within svg { color: var(--text-primary); border-color: var(--text-secondary); }
+    .coll-cover-wrap:hover .cover-change-icon,
+    .cover-change:focus-within .cover-change-icon { color: var(--text-primary); border-color: var(--text-secondary); }
     .cover-change:focus-within { outline: 2px solid var(--color-primary); outline-offset: 2px; }
     .cover-file {
       position: absolute; width: 1px; height: 1px;
@@ -294,7 +288,9 @@ import { UploadService } from '../../../core/services/upload.service';
       background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--border-radius);
       padding: var(--space-md) var(--space-lg); cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s;
     }
-    .entry-card:hover { border-color: var(--color-primary); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .entry-card:hover { border-color: var(--color-primary); box-shadow: var(--shadow-sm); }
+    .entry-card--skeleton { display: flex; flex-direction: column; gap: var(--space-sm); cursor: default; }
+    .entry-card--skeleton:hover { border-color: var(--border-color); box-shadow: none; }
     .entry-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-xs); }
     .entry-meta { display: flex; align-items: center; gap: var(--space-sm); }
     .entry-date { font-size: var(--font-size-xs); color: var(--text-secondary); }

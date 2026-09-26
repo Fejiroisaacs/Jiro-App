@@ -21,6 +21,7 @@ import { addDays, dayKey, todayKey } from '../../../core/utils/day';
 import { MoodTrendComponent } from '../mood-trend/mood-trend';
 import { JournalDayModalComponent } from '../journal-day-modal/journal-day-modal';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 
 @Component({
   selector: 'app-journal-home',
@@ -28,7 +29,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
   imports: [
     FormsModule, JiroPageHeaderComponent, JournalWeekViewComponent,
     JournalDayModalComponent, JiroButtonComponent, JiroEmptyStateComponent,
-    MoodTrendComponent,
+    MoodTrendComponent, JiroIconComponent,
   ],
   template: `
     <div class="journal-home">
@@ -134,10 +135,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
             </div>
             <div class="entry-card-actions" (click)="$event.stopPropagation()">
               <button class="icon-btn danger" type="button" (click)="deleteEntry(e)" [attr.aria-label]="'Delete the entry from ' + formatDate(e.created_at)">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                  <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
-                </svg>
+                <jiro-icon name="trash" [size]="14" />
               </button>
             </div>
           </div>
@@ -153,10 +151,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
             </div>
             @if (e.images?.length) {
 <span class="img-badge">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
-                <polyline points="21,15 16,10 5,21"/>
-              </svg>
+              <jiro-icon name="image" [size]="12" />
               {{ e.images?.length }}
             </span>
 }
@@ -237,7 +232,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
       border-radius: var(--border-radius); padding: var(--space-md) var(--space-lg);
       cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s;
     }
-    .entry-card:hover { border-color: var(--color-primary); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .entry-card:hover { border-color: var(--color-primary); box-shadow: var(--shadow-sm); }
     .entry-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-xs); }
     .entry-meta { display: flex; align-items: center; gap: var(--space-sm); }
     .entry-date { font-size: var(--font-size-xs); color: var(--text-secondary); }

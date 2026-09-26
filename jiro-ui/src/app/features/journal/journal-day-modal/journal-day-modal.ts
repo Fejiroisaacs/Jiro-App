@@ -9,13 +9,15 @@ import { RouterLink } from '@angular/router';
 import { JournalEntry, JournalService, MOODS } from '../../../core/services/journal.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { isJiroModalOpen } from '../../../shared/components/jiro-modal/jiro-modal';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { SettingsService } from '../../../core/services/settings.service';
 import { todayKey } from '../../../core/utils/day';
 
 @Component({
   selector: 'journal-day-modal',
   standalone: true,
-  imports: [A11yModule, RouterLink, JiroButtonComponent],
+  imports: [A11yModule, RouterLink, JiroButtonComponent, JiroIconComponent, JiroSkeletonComponent],
   template: `
     <!-- Backdrop -->
     <div class="backdrop" (click)="close.emit()" aria-hidden="true"></div>
@@ -38,17 +40,13 @@ import { todayKey } from '../../../core/utils/day';
       <div class="modal-header">
         @if (expanded() || expandLoading()) {
 <button class="hdr-btn" (click)="backToList()" aria-label="Back to list">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="15,18 9,12 15,6"/>
-          </svg>
+          <jiro-icon name="caret-left" [size]="15" />
           Back
         </button>
 }
         <h2 id="dm-date" class="modal-date">{{ formattedDate }}</h2>
         <button class="hdr-btn hdr-close" (click)="close.emit()" aria-label="Close">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
+          <jiro-icon name="x" [size]="15" />
         </button>
       </div>
 
@@ -114,10 +112,7 @@ import { todayKey } from '../../../core/utils/day';
             @if (canEdit(e)) {
 <div class="card-delete-row" (click)="$event.stopPropagation()">
               <button class="card-delete-btn" (click)="deleteEntry.emit(e.id)" aria-label="Delete entry">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                  <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
-                </svg>
+                <jiro-icon name="trash" [size]="12" />
                 Delete
               </button>
             </div>
@@ -135,9 +130,12 @@ import { todayKey } from '../../../core/utils/day';
 
         <!-- Expand loading -->
         @if (expandLoading()) {
-<div class="expand-loading">
-          <div class="spinner"></div>
+<div class="expand-loading" aria-hidden="true">
+          <jiro-skeleton height="12px" width="96px" />
+          <jiro-skeleton height="22px" width="55%" />
+          <jiro-skeleton [lines]="4" height="14px" />
         </div>
+        <span class="sr-only" role="status">Loading entry</span>
 }
 
         <!-- Expanded entry -->
@@ -213,7 +211,7 @@ import { todayKey } from '../../../core/utils/day';
     .backdrop {
       position: absolute;
       inset: 0;
-      background: rgba(0, 0, 0, 0.45);
+      background: var(--scrim);
       backdrop-filter: blur(4px);
       -webkit-backdrop-filter: blur(4px);
       animation: fade-in 200ms ease-out forwards;
@@ -226,7 +224,7 @@ import { todayKey } from '../../../core/utils/day';
       background: var(--bg-surface);
       border-radius: var(--border-radius-lg);
       width: min(600px, calc(100vw - 32px));
-      max-height: 80vh;
+      max-height: 80dvh;
       display: flex;
       flex-direction: column;
       box-shadow: 0 10px 40px rgba(var(--shadow-rgb), 0.22);
@@ -396,19 +394,10 @@ import { todayKey } from '../../../core/utils/day';
     /* ── Expand loading ─────────────────────────────────── */
     .expand-loading {
       display: flex;
-      justify-content: center;
-      align-items: center;
-      padding: var(--space-xl) 0;
+      flex-direction: column;
+      gap: var(--space-sm);
+      padding: var(--space-sm) 0 var(--space-lg);
     }
-    .spinner {
-      width: 28px;
-      height: 28px;
-      border: 3px solid var(--border-color);
-      border-top-color: var(--color-primary);
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ── Expanded view ──────────────────────────────────── */
     .expanded-view { animation: expand-in 180ms ease-out forwards; }
@@ -470,7 +459,7 @@ import { todayKey } from '../../../core/utils/day';
     .lightbox {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.9);
+      background: var(--scrim);
       z-index: var(--z-overlay);
       display: flex;
       align-items: center;
@@ -479,7 +468,7 @@ import { todayKey } from '../../../core/utils/day';
     }
     .lightbox img {
       max-width: 90vw;
-      max-height: 90vh;
+      max-height: 90dvh;
       object-fit: contain;
       border-radius: var(--border-radius);
     }
@@ -504,7 +493,7 @@ import { todayKey } from '../../../core/utils/day';
       .modal {
         width: 100%;
         border-radius: var(--border-radius-lg) var(--border-radius-lg) 0 0;
-        max-height: 88vh;
+        max-height: 88dvh;
         animation: sheet-in 280ms cubic-bezier(0.32, 0.72, 0, 1) forwards;
       }
       .handle {
