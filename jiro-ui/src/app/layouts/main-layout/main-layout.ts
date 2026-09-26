@@ -335,7 +335,7 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
       font-size: var(--font-size-xs);
       text-transform: uppercase;
       letter-spacing: 1px;
-      opacity: 0.5;
+      opacity: 0.7; /* 5:1 on the Earth sidebar */
     }
 
     .sidebar-footer {

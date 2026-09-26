@@ -1,3 +1,14 @@
+import { Chart } from 'chart.js';
+
+// Canvas ignores the CSS reduced-motion rule, so chart pages switch animation off here.
+if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+  const query = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const initial = Chart.defaults.animation;
+  const apply = () => { Chart.defaults.animation = query.matches ? false : initial; };
+  apply();
+  query.addEventListener('change', apply);
+}
+
 /**
  * Chart.js cannot read CSS custom properties, so charts ask for the current
  * theme's colours here and get plain strings back. Call this inside the draw
@@ -32,7 +43,7 @@ export function chartTones(): ChartTones {
   const primaryRgb = read(css, '--color-primary-rgb', '110, 49, 40');
   return {
     primary: read(css, '--color-primary', '#6E3128'),
-    warning: read(css, '--color-warning', '#956B3D'),
+    warning: read(css, '--color-warning', '#8A6237'),
     accent: read(css, '--color-accent', '#4A6741'),
     secondary: read(css, '--color-secondary', '#D4C5A9'),
     muted: read(css, '--text-muted', '#756861'),
