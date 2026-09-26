@@ -14,6 +14,8 @@ func CORS(allowedOrigins []string) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
+		// Allow-Origin depends on the request's Origin, so caches must key on it.
+		c.Writer.Header().Add("Vary", "Origin")
 
 		if originSet[origin] {
 			c.Header("Access-Control-Allow-Origin", origin)

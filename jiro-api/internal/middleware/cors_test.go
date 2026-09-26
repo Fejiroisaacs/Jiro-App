@@ -27,3 +27,27 @@ func TestCORSExposesTotalCount(t *testing.T) {
 		}
 	}
 }
+
+func TestCORSVariesOnOrigin(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(CORS([]string{"http://allowed.test"}))
+	r.GET("/x", func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	for _, tc := range []struct{ method, origin string }{
+		{http.MethodGet, "http://allowed.test"},
+		{http.MethodGet, "http://other.test"},
+		{http.MethodGet, ""},
+		{http.MethodOptions, "http://allowed.test"},
+	} {
+		req := httptest.NewRequest(tc.method, "/x", nil)
+		if tc.origin != "" {
+			req.Header.Set("Origin", tc.origin)
+		}
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if got := w.Header().Values("Vary"); len(got) != 1 || got[0] != "Origin" {
+			t.Errorf("%s origin %q: Vary = %q, want [Origin]", tc.method, tc.origin, got)
+		}
+	}
+}
