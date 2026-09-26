@@ -407,7 +407,7 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
     }
 
     @media (min-width: 601px) {
-      .l-hero { padding: 100px 0 80px; }
+      .l-hero { padding: 96px 0 80px; }
     }
 
     /* Desktop split. The grid drops its right padding and its max-width, and
@@ -642,7 +642,7 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
       .l-privacy-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     @media (min-width: 1024px) {
-      .l-privacy-list { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+      .l-privacy-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     }
 
     /* ── Final CTA ─────────────────────────────────────────────────────────── */
