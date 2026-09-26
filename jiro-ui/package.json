@@ -49,7 +49,7 @@
     "@angular/compiler-cli": "^21.2.23",
     "@phosphor-icons/core": "^2.1.1",
     "@types/express": "^5.0.1",
-    "@types/node": "^20.17.19",
+    "@types/node": "^26.6.2",
     "typescript": "~5.9.2"
   }
 }
