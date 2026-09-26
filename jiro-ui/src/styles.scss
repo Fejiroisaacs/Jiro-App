@@ -448,6 +448,27 @@ select:focus-visible {
 }
 
 // ========================================
+// Pressed state. The `translate` property composes with a hover `transform`
+// lift instead of replacing it. Text links and fields are left out, and
+// jiro-button has its own press.
+// ========================================
+
+@media (prefers-reduced-motion: no-preference) {
+  :is(
+    button,
+    [role="button"],
+    [role="tab"],
+    [role="menuitem"],
+    [role="option"],
+    summary,
+    .jiro-card.clickable,
+    a[href]:is([class*="btn"], [class*="cta"], [class*="chip"], [class*="card"], [class*="tile"], .nav-item, .mobile-nav-item)
+  ):not(:disabled, [aria-disabled="true"], .jiro-btn, input, textarea, select):active {
+    translate: 0 1px;
+  }
+}
+
+// ========================================
 // Motion: honour the OS setting. Durations stay non-zero so end events fire.
 // ========================================
 
