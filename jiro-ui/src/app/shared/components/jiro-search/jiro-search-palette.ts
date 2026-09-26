@@ -186,7 +186,7 @@ interface TextPart { text: string; match: boolean; }
       position: fixed;
       inset: 0;
       z-index: var(--z-modal);
-      background: rgba(0, 0, 0, 0.5);
+      background: var(--scrim);
       display: flex;
       justify-content: center;
       align-items: flex-start;
@@ -599,7 +599,7 @@ export class JiroSearchPaletteComponent implements AfterViewInit, OnDestroy {
     if (o.group === 'sessions' && item.subtitle && item.subtitle !== 'normal') parts.push(capitalise(item.subtitle));
     if (o.group === 'journal' && item.group_id) parts.push('Group post');
     if (item.date) parts.push(formatDate(item.date));
-    return parts.join(' · ');
+    return parts.join(', ');
   }
 
   /** Splits text around case-insensitive matches of the query that produced the results. */
