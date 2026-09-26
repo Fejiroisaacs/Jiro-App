@@ -31,10 +31,12 @@ interface WakeLockSentinelLike {
  * bottom bar so this page's footer owns the bottom of the viewport. Exiting is
  * always the visible button; Escape is a desktop convenience on top of it.
  */
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
+
 @Component({
   selector: 'app-cook-mode',
   standalone: true,
-  imports: [JiroIconComponent, JiroEmptyStateComponent],
+  imports: [JiroSkeletonComponent, JiroIconComponent, JiroEmptyStateComponent],
   template: `
     <div class="cook">
       <header class="cook-header">
@@ -46,7 +48,12 @@ interface WakeLockSentinelLike {
       </header>
 
       @if (loading()) {
-        <div class="cook-loading" aria-busy="true"><span class="spinner"></span></div>
+        <div class="cook-body cook-loading" role="status" aria-label="Loading recipe">
+          <jiro-skeleton width="30%" height="12px" />
+          <jiro-skeleton [lines]="4" height="22px" />
+          <jiro-skeleton width="30%" height="12px" />
+          <jiro-skeleton [lines]="3" height="64px" />
+        </div>
       } @else if (!recipe()) {
         <div class="cook-body">
           <jiro-empty-state
@@ -201,7 +208,7 @@ interface WakeLockSentinelLike {
     }
     .cook-exit:hover { border-color: var(--color-primary); color: var(--color-primary); }
 
-    .cook-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
+    .cook-loading { display: flex; flex-direction: column; gap: var(--space-md); }
 
     .cook-body {
       flex: 1;

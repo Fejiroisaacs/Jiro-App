@@ -6,11 +6,12 @@ import { SettingsService } from '../../../core/services/settings.service';
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 
 @Component({
   selector: 'app-pr-wall',
   standalone: true,
-  imports: [CommonModule, JiroPageHeaderComponent, JiroEmptyStateComponent, JymPrBadgeComponent],
+  imports: [JiroSkeletonComponent, CommonModule, JiroPageHeaderComponent, JiroEmptyStateComponent, JymPrBadgeComponent],
   template: `
     <div class="pr-wall">
       @if (!embedded()) {
@@ -19,7 +20,7 @@ import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
 
       <!-- Loading -->
       @if (loading()) {
-        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+        <div class="state-loading" role="status" aria-label="Loading records"><jiro-skeleton [lines]="6" height="48px" /></div>
       }
 
       <!-- Empty state -->
@@ -173,7 +174,7 @@ import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
     .unit { font-size: var(--font-size-xs); color: var(--text-muted); font-weight: 400; }
 
     /* States */
-    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
+    .state-loading { display: flex; flex-direction: column; }
 
     /* Mobile */
     @media (max-width: 600px) {

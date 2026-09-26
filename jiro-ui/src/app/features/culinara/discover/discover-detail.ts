@@ -2,25 +2,30 @@ import { Component, OnInit, signal } from '@angular/core';
 
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { RecipeService, Recipe } from '../../../core/services/recipe.service';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 
 @Component({
   selector: 'app-culinara-discover-detail',
   standalone: true,
-  imports: [RouterLink],
+  imports: [JiroSkeletonComponent, JiroIconComponent, RouterLink],
   template: `
     <div class="discover-detail">
       <!-- Loading -->
       @if (loading()) {
-<div class="state-message">
-        <span class="spinner"></span>
-        <p>Loading recipe...</p>
+<div class="sk-detail" role="status" aria-label="Loading recipe">
+        <jiro-skeleton width="120px" height="14px" />
+        <jiro-skeleton width="60%" height="32px" />
+        <jiro-skeleton [lines]="2" />
+        <jiro-skeleton width="30%" height="20px" />
+        <jiro-skeleton [lines]="6" height="18px" />
       </div>
 }
 
       <!-- Error -->
       @if (!loading() && !recipe()) {
 <div class="state-message">
-        <h3>Recipe not found</h3>
+        <h1 class="not-found-title">Recipe not found</h1>
         <p class="text-secondary">This recipe may be private or no longer exists.</p>
         <a routerLink="/culinara/discover" class="back-link">Back to Discover</a>
       </div>
@@ -38,16 +43,10 @@ import { RecipeService, Recipe } from '../../../core/services/recipe.service';
             [disabled]="importing()"
             (click)="importRecipe(r.id)">
             @if (!imported()) {
-<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="7,10 12,15 17,10"/>
-              <line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
+<jiro-icon name="download-simple" [size]="14" />
 }
             @if (imported()) {
-<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="20,6 9,17 4,12"/>
-            </svg>
+<jiro-icon name="check" [size]="14" />
 }
             {{ importing() ? 'Saving...' : imported() ? 'Saved!' : 'Save to My Library' }}
           </button>
@@ -56,9 +55,9 @@ import { RecipeService, Recipe } from '../../../core/services/recipe.service';
         <!-- Import success banner -->
         @if (imported()) {
 <div class="import-banner">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg>
+          <jiro-icon name="check" [size]="14" />
           Recipe saved to your library.
-          <button class="banner-link" (click)="router.navigate(['/culinara', importedId()])">Open it →</button>
+          <button class="banner-link" (click)="router.navigate(['/culinara', importedId()])">Open it <jiro-icon name="arrow-right" [size]="14" /></button>
         </div>
 }
 
@@ -86,13 +85,13 @@ import { RecipeService, Recipe } from '../../../core/services/recipe.service';
 <div class="dietary-row">
           @if (r.dietary_flags.vegan) {
 <span class="dietary-pill">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.9C15.5 4.9 17 3.5 19 1c1 2 2 4.5 2 8 0 5.5-4.5 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>
+            <jiro-icon name="leaf" [size]="12" />
             Vegan
           </span>
 }
           @if (r.dietary_flags.vegetarian) {
 <span class="dietary-pill">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 20h10"/><path d="M10 20c5.5-2.5 8-6.5 8-12"/><path d="M6 20c-2-5-2.5-10 0-15 3 2 6 3 10 3"/></svg>
+            <jiro-icon name="plant" [size]="12" />
             Vegetarian
           </span>
 }
@@ -134,7 +133,7 @@ import { RecipeService, Recipe } from '../../../core/services/recipe.service';
         <!-- Ingredients -->
         @if (r.base_ingredients && r.base_ingredients.length) {
 <div class="section">
-          <h3 class="section-title">Ingredients</h3>
+          <h2 class="section-title">Ingredients</h2>
           <div class="ingredient-table">
             @for (ing of r.base_ingredients; track ing) {
 <div class="ingredient-row">
@@ -149,7 +148,7 @@ import { RecipeService, Recipe } from '../../../core/services/recipe.service';
         <!-- Instructions -->
         @if (r.instructions) {
 <div class="section">
-          <h3 class="section-title">Instructions</h3>
+          <h2 class="section-title">Instructions</h2>
           <div class="instructions-body">{{ r.instructions }}</div>
         </div>
 }
@@ -198,6 +197,7 @@ import { RecipeService, Recipe } from '../../../core/services/recipe.service';
       background: none; border: none; cursor: pointer; font-family: inherit;
       font-size: var(--font-size-sm); color: var(--color-primary); font-weight: 600;
       padding: 0; margin-left: auto;
+      display: inline-flex; align-items: center; gap: 4px;
     }
     .banner-link:hover { text-decoration: underline; }
 
@@ -216,7 +216,7 @@ import { RecipeService, Recipe } from '../../../core/services/recipe.service';
     .tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: var(--space-sm); }
     .recipe-tag {
       font-size: var(--font-size-xs); padding: 3px 10px;
-      background: rgba(122, 59, 46, 0.08); color: var(--color-primary);
+      background: rgba(var(--color-primary-rgb), 0.08); color: var(--color-primary);
       border-radius: 10px; font-weight: 500;
     }
 
@@ -243,6 +243,8 @@ import { RecipeService, Recipe } from '../../../core/services/recipe.service';
     }
 
     .section { margin-bottom: var(--space-xl); }
+    .not-found-title { font-size: var(--font-size-xl); }
+
     .section-title {
       font-size: var(--font-size-md); font-weight: 600;
       color: var(--text-primary); margin-bottom: var(--space-md);
@@ -264,7 +266,7 @@ import { RecipeService, Recipe } from '../../../core/services/recipe.service';
       line-height: 1.8; white-space: pre-wrap;
     }
 
-    @keyframes spin { to { transform: rotate(360deg); } }
+    .sk-detail { display: flex; flex-direction: column; gap: var(--space-md); }
   `]
 })
 export class CulinaraDiscoverDetailComponent implements OnInit {

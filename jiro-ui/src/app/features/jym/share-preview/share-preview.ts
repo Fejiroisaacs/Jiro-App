@@ -1,42 +1,47 @@
 import { Component, OnInit, signal } from '@angular/core';
 
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { JymService, SharePreview } from '../../../core/services/jym.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
+import { JiroLogoComponent } from '../../../shared/components/jiro-logo/jiro-logo';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 
 @Component({
   selector: 'app-share-preview',
   standalone: true,
-  imports: [JiroButtonComponent],
+  imports: [JiroButtonComponent, RouterLink, JiroLogoComponent, JiroIconComponent, JiroSkeletonComponent],
   template: `
     <main class="share-page">
       <div class="share-container">
 
         <div class="brand">
-          <span class="brand-logo">Jiro</span>
-          <span class="brand-dot">·</span>
-          <span class="brand-sub">Split Share</span>
+          <a routerLink="/" class="brand-logo" aria-label="Jiro home"><jiro-logo [size]="28" /></a>
+          <span class="brand-sub">Split share</span>
         </div>
 
         <!-- Loading -->
         @if (loading()) {
-          <div class="state-message" aria-busy="true">
-            <span class="spinner"></span>
+          <div class="preview-card" role="status" aria-label="Loading shared split">
+            <div class="preview-header">
+              <jiro-skeleton width="25%" height="12px" />
+              <jiro-skeleton width="60%" height="30px" class="sk-gap" />
+              <jiro-skeleton width="30%" height="14px" class="sk-gap" />
+            </div>
+            @for (i of [1, 2, 3]; track i) {
+              <div class="routine-row"><jiro-skeleton [lines]="3" /></div>
+            }
           </div>
         }
 
         <!-- Error -->
         @if (!loading() && error()) {
 <div class="state-message">
-          <div class="error-icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-            </svg>
-          </div>
+          <jiro-icon name="warning-circle" [size]="32" class="error-icon" />
           <h1 class="preview-title">{{ errorTitle() }}</h1>
           <p class="text-secondary">{{ error() }}</p>
+          <a [routerLink]="isLoggedIn() ? '/jym' : '/'" class="link-btn">{{ isLoggedIn() ? 'Go to Jym' : 'Go to Jiro' }}</a>
         </div>
 }
 
@@ -89,7 +94,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
 }
             @if (isLoggedIn() && !imported()) {
 <div class="import-info">
-              <p class="text-secondary">This split will be copied into your account — exercises will be matched by name or created for you.</p>
+              <p class="text-secondary">This split will be copied into your account. Exercises will be matched by name or created for you.</p>
               <jiro-button variant="primary" type="button" [disabled]="importing()" (click)="importSplit()">
                 {{ importing() ? 'Importing...' : 'Import to My Account' }}
               </jiro-button>
@@ -97,10 +102,8 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
 }
             @if (imported()) {
 <div class="import-success">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-positive)" stroke-width="2">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
-              <p>Split imported! <button class="link-btn" (click)="goToSplit()">Open it →</button></p>
+              <jiro-icon name="check" [size]="20" />
+              <p>Split imported! <button class="link-btn icon-link" (click)="goToSplit()">Open it <jiro-icon name="arrow-right" [size]="14" /></button></p>
             </div>
 }
           </div>
@@ -114,7 +117,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
     :host { display: block; }
 
     .share-page {
-      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      min-height: 100dvh; display: flex; align-items: center; justify-content: center;
       background: var(--bg-canvas); padding: var(--space-lg);
     }
 
@@ -125,8 +128,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
       margin-bottom: var(--space-xl);
     }
 
-    .brand-logo { font-size: var(--font-size-lg); font-weight: 700; color: var(--color-primary); }
-    .brand-dot { color: var(--text-muted); }
+    .brand-logo { display: inline-flex; color: var(--text-primary); text-decoration: none; margin-right: var(--space-sm); }
     .brand-sub { font-size: var(--font-size-sm); color: var(--text-muted); }
 
     .state-message {
@@ -136,11 +138,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
       border-radius: var(--border-radius);
     }
 
-    .spinner {
-      width: 32px; height: 32px; border: 2px solid var(--border-color);
-      border-top-color: var(--color-primary); border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
+    .sk-gap { margin-top: var(--space-sm); }
 
     .error-icon { color: var(--color-danger); }
 
@@ -221,7 +219,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
       cursor: pointer; font-size: inherit; padding: 0; text-decoration: underline;
     }
 
-    @keyframes spin { to { transform: rotate(360deg); } }
+    .icon-link { display: inline-flex; align-items: center; gap: 4px; }
   `]
 })
 export class SharePreviewComponent implements OnInit {

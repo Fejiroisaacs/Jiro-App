@@ -28,7 +28,7 @@ import { Component, input } from '@angular/core';
       border: 1px solid rgba(var(--color-warning-rgb), 0.45);
       border-radius: var(--border-radius-pill);
       background: rgba(var(--color-warning-rgb), 0.14);
-      color: var(--color-warning);
+      color: color-mix(in srgb, var(--color-warning) 70%, var(--text-primary));
       font-size: 0.65rem;
       font-weight: 700;
       letter-spacing: 0.6px;

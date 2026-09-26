@@ -10,6 +10,7 @@ import { addDays, dayKey, mondayOfKey, relativeDayName, todayKey } from '../../.
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { suggestDeload } from '../deload-rule';
@@ -23,7 +24,7 @@ const DELOAD_SNOOZE_DAYS = 7;
   standalone: true,
   imports: [
     RouterLink, DecimalPipe, JiroButtonComponent, JiroModalComponent, JiroIconComponent,
-    JiroPageHeaderComponent, JiroEmptyStateComponent,
+    JiroPageHeaderComponent, JiroEmptyStateComponent, JiroSkeletonComponent,
   ],
   template: `
     <div class="jym-dash">
@@ -182,9 +183,7 @@ const DELOAD_SNOOZE_DAYS = 7;
             <div class="asc-actions">
               <button class="asc-view-btn" (click)="router.navigate(['/jym/series', sr.id])">View</button>
               <jiro-button variant="primary" type="button" (click)="startFromSeriesSplit(sr.split_id, sr.id)">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                  <polygon points="5,3 19,12 5,21"/>
-                </svg>
+                <jiro-icon name="play:fill" [size]="11" />
                 Start
               </jiro-button>
             </div>
@@ -199,11 +198,13 @@ const DELOAD_SNOOZE_DAYS = 7;
         <div class="splits-summary-header">
           <h2 class="section-title">Your splits</h2>
           <a routerLink="/jym/plan" class="manage-link">
-            Manage splits →
+            Manage splits <jiro-icon name="arrow-right" [size]="14" />
           </a>
         </div>
         @if (loading()) {
-          <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+<div class="chip-skeletons" role="status" aria-label="Loading">
+            @for (i of [1, 2, 3]; track i) { <jiro-skeleton height="50px" /> }
+          </div>
         }
         @if (!loading() && splits().length === 0) {
           <jiro-empty-state compact heading="No splits yet" message="A split organises your training week.">
@@ -220,9 +221,7 @@ const DELOAD_SNOOZE_DAYS = 7;
             </div>
             <button class="split-start-btn" type="button" title="Start workout from this split"
               [attr.aria-label]="'Start a workout from ' + split.name" (click)="startFromSplit(split.id)">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true">
-                <polygon points="5,3 19,12 5,21"/>
-              </svg>
+              <jiro-icon name="play:fill" [size]="12" />
             </button>
           </div>
 }
@@ -239,10 +238,12 @@ const DELOAD_SNOOZE_DAYS = 7;
       <div class="splits-summary">
         <div class="splits-summary-header">
           <h2 class="section-title">Templates</h2>
-          <a routerLink="/jym/templates" class="manage-link">Manage →</a>
+          <a routerLink="/jym/templates" class="manage-link">Manage <jiro-icon name="arrow-right" [size]="14" /></a>
         </div>
         @if (loading()) {
-          <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+<div class="chip-skeletons" role="status" aria-label="Loading">
+            @for (i of [1, 2, 3]; track i) { <jiro-skeleton height="50px" /> }
+          </div>
         }
         @if (!loading() && templates().length === 0) {
           <jiro-empty-state
@@ -271,7 +272,9 @@ const DELOAD_SNOOZE_DAYS = 7;
       @if (showRoutinePicker()) {
 <jiro-modal title="Choose Routine" maxWidth="420px" (close)="showRoutinePicker.set(false)">
         @if (loadingRoutines()) {
-          <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+<div class="list-skeletons" role="status" aria-label="Loading routines">
+            @for (i of [1, 2, 3]; track i) { <jiro-skeleton height="48px" /> }
+          </div>
         }
         @if (!loadingRoutines()) {
 <div class="routine-list">
@@ -395,7 +398,7 @@ const DELOAD_SNOOZE_DAYS = 7;
 
     .asc-pill {
       font-size: var(--font-size-xs); padding: 2px 8px; border-radius: 10px;
-      background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary); font-weight: 500;
+      background: rgba(var(--color-primary-rgb), 0.1); color: color-mix(in srgb, var(--color-primary) 75%, var(--text-primary)); font-weight: 500;
     }
 
     .asc-actions { display: flex; align-items: center; gap: var(--space-sm); flex-shrink: 0; }
@@ -421,6 +424,7 @@ const DELOAD_SNOOZE_DAYS = 7;
     .splits-summary-header .section-title { margin-bottom: 0; }
 
     .manage-link {
+      display: inline-flex; align-items: center; gap: 4px;
       font-size: var(--font-size-sm); color: var(--color-primary);
       text-decoration: none; font-weight: 500; transition: opacity 0.15s;
     }
@@ -456,7 +460,7 @@ const DELOAD_SNOOZE_DAYS = 7;
     }
 
     .split-start-btn:hover {
-      background: var(--color-primary); color: white;
+      background: var(--color-primary); color: var(--text-on-primary);
       border-color: var(--color-primary);
     }
 
@@ -466,7 +470,9 @@ const DELOAD_SNOOZE_DAYS = 7;
     }
 
     /* ── State ── */
-    .state-loading { display: flex; justify-content: center; padding: var(--space-xl); }
+    .chip-skeletons { display: flex; gap: var(--space-sm); flex-wrap: wrap; }
+    .chip-skeletons jiro-skeleton { width: 160px; }
+    .list-skeletons { display: flex; flex-direction: column; gap: var(--space-sm); }
 
 
     /* ── Activity Stats ── */

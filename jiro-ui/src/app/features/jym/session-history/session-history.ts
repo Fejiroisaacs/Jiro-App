@@ -15,11 +15,12 @@ import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-he
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
 import { dayKey, todayKey } from '../../../core/utils/day';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 
 @Component({
   selector: 'app-session-history',
   standalone: true,
-  imports: [
+  imports: [JiroSkeletonComponent, 
     CommonModule, FormsModule, RouterLink, JiroButtonComponent, JiroIconComponent,
     JiroPageHeaderComponent, JiroEmptyStateComponent, JymPrBadgeComponent,
   ],
@@ -65,7 +66,7 @@ import { dayKey, todayKey } from '../../../core/utils/day';
 
       <!-- Loading -->
       @if (loading()) {
-        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+        <div class="sessions-list" role="status" aria-label="Loading sessions">@for (i of [1, 2, 3, 4]; track i) { <jiro-skeleton height="88px" /> }</div>
       }
 
       <!-- Empty -->
@@ -125,8 +126,9 @@ import { dayKey, todayKey } from '../../../core/utils/day';
           @if (selectedId() === s.id) {
 <div class="session-detail">
             @if (detailLoading()) {
-<div class="detail-loading">
-              <div class="spinner-sm"></div>
+<div class="detail-loading" role="status" aria-label="Loading session">
+              <jiro-skeleton width="30%" height="16px" />
+              <jiro-skeleton [lines]="3" height="28px" />
             </div>
 }
 
@@ -290,7 +292,7 @@ import { dayKey, todayKey } from '../../../core/utils/day';
       z-index: 0;
     }
 
-    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
+
 
     .sessions-list { display: flex; flex-direction: column; gap: var(--space-md); }
 
@@ -314,7 +316,7 @@ import { dayKey, todayKey } from '../../../core/utils/day';
     .session-date { font-weight: 600; font-size: var(--font-size-md); }
 
     .session-routine {
-      font-size: var(--font-size-sm); color: var(--text-secondary);
+      font-size: var(--font-size-sm); color: var(--text-primary);
       background: var(--color-secondary); padding: 2px 10px; border-radius: 10px;
     }
 
@@ -344,7 +346,7 @@ import { dayKey, todayKey } from '../../../core/utils/day';
 
     .stat-pill {
       font-size: var(--font-size-xs); padding: 3px 10px;
-      background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary);
+      background: rgba(var(--color-primary-rgb), 0.1); color: color-mix(in srgb, var(--color-primary) 75%, var(--text-primary));
       border-radius: 10px; font-weight: 500;
     }
 
@@ -357,13 +359,7 @@ import { dayKey, todayKey } from '../../../core/utils/day';
       animation: slideDown 0.2s ease;
     }
 
-    .detail-loading { display: flex; align-items: center; justify-content: center; padding: var(--space-md); }
-
-    .spinner-sm {
-      width: 24px; height: 24px; border: 2px solid var(--border-color);
-      border-top-color: var(--color-primary); border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
+    .detail-loading { display: flex; flex-direction: column; gap: var(--space-sm); padding: var(--space-md); }
 
     .detail-sets { display: flex; flex-direction: column; gap: var(--space-md); }
 
@@ -600,7 +596,8 @@ export class SessionHistoryComponent implements OnInit {
 
   private scrollToSession(id: string) {
     afterNextRender(() => {
-      document.getElementById('session-' + id)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      document.getElementById('session-' + id)?.scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : 'smooth' });
     }, { injector: this.injector });
   }
 

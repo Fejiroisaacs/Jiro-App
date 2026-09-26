@@ -7,6 +7,8 @@ import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-
 import { JymService, SplitWithRoutines, Routine, RoutineItem, Exercise, ReplaceItemEntry } from '../../../core/services/jym.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-series-modal';
@@ -14,17 +16,32 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
 @Component({
   selector: 'app-split-detail',
   standalone: true,
-  imports: [DatePipe, FormsModule, DragDropModule, JiroButtonComponent, JiroModalComponent, JymNewSeriesModalComponent],
+  imports: [DatePipe, FormsModule, DragDropModule, JiroButtonComponent, JiroModalComponent, JiroIconComponent, JiroSkeletonComponent, JymNewSeriesModalComponent],
   template: `
+    @if (!split() && loading()) {
+      <div class="split-detail" role="status" aria-label="Loading split">
+        <div class="sk-header">
+          <jiro-skeleton width="90px" height="14px" />
+          <jiro-skeleton width="280px" height="36px" />
+          <jiro-skeleton width="200px" height="24px" />
+        </div>
+        <div class="routines-board">
+          @for (i of [1, 2, 3]; track i) {
+            <div class="routine-column sk-column">
+              <jiro-skeleton width="50%" height="20px" />
+              <jiro-skeleton [lines]="4" height="40px" />
+            </div>
+          }
+        </div>
+      </div>
+    }
     @if (split()) {
 <div class="split-detail">
       <!-- Header -->
       <div class="page-header">
         <div class="header-left">
           <button class="back-btn" (click)="goBack()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="15,18 9,12 15,6"/>
-            </svg>
+            <jiro-icon name="caret-left" [size]="16" />
             All Splits
           </button>
           <div class="split-title-row">
@@ -35,10 +52,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
 <input class="title-input" [(ngModel)]="editName" (blur)="saveName()" (keydown.enter)="saveName()" autofocus />
 }
             <button class="edit-btn" type="button" (click)="startEditName()" title="Rename split" aria-label="Rename split">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-              </svg>
+              <jiro-icon name="pencil-simple" [size]="14" />
             </button>
           </div>
 
@@ -46,17 +60,11 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
           <div class="split-meta-row">
             <div class="vis-toggle">
               <button class="vis-btn" [class.active]="split()!.visibility === 'private'" (click)="setVisibility('private')">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                </svg>
+                <jiro-icon name="lock-simple" [size]="11" />
                 Private
               </button>
               <button class="vis-btn" [class.active]="split()!.visibility === 'public'" (click)="setVisibility('public')">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
-                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-                </svg>
+                <jiro-icon name="globe" [size]="11" />
                 Public
               </button>
             </div>
@@ -67,16 +75,15 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
 <span class="tag-chip">{{ tag }}</span>
 }
                 <button class="tag-edit-btn" (click)="startEditTags()" [attr.aria-label]="split()!.tags.length ? 'Edit tags' : null">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
-                  </svg>
+                  <jiro-icon name="pencil-simple" [size]="11" />
                   {{ split()!.tags.length ? '' : 'Add tags' }}
                 </button>
               </div>
 }
               @if (editingTags()) {
 <div class="tags-edit">
-                <input class="tag-input" type="text" [(ngModel)]="editTagsRaw" placeholder="PPL, Hypertrophy, Beginner" (keydown.enter)="saveTags()" (keydown.escape)="editingTags.set(false)" autofocus />
+                <label class="tag-label" for="split-tags">Tags, separated by commas</label>
+                <input id="split-tags" class="tag-input" type="text" [(ngModel)]="editTagsRaw" placeholder="PPL, Hypertrophy, Beginner" (keydown.enter)="saveTags()" (keydown.escape)="editingTags.set(false)" autofocus />
                 <button class="tag-save-btn" (click)="saveTags()">Save</button>
                 <button class="tag-cancel-btn" (click)="editingTags.set(false)">Cancel</button>
               </div>
@@ -86,16 +93,11 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
         </div>
         <div class="header-btns">
           <jiro-button variant="secondary" type="button" (click)="openSeriesModal()">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polygon points="5,3 19,12 5,21" fill="currentColor" stroke="none"/>
-            </svg>
+            <jiro-icon name="play:fill" [size]="13" />
             Start Series
           </jiro-button>
           <jiro-button variant="secondary" type="button" [disabled]="sharing()" (click)="shareSplit()">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
-              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-            </svg>
+            <jiro-icon name="share-network" [size]="13" />
             {{ sharing() ? 'Generating...' : 'Share' }}
           </jiro-button>
           <jiro-button variant="primary" type="button" (click)="showAddRoutine.set(true)">
@@ -111,14 +113,10 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
           <input class="share-url-input" [value]="shareUrl()" readonly />
           <button class="share-copy-btn" (click)="copyLink()" [class.copied]="copied()">
             @if (!copied()) {
-<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-            </svg>
+<jiro-icon name="copy" [size]="14" />
 }
             @if (copied()) {
-<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="20 6 9 17 4 12"/>
-            </svg>
+<jiro-icon name="check" [size]="14" />
 }
             {{ copied() ? 'Copied!' : 'Copy' }}
           </button>
@@ -132,7 +130,14 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
 
       <!-- Loading -->
       @if (loading()) {
-        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+        <div class="routines-board" role="status" aria-label="Loading training days">
+          @for (i of [1, 2, 3]; track i) {
+            <div class="routine-column sk-column">
+              <jiro-skeleton width="50%" height="20px" />
+              <jiro-skeleton [lines]="4" height="40px" />
+            </div>
+          }
+        </div>
       }
 
       <!-- Routines (drag-drop columns) -->
@@ -149,10 +154,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
             </div>
             <button class="icon-btn danger" type="button" (click)="deleteRoutine(routine, ri)" title="Delete day"
               [attr.aria-label]="'Delete training day ' + routine.name">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="3,6 5,6 21,6"/><path d="M19,6l-1,14a2,2,0,0,1-2,2H8a2,2,0,0,1-2-2L5,6"/>
-                <path d="M10,11v6M14,11v6M9,6V4a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1V6"/>
-              </svg>
+              <jiro-icon name="trash" [size]="14" />
             </button>
           </div>
 
@@ -170,10 +172,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
               cdkDrag
               class="exercise-item">
               <div class="drag-handle" cdkDragHandle>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/>
-                  <circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/>
-                </svg>
+                <jiro-icon name="dots-six-vertical" [size]="14" />
               </div>
               <div class="item-info">
                 <span class="item-name">{{ item.exercise_name }}</span>
@@ -188,9 +187,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
               </div>
               <button class="icon-btn" type="button" (click)="removeItem(ri, ii)" title="Remove exercise"
                 [attr.aria-label]="'Remove ' + item.exercise_name + ' from ' + routine.name">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
+                <jiro-icon name="x" [size]="12" />
               </button>
             </div>
 }
@@ -437,7 +434,12 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
 
     .tag-edit-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
 
-    .tags-edit { display: flex; align-items: center; gap: var(--space-xs); }
+    .tags-edit { display: flex; align-items: center; gap: var(--space-xs); flex-wrap: wrap; }
+
+    .tag-label {
+      flex-basis: 100%;
+      font-size: var(--font-size-sm); font-weight: 500; color: var(--text-secondary);
+    }
 
     .tag-input {
       padding: 4px 10px; border: 1px solid var(--color-primary);
@@ -457,7 +459,8 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
 
     .tag-cancel-btn:hover { border-color: var(--color-danger); color: var(--color-danger); }
 
-    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
+    .sk-column { padding: var(--space-md); gap: var(--space-md); }
+    .sk-header { display: flex; flex-direction: column; gap: var(--space-sm); margin-bottom: var(--space-xl); }
 
     .routines-board {
       display: flex; gap: var(--space-lg); overflow-x: auto;
@@ -692,11 +695,10 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
 
 
     @media (max-width: 600px) {
-      .header-btns {
-        flex-direction: column;
-      }
-
-      .header-btns { --jiro-btn-width: 100%; }
+      .page-header { flex-direction: column; align-items: stretch; }
+      .header-btns { flex-wrap: wrap; --jiro-btn-width: 100%; }
+      .header-btns > jiro-button { flex: 1 1 auto; }
+      .tag-input { width: 100%; }
     }
 
   `]
