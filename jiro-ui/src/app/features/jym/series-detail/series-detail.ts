@@ -11,23 +11,23 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
 import { chartTones } from '../../../shared/chart-theme';
 
 Chart.register(...registerables);
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 
 @Component({
   selector: 'app-series-detail',
   standalone: true,
-  imports: [CommonModule, FormsModule, JiroButtonComponent, JiroModalComponent, JiroEmptyStateComponent],
+  imports: [JiroSkeletonComponent, JiroIconComponent, CommonModule, FormsModule, JiroButtonComponent, JiroModalComponent, JiroEmptyStateComponent],
   template: `
     <div class="series-detail">
       <!-- Back -->
       <button class="back-btn" type="button" (click)="goBack()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-          <polyline points="15,18 9,12 15,6"/>
-        </svg>
+        <jiro-icon name="caret-left" [size]="16" />
         My series
       </button>
 
       @if (loading()) {
-        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+        <div class="state-loading" role="status" aria-label="Loading series"><jiro-skeleton width="20%" height="12px" /><jiro-skeleton width="50%" height="32px" /><jiro-skeleton height="96px" /><jiro-skeleton height="260px" /></div>
       }
 
       @if (!loading() && series()) {
@@ -184,7 +184,7 @@ Chart.register(...registerables);
                   <td>{{ formatDate(s.date) }}</td>
                   <td>
                     @if (s.session_type === 'normal') {
-<span class="type-dot normal"></span>
+<span class="type-chip normal">Normal</span>
 }
                     @if (s.session_type === 'deload') {
 <span class="type-chip deload">Deload</span>
@@ -211,8 +211,8 @@ Chart.register(...registerables);
         <div class="routine-picker">
           <p class="picker-sub">Pick a routine for this session, or go freestyle.</p>
           @if (loadingRoutines()) {
-<div class="picker-loading">
-            <div class="spinner-sm"></div>
+<div class="routine-list" role="status" aria-label="Loading routines">
+            @for (i of [1, 2, 3]; track i) { <jiro-skeleton height="52px" /> }
           </div>
 }
           @if (!loadingRoutines()) {
@@ -246,7 +246,7 @@ Chart.register(...registerables);
     }
     .back-btn:hover { color: var(--text-primary); }
 
-    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
+    .state-loading { display: flex; flex-direction: column; gap: var(--space-md); margin-top: var(--space-md); }
 
     .state-message {
       display: flex; flex-direction: column; align-items: center;
@@ -350,24 +350,17 @@ Chart.register(...registerables);
 
     .num-cell { color: var(--text-muted); font-weight: 500; }
 
-    .type-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--color-positive); }
     .type-chip {
       font-size: var(--font-size-xs); font-weight: 600; padding: 1px 6px; border-radius: 8px;
     }
-    .type-chip.deload { background: rgba(var(--color-danger-rgb), 0.1); color: var(--color-danger); }
+    .type-chip.normal { background: var(--bg-canvas); color: var(--text-secondary); border: 1px solid var(--border-color); }
+    .type-chip.deload { background: rgba(var(--color-danger-rgb), 0.1); color: var(--color-negative); }
     .type-chip.test { background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary); }
 
     .routine-picker { display: flex; flex-direction: column; gap: var(--space-md); }
 
     .picker-sub { font-size: var(--font-size-sm); color: var(--text-secondary); }
 
-    .picker-loading { display: flex; justify-content: center; padding: var(--space-lg); }
-
-    .spinner-sm {
-      width: 24px; height: 24px; border: 2px solid var(--border-color);
-      border-top-color: var(--color-primary); border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
 
     .routine-list { display: flex; flex-direction: column; gap: var(--space-xs); }
 
@@ -484,7 +477,7 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
           legend: { display: false },
           tooltip: {
             callbacks: {
-              title: (items) => `Session ${items[0].label} — ${this.formatDate(sessions[items[0].dataIndex].date)}`,
+              title: (items) => `Session ${items[0].label}, ${this.formatDate(sessions[items[0].dataIndex].date)}`,
               label: ctx => ` ${(ctx.parsed.y as number).toLocaleString()} ${unit} total volume`,
             },
           },
@@ -528,7 +521,7 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
           legend: { display: false },
           tooltip: {
             callbacks: {
-              title: (items) => `Session ${items[0].label} — ${this.formatDate(ex.points[items[0].dataIndex].date)}`,
+              title: (items) => `Session ${items[0].label}, ${this.formatDate(ex.points[items[0].dataIndex].date)}`,
               label: ctx => ` ${ctx.parsed.y} ${unit}`,
             },
           },

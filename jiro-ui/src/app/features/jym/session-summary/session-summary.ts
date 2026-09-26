@@ -82,11 +82,12 @@ function capitalize(s: string): string {
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────────
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 
 @Component({
   selector: 'app-session-summary',
   standalone: true,
-  imports: [CommonModule, RouterLink, JymPrBadgeComponent],
+  imports: [JiroIconComponent, CommonModule, RouterLink, JymPrBadgeComponent],
   template: `
     <!-- ════════════════════════════════════════════════════════════════
          In-app view
@@ -225,15 +226,7 @@ function capitalize(s: string): string {
       <div class="action-row">
         <button class="btn-share" (click)="shareWorkout()" [disabled]="sharing()">
           @if (!sharing()) {
-<svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="2.5"
-            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="18" cy="5" r="3"/>
-            <circle cx="6" cy="12" r="3"/>
-            <circle cx="18" cy="19" r="3"/>
-            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-          </svg>
+<jiro-icon name="share-network" [size]="16" />
 }
           @if (sharing()) {
 <span class="spinner" aria-hidden="true"></span>
@@ -743,11 +736,9 @@ function capitalize(s: string): string {
       border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
       border-top-color: currentColor;
       border-radius: 50%;
-      animation: spin 0.7s linear infinite;
+      animation: jiro-spin 0.7s linear infinite;
       flex-shrink: 0;
     }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ══════════════════════════════════════════════════════════════════
        SHARE CARD — 375 × 667 px
@@ -1154,7 +1145,7 @@ export class SessionSummaryComponent implements OnInit {
       const file = new File([blob], 'workout.png', { type: 'image/png' });
 
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'My Workout — Jym' });
+        await navigator.share({ files: [file], title: 'My Jym workout' });
       } else {
         const a = document.createElement('a');
         a.href = dataUrl;

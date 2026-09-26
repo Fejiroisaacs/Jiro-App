@@ -128,10 +128,12 @@ interface ExerciseBlock {
       <!-- Session notes -->
       @if (!loading()) {
 <div class="notes-panel">
+        <label class="field-label" for="session-notes">Session notes</label>
         <textarea
+          id="session-notes"
           class="notes-input"
           [(ngModel)]="sessionNotes"
-          placeholder="Session notes (optional)..."
+          placeholder="Optional"
           rows="2"
           (blur)="saveNotes()">
         </textarea>
@@ -141,10 +143,11 @@ interface ExerciseBlock {
       <!-- Body weight panel -->
       @if (!loading()) {
 <div class="bw-panel">
-        <span class="bw-label">Body weight</span>
+        <label class="bw-label" for="session-bw">Body weight</label>
         @if (!bwLogged()) {
 <div class="bw-row">
           <input
+            id="session-bw"
             class="bw-input"
             type="number"
             step="0.1"
@@ -160,7 +163,7 @@ interface ExerciseBlock {
         </div>
 }
         @if (bwLogged()) {
-<span class="bw-logged">✓ {{ bwValue }} {{ settingsService.unitLabel() }} logged</span>
+<span class="bw-logged"><jiro-icon name="check" [size]="14" /> {{ bwValue }} {{ settingsService.unitLabel() }} logged</span>
 }
       </div>
 }
@@ -202,9 +205,7 @@ interface ExerciseBlock {
                   <jiro-icon name="trash" [size]="16" />
                 }
               </button>
-              <svg class="chevron" aria-hidden="true" [class.open]="!isCollapsed(bi)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="6,9 12,15 18,9"/>
-              </svg>
+              <jiro-icon name="caret-down" [size]="16" class="chevron" [class.open]="!isCollapsed(bi)" />
             </div>
           </div>
 
@@ -214,19 +215,19 @@ interface ExerciseBlock {
             <!-- Progressive overload suggestion -->
             @if (block.suggestion && !allSaved(bi)) {
 <div class="overload-hint">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="23,6 13.5,15.5 8.5,10.5 1,18"/><polyline points="17,6 23,6 23,12"/>
-              </svg>
+              <jiro-icon name="trend-up" [size]="12" />
               {{ block.suggestion }}
             </div>
 }
 
             <!-- Exercise note -->
             <div class="ex-note-wrap">
+              <label class="field-label" [attr.for]="'ex-note-' + bi">Exercise note</label>
               <textarea
+                [id]="'ex-note-' + bi"
                 class="ex-note-input"
                 [(ngModel)]="block.exerciseNote"
-                placeholder="Note for this exercise..."
+                placeholder="Optional"
                 rows="1"
                 (blur)="saveExerciseNote(bi)"></textarea>
             </div>
@@ -276,7 +277,6 @@ interface ExerciseBlock {
                   min="1"
                   max="10"
                   [(ngModel)]="row.rpe"
-                  placeholder="—"
                   [disabled]="row.saved" />
 
                 <button
@@ -329,10 +329,7 @@ interface ExerciseBlock {
                      [class.fc-uploading]="isFormCheckUploading(block.exerciseId)"
                      [class.fc-disabled]="!canUploadFormCheck(bi, block.exerciseId)"
                      [title]="formCheckBtnTitle(bi, block.exerciseId)">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                  <circle cx="12" cy="13" r="4"/>
-                </svg>
+                <jiro-icon name="camera" [size]="13" />
                 {{ isFormCheckUploading(block.exerciseId) ? 'Uploading...' : '+ Form Check' }}
               </label>
               <input type="file" [id]="'fc-input-' + block.exerciseId"
@@ -356,9 +353,7 @@ interface ExerciseBlock {
 }
                   @if (!clip.file_type.startsWith('image/')) {
 <span class="fc-thumb-video">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
-                    </svg>
+                    <jiro-icon name="video-camera" [size]="14" />
                   </span>
 }
                 </a>
@@ -403,7 +398,9 @@ interface ExerciseBlock {
       <p style="font-size:var(--font-size-sm);color:var(--text-secondary);margin-bottom:var(--space-md);">
         Give this workout layout a name to reuse it in future sessions.
       </p>
+      <label class="field-label" for="template-name">Template name</label>
       <input
+        id="template-name"
         class="template-name-input"
         type="text"
         [(ngModel)]="templateName"
@@ -508,7 +505,7 @@ interface ExerciseBlock {
 
     .session-bar-left { display: flex; align-items: center; gap: var(--space-md); }
 
-    .bar-label { font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 1px; opacity: 0.75; }
+    .bar-label { font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; }
 
     .timer { font-size: var(--font-size-xl); font-weight: 700; font-variant-numeric: tabular-nums; }
 
@@ -641,6 +638,15 @@ interface ExerciseBlock {
 
     .notes-panel { margin-bottom: var(--space-md); }
 
+    .field-label {
+      display: block;
+      font-size: var(--font-size-sm); font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: var(--space-xs);
+    }
+
+    .ex-note-wrap .field-label { font-size: var(--font-size-xs); padding: 0 10px; }
+
     .notes-input {
       width: 100%; box-sizing: border-box;
       padding: var(--space-sm) var(--space-md);
@@ -691,6 +697,7 @@ interface ExerciseBlock {
     .bw-save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
     .bw-logged {
+      display: inline-flex; align-items: center; gap: 4px;
       font-size: var(--font-size-sm); color: var(--color-accent); font-weight: 500;
     }
 
@@ -748,7 +755,7 @@ interface ExerciseBlock {
     .chevron.open { transform: rotate(0deg); }
 
     .mg-tag {
-      background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary);
+      background: rgba(var(--color-primary-rgb), 0.12); color: color-mix(in srgb, var(--color-primary) 75%, var(--text-primary));
       font-size: var(--font-size-xs); padding: 2px 8px; border-radius: 10px;
     }
 
@@ -875,7 +882,7 @@ interface ExerciseBlock {
       width: 14px; height: 14px;
       border: 2px solid color-mix(in srgb, currentColor 40%, transparent);
       border-top-color: currentColor; border-radius: 50%;
-      animation: spin 0.6s linear infinite; display: inline-block;
+      animation: jiro-spin 0.6s linear infinite; display: inline-block;
     }
 
     .add-set-btn {
@@ -954,8 +961,6 @@ interface ExerciseBlock {
       font-family: inherit; width: 100%;
     }
     .create-select:focus { border-color: var(--color-primary); }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ── Mobile responsive ── */
     @media (max-width: 768px) {
@@ -1577,7 +1582,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   finishSession() {
     const hasSavedSets = this.blocks().some(b => b.sets.some(s => s.saved));
     if (!hasSavedSets && !this.sessionNotes.trim()) {
-      this.emptySessionError.set('Nothing to save — log at least one set or add session notes first.');
+      this.emptySessionError.set('Nothing to save. Log at least one set or add session notes first.');
       return;
     }
     this.emptySessionError.set(null);
@@ -1891,7 +1896,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     const suggestDisp = +(this.settingsService.toDisplay(suggestKg)).toFixed(2);
 
     return {
-      suggestion: `Last: ${lastDisp} ${unit} × ${last.reps} — try ${suggestDisp} ${unit}`,
+      suggestion: `Last: ${lastDisp} ${unit} × ${last.reps}, try ${suggestDisp} ${unit}`,
       ghostWeight: String(suggestDisp),
       ghostReps: String(last.reps),
     };
