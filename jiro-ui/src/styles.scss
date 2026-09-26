@@ -119,6 +119,19 @@
   --color-warning: #8A6237;
   --color-warning-rgb: 138, 98, 55;
   --color-info: #475B70;
+  /* Data palette: categories, muscle groups, moods. Fills and marks; chip text uses --text-primary on a tint. */
+  --data-1: #A8563F;
+  --data-2: #5E7040;
+  --data-3: #A77B2E;
+  --data-4: #5F8069;
+  --data-5: #4F6A80;
+  --data-6: #8C5A6A;
+  --data-7: #7A6A55;
+  --data-8: #466B4E;
+  --data-9: #B0714F;
+  --data-10: #59626B;
+  --data-11: #8A7040;
+  --data-12: #6B4E3D;
   --color-success: var(--color-positive);
 
   // Surfaces
@@ -148,6 +161,7 @@
 
   // Borders and radius
   --border-color: #E0D6C8;
+  /* Radius scale: sm = small bits, base = buttons and inputs, lg = cards and dialogs, pill = chips and badges. */
   --border-radius-sm: 4px;
   --border-radius: 8px;
   --border-radius-md: var(--border-radius);
@@ -290,6 +304,18 @@ html.dark {
   --color-warning: #D2A468;
   --color-warning-rgb: 210, 164, 104;
   --color-info: #8FAAC6;
+  --data-1: #D98B72;
+  --data-2: #9DB079;
+  --data-3: #D8AE62;
+  --data-4: #93B49D;
+  --data-5: #8FA9BF;
+  --data-6: #C495A4;
+  --data-7: #B8A68E;
+  --data-8: #86AE8E;
+  --data-9: #E0A283;
+  --data-10: #A3ADB8;
+  --data-11: #C9AC76;
+  --data-12: #B99680;
 
   --shadow-sm: 2px 2px 0px rgba(0, 0, 0, 0.45);
   --shadow-md: 4px 4px 0px rgba(0, 0, 0, 0.45);
