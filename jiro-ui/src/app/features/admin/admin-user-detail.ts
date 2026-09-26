@@ -5,14 +5,17 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AdminService, AdminUserDetail } from '../../core/services/admin.service';
 
+import { JiroIconComponent } from '../../shared/components/jiro-icon/jiro-icon';
+
 @Component({
   selector: 'app-admin-user-detail',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, JiroIconComponent],
   template: `
     <div class="user-detail">
-      <button class="back-btn" (click)="router.navigate(['/admin/users'])">
-        ← Users
+      <button class="back-btn" type="button" (click)="router.navigate(['/admin/users'])">
+        <jiro-icon name="caret-left" [size]="14" />
+        Users
       </button>
 
       @if (loading()) {
@@ -49,11 +52,11 @@ import { AdminService, AdminUserDetail } from '../../core/services/admin.service
             <div class="stat-lbl">Splits</div>
           </div>
           <div class="stat-card">
-            <div class="stat-val">{{ u.last_session_at ? formatDate(u.last_session_at) : '—' }}</div>
+            <div class="stat-val">{{ u.last_session_at ? formatDate(u.last_session_at) : 'Never' }}</div>
             <div class="stat-lbl">Last Session</div>
           </div>
           <div class="stat-card">
-            <div class="stat-val">{{ u.last_login_at ? formatDate(u.last_login_at) : '—' }}</div>
+            <div class="stat-val">{{ u.last_login_at ? formatDate(u.last_login_at) : 'Never' }}</div>
             <div class="stat-lbl">Last Login</div>
           </div>
         </div>
@@ -65,7 +68,7 @@ import { AdminService, AdminUserDetail } from '../../core/services/admin.service
           <!-- Send password reset email -->
           <div class="action-block">
             <div class="action-label">Send Password Reset Link</div>
-            <p class="action-desc">Emails the user a reset link — they set their own new password.</p>
+            <p class="action-desc">Emails the user a reset link so they can set their own new password.</p>
             <button class="action-btn" [disabled]="actionLoading()" (click)="sendPasswordReset()">Send Reset Email</button>
           </div>
 
@@ -93,7 +96,8 @@ import { AdminService, AdminUserDetail } from '../../core/services/admin.service
   `,
   styles: [`
     .back-btn { background: none; border: 1px solid var(--border-color); border-radius: 6px;
-      padding: 7px 14px; color: var(--text-secondary); font-size: 13px; cursor: pointer; margin-bottom: 20px; }
+      padding: 7px 14px; color: var(--text-secondary); font-size: 13px; cursor: pointer; margin-bottom: 20px;
+      display: inline-flex; align-items: center; gap: 4px; }
     .back-btn:hover { color: var(--color-primary); border-color: var(--color-primary); }
     .state-msg { color: var(--text-secondary); }
     .error-msg { color: var(--color-danger); }
@@ -102,7 +106,7 @@ import { AdminService, AdminUserDetail } from '../../core/services/admin.service
     .user-sub { color: var(--text-secondary); font-size: 13px; margin: 0; }
     .badge { padding: 4px 10px; border-radius: 10px; font-size: 12px; font-weight: 600;
       background: var(--border-color); color: var(--text-secondary); flex-shrink: 0; }
-    .badge.verified { background: rgba(56,160,100,0.15); color: #2a8a54; }
+    .badge.verified { background: color-mix(in srgb, var(--color-positive) 14%, transparent); color: var(--color-positive); }
     .stat-grid { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 32px; }
     .stat-card { background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px;
       padding: 16px 20px; min-width: 100px; flex: 1 1 120px; }
@@ -112,16 +116,16 @@ import { AdminService, AdminUserDetail } from '../../core/services/admin.service
     .actions-section { display: flex; flex-direction: column; gap: 16px; }
     .action-block { background: var(--bg-surface); border: 1px solid var(--border-color);
       border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
-    .action-block.danger-zone { border-color: rgba(224,92,92,0.3); }
+    .action-block.danger-zone { border-color: color-mix(in srgb, var(--color-danger) 30%, transparent); }
     .action-label { font-size: 14px; font-weight: 600; }
     .action-desc { font-size: 13px; color: var(--text-secondary); margin: 0; }
-    .action-btn { padding: 8px 16px; background: var(--color-primary); color: #fff;
+    .action-btn { padding: 8px 16px; background: var(--color-primary); color: var(--text-on-primary);
       border: none; border-radius: 6px; font-size: 14px; cursor: pointer; }
     .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .action-btn.danger { background: var(--color-danger); }
     .action-btn.danger:hover:not(:disabled) { background: var(--color-danger-hover); }
-    .action-feedback { margin-top: 16px; padding: 10px 14px; background: rgba(56,160,100,0.1);
-      color: #56c87a; border-radius: 6px; font-size: 13px; }
+    .action-feedback { margin-top: 16px; padding: 10px 14px; border-radius: 6px; font-size: 13px;
+      background: color-mix(in srgb, var(--color-positive) 14%, transparent); color: var(--color-positive); }
     @media (max-width: 600px) {
       .header { flex-direction: column; align-items: flex-start; gap: 8px; }
       .user-email { font-size: 16px; word-break: break-all; }

@@ -2,6 +2,7 @@ import { Component, OnInit, signal, ElementRef, ViewChild, AfterViewInit } from 
 
 import { Router } from '@angular/router';
 import { AdminService, AdminStats, EventDayStat } from '../../core/services/admin.service';
+import { chartTones } from '../../shared/chart-theme';
 import { Chart, BarController, BarElement, CategoryScale, LinearScale, Tooltip, Legend } from 'chart.js';
 
 Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip, Legend);
@@ -41,7 +42,7 @@ Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip, L
 
         <!-- Events chart -->
         <div class="chart-card">
-          <h2 class="chart-title">Events — Last 30 Days</h2>
+          <h2 class="chart-title">Events: Last 30 Days</h2>
           <div class="chart-wrap">
             <canvas #chartCanvas></canvas>
           </div>
@@ -53,7 +54,7 @@ Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip, L
   styles: [`
     .page-title { font-size: 24px; font-weight: 700; margin-bottom: 24px; }
     .loading { color: var(--text-secondary); }
-    .error-msg { color: #e05c5c; }
+    .error-msg { color: var(--color-negative); }
     .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; margin-bottom: 32px; }
     .stat-card {
       background: var(--bg-surface); border: 1px solid var(--border-color);
@@ -104,7 +105,7 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
   }
 
   ngAfterViewInit() {
-    // Chart is built once stats arrive — handled in ngOnInit via the signal
+    // The chart is built in ngDoCheck once stats arrive.
   }
 
   ngDoCheck() {
@@ -123,7 +124,8 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
     const dates = [...new Set(data.map(d => d.date))].sort();
     const events = [...new Set(data.map(d => d.event))];
 
-    const palette = ['#7a3b2e', '#b85c3e', '#d4845a', '#e8b490', '#f2d4b8', '#6b5e52', '#a39888', '#c4b8a8'];
+    const tone = chartTones();
+    const palette = [tone.primary, tone.warning, tone.accent, tone.secondary, tone.muted, tone.tick];
 
     const datasets = events.map((ev, i) => ({
       label: ev,
@@ -142,11 +144,11 @@ export class AdminDashboardComponent implements OnInit, AfterViewInit {
         responsive: true,
         maintainAspectRatio: false,
         scales: {
-          x: { stacked: true, ticks: { color: '#6B5E57', maxTicksLimit: 10 }, grid: { color: 'rgba(92,64,51,0.08)' } },
-          y: { stacked: true, ticks: { color: '#6B5E57' }, grid: { color: 'rgba(92,64,51,0.08)' } },
+          x: { stacked: true, ticks: { color: tone.tick, maxTicksLimit: 10 }, grid: { color: tone.grid } },
+          y: { stacked: true, ticks: { color: tone.tick }, grid: { color: tone.grid } },
         },
         plugins: {
-          legend: { labels: { color: '#6B5E57', boxWidth: 12, font: { size: 12 } } },
+          legend: { labels: { color: tone.tick, boxWidth: 12, font: { size: 12 } } },
           tooltip: { mode: 'index' },
         },
       }

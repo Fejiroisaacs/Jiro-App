@@ -1,6 +1,7 @@
 import { Component, OnInit, signal } from '@angular/core';
 
 import { AdminService, FeedbackItem } from '../../core/services/admin.service';
+import { JiroIconComponent } from '../../shared/components/jiro-icon/jiro-icon';
 
 const TYPE_LABELS: Record<string, string> = {
   bug: 'Bug',
@@ -11,7 +12,7 @@ const TYPE_LABELS: Record<string, string> = {
 @Component({
   selector: 'app-admin-feedback',
   standalone: true,
-  imports: [],
+  imports: [JiroIconComponent],
   template: `
     <div class="feedback-page">
       <h1 class="page-title">Feedback</h1>
@@ -32,7 +33,7 @@ const TYPE_LABELS: Record<string, string> = {
               <th>User</th>
               <th>Type</th>
               <th>Message</th>
-              <th></th>
+              <th><span class="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody>
@@ -48,7 +49,7 @@ const TYPE_LABELS: Record<string, string> = {
               <td><span class="type-chip" [class]="'type-chip--' + item.type">{{ typeLabel(item.type) }}</span></td>
               <td class="msg-cell">{{ item.message }}</td>
               <td>
-                <button class="del-btn" (click)="delete(item.id)" title="Delete">✕</button>
+                <button class="del-btn" type="button" (click)="delete(item.id)" title="Delete"><jiro-icon name="x" [size]="14" label="Delete feedback" /></button>
               </td>
             </tr>
 }
@@ -73,7 +74,7 @@ const TYPE_LABELS: Record<string, string> = {
   styles: [`
     .page-title { font-size: 24px; font-weight: 700; margin-bottom: 20px; }
     .state-msg { color: var(--text-secondary); }
-    .error-msg { color: #e05c5c; }
+    .error-msg { color: var(--color-negative); }
     .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .feedback-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 560px; }
     .feedback-table th {
@@ -92,12 +93,12 @@ const TYPE_LABELS: Record<string, string> = {
       background: color-mix(in srgb, var(--color-primary) 10%, transparent);
       color: var(--color-primary);
     }
-    .type-chip--bug { background: rgba(220,53,69,0.1); color: #c0392b; }
-    .type-chip--feature { background: rgba(40,167,69,0.1); color: #1e7e34; }
+    .type-chip--bug { background: color-mix(in srgb, var(--color-negative) 12%, transparent); color: var(--color-negative); }
+    .type-chip--feature { background: color-mix(in srgb, var(--color-positive) 14%, transparent); color: var(--color-positive); }
     .msg-cell { max-width: 360px; line-height: 1.4; color: var(--text-primary); }
     .del-btn {
       background: none; border: none; cursor: pointer; color: var(--text-secondary);
-      font-size: 14px; padding: 2px 6px; border-radius: 4px; transition: color 0.15s;
+      display: inline-flex; padding: 4px 6px; border-radius: 4px; transition: color 0.15s;
     }
     .del-btn:hover { color: var(--color-danger); }
     .pagination { display: flex; align-items: center; gap: 12px; margin-top: 20px; }

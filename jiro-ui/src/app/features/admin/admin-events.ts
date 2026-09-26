@@ -21,12 +21,12 @@ const EVENT_TYPES = [
       <h1 class="page-title">Events</h1>
 
       <form class="filter-bar" (ngSubmit)="search()">
-        <select class="filter-input" [(ngModel)]="eventFilter" name="event">
+        <select class="filter-input" [(ngModel)]="eventFilter" name="event" aria-label="Event type">
           @for (e of eventTypes; track e) {
 <option [value]="e">{{ e || 'All events' }}</option>
 }
         </select>
-        <input class="filter-input uid-input" type="text" [(ngModel)]="userIdFilter" name="uid" placeholder="Filter by user ID..." />
+        <input class="filter-input uid-input" type="text" [(ngModel)]="userIdFilter" name="uid" aria-label="Filter by user ID" placeholder="Filter by user ID..." />
         <button class="search-btn" type="submit">Filter</button>
       </form>
 
@@ -61,11 +61,11 @@ const EVENT_TYPES = [
                   </span>
                 
 } @else {
-<span class="dim">—</span>
+<span class="dim">Anonymous</span>
 }
                 
               </td>
-              <td class="props-cell hide-sm">{{ e.properties ? (e.properties | json) : '—' }}</td>
+              <td class="props-cell hide-sm">{{ e.properties ? (e.properties | json) : 'None' }}</td>
             </tr>
 }
           </tbody>
@@ -97,11 +97,11 @@ const EVENT_TYPES = [
     select.filter-input { min-width: 150px; }
     .uid-input { flex: 1; min-width: 160px; }
     .search-btn {
-      padding: 8px 18px; background: var(--color-primary); color: #fff;
+      padding: 8px 18px; background: var(--color-primary); color: var(--text-on-primary);
       border: none; border-radius: 6px; font-size: 14px; cursor: pointer; white-space: nowrap;
     }
     .state-msg { color: var(--text-secondary); }
-    .error-msg { color: #e05c5c; }
+    .error-msg { color: var(--color-negative); }
     .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .events-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 520px; }
     .events-table th {
@@ -112,7 +112,7 @@ const EVENT_TYPES = [
     .events-table td { padding: 8px 10px; border-bottom: 1px solid var(--border-color); vertical-align: middle; }
     .time-cell { color: var(--text-secondary); white-space: nowrap; font-size: 12px; }
     .event-chip {
-      background: rgba(122,59,46,0.12); color: var(--color-primary);
+      background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary);
       padding: 2px 8px; border-radius: 8px; font-size: 12px; font-weight: 500; white-space: nowrap;
     }
     .user-cell { max-width: 180px; }
