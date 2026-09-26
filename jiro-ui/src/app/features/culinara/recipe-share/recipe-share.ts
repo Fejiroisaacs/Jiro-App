@@ -3,39 +3,36 @@ import { Component, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { RecipeService, SharedRecipeResponse } from '../../../core/services/recipe.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { JiroLogoComponent } from '../../../shared/components/jiro-logo/jiro-logo';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 
 @Component({
   selector: 'app-recipe-share',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, JiroLogoComponent, JiroIconComponent, JiroSkeletonComponent],
   template: `
     <div class="share-page">
       <header class="share-header">
-        <div class="brand">
-          <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
-            <rect width="32" height="32" rx="8" fill="#7A3B2E"/>
-            <text x="16" y="22" text-anchor="middle" font-family="Georgia,serif" font-size="18" fill="#F5F0E8" font-weight="bold">J</text>
-          </svg>
-          <span class="brand-name">Jiro</span>
-        </div>
+        <a routerLink="/" class="brand" aria-label="Jiro home"><jiro-logo [size]="28" /></a>
         <a routerLink="/culinara" class="home-link">My Recipes</a>
       </header>
 
       <main class="share-main">
         @if (loading()) {
-<div class="state-box">
-          <div class="spinner"></div>
-          <p>Loading shared recipe…</p>
+<div class="recipe-card" role="status" aria-label="Loading shared recipe">
+          <jiro-skeleton width="30%" height="12px" />
+          <jiro-skeleton width="65%" height="32px" class="sk-gap" />
+          <jiro-skeleton [lines]="2" class="sk-gap" />
+          <jiro-skeleton width="40%" height="18px" class="sk-section" />
+          <jiro-skeleton [lines]="5" class="sk-gap" />
         </div>
 }
 
         @if (!loading() && error()) {
 <div class="state-box error-box">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="12" y1="8" x2="12" y2="12"/>
-            <line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
+          <jiro-icon name="warning-circle" [size]="40" class="error-icon" />
+          <h1 class="error-title">Recipe not found</h1>
           <p class="error-msg">This link is invalid or has expired.</p>
           <a routerLink="/culinara" class="btn-primary">Browse your recipes</a>
         </div>
@@ -112,7 +109,7 @@ import { AuthService } from '../../../core/services/auth.service';
 }
             </button>
             @if (importSuccess()) {
-<p class="import-success">Imported! <a routerLink="/culinara">View your recipes →</a></p>
+<p class="import-success">Imported! <a routerLink="/culinara" class="icon-link">View your recipes <jiro-icon name="arrow-right" [size]="14" /></a></p>
 }
             @if (importError()) {
 <p class="import-error">{{ importError() }}</p>
@@ -124,26 +121,25 @@ import { AuthService } from '../../../core/services/auth.service';
     </div>
   `,
   styles: [`
-    :host { display: block; min-height: 100vh; background: var(--bg-page, #F5F0E8); color: var(--text-primary, #2C1810); font-family: Inter, sans-serif; }
+    :host { display: block; min-height: 100dvh; background: var(--bg-page); color: var(--text-primary); }
 
     .share-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
       padding: 16px 24px;
-      background: var(--bg-canvas, #fff);
-      border-bottom: 1px solid var(--border-color, #e5e0d8);
+      background: var(--bg-canvas);
+      border-bottom: 1px solid var(--border-color);
       position: sticky;
       top: 0;
       z-index: 10;
     }
 
-    .brand { display: flex; align-items: center; gap: 10px; }
-    .brand-name { font-size: 1.2rem; font-weight: 700; color: var(--text-primary); }
+    .brand { display: inline-flex; color: var(--text-primary); text-decoration: none; }
 
     .home-link {
       font-size: 0.85rem;
-      color: var(--color-primary, #7A3B2E);
+      color: var(--color-primary);
       text-decoration: none;
       font-weight: 500;
     }
@@ -162,22 +158,16 @@ import { AuthService } from '../../../core/services/auth.service';
       color: var(--text-secondary);
     }
 
-    .spinner {
-      width: 36px;
-      height: 36px;
-      border: 3px solid var(--border-color);
-      border-top-color: var(--color-primary, #7A3B2E);
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-      margin: 0 auto 16px;
-    }
+    .sk-gap { margin-top: 12px; }
+    .sk-section { margin-top: 28px; }
 
-    .error-box svg { margin: 0 auto 12px; display: block; opacity: 0.5; }
+    .error-icon { display: flex; margin: 0 auto 12px; color: var(--text-muted); }
+    .error-title { font-size: 1.5rem; margin: 0 0 8px; color: var(--text-primary); }
     .error-msg { margin: 0 0 20px; font-size: 1rem; }
 
     .recipe-card {
-      background: var(--bg-canvas, #fff);
-      border: 1px solid var(--border-color, #e5e0d8);
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-color);
       border-radius: 12px;
       padding: 32px;
     }
@@ -201,7 +191,7 @@ import { AuthService } from '../../../core/services/auth.service';
 
     .tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
     .tag {
-      background: var(--bg-surface-hover, #f0ebe3);
+      background: var(--bg-surface-hover);
       color: var(--text-secondary);
       font-size: 0.72rem;
       padding: 2px 9px;
@@ -211,8 +201,8 @@ import { AuthService } from '../../../core/services/auth.service';
 
     .info-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
     .chip {
-      background: var(--bg-surface, #faf7f3);
-      border: 1px solid var(--border-color, #e5e0d8);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
       border-radius: 6px;
       padding: 4px 10px;
       font-size: 0.78rem;
@@ -225,7 +215,7 @@ import { AuthService } from '../../../core/services/auth.service';
       font-weight: 600;
       margin: 0 0 12px;
       padding-bottom: 6px;
-      border-bottom: 1px solid var(--border-color, #e5e0d8);
+      border-bottom: 1px solid var(--border-color);
     }
 
     .ingredient-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
@@ -244,7 +234,7 @@ import { AuthService } from '../../../core/services/auth.service';
     .import-bar {
       margin-top: 32px;
       padding-top: 24px;
-      border-top: 1px solid var(--border-color, #e5e0d8);
+      border-top: 1px solid var(--border-color);
       display: flex;
       flex-direction: column;
       align-items: flex-start;
@@ -258,37 +248,36 @@ import { AuthService } from '../../../core/services/auth.service';
       align-items: center;
       justify-content: center;
       padding: 9px 20px;
-      background: var(--color-primary, #7A3B2E);
-      color: #fff;
+      background: var(--color-primary);
+      color: var(--text-on-primary);
       border: none;
-      border-radius: 7px;
+      border-radius: var(--border-radius);
       font-size: 0.88rem;
       font-weight: 600;
       font-family: inherit;
       cursor: pointer;
       text-decoration: none;
-      transition: opacity 0.15s;
+      transition: background 0.15s;
       min-width: 130px;
       min-height: 36px;
     }
 
-    .btn-primary:hover:not([disabled]) { opacity: 0.88; }
+    .btn-primary:hover:not([disabled]) { background: var(--color-primary-hover); }
     .btn-primary[disabled] { opacity: 0.6; cursor: not-allowed; }
 
     .btn-spinner {
       width: 16px;
       height: 16px;
-      border: 2px solid rgba(255,255,255,0.4);
-      border-top-color: #fff;
+      border: 2px solid color-mix(in srgb, var(--text-on-primary) 40%, transparent);
+      border-top-color: var(--text-on-primary);
       border-radius: 50%;
-      animation: spin 0.7s linear infinite;
+      animation: jiro-spin 0.7s linear infinite;
     }
 
-    .import-success { margin: 0; font-size: 0.85rem; color: #2d8a4e; }
+    .import-success { margin: 0; font-size: 0.85rem; color: var(--color-positive); }
     .import-success a { color: inherit; font-weight: 600; }
-    .import-error { margin: 0; font-size: 0.85rem; color: var(--color-danger, #c0392b); }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
+    .icon-link { display: inline-flex; align-items: center; gap: 4px; }
+    .import-error { margin: 0; font-size: 0.85rem; color: var(--color-negative); }
 
     @media (max-width: 600px) {
       .recipe-card { padding: 20px 16px; }
