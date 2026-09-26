@@ -438,8 +438,8 @@ export class JymService {
   }
 
   // Split shares
-  createShare(splitId: string): Observable<{ share_id: string; url: string }> {
-    return this.http.post<{ share_id: string; url: string }>(`${API_URL}/splits/${splitId}/share`, {});
+  createShare(splitId: string): Observable<{ share_id: string; url: string; expires_at: string }> {
+    return this.http.post<{ share_id: string; url: string; expires_at: string }>(`${API_URL}/splits/${splitId}/share`, {});
   }
 
   revokeShare(shareId: string): Observable<void> {

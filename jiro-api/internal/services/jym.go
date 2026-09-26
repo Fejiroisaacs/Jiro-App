@@ -1870,6 +1870,14 @@ func (s *JymService) StreamSessionsCSV(ctx context.Context, userID uuid.UUID, fr
 
 // ─── Split Shares ─────────────────────────────────────────────────────────────
 
+// SplitShareTTL is how long a new split share link stays usable.
+const SplitShareTTL = 30 * 24 * time.Hour
+
+// splitShareUsable reports whether a share with this expiry is live; NULL (pre-TTL rows) never expires.
+func splitShareUsable(expiresAt *time.Time, now time.Time) bool {
+	return expiresAt == nil || now.Before(*expiresAt)
+}
+
 // CreateShare generates a share record for a split the user owns and returns a
 // shareable URL.
 func (s *JymService) CreateShare(ctx context.Context, userID, splitID uuid.UUID, appBaseURL string) (*models.CreateShareResponse, error) {
@@ -1887,17 +1895,19 @@ func (s *JymService) CreateShare(ctx context.Context, userID, splitID uuid.UUID,
 	}
 
 	var shareID uuid.UUID
+	var expiresAt time.Time
 	err = s.db.QueryRow(ctx,
-		`INSERT INTO split_shares (split_id, created_by) VALUES ($1, $2) RETURNING id`,
-		splitID, userID,
-	).Scan(&shareID)
+		`INSERT INTO split_shares (split_id, created_by, expires_at) VALUES ($1, $2, $3) RETURNING id, expires_at`,
+		splitID, userID, time.Now().Add(SplitShareTTL),
+	).Scan(&shareID, &expiresAt)
 	if err != nil {
 		return nil, err
 	}
 
 	return &models.CreateShareResponse{
-		ShareID: shareID.String(),
-		URL:     appBaseURL + "/jym/share/" + shareID.String(),
+		ShareID:   shareID.String(),
+		URL:       appBaseURL + "/jym/share/" + shareID.String(),
+		ExpiresAt: expiresAt,
 	}, nil
 }
 
@@ -1930,7 +1940,7 @@ func (s *JymService) GetSharePreview(ctx context.Context, shareID uuid.UUID) (*m
 	if err != nil {
 		return nil, err
 	}
-	if expiresAt != nil && time.Now().After(*expiresAt) {
+	if !splitShareUsable(expiresAt, time.Now()) {
 		return nil, ErrShareExpired
 	}
 
@@ -2013,7 +2023,7 @@ func (s *JymService) ImportShare(ctx context.Context, importerID, shareID uuid.U
 	if err != nil {
 		return uuid.Nil, err
 	}
-	if expiresAt != nil && time.Now().After(*expiresAt) {
+	if !splitShareUsable(expiresAt, time.Now()) {
 		return uuid.Nil, ErrShareExpired
 	}
 	return s.copySplit(ctx, importerID, splitID)

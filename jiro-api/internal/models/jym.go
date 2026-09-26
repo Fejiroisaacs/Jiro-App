@@ -268,8 +268,9 @@ type SplitShare struct {
 }
 
 type CreateShareResponse struct {
-	ShareID string `json:"share_id"`
-	URL     string `json:"url"`
+	ShareID   string    `json:"share_id"`
+	URL       string    `json:"url"`
+	ExpiresAt time.Time `json:"expires_at"`
 }
 
 type ShareExercisePreview struct {

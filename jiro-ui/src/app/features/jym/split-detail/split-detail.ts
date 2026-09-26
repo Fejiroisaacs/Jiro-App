@@ -1,4 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
 
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -13,7 +14,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
 @Component({
   selector: 'app-split-detail',
   standalone: true,
-  imports: [FormsModule, DragDropModule, JiroButtonComponent, JiroModalComponent, JymNewSeriesModalComponent],
+  imports: [DatePipe, FormsModule, DragDropModule, JiroButtonComponent, JiroModalComponent, JymNewSeriesModalComponent],
   template: `
     @if (split()) {
 <div class="split-detail">
@@ -122,6 +123,9 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
             {{ copied() ? 'Copied!' : 'Copy' }}
           </button>
         </div>
+        @if (shareExpiresAt()) {
+          <span class="share-expiry">Expires {{ shareExpiresAt() | date: 'MMM d, y' }}</span>
+        }
         <button class="share-revoke-btn" (click)="revokeShare()">Revoke link</button>
       </div>
 }
@@ -677,6 +681,8 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
     .share-copy-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
     .share-copy-btn.copied { border-color: var(--color-positive); color: var(--color-positive); }
 
+    .share-expiry { color: var(--text-muted); font-size: var(--font-size-sm); white-space: nowrap; }
+
     .share-revoke-btn {
       background: none; border: none; color: var(--text-muted);
       font-size: var(--font-size-sm); cursor: pointer; white-space: nowrap;
@@ -724,6 +730,7 @@ export class SplitDetailComponent implements OnInit {
   // Share
   shareId = signal('');
   shareUrl = signal('');
+  shareExpiresAt = signal('');
   sharing = signal(false);
   copied = signal(false);
 
@@ -1017,6 +1024,7 @@ export class SplitDetailComponent implements OnInit {
       next: res => {
         this.shareId.set(res.share_id);
         this.shareUrl.set(res.url);
+        this.shareExpiresAt.set(res.expires_at);
         this.sharing.set(false);
       },
       error: () => this.sharing.set(false),
@@ -1028,6 +1036,7 @@ export class SplitDetailComponent implements OnInit {
       next: () => {
         this.shareId.set('');
         this.shareUrl.set('');
+        this.shareExpiresAt.set('');
       },
     });
   }

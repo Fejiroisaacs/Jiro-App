@@ -180,3 +180,65 @@ func TestWarmupIsNeverPR(t *testing.T) {
 		t.Fatalf("working set should be a PR again")
 	}
 }
+
+func TestSplitShareUsable(t *testing.T) {
+	now := time.Date(2026, 9, 26, 12, 0, 0, 0, time.UTC)
+	at := func(d time.Duration) *time.Time { v := now.Add(d); return &v }
+	for _, tc := range []struct {
+		name      string
+		expiresAt *time.Time
+		want      bool
+	}{
+		{"legacy row without expiry", nil, true},
+		{"fresh", at(SplitShareTTL), true},
+		{"one second left", at(time.Second), true},
+		{"expires exactly now", at(0), false},
+		{"expired", at(-time.Hour), false},
+	} {
+		if got := splitShareUsable(tc.expiresAt, now); got != tc.want {
+			t.Errorf("%s: usable = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+	if SplitShareTTL != 30*24*time.Hour {
+		t.Errorf("SplitShareTTL = %v, want 30 days", SplitShareTTL)
+	}
+}
+
+func TestSplitShareExpires(t *testing.T) {
+	svc, userID := testJymDB(t)
+	ctx := context.Background()
+
+	split, err := svc.CreateSplit(ctx, userID, &models.CreateSplitRequest{Name: "Share Test"})
+	if err != nil {
+		t.Fatalf("create split: %v", err)
+	}
+	share, err := svc.CreateShare(ctx, userID, split.ID, "https://example.com")
+	if err != nil {
+		t.Fatalf("create share: %v", err)
+	}
+	if d := time.Until(share.ExpiresAt); d < SplitShareTTL-time.Minute || d > SplitShareTTL {
+		t.Fatalf("expires in %v, want about %v", d, SplitShareTTL)
+	}
+	shareID := uuid.MustParse(share.ShareID)
+	if _, err := svc.GetSharePreview(ctx, shareID); err != nil {
+		t.Fatalf("preview fresh share: %v", err)
+	}
+
+	if _, err := svc.db.Exec(ctx, `UPDATE split_shares SET expires_at = NOW() - INTERVAL '1 minute' WHERE id = $1`, shareID); err != nil {
+		t.Fatalf("expire share: %v", err)
+	}
+	if _, err := svc.GetSharePreview(ctx, shareID); !errors.Is(err, ErrShareExpired) {
+		t.Fatalf("preview expired share: got %v, want ErrShareExpired", err)
+	}
+	if _, err := svc.ImportShare(ctx, userID, shareID); !errors.Is(err, ErrShareExpired) {
+		t.Fatalf("import expired share: got %v, want ErrShareExpired", err)
+	}
+
+	// Rows from before the TTL have no expiry and keep working.
+	if _, err := svc.db.Exec(ctx, `UPDATE split_shares SET expires_at = NULL WHERE id = $1`, shareID); err != nil {
+		t.Fatalf("clear expiry: %v", err)
+	}
+	if _, err := svc.GetSharePreview(ctx, shareID); err != nil {
+		t.Fatalf("preview legacy share: %v", err)
+	}
+}
