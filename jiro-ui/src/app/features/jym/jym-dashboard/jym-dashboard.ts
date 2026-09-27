@@ -14,6 +14,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { suggestDeload } from '../deload-rule';
+import { muscleColor } from '../shared/muscle-colors';
 
 /** Snooze stamp for the deload suggestion: the epoch ms of the last "Not now". */
 const DELOAD_SNOOZED_KEY = 'jiro_jym_deload_snoozed';
@@ -106,9 +107,7 @@ const DELOAD_SNOOZE_DAYS = 7;
                 <div class="mg-bar">
                   <div class="mg-fill"
                     [style.width.%]="(mg.sessionsLast28 / maxMgCount()) * 100"
-                    [class.mg-fill-fresh]="mg.daysSinceLast <= 7"
-                    [class.mg-fill-warm]="mg.daysSinceLast > 7 && mg.daysSinceLast <= 14"
-                    [class.mg-fill-cold]="mg.daysSinceLast > 14">
+                    [style.background]="muscleColor(mg.name)">
                   </div>
                 </div>
                 <span class="mg-days"
@@ -539,12 +538,6 @@ const DELOAD_SNOOZE_DAYS = 7;
 
     .mg-fill { height: 100%; border-radius: 3px; transition: width 0.3s; min-width: 3px; }
 
-    .mg-fill-fresh { background: var(--color-positive); }
-
-    .mg-fill-warm { background: var(--color-warning); }
-
-    .mg-fill-cold { background: var(--border-color); }
-
     .mg-days { font-size: var(--font-size-xs); min-width: 54px; text-align: right; color: var(--text-muted); }
 
     .day-fresh { color: var(--color-positive); font-weight: 500; }
@@ -591,6 +584,7 @@ const DELOAD_SNOOZE_DAYS = 7;
   `]
 })
 export class JymDashboardComponent implements OnInit {
+  readonly muscleColor = muscleColor;
   splits = signal<Split[]>([]);
   activeSeries = signal<SplitSeriesSummary[]>([]);
   allSessions = signal<SessionSummary[]>([]);
