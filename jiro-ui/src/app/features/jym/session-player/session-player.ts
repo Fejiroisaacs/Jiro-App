@@ -6,6 +6,7 @@ import {
   JymService,
   RoutineItem,
   CreateSetRequest,
+  UpdateSetRequest,
   SetHistory,
   SessionAttachment,
   SessionSet,
@@ -38,6 +39,9 @@ interface SetRow {
   ghostWeight: string;
   ghostReps: string;
   isWarmup: boolean;
+  /** A logged set opened for correction, and its values before the edit. */
+  editing?: boolean;
+  before?: { weight: string; reps: string; rpe: string };
 }
 
 /** What only this device knows until it's logged: typed rows, added exercises, removed plan exercises. */
@@ -193,7 +197,7 @@ interface ExerciseBlock {
         }
 
         <!-- Exercise blocks -->
-        @for (block of blocks(); track block; let bi = $index) {
+        @for (block of blocks(); track block.exerciseId; let bi = $index) {
 <div class="ex-block">
           <!-- The header toggles on click; the name button is its keyboard handle (its click bubbles up). -->
           <div class="block-header" [class.block-open]="!isCollapsed(bi)" (click)="toggleBlock(bi)">
@@ -260,9 +264,9 @@ interface ExerciseBlock {
             </div>
 
             <!-- Set rows -->
-            @for (row of block.sets; track row; let si = $index) {
+            @for (row of block.sets; track row.id ?? 'new-' + row.setNumber; let si = $index) {
 
-              <div class="set-row" [class.set-done]="row.saved" [class.set-warmup]="row.isWarmup" [class.set-short]="isShort(block, row)">
+              <div class="set-row" [class.set-done]="row.saved" [class.set-warmup]="row.isWarmup" [class.set-short]="isShort(block, row)" [class.set-editing]="row.editing">
                 <span class="set-num-cell">{{ row.setNumber }}</span>
 
                 <input
@@ -275,7 +279,12 @@ interface ExerciseBlock {
                   [placeholder]="row.ghostWeight || '0'"
                   [class.has-ghost]="row.ghostWeight && !row.weight"
                   [attr.aria-label]="'Set ' + row.setNumber + ' weight (' + settingsService.unitLabel() + ')'"
-                  [disabled]="row.saved" />
+                  [readonly]="row.saved && !row.editing"
+                  [class.logged]="row.saved && !row.editing"
+                  [attr.title]="row.saved && !row.editing ? 'Tap to edit' : null"
+                  (click)="editRow($event, bi, si)"
+                  (keydown.enter)="editRow($event, bi, si)"
+                  (keydown.escape)="cancelEdit(bi, si)" />
 
                 <input
                   class="set-input reps-input"
@@ -286,7 +295,12 @@ interface ExerciseBlock {
                   [placeholder]="row.ghostReps || '0'"
                   [class.has-ghost]="row.ghostReps && !row.reps"
                   [attr.aria-label]="'Set ' + row.setNumber + ' reps' + (isShort(block, row) ? ', below plan' : '')"
-                  [disabled]="row.saved" />
+                  [readonly]="row.saved && !row.editing"
+                  [class.logged]="row.saved && !row.editing"
+                  [attr.title]="row.saved && !row.editing ? 'Tap to edit' : null"
+                  (click)="editRow($event, bi, si)"
+                  (keydown.enter)="editRow($event, bi, si)"
+                  (keydown.escape)="cancelEdit(bi, si)" />
 
                 <input
                   class="set-input rpe-input"
@@ -297,7 +311,12 @@ interface ExerciseBlock {
                   max="10"
                   [(ngModel)]="row.rpe"
                   (ngModelChange)="saveDraftSoon()"
-                  [disabled]="row.saved" />
+                  [readonly]="row.saved && !row.editing"
+                  [class.logged]="row.saved && !row.editing"
+                  [attr.title]="row.saved && !row.editing ? 'Tap to edit' : null"
+                  (click)="editRow($event, bi, si)"
+                  (keydown.enter)="editRow($event, bi, si)"
+                  (keydown.escape)="cancelEdit(bi, si)" />
 
                 <button
                   type="button"
@@ -309,29 +328,39 @@ interface ExerciseBlock {
                   (click)="toggleWarmup(bi, si)"><jiro-icon name="fire" [size]="16" /></button>
 
                 <div class="action-cell">
-                  @if (row.saved && row.isPR) {
-<jym-pr-badge />
-}
-                  @if (!row.saved) {
-<button type="button" class="log-btn" [attr.aria-label]="'Log set ' + row.setNumber"
-                    [disabled]="row.saving || !row.weight || !row.reps || (!!row.rpe && rpeInvalid(row.rpe))"
-                    (click)="logSet(bi, si)">
-                    @if (!row.saving) {
-<jiro-icon name="check" [size]="18" />
-}
-                    @if (row.saving) {
-<span class="spinner-sm"></span>
-}
-                  </button>
-}
-                  @if (row.saved) {
-<button type="button" class="del-btn" [attr.aria-label]="'Remove set ' + row.setNumber" title="Remove set" (click)="deleteSet(bi, si)">
-                    <jiro-icon name="x" [size]="14" />
-                  </button>
-}
+                  @if (row.editing) {
+                    <button type="button" class="log-btn" [attr.aria-label]="'Save set ' + row.setNumber"
+                      [disabled]="row.saving || !editValid(row)" (click)="saveEdit(bi, si)">
+                      @if (row.saving) {
+                        <span class="spinner-sm"></span>
+                      } @else {
+                        <jiro-icon name="check" [size]="18" />
+                      }
+                    </button>
+                    <button type="button" class="del-btn" [attr.aria-label]="'Cancel editing set ' + row.setNumber" title="Cancel" (click)="cancelEdit(bi, si)">
+                      <jiro-icon name="x" [size]="14" />
+                    </button>
+                  } @else if (row.saved) {
+                    @if (row.isPR) {
+                      <jym-pr-badge />
+                    }
+                    <button type="button" class="del-btn" [attr.aria-label]="'Remove set ' + row.setNumber" title="Remove set" (click)="deleteSet(bi, si)">
+                      <jiro-icon name="trash" [size]="14" />
+                    </button>
+                  } @else {
+                    <!-- One tap logs what the row shows: typed values, else the ghosts. -->
+                    <button type="button" class="log-btn" [attr.aria-label]="logLabel(row)"
+                      [disabled]="!canLog(row)" (click)="logSet(bi, si)">
+                      @if (row.saving) {
+                        <span class="spinner-sm"></span>
+                      } @else {
+                        <jiro-icon name="check" [size]="18" />
+                      }
+                    </button>
+                  }
                 </div>
               </div>
-              @if (!row.saved && !!row.rpe && rpeInvalid(row.rpe)) {
+              @if ((!row.saved || row.editing) && !!row.rpe && rpeInvalid(row.rpe)) {
 <div class="rpe-err-msg">
                 RPE must be between 1 and 10
               </div>
@@ -808,7 +837,7 @@ interface ExerciseBlock {
     /* Set table */
     .set-header-row {
       display: grid;
-      grid-template-columns: 40px 1fr 1fr 64px 44px 84px;
+      grid-template-columns: 40px 1fr 1fr 64px 44px 92px;
       gap: var(--space-sm);
       padding: var(--space-xs) var(--space-lg);
       border-bottom: 1px solid var(--border-color);
@@ -823,7 +852,7 @@ interface ExerciseBlock {
 
     .set-row {
       display: grid;
-      grid-template-columns: 40px 1fr 1fr 64px 44px 84px;
+      grid-template-columns: 40px 1fr 1fr 64px 44px 92px;
       gap: var(--space-sm);
       align-items: center;
       padding: var(--space-xs) var(--space-lg);
@@ -838,7 +867,7 @@ interface ExerciseBlock {
     .set-row.set-warmup { background: rgba(var(--color-warning-rgb), 0.08); }
 
     /* A logged working set below the plan's reps */
-    .set-row.set-short .reps-input { color: var(--color-warning); font-weight: 600; opacity: 1; }
+    .set-row.set-short .reps-input { color: var(--color-warning); font-weight: 600; }
 
     .warmup-btn {
       width: 40px; height: 40px; border-radius: var(--border-radius-sm);
@@ -866,7 +895,9 @@ interface ExerciseBlock {
 
     .set-input:focus { border-color: var(--color-primary); }
 
-    .set-input:disabled { opacity: 0.7; background: transparent; border-color: transparent; }
+    .set-input.logged { background: transparent; border-color: transparent; cursor: pointer; }
+    .set-input.logged:hover { border-color: var(--border-color); }
+    .set-row.set-editing { background: rgba(var(--color-primary-rgb), 0.08); }
 
     .set-input.has-ghost::placeholder { color: rgba(var(--color-primary-rgb), 0.55); font-style: italic; }
 
@@ -1031,7 +1062,7 @@ interface ExerciseBlock {
     @media (max-width: 480px) {
       .set-header-row,
       .set-row {
-        grid-template-columns: 24px 1fr 1fr 44px 36px 72px;
+        grid-template-columns: 24px 1fr 1fr 44px 36px 76px;
         padding: var(--space-xs) var(--space-md);
         gap: 4px;
       }
@@ -1469,7 +1500,9 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   private persistRow(blockIndex: number, setIndex: number, startRest: boolean): Promise<boolean> {
     const block = this.blocks()[blockIndex];
     const row = block?.sets[setIndex];
-    if (!row || !row.weight || !row.reps) return Promise.resolve(false);
+    const weight = row?.weight || row?.ghostWeight;
+    const reps = row?.reps || row?.ghostReps;
+    if (!row || !weight || !reps) return Promise.resolve(false);
 
     // Warm up audio NOW, synchronously while the tap gesture is still active.
     // Safari blocks AudioContext creation/resume in async callbacks (e.g. HTTP responses).
@@ -1477,14 +1510,14 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
 
     this.blocks.update(bs => bs.map((b, bi) => bi === blockIndex ? {
       ...b,
-      sets: b.sets.map((s, si) => si === setIndex ? { ...s, saving: true } : s),
+      sets: b.sets.map((s, si) => si === setIndex ? { ...s, weight, reps, saving: true } : s),
     } : b));
 
     const req: CreateSetRequest = {
       exercise_id: block.exerciseId,
       set_number: row.setNumber,
-      weight: this.settingsService.toKg(parseFloat(row.weight)),
-      reps_performed: parseInt(row.reps, 10),
+      weight: this.settingsService.toKg(parseFloat(weight)),
+      reps_performed: parseInt(reps, 10),
       rpe: row.rpe ? parseInt(row.rpe, 10) : undefined,
       is_warmup: row.isWarmup,
       exercise_note: block.exerciseNote || undefined,
@@ -2123,6 +2156,92 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
       ghostWeight: String(+next.weight.toFixed(2)),
       ghostReps: String(next.reps),
     };
+  }
+
+  /** ✓ is ready when weight and reps are each typed or ghosted. */
+  canLog(row: SetRow): boolean {
+    return !row.saving && !!(row.weight || row.ghostWeight) && !!(row.reps || row.ghostReps)
+      && !(row.rpe && this.rpeInvalid(row.rpe));
+  }
+
+  logLabel(row: SetRow): string {
+    const weight = row.weight || row.ghostWeight;
+    const reps = row.reps || row.ghostReps;
+    return weight && reps
+      ? `Log set ${row.setNumber}: ${weight} ${this.settingsService.unitLabel()} × ${reps}`
+      : `Log set ${row.setNumber}`;
+  }
+
+  /** A tap on a logged value opens its row for editing; unlocking and focusing inside the tap lets a phone open its keyboard. */
+  editRow(event: Event, bi: number, si: number) {
+    const row = this.blocks()[bi]?.sets[si];
+    if (!row?.saved || row.editing || row.saving) return;
+    event.preventDefault();
+    this.patchRow(bi, si, { editing: true, before: { weight: row.weight, reps: row.reps, rpe: row.rpe } });
+    const input = event.target as HTMLInputElement;
+    input.readOnly = false;
+    input.focus();
+  }
+
+  cancelEdit(bi: number, si: number) {
+    const row = this.blocks()[bi]?.sets[si];
+    if (!row?.editing || row.saving) return;
+    this.patchRow(bi, si, { editing: false, ...(row.before ?? {}), before: undefined });
+  }
+
+  editValid(row: SetRow): boolean {
+    const weight = parseFloat(row.weight);
+    const reps = parseInt(row.reps, 10);
+    return !isNaN(weight) && weight >= 0 && !isNaN(reps) && reps >= 1 && !(row.rpe && this.rpeInvalid(row.rpe));
+  }
+
+  /** Saves a corrected set; the API re-rates the exercise, so PR badges are re-read. */
+  saveEdit(bi: number, si: number) {
+    const row = this.blocks()[bi]?.sets[si];
+    if (!row?.id || !row.editing || row.saving || !this.editValid(row)) return;
+    const before = row.before;
+    if (before && row.weight === before.weight && row.reps === before.reps && row.rpe === before.rpe) {
+      this.patchRow(bi, si, { editing: false, before: undefined });
+      return;
+    }
+    const id = row.id;
+    const req: UpdateSetRequest = {
+      weight: this.settingsService.toKg(parseFloat(row.weight)),
+      reps_performed: parseInt(row.reps, 10),
+      ...(row.rpe ? { rpe: parseInt(row.rpe, 10) } : {}),
+    };
+    this.patchSet(id, { saving: true });
+    this.jymService.updateSet(id, req).subscribe({
+      next: saved => {
+        this.patchSet(id, {
+          saving: false, editing: false, before: undefined,
+          weightKg: saved.weight,
+          weight: String(this.settingsService.toDisplay(saved.weight)),
+          reps: String(saved.reps_performed),
+          rpe: saved.rpe != null ? String(saved.rpe) : '',
+        });
+        this.refreshPrBadges();
+      },
+      error: () => {
+        this.patchSet(id, { saving: false });
+        this.toast.error('Could not save the change.');
+      },
+    });
+  }
+
+  private patchRow(bi: number, si: number, patch: Partial<SetRow>) {
+    this.blocks.update(bs => bs.map((b, i) => i !== bi ? b : {
+      ...b,
+      sets: b.sets.map((r, j) => j !== si ? r : { ...r, ...patch }),
+    }));
+  }
+
+  /** Patches a logged set by id: rows can move while a request is out. */
+  private patchSet(id: string, patch: Partial<SetRow>) {
+    this.blocks.update(bs => bs.map(b => ({
+      ...b,
+      sets: b.sets.map(r => r.id !== id ? r : { ...r, ...patch }),
+    })));
   }
 
   /** A logged working set below the plan's reps. */
