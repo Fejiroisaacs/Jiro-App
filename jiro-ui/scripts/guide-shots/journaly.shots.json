@@ -58,7 +58,7 @@
       {
         "click": {
           "role": "button",
-          "name": "Open Tue 22"
+          "name": "Open Wed 23"
         }
       },
       {
@@ -111,7 +111,8 @@
       {
         "click": {
           "role": "button",
-          "name": "+ New"
+          "name": "New",
+          "exact": true
         }
       },
       {
@@ -150,7 +151,7 @@
       {
         "click": {
           "role": "button",
-          "name": "+ New Group"
+          "name": "Create group"
         }
       },
       {
