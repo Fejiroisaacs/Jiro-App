@@ -230,7 +230,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 
     .sessions-pill, .duration-pill {
       font-size: var(--font-size-xs); padding: 3px 10px; border-radius: 10px;
-      background: rgba(var(--color-primary-rgb), 0.1); color: color-mix(in srgb, var(--color-primary) 75%, var(--text-primary)); font-weight: 500;
+      background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary-text); font-weight: 500;
     }
 
     .duration-pill.open { background: var(--bg-canvas); color: var(--text-muted); }

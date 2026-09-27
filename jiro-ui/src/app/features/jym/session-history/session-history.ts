@@ -346,7 +346,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 
     .stat-pill {
       font-size: var(--font-size-xs); padding: 3px 10px;
-      background: rgba(var(--color-primary-rgb), 0.1); color: color-mix(in srgb, var(--color-primary) 75%, var(--text-primary));
+      background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary-text);
       border-radius: 10px; font-weight: 500;
     }
 

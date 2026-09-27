@@ -146,7 +146,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     }
 
     .day-chip {
-      background: rgba(var(--color-primary-rgb), 0.12); color: color-mix(in srgb, var(--color-primary) 75%, var(--text-primary));
+      background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary-text);
       font-size: var(--font-size-xs); font-weight: 600;
       padding: 2px 8px; border-radius: 10px; white-space: nowrap;
     }
@@ -171,7 +171,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 
     .ex-sets {
       font-size: var(--font-size-xs); font-weight: 600;
-      color: color-mix(in srgb, var(--color-primary) 75%, var(--text-primary)); background: rgba(var(--color-primary-rgb), 0.1);
+      color: var(--color-primary-text); background: rgba(var(--color-primary-rgb), 0.1);
       padding: 2px 8px; border-radius: 8px; white-space: nowrap;
     }
 

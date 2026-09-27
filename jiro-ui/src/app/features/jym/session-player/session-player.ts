@@ -755,7 +755,7 @@ interface ExerciseBlock {
     .chevron.open { transform: rotate(0deg); }
 
     .mg-tag {
-      background: rgba(var(--color-primary-rgb), 0.12); color: color-mix(in srgb, var(--color-primary) 75%, var(--text-primary));
+      background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary-text);
       font-size: var(--font-size-xs); padding: 2px 8px; border-radius: 10px;
     }
 

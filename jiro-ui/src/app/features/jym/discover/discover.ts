@@ -161,7 +161,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .split-name { font-size: var(--font-size-lg); font-weight: 600; }
 
     .routine-badge {
-      background: rgba(var(--color-primary-rgb), 0.12); color: color-mix(in srgb, var(--color-primary) 75%, var(--text-primary));
+      background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary-text);
       font-size: var(--font-size-xs); font-weight: 600;
       padding: 3px 10px; border-radius: 12px; white-space: nowrap; flex-shrink: 0;
     }

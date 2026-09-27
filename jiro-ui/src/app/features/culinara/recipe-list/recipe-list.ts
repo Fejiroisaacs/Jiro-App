@@ -450,7 +450,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
       font-size: var(--font-size-xs);
       padding: 2px 8px;
       background: rgba(var(--color-primary-rgb), 0.08);
-      color: color-mix(in srgb, var(--color-primary) 75%, var(--text-primary));
+      color: var(--color-primary-text);
       border-radius: 10px;
       font-weight: 500;
     }

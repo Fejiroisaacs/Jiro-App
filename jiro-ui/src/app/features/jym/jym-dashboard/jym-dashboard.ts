@@ -398,7 +398,7 @@ const DELOAD_SNOOZE_DAYS = 7;
 
     .asc-pill {
       font-size: var(--font-size-xs); padding: 2px 8px; border-radius: 10px;
-      background: rgba(var(--color-primary-rgb), 0.1); color: color-mix(in srgb, var(--color-primary) 75%, var(--text-primary)); font-weight: 500;
+      background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary-text); font-weight: 500;
     }
 
     .asc-actions { display: flex; align-items: center; gap: var(--space-sm); flex-shrink: 0; }
