@@ -40,7 +40,7 @@ export interface TabOption<T extends string = string> {
       display: inline-flex;
       background: var(--bg-canvas);
       border: 1px solid var(--border-color);
-      border-radius: 10px;
+      border-radius: var(--border-radius-lg);
       padding: 3px;
       position: sticky;
       top: calc(var(--topbar-height, 0px) + var(--module-nav-height, 0px) + 12px);
@@ -53,7 +53,7 @@ export interface TabOption<T extends string = string> {
       flex: 1;
       padding: 7px 18px;
       border: none;
-      border-radius: 7px;
+      border-radius: var(--border-radius);
       background: none;
       color: var(--text-secondary);
       font-size: var(--font-size-sm);
