@@ -1,8 +1,4 @@
--- Copyable group invite links. Unlike journal_group_invites (one row per
--- emailed address, redeemable only by that address), a link admits any
--- signed-in Jiro account that holds it, until it expires or the owner
--- revokes it. Only a SHA-256 hash of the token is stored, as with email
--- invites and refresh tokens: the raw token is shown to the owner once.
+-- Copyable group invite links for any signed-in account until expired or revoked; only the token hash is stored.
 CREATE TABLE IF NOT EXISTS journal_group_invite_links (
     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     group_id   UUID NOT NULL REFERENCES journal_groups(id) ON DELETE CASCADE,
@@ -16,8 +12,7 @@ CREATE TABLE IF NOT EXISTS journal_group_invite_links (
 CREATE INDEX IF NOT EXISTS idx_journal_group_invite_links_group
     ON journal_group_invite_links(group_id);
 
--- 000032's default privileges only cover tables created by the role that ran
--- it; grant explicitly so this works whichever admin role applies it.
+-- Grant explicitly: 000032's default privileges only cover tables made by the role that ran it.
 DO $$
 BEGIN
     IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'jiro_app') THEN

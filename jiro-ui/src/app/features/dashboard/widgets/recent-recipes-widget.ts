@@ -1,6 +1,7 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Recipe } from '../../../core/services/recipe.service';
+import { SettingsService } from '../../../core/services/settings.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
@@ -62,6 +63,7 @@ import { shortDate } from './format';
   `],
 })
 export class RecentRecipesWidgetComponent {
+  private readonly settings = inject(SettingsService);
   data = input<WidgetData<Recipe[]>>(undefined);
 
   readonly def = WIDGET_BY_ID.get('recent_recipes')!;
@@ -71,7 +73,7 @@ export class RecentRecipesWidgetComponent {
     (this.data() ?? []).map(r => ({
       id: r.id,
       title: r.title,
-      cooked: r.last_cooked ? `Last cooked ${shortDate(r.last_cooked)}` : 'Not cooked yet',
+      cooked: r.last_cooked ? `Last cooked ${shortDate(r.last_cooked, this.settings.timezone())}` : 'Not cooked yet',
     })),
   );
 }

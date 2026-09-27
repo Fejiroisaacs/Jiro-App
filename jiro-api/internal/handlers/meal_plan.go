@@ -21,8 +21,7 @@ func NewMealPlanHandler(service *services.MealPlanService) *MealPlanHandler {
 
 // GET /culinara/meal-plan?week=YYYY-MM-DD&tz=<IANA>
 // Returns (or creates) the meal plan for the given week.
-// If week is omitted, uses the Monday of the current week in the user's
-// timezone (tz is only a fallback for a user with no timezone setting).
+// If week is omitted, uses the current week in the user's timezone.
 func (h *MealPlanHandler) GetOrCreate(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 
@@ -108,8 +107,7 @@ func (h *MealPlanHandler) RemoveEntry(c *gin.Context) {
 }
 
 // parseWeekStart parses a YYYY-MM-DD string and returns the Monday of that week.
-// If s is empty, returns the Monday of today's week, where today is the
-// user's calendar date (see MealPlanService.Today).
+// If s is empty, returns the Monday of the user's current week.
 func parseWeekStart(s string, today time.Time) (time.Time, error) {
 	var t time.Time
 	if s == "" {

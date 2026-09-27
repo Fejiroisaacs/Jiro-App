@@ -12,6 +12,7 @@ import {
 import { UploadService } from '../../../core/services/upload.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { todayKey } from '../../../core/utils/day';
+import { suggestNextWeight } from '../weight-suggestion';
 import { AuthService } from '../../../core/services/auth.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
@@ -56,7 +57,7 @@ interface ExerciseBlock {
     <div class="session-bar">
       <div class="session-bar-row">
         <div class="session-bar-left">
-          <span class="bar-label">Active Session</span>
+          <span class="bar-label">Active session</span>
           <span class="timer">{{ elapsedDisplay() }}</span>
         </div>
         <div class="session-bar-right">
@@ -128,10 +129,12 @@ interface ExerciseBlock {
       <!-- Session notes -->
       @if (!loading()) {
 <div class="notes-panel">
+        <label class="field-label" for="session-notes">Session notes</label>
         <textarea
+          id="session-notes"
           class="notes-input"
           [(ngModel)]="sessionNotes"
-          placeholder="Session notes (optional)..."
+          placeholder="Optional"
           rows="2"
           (blur)="saveNotes()">
         </textarea>
@@ -141,10 +144,11 @@ interface ExerciseBlock {
       <!-- Body weight panel -->
       @if (!loading()) {
 <div class="bw-panel">
-        <span class="bw-label">Body weight</span>
+        <label class="bw-label" for="session-bw">Body weight</label>
         @if (!bwLogged()) {
 <div class="bw-row">
           <input
+            id="session-bw"
             class="bw-input"
             type="number"
             step="0.1"
@@ -160,7 +164,7 @@ interface ExerciseBlock {
         </div>
 }
         @if (bwLogged()) {
-<span class="bw-logged">✓ {{ bwValue }} {{ settingsService.unitLabel() }} logged</span>
+<span class="bw-logged"><jiro-icon name="check" [size]="14" /> {{ bwValue }} {{ settingsService.unitLabel() }} logged</span>
 }
       </div>
 }
@@ -178,8 +182,7 @@ interface ExerciseBlock {
         <!-- Exercise blocks -->
         @for (block of blocks(); track block; let bi = $index) {
 <div class="ex-block">
-          <!-- The whole header toggles on click; the name button is its keyboard and
-               screen reader handle (its click bubbles up here). Delete stops propagation. -->
+          <!-- The header toggles on click; the name button is its keyboard handle (its click bubbles up). -->
           <div class="block-header" [class.block-open]="!isCollapsed(bi)" (click)="toggleBlock(bi)">
             <div class="block-title">
               <h2><button type="button" class="block-toggle" [attr.aria-expanded]="!isCollapsed(bi)" [attr.aria-controls]="'block-body-' + bi">{{ block.exerciseName }}</button></h2>
@@ -203,9 +206,7 @@ interface ExerciseBlock {
                   <jiro-icon name="trash" [size]="16" />
                 }
               </button>
-              <svg class="chevron" aria-hidden="true" [class.open]="!isCollapsed(bi)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="6,9 12,15 18,9"/>
-              </svg>
+              <jiro-icon name="caret-down" [size]="16" class="chevron" [class.open]="!isCollapsed(bi)" />
             </div>
           </div>
 
@@ -215,19 +216,19 @@ interface ExerciseBlock {
             <!-- Progressive overload suggestion -->
             @if (block.suggestion && !allSaved(bi)) {
 <div class="overload-hint">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="23,6 13.5,15.5 8.5,10.5 1,18"/><polyline points="17,6 23,6 23,12"/>
-              </svg>
+              <jiro-icon name="trend-up" [size]="12" />
               {{ block.suggestion }}
             </div>
 }
 
             <!-- Exercise note -->
             <div class="ex-note-wrap">
+              <label class="field-label" [attr.for]="'ex-note-' + bi">Exercise note</label>
               <textarea
+                [id]="'ex-note-' + bi"
                 class="ex-note-input"
                 [(ngModel)]="block.exerciseNote"
-                placeholder="Note for this exercise..."
+                placeholder="Optional"
                 rows="1"
                 (blur)="saveExerciseNote(bi)"></textarea>
             </div>
@@ -277,7 +278,6 @@ interface ExerciseBlock {
                   min="1"
                   max="10"
                   [(ngModel)]="row.rpe"
-                  placeholder="—"
                   [disabled]="row.saved" />
 
                 <button
@@ -321,7 +321,7 @@ interface ExerciseBlock {
 }
 
             <!-- Add set -->
-            <button class="add-set-btn" (click)="addSet(bi)">+ Add Set</button>
+            <button class="add-set-btn" (click)="addSet(bi)">+ Add set</button>
 
             <!-- Form check upload -->
             <div class="form-check-row">
@@ -330,11 +330,8 @@ interface ExerciseBlock {
                      [class.fc-uploading]="isFormCheckUploading(block.exerciseId)"
                      [class.fc-disabled]="!canUploadFormCheck(bi, block.exerciseId)"
                      [title]="formCheckBtnTitle(bi, block.exerciseId)">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                  <circle cx="12" cy="13" r="4"/>
-                </svg>
-                {{ isFormCheckUploading(block.exerciseId) ? 'Uploading...' : '+ Form Check' }}
+                <jiro-icon name="camera" [size]="13" />
+                {{ isFormCheckUploading(block.exerciseId) ? 'Uploading...' : '+ Form check' }}
               </label>
               <input type="file" [id]="'fc-input-' + block.exerciseId"
                 accept="video/mp4,video/webm,image/jpeg,image/png"
@@ -357,9 +354,7 @@ interface ExerciseBlock {
 }
                   @if (!clip.file_type.startsWith('image/')) {
 <span class="fc-thumb-video">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
-                    </svg>
+                    <jiro-icon name="video-camera" [size]="14" />
                   </span>
 }
                 </a>
@@ -373,38 +368,40 @@ interface ExerciseBlock {
 }
 
         <!-- Add exercise -->
-        <button class="add-exercise-btn" (click)="addExercise()">+ Add Exercise</button>
+        <button class="add-exercise-btn" (click)="addExercise()">+ Add exercise</button>
       </div>
 }
     </div>
 
     <!-- Exit confirmation modal -->
     @if (showExitConfirm()) {
-<jiro-modal title="Exit Workout?" maxWidth="400px" (close)="showExitConfirm.set(false)">
+<jiro-modal title="Exit workout?" maxWidth="400px" (close)="showExitConfirm.set(false)">
       <p style="font-size:var(--font-size-sm);color:var(--text-secondary);line-height:1.6;margin-bottom:var(--space-lg)">
         Your sets are saved. You can resume this session any time from the Jym home page.
       </p>
       <div style="display:flex;flex-direction:column;gap:var(--space-sm)">
         <div style="display:flex;justify-content:flex-end;gap:var(--space-sm)">
-          <jiro-button variant="secondary" type="button" (click)="showExitConfirm.set(false)">Keep Training</jiro-button>
+          <jiro-button variant="secondary" type="button" (click)="showExitConfirm.set(false)">Keep training</jiro-button>
           <jiro-button variant="primary" type="button" (click)="exitSession()">Save & Exit</jiro-button>
         </div>
         <div style="border-top:1px solid var(--border-color);padding-top:var(--space-sm)">
           <jiro-button variant="danger" type="button" [disabled]="discarding()" (click)="discardSession()">
-            {{ discarding() ? 'Discarding...' : 'Discard Session' }}
+            {{ discarding() ? 'Discarding...' : 'Discard session' }}
           </jiro-button>
         </div>
       </div>
     </jiro-modal>
 }
 
-    <!-- Save as Template modal -->
+    <!-- Save as template modal -->
     @if (showTemplateSave()) {
-<jiro-modal title="Save as Template" maxWidth="420px" (close)="showTemplateSave.set(false)">
+<jiro-modal title="Save as template" maxWidth="420px" (close)="showTemplateSave.set(false)">
       <p style="font-size:var(--font-size-sm);color:var(--text-secondary);margin-bottom:var(--space-md);">
         Give this workout layout a name to reuse it in future sessions.
       </p>
+      <label class="field-label" for="template-name">Template name</label>
       <input
+        id="template-name"
         class="template-name-input"
         type="text"
         [(ngModel)]="templateName"
@@ -418,7 +415,7 @@ interface ExerciseBlock {
       <div style="display:flex;justify-content:flex-end;gap:var(--space-sm);margin-top:var(--space-md)">
         <jiro-button variant="secondary" type="button" (click)="showTemplateSave.set(false)">Cancel</jiro-button>
         <jiro-button variant="primary" type="button" [disabled]="!templateName.trim() || templateSaving()" (click)="saveAsTemplate()">
-          {{ templateSaving() ? 'Saving...' : 'Save Template' }}
+          {{ templateSaving() ? 'Saving...' : 'Save template' }}
         </jiro-button>
       </div>
     </jiro-modal>
@@ -509,7 +506,7 @@ interface ExerciseBlock {
 
     .session-bar-left { display: flex; align-items: center; gap: var(--space-md); }
 
-    .bar-label { font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 1px; opacity: 0.75; }
+    .bar-label { font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; }
 
     .timer { font-size: var(--font-size-xl); font-weight: 700; font-variant-numeric: tabular-nums; }
 
@@ -540,7 +537,7 @@ interface ExerciseBlock {
     .rest-presets { display: flex; gap: 4px; margin-left: auto; }
 
     .rest-chip {
-      min-height: 28px; padding: 2px 8px; border-radius: 10px;
+      min-height: 28px; padding: 2px 8px; border-radius: var(--border-radius-pill);
       border: 1px solid color-mix(in srgb, currentColor 35%, transparent); background: none;
       color: color-mix(in srgb, currentColor 88%, transparent); font-size: var(--font-size-xs);
       cursor: pointer; transition: all 0.15s; font-family: inherit; white-space: nowrap;
@@ -578,7 +575,7 @@ interface ExerciseBlock {
 
     .rest-skip-btn {
       display: inline-flex; align-items: center; justify-content: center;
-      min-height: 28px; padding: 3px 8px; border-radius: 10px;
+      min-height: 28px; padding: 3px 8px; border-radius: var(--border-radius-pill);
       border: 1px solid color-mix(in srgb, currentColor 30%, transparent); background: none;
       color: color-mix(in srgb, currentColor 88%, transparent); cursor: pointer;
       font-size: var(--font-size-xs); transition: all 0.15s; font-family: inherit;
@@ -599,7 +596,7 @@ interface ExerciseBlock {
     .rest-row.rest-done .rest-progress-fill { background: var(--color-positive); }
 
     .type-toggle {
-      display: flex; border-radius: 6px; overflow: hidden;
+      display: flex; border-radius: var(--border-radius); overflow: hidden;
       border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
     }
 
@@ -641,6 +638,15 @@ interface ExerciseBlock {
     }
 
     .notes-panel { margin-bottom: var(--space-md); }
+
+    .field-label {
+      display: block;
+      font-size: var(--font-size-sm); font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: var(--space-xs);
+    }
+
+    .ex-note-wrap .field-label { font-size: var(--font-size-xs); padding: 0 10px; }
 
     .notes-input {
       width: 100%; box-sizing: border-box;
@@ -692,6 +698,7 @@ interface ExerciseBlock {
     .bw-save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
     .bw-logged {
+      display: inline-flex; align-items: center; gap: 4px;
       font-size: var(--font-size-sm); color: var(--color-accent); font-weight: 500;
     }
 
@@ -738,7 +745,7 @@ interface ExerciseBlock {
     .block-title h2 { font-size: var(--font-size-md); font-weight: 600; }
 
     .sets-done-tag {
-      font-size: var(--font-size-xs); padding: 2px 8px; border-radius: 10px;
+      font-size: var(--font-size-xs); padding: 2px 8px; border-radius: var(--border-radius-pill);
       background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary); font-weight: 500;
     }
 
@@ -749,8 +756,8 @@ interface ExerciseBlock {
     .chevron.open { transform: rotate(0deg); }
 
     .mg-tag {
-      background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary);
-      font-size: var(--font-size-xs); padding: 2px 8px; border-radius: 10px;
+      background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary-text);
+      font-size: var(--font-size-xs); padding: 2px 8px; border-radius: var(--border-radius-pill);
     }
 
     /* Exercise note */
@@ -876,7 +883,7 @@ interface ExerciseBlock {
       width: 14px; height: 14px;
       border: 2px solid color-mix(in srgb, currentColor 40%, transparent);
       border-top-color: currentColor; border-radius: 50%;
-      animation: spin 0.6s linear infinite; display: inline-block;
+      animation: jiro-spin 0.6s linear infinite; display: inline-block;
     }
 
     .add-set-btn {
@@ -955,8 +962,6 @@ interface ExerciseBlock {
       font-family: inherit; width: 100%;
     }
     .create-select:focus { border-color: var(--color-primary); }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ── Mobile responsive ── */
     @media (max-width: 768px) {
@@ -1046,7 +1051,7 @@ interface ExerciseBlock {
 
     .fc-progress-bar {
       flex: 1; height: 4px; background: var(--border-color);
-      border-radius: 2px; overflow: hidden;
+      border-radius: var(--border-radius-sm); overflow: hidden;
     }
 
     .fc-progress-fill {
@@ -1069,10 +1074,10 @@ interface ExerciseBlock {
     }
 
     .fc-clip-link { display: inline-flex; align-items: center; text-decoration: none; }
-    .fc-thumb { width: 32px; height: 32px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border-color); }
+    .fc-thumb { width: 32px; height: 32px; object-fit: cover; border-radius: var(--border-radius-sm); border: 1px solid var(--border-color); }
     .fc-thumb-video {
       width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
-      background: var(--surface-secondary); border-radius: 4px; border: 1px solid var(--border-color);
+      background: var(--surface-secondary); border-radius: var(--border-radius-sm); border: 1px solid var(--border-color);
       color: var(--text-secondary);
     }
   `]
@@ -1578,7 +1583,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   finishSession() {
     const hasSavedSets = this.blocks().some(b => b.sets.some(s => s.saved));
     if (!hasSavedSets && !this.sessionNotes.trim()) {
-      this.emptySessionError.set('Nothing to save — log at least one set or add session notes first.');
+      this.emptySessionError.set('Nothing to save. Log at least one set or add session notes first.');
       return;
     }
     this.emptySessionError.set(null);
@@ -1885,14 +1890,12 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     const last = sorted[0];
 
-    const increment = last.weight >= 50 ? 2.5 : 1.25;
-    const suggestKg = Math.round((last.weight + increment) * 4) / 4;
     const unit = this.settingsService.unitLabel();
     const lastDisp = +(this.settingsService.toDisplay(last.weight)).toFixed(2);
-    const suggestDisp = +(this.settingsService.toDisplay(suggestKg)).toFixed(2);
+    const suggestDisp = suggestNextWeight(lastDisp, unit);
 
     return {
-      suggestion: `Last: ${lastDisp} ${unit} × ${last.reps} — try ${suggestDisp} ${unit}`,
+      suggestion: `Last: ${lastDisp} ${unit} × ${last.reps}, try ${suggestDisp} ${unit}`,
       ghostWeight: String(suggestDisp),
       ghostReps: String(last.reps),
     };

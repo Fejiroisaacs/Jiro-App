@@ -51,14 +51,14 @@ export class WorkoutWidgetComponent {
     return {
       id: s.id,
       name: s.routine_name || 'Freestyle session',
-      detail: `In progress, started ${timeAgo(s.started_at)}, ${plural(s.set_count, 'set', 'sets')} logged`,
+      detail: `In progress, started ${timeAgo(s.started_at, Date.now(), this.settings.timezone())}, ${plural(s.set_count, 'set', 'sets')} logged`,
     };
   });
 
   readonly last = computed(() => {
     const s = this.data()?.lastCompleted;
     if (!s) return null;
-    const parts = [timeAgo(s.ended_at!), plural(s.set_count, 'set', 'sets')];
+    const parts = [timeAgo(s.ended_at!, Date.now(), this.settings.timezone()), plural(s.set_count, 'set', 'sets')];
     if (s.pr_count > 0) parts.push(plural(s.pr_count, 'PR', 'PRs'));
     const volume = Math.round(this.settings.toDisplay(s.total_volume)).toLocaleString('en-US');
     return {

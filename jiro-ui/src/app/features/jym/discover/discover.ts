@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, inject } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -8,11 +8,14 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
 import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-card';
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
+import { SettingsService } from '../../../core/services/settings.service';
+import { formatInstant } from '../../../core/utils/format-date';
 
 @Component({
   selector: 'app-discover',
   standalone: true,
-  imports: [FormsModule, JiroButtonComponent, JiroIconComponent, JiroCardComponent, JiroPageHeaderComponent, JiroEmptyStateComponent],
+  imports: [JiroSkeletonComponent, FormsModule, JiroButtonComponent, JiroIconComponent, JiroCardComponent, JiroPageHeaderComponent, JiroEmptyStateComponent],
   template: `
     <div class="discover">
       <jiro-page-header heading="Discover" subtitle="Browse public training splits from the community">
@@ -46,7 +49,7 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
 
       <!-- Loading -->
       @if (loading()) {
-        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+        <div class="splits-grid" role="status" aria-label="Loading splits">@for (i of [1, 2, 3, 4, 5, 6]; track i) { <jiro-skeleton height="140px" /> }</div>
       }
 
       <!-- Empty -->
@@ -98,17 +101,13 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
       @if (!loading() && splits().length > 0) {
 <div class="pagination">
         <button class="page-btn" [disabled]="page() <= 1" (click)="changePage(-1)">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="15,18 9,12 15,6"/>
-          </svg>
+          <jiro-icon name="caret-left" [size]="14" />
           Prev
         </button>
         <span class="page-label text-secondary">Page {{ page() }}</span>
         <button class="page-btn" [disabled]="splits().length < pageSize" (click)="changePage(1)">
           Next
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="9,18 15,12 9,6"/>
-          </svg>
+          <jiro-icon name="caret-right" [size]="14" />
         </button>
       </div>
 }
@@ -147,7 +146,7 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
 
     .tag-input { flex: 0 1 180px; }
 
-    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
+
 
     .splits-grid {
       display: grid;
@@ -164,9 +163,9 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
     .split-name { font-size: var(--font-size-lg); font-weight: 600; }
 
     .routine-badge {
-      background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary);
+      background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary-text);
       font-size: var(--font-size-xs); font-weight: 600;
-      padding: 3px 10px; border-radius: 12px; white-space: nowrap; flex-shrink: 0;
+      padding: 3px 10px; border-radius: var(--border-radius-pill); white-space: nowrap; flex-shrink: 0;
     }
 
     .split-desc { font-size: var(--font-size-sm); line-height: 1.4; }
@@ -175,7 +174,7 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
 
     .tag-chip {
       font-size: 11px; font-weight: 500;
-      padding: 2px 8px; border-radius: 10px;
+      padding: 2px 8px; border-radius: var(--border-radius-pill);
       background: rgba(var(--color-primary-rgb), 0.08); color: var(--color-primary);
       border: 1px solid rgba(var(--color-primary-rgb), 0.18);
     }
@@ -215,6 +214,8 @@ export class DiscoverComponent implements OnInit {
   searchQuery = '';
   tagFilter = '';
 
+  private readonly settings = inject(SettingsService);
+
   constructor(private jymService: JymService, public router: Router) { }
 
   ngOnInit() {
@@ -249,7 +250,7 @@ export class DiscoverComponent implements OnInit {
     });
   }
 
-  formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  formatDate(instant: string): string {
+    return formatInstant(instant, this.settings.timezone());
   }
 }

@@ -8,11 +8,12 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 
 @Component({
   selector: 'app-jym-templates',
   standalone: true,
-  imports: [JiroButtonComponent, JiroIconComponent, JiroPageHeaderComponent, JiroEmptyStateComponent],
+  imports: [JiroSkeletonComponent, JiroButtonComponent, JiroIconComponent, JiroPageHeaderComponent, JiroEmptyStateComponent],
   template: `
     <div class="templates-page">
       @if (!embedded()) {
@@ -20,7 +21,7 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
       }
 
       @if (loading()) {
-        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+        <div class="template-list" role="status" aria-label="Loading templates">@for (i of [1, 2, 3]; track i) { <jiro-skeleton height="72px" /> }</div>
       }
 
       @if (!loading() && templates().length === 0) {
@@ -53,9 +54,7 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
           </div>
           <div class="template-actions">
             <jiro-button variant="primary" type="button" (click)="startFromTemplate(t)">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                <polygon points="5,3 19,12 5,21"/>
-              </svg>
+              <jiro-icon name="play:fill" [size]="11" />
               Start
             </jiro-button>
             <button class="delete-btn" type="button" title="Delete template" [attr.aria-label]="'Delete template ' + t.name" (click)="deleteTemplate(t)">
@@ -73,7 +72,7 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
     :host { display: block; }
     .templates-page { max-width: 700px; width: 100%; }
 
-    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
+
 
     .template-list { display: flex; flex-direction: column; gap: var(--space-sm); }
 

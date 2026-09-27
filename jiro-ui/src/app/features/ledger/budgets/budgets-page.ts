@@ -12,10 +12,11 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { SettingsService } from '../../../core/services/settings.service';
-import { periodLabel, clamp, formatCurrency, currencySymbol } from '../shared/ledger-utils';
+import { periodLabel, clamp, formatCurrency, currencySymbol, categoryColor } from '../shared/ledger-utils';
 import { LedgerCategoryDialogComponent } from '../shared/category-dialog/ledger-category-dialog';
 import { LedgerCategoryManagerComponent } from '../shared/category-manager/ledger-category-manager';
 import { LedgerCategory } from '../../../core/services/ledger.service';
@@ -25,7 +26,7 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
   standalone: true,
   imports: [
     CommonModule, FormsModule, JiroCardComponent, JiroButtonComponent, JiroModalComponent,
-    JiroIconComponent, JiroPageHeaderComponent, JiroEmptyStateComponent,
+    JiroIconComponent, JiroPageHeaderComponent, JiroEmptyStateComponent, JiroSkeletonComponent,
     LedgerCategoryDialogComponent, LedgerCategoryManagerComponent,
   ],
   template: `
@@ -41,7 +42,18 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
 
       <!-- Loading -->
       @if (loading()) {
-        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+        <div class="budgets-grid" aria-hidden="true">
+          @for (i of [0, 1, 2, 3]; track i) {
+            <jiro-card>
+              <div class="sk-stack">
+                <jiro-skeleton height="18px" width="50%" />
+                <jiro-skeleton height="10px" />
+                <jiro-skeleton height="12px" width="40%" />
+              </div>
+            </jiro-card>
+          }
+        </div>
+        <span class="sr-only" role="status">Loading budgets</span>
       }
 
       <!-- Summary bar -->
@@ -90,7 +102,7 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
               <span
                 class="color-dot"
                 aria-hidden="true"
-                [style.background]="budget.category_color || 'var(--text-muted)'">
+                [style.background]="categoryColor(budget.category_color)">
               </span>
               <h2 class="category-name">{{ budget.category_name }}</h2>
             </div>
@@ -128,9 +140,7 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
 }
             @if (budget.remaining < 0) {
 <span class="remaining-over">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-              </svg>
+              <jiro-icon name="warning-circle" [size]="12" />
               Over budget by {{ money(-budget.remaining) }}
             </span>
 }
@@ -164,9 +174,9 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
           <div class="form-group">
             <div class="label-row">
               <label class="form-label" for="budget-add-category">Category</label>
-              <button type="button" class="new-cat-btn" (click)="showCatDialog.set(true)">+ New category</button>
+              <button type="button" class="new-cat-btn" (click)="showCatDialog.set(true)"><jiro-icon name="plus" [size]="14" /> New category</button>
             </div>
-            <select id="budget-add-category" class="form-input" [(ngModel)]="newCategoryId" name="category" required>
+            <span class="select-wrap"><select id="budget-add-category" class="form-input" [(ngModel)]="newCategoryId" name="category" required>
               <option value="" disabled>Select a category...</option>
               @for (cat of expenseCategories(); track cat.id) {
                 <option [value]="cat.id">{{ cat.name }}</option>
@@ -174,7 +184,7 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
                   <option [value]="child.id">{{ cat.name }} / {{ child.name }}</option>
                 }
               }
-            </select>
+            </select></span>
           </div>
 
           <div class="form-group">
@@ -194,11 +204,11 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
 
           <div class="form-group">
             <label class="form-label" for="budget-add-period">Period</label>
-            <select id="budget-add-period" class="form-input" [(ngModel)]="newPeriod" name="period">
+            <span class="select-wrap"><select id="budget-add-period" class="form-input" [(ngModel)]="newPeriod" name="period">
               <option value="monthly">Monthly</option>
               <option value="weekly">Weekly</option>
               <option value="yearly">Yearly</option>
-            </select>
+            </select></span>
             <p class="field-hint">A budget always tracks the current {{ periodWord(newPeriod) }}, starting over at the next one.</p>
           </div>
 
@@ -235,11 +245,11 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
           </div>
           <div class="form-group">
             <label class="form-label" for="budget-edit-period">Period</label>
-            <select id="budget-edit-period" class="form-input" [(ngModel)]="editPeriod" name="period">
+            <span class="select-wrap"><select id="budget-edit-period" class="form-input" [(ngModel)]="editPeriod" name="period">
               <option value="monthly">Monthly</option>
               <option value="weekly">Weekly</option>
               <option value="yearly">Yearly</option>
-            </select>
+            </select></span>
           </div>
           @if (formError()) {
             <p class="form-error" role="alert">{{ formError() }}</p>
@@ -317,7 +327,7 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
     }
 
     /* ── State messages ── */
-    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
+    .sk-stack { display: flex; flex-direction: column; gap: var(--space-sm); }
 
 
     /* ── Empty state ── */
@@ -345,7 +355,7 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
       width: 40px; height: 40px; border: none; background: none; cursor: pointer;
       border-radius: var(--border-radius); color: var(--text-secondary);
     }
-    .icon-btn:hover { background: var(--bg-canvas); color: var(--color-primary); }
+    .icon-btn:hover { background: var(--bg-canvas); color: var(--color-primary-text); }
     .icon-btn.delete-btn:hover { color: var(--color-danger); }
 
     .field-hint { font-size: var(--font-size-xs); color: var(--text-muted); margin: 0; line-height: 1.5; }
@@ -384,7 +394,7 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
       font-size: var(--font-size-xs);
       font-weight: 600;
       padding: 3px 8px;
-      border-radius: 2px;
+      border-radius: var(--border-radius-pill);
       border: 1px solid var(--border-color);
       white-space: nowrap;
       flex-shrink: 0;
@@ -396,7 +406,7 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
     .progress-track {
       height: 8px;
       background: var(--bg-canvas);
-      border-radius: 4px;
+      border-radius: var(--border-radius-pill);
       border: 1px solid var(--border-color);
       overflow: hidden;
     }
@@ -404,7 +414,7 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
     .progress-fill {
       height: 100%;
       background: var(--color-accent);
-      border-radius: 4px;
+      border-radius: var(--border-radius-pill);
       transition: width 0.4s ease;
     }
 
@@ -467,12 +477,13 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
     }
 
     .new-cat-btn {
+      display: inline-flex; align-items: center; gap: 4px;
       background: none;
       border: none;
       padding: 8px 0;
       font-size: var(--font-size-sm);
       font-weight: 500;
-      color: var(--color-primary);
+      color: var(--color-primary-text);
       cursor: pointer;
       line-height: 1;
     }
@@ -502,11 +513,24 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
     }
 
     select.form-input {
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239B8F88' stroke-width='2.5'%3E%3Cpolyline points='6,9 12,15 18,9'/%3E%3C/svg%3E");
-      background-repeat: no-repeat;
-      background-position: right 4px center;
       padding-right: 24px;
       cursor: pointer;
+    }
+
+    .select-wrap { position: relative; display: block; }
+
+    /* Chevron drawn as a mask so it takes the theme's muted text colour. */
+    .select-wrap::after {
+      content: '';
+      position: absolute;
+      right: 4px;
+      top: 50%;
+      width: 12px;
+      height: 12px;
+      transform: translateY(-50%);
+      background-color: var(--text-muted);
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5'%3E%3Cpolyline points='6,9 12,15 18,9'/%3E%3C/svg%3E") center / contain no-repeat;
+      pointer-events: none;
     }
 
     .form-input:focus { border-bottom-color: var(--color-primary); }
@@ -525,6 +549,7 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
   `]
 })
 export class BudgetsPageComponent implements OnInit {
+  readonly categoryColor = categoryColor;
   readonly periodLabel = periodLabel;
   readonly clamp = clamp;
 

@@ -15,11 +15,13 @@ import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-he
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
 import { dayKey, todayKey } from '../../../core/utils/day';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
+import { formatInstant } from '../../../core/utils/format-date';
 
 @Component({
   selector: 'app-session-history',
   standalone: true,
-  imports: [
+  imports: [JiroSkeletonComponent, 
     CommonModule, FormsModule, RouterLink, JiroButtonComponent, JiroIconComponent,
     JiroPageHeaderComponent, JiroEmptyStateComponent, JymPrBadgeComponent,
   ],
@@ -65,7 +67,7 @@ import { dayKey, todayKey } from '../../../core/utils/day';
 
       <!-- Loading -->
       @if (loading()) {
-        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+        <div class="sessions-list" role="status" aria-label="Loading sessions">@for (i of [1, 2, 3, 4]; track i) { <jiro-skeleton height="88px" /> }</div>
       }
 
       <!-- Empty -->
@@ -125,8 +127,9 @@ import { dayKey, todayKey } from '../../../core/utils/day';
           @if (selectedId() === s.id) {
 <div class="session-detail">
             @if (detailLoading()) {
-<div class="detail-loading">
-              <div class="spinner-sm"></div>
+<div class="detail-loading" role="status" aria-label="Loading session">
+              <jiro-skeleton width="30%" height="16px" />
+              <jiro-skeleton [lines]="3" height="28px" />
             </div>
 }
 
@@ -170,7 +173,7 @@ import { dayKey, todayKey } from '../../../core/utils/day';
               @if (detail()!.attachments.length > 0) {
 <div class="attachments-panel" (click)="$event.stopPropagation()">
                 <div class="attachments-header">
-                  <span class="section-label">Form Check / Photos</span>
+                  <span class="section-label">Form check / photos</span>
                 </div>
 
                 <div class="attachments-grid">
@@ -290,7 +293,7 @@ import { dayKey, todayKey } from '../../../core/utils/day';
       z-index: 0;
     }
 
-    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
+
 
     .sessions-list { display: flex; flex-direction: column; gap: var(--space-md); }
 
@@ -314,15 +317,15 @@ import { dayKey, todayKey } from '../../../core/utils/day';
     .session-date { font-weight: 600; font-size: var(--font-size-md); }
 
     .session-routine {
-      font-size: var(--font-size-sm); color: var(--text-secondary);
-      background: var(--color-secondary); padding: 2px 10px; border-radius: 10px;
+      font-size: var(--font-size-sm); color: var(--text-primary);
+      background: var(--color-secondary); padding: 2px 10px; border-radius: var(--border-radius-pill);
     }
 
     .session-routine.freestyle { color: var(--text-muted); font-style: italic; background: none; }
 
     .type-badge {
       font-size: var(--font-size-xs); font-weight: 600;
-      padding: 2px 8px; border-radius: 10px;
+      padding: 2px 8px; border-radius: var(--border-radius-pill);
     }
 
     .type-badge.deload { background: rgba(var(--color-danger-rgb), 0.1); color: var(--color-danger); }
@@ -335,7 +338,7 @@ import { dayKey, todayKey } from '../../../core/utils/day';
 
     .delete-session-btn {
       background: none; border: none; cursor: pointer;
-      color: var(--text-muted); padding: 6px; border-radius: 4px;
+      color: var(--text-muted); padding: 6px; border-radius: var(--border-radius-sm);
       display: flex; align-items: center; transition: all 0.15s;
       flex-shrink: 0;
     }
@@ -344,8 +347,8 @@ import { dayKey, todayKey } from '../../../core/utils/day';
 
     .stat-pill {
       font-size: var(--font-size-xs); padding: 3px 10px;
-      background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary);
-      border-radius: 10px; font-weight: 500;
+      background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary-text);
+      border-radius: var(--border-radius-pill); font-weight: 500;
     }
 
     .vol-pill { background: var(--bg-canvas); color: var(--text-secondary); border: 1px solid var(--border-color); }
@@ -357,13 +360,7 @@ import { dayKey, todayKey } from '../../../core/utils/day';
       animation: slideDown 0.2s ease;
     }
 
-    .detail-loading { display: flex; align-items: center; justify-content: center; padding: var(--space-md); }
-
-    .spinner-sm {
-      width: 24px; height: 24px; border: 2px solid var(--border-color);
-      border-top-color: var(--color-primary); border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
+    .detail-loading { display: flex; flex-direction: column; gap: var(--space-sm); padding: var(--space-md); }
 
     .detail-sets { display: flex; flex-direction: column; gap: var(--space-md); }
 
@@ -479,7 +476,7 @@ import { dayKey, todayKey } from '../../../core/utils/day';
     .attachment-delete-btn {
       flex-shrink: 0; width: 20px; height: 20px;
       display: flex; align-items: center; justify-content: center;
-      background: none; border: none; border-radius: 4px;
+      background: none; border: none; border-radius: var(--border-radius-sm);
       color: var(--text-muted); cursor: pointer; padding: 0;
       transition: background 0.15s, color 0.15s;
     }
@@ -600,7 +597,8 @@ export class SessionHistoryComponent implements OnInit {
 
   private scrollToSession(id: string) {
     afterNextRender(() => {
-      document.getElementById('session-' + id)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      document.getElementById('session-' + id)?.scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : 'smooth' });
     }, { injector: this.injector });
   }
 
@@ -641,8 +639,8 @@ export class SessionHistoryComponent implements OnInit {
     return Array.from(map.values());
   }
 
-  formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  formatDate(instant: string): string {
+    return formatInstant(instant, this.settingsService.timezone(), { weekday: true });
   }
 
   formatDuration(start: string, end: string): string {

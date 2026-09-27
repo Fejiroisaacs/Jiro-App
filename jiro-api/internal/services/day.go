@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"math"
 	"time"
-	// The runtime image (alpine, no tzdata package) has no zoneinfo on disk,
-	// so without the embedded copy every LoadLocation would fail and every
-	// user's day would silently fall back to UTC in production.
+	// The alpine runtime image has no zoneinfo; without this every zone falls back to UTC.
 	_ "time/tzdata"
 
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/models"
@@ -28,9 +26,7 @@ const dayLayout = "2006-01-02"
 // dayExcerptRunes caps the journal excerpt sent with each entry.
 const dayExcerptRunes = 240
 
-// DayService assembles the cross-module view of one calendar day. It only
-// reads: in particular the planned meals are read without creating the
-// week's plan, unlike GET /culinara/meal-plan.
+// DayService assembles one calendar day across modules; read-only (never creates a meal plan).
 type DayService struct {
 	db  *pgxpool.Pool
 	jym *JymService
@@ -40,9 +36,7 @@ func NewDayService(db *pgxpool.Pool, jym *JymService) *DayService {
 	return &DayService{db: db, jym: jym}
 }
 
-// UserLocation resolves a stored IANA zone name. Empty, "Local" (which would
-// mean the server's zone) and anything the zone database does not know fall
-// back to UTC. The returned name is the zone actually used.
+// UserLocation resolves an IANA zone name, falling back to UTC for empty, "Local" or unknown.
 func UserLocation(name string) (*time.Location, string) {
 	if name == "" || name == "Local" {
 		return time.UTC, "UTC"
@@ -54,10 +48,7 @@ func UserLocation(name string) (*time.Location, string) {
 	return loc, loc.String()
 }
 
-// PickLocation chooses the zone a user's day is cut in: their settings zone
-// when it is valid, else the client's hint (the browser's zone, which the
-// client also falls back to, so both sides agree for a user who never set
-// one), else UTC.
+// PickLocation picks the zone a user's day is cut in: settings zone, else client hint, else UTC.
 func PickLocation(setting, hint string) (*time.Location, string) {
 	if loc, name := UserLocation(setting); name != "UTC" || setting == "UTC" {
 		return loc, name
@@ -65,11 +56,7 @@ func PickLocation(setting, hint string) (*time.Location, string) {
 	return UserLocation(hint)
 }
 
-// userLocation reads the user's settings timezone and returns the zone their
-// days are cut in, with the same precedence as GET /day (PickLocation). Every
-// day-based endpoint calls it once per request. The zone's name
-// (loc.String()) is also valid for Postgres's AT TIME ZONE: the embedded
-// tzdata and Postgres's use the same IANA names.
+// userLocation returns the user's day zone (as PickLocation); its name also works for AT TIME ZONE.
 func userLocation(ctx context.Context, db *pgxpool.Pool, userID uuid.UUID, hint string) (*time.Location, error) {
 	var tzName *string
 	if err := db.QueryRow(ctx,
@@ -81,25 +68,19 @@ func userLocation(ctx context.Context, db *pgxpool.Pool, userID uuid.UUID, hint 
 	return loc, nil
 }
 
-// calendarToday is today's calendar date in loc, at UTC midnight (the form
-// the day and week helpers here work in).
+// calendarToday is today's date in loc, at UTC midnight.
 func calendarToday(now time.Time, loc *time.Location) time.Time {
 	y, m, d := now.In(loc).Date()
 	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 }
 
-// DayWindow is the instant range [start, end) of the calendar day
-// year-month-day in loc: local midnight to the next local midnight. The end
-// comes from AddDate on the calendar date, not start+24h, so the window is
-// 23 hours on a spring-forward day and 25 on a fall-back day.
+// DayWindow is [local midnight, next local midnight) of that date in loc; 23 or 25 hours across DST.
 func DayWindow(year int, month time.Month, day int, loc *time.Location) (time.Time, time.Time) {
 	start := time.Date(year, month, day, 0, 0, 0, 0, loc)
 	return start, start.AddDate(0, 0, 1)
 }
 
-// ResolveDay parses the requested date against "now" in loc. An empty string
-// means today. It returns the calendar date (at UTC midnight, used only for
-// its year/month/day) or ErrInvalidDay / ErrFutureDay.
+// ResolveDay parses a date (empty means today in loc) or returns ErrInvalidDay / ErrFutureDay.
 func ResolveDay(raw string, loc *time.Location, now time.Time) (time.Time, error) {
 	ty, tm, td := now.In(loc).Date()
 	today := time.Date(ty, tm, td, 0, 0, 0, 0, time.UTC)
@@ -121,8 +102,7 @@ func weekdayIndex(d time.Time) int {
 	return (int(d.Weekday()) + 6) % 7
 }
 
-// GetDay returns the user's day. rawDate is YYYY-MM-DD or empty for today;
-// tzHint is used only when the user has no valid timezone setting.
+// GetDay returns the user's day; rawDate is YYYY-MM-DD or empty for today.
 func (s *DayService) GetDay(ctx context.Context, userID uuid.UUID, rawDate, tzHint string, now time.Time) (*models.DayResponse, error) {
 	var tzName, unit *string
 	if err := s.db.QueryRow(ctx,
@@ -222,8 +202,7 @@ func (s *DayService) cooked(ctx context.Context, userID uuid.UUID, start, end ti
 	return out, rows.Err()
 }
 
-// planned reads the week's existing plan only; a week with no plan row is
-// simply empty. The recipe join is scoped to the plan's owner as well.
+// planned reads the week's existing plan only, scoped to its owner.
 func (s *DayService) planned(ctx context.Context, userID uuid.UUID, weekStart string, weekday int) ([]models.DayPlanned, error) {
 	rows, err := s.db.Query(ctx, `
 		SELECT e.id, e.meal_slot, r.id, r.title, e.custom_label
@@ -273,8 +252,7 @@ func (s *DayService) journal(ctx context.Context, userID uuid.UUID, start, end t
 	return out, rows.Err()
 }
 
-// ledger: transactions dated that day. A transfer writes two rows (negative
-// on the source, positive on the destination); only the source leg is listed.
+// ledger lists that day's transactions; a transfer is listed once, by its source leg.
 func (s *DayService) ledger(ctx context.Context, userID uuid.UUID, date string, dst *models.DayLedger) error {
 	rows, err := s.db.Query(ctx, `
 		SELECT t.id, t.type, t.amount::float8, t.description, t.account_id, a.name, a.currency,

@@ -27,6 +27,8 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
+import { formatDay } from '../../../core/utils/format-date';
 
 Chart.register(...registerables);
 
@@ -35,7 +37,7 @@ Chart.register(...registerables);
   standalone: true,
   imports: [
     CommonModule, FormsModule, JiroCardComponent, JiroButtonComponent, JiroModalComponent,
-    JiroIconComponent, JiroPageHeaderComponent, JiroEmptyStateComponent,
+    JiroIconComponent, JiroPageHeaderComponent, JiroEmptyStateComponent, JiroSkeletonComponent,
   ],
   template: `
     <div class="networth-page">
@@ -50,7 +52,18 @@ Chart.register(...registerables);
 
       <!-- Loading -->
       @if (loading()) {
-        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+        <div class="sk-stack" aria-hidden="true">
+          <jiro-card>
+            <div class="sk-stack">
+              <jiro-skeleton height="12px" width="140px" />
+              <jiro-skeleton height="36px" width="220px" />
+              <jiro-skeleton height="12px" width="120px" />
+            </div>
+          </jiro-card>
+          <jiro-skeleton height="280px" />
+          <jiro-skeleton [lines]="4" height="44px" />
+        </div>
+        <span class="sr-only" role="status">Loading net worth</span>
       }
 
       <!-- Empty state (no snapshots at all) -->
@@ -71,7 +84,7 @@ Chart.register(...registerables);
         <jiro-card class="summary-card">
           <div class="summary-grid">
             <div class="summary-main">
-              <span class="summary-label">Current Net Worth</span>
+              <span class="summary-label">Current net worth</span>
               <span
                 class="summary-networth"
                 [class.positive]="latestSnapshot()!.net_worth >= 0"
@@ -83,18 +96,14 @@ Chart.register(...registerables);
             <div class="summary-side">
               <div class="side-stat">
                 <span class="side-label">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="23,6 13.5,15.5 8.5,10.5 1,18"/><polyline points="17,6 23,6 23,12"/>
-                  </svg>
+                  <jiro-icon name="trend-up" [size]="12" />
                   Assets
                 </span>
                 <span class="side-value assets">{{ money(latestSnapshot()!.assets_total) }}</span>
               </div>
               <div class="side-stat">
                 <span class="side-label">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="23,18 13.5,8.5 8.5,13.5 1,6"/><polyline points="17,18 23,18 23,12"/>
-                  </svg>
+                  <jiro-icon name="trend-down" [size]="12" />
                   Liabilities
                 </span>
                 <span class="side-value liabilities">{{ money(latestSnapshot()!.liabilities_total) }}</span>
@@ -105,7 +114,7 @@ Chart.register(...registerables);
 
         <!-- Chart -->
         <jiro-card class="chart-card">
-          <div class="chart-title">Net Worth Over Time</div>
+          <div class="chart-title">Net worth over time</div>
           <div class="chart-wrapper">
             <canvas #networthChart></canvas>
           </div>
@@ -113,14 +122,14 @@ Chart.register(...registerables);
 
         <!-- Snapshot list -->
         <div class="snapshot-list-section">
-          <h2 class="section-heading">Snapshot History</h2>
-          <div class="snapshot-list">
+          <h2 class="section-heading" id="snapshot-history-heading">Snapshot history</h2>
+          <div class="snapshot-list" tabindex="0" role="region" aria-labelledby="snapshot-history-heading">
             @for (snap of displayedSnapshots(); track snap.id) {
 <div class="snapshot-row">
               <div class="snap-date">{{ formatDate(snap.snapshot_date) }}</div>
               <div class="snap-values">
                 <div class="snap-stat">
-                  <span class="snap-label">Net Worth</span>
+                  <span class="snap-label">Net worth</span>
                   <span
                     class="snap-value networth"
                     [class.positive]="snap.net_worth >= 0"
@@ -147,13 +156,13 @@ Chart.register(...registerables);
 
       <!-- Take Snapshot Modal -->
       @if (showSnapshotModal()) {
-<jiro-modal title="Take Snapshot" maxWidth="480px" (close)="closeSnapshotModal()">
+<jiro-modal title="Take snapshot" maxWidth="480px" (close)="closeSnapshotModal()">
 
         @if (loadingAccounts()) {
-<div class="accounts-loading">
-          <div class="spinner-sm"></div>
-          <span>Loading accounts...</span>
+<div class="sk-stack" aria-hidden="true">
+          <jiro-skeleton [lines]="4" height="40px" />
         </div>
+        <span class="sr-only" role="status">Loading accounts</span>
 }
 
         @if (!loadingAccounts()) {
@@ -212,7 +221,7 @@ Chart.register(...registerables);
           <div class="form-actions">
             <jiro-button variant="secondary" type="button" (click)="closeSnapshotModal()">Cancel</jiro-button>
             <jiro-button variant="primary" type="submit" [disabled]="savingSnapshot()">
-              {{ savingSnapshot() ? 'Saving...' : 'Save Snapshot' }}
+              {{ savingSnapshot() ? 'Saving...' : 'Save snapshot' }}
             </jiro-button>
           </div>
 
@@ -237,17 +246,7 @@ Chart.register(...registerables);
     }
 
     /* ── Loading ── */
-    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
-
-
-    .spinner-sm {
-      width: 16px; height: 16px;
-      border: 2px solid var(--border-color);
-      border-top-color: var(--color-primary);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      flex-shrink: 0;
-    }
+    .sk-stack { display: flex; flex-direction: column; gap: var(--space-md); }
 
     /* ── Empty state ── */
 
@@ -415,14 +414,6 @@ Chart.register(...registerables);
     .snap-value.liabilities { color: var(--color-danger); }
 
     /* ── Modal form ── */
-    .accounts-loading {
-      display: flex;
-      align-items: center;
-      gap: var(--space-sm);
-      padding: var(--space-lg);
-      color: var(--text-secondary);
-      font-size: var(--font-size-sm);
-    }
 
     .snap-help { font-size: var(--font-size-sm); color: var(--text-secondary); margin: 0; line-height: 1.5; }
 
@@ -603,11 +594,7 @@ export class NetWorthPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   formatDate(iso: string): string {
-    return parseDateOnly(iso).toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
+    return formatDay(iso);
   }
 
   formatNetWorth(value: number): string {
@@ -642,7 +629,7 @@ export class NetWorthPageComponent implements OnInit, AfterViewInit, OnDestroy {
         data: {
           labels,
           datasets: [{
-            label: 'Net Worth',
+            label: 'Net worth',
             data: values,
             borderColor: tone.accent,
             backgroundColor: `${tone.accent}1a`,

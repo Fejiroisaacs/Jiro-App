@@ -6,16 +6,17 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 
 @Component({
   selector: 'app-discover-detail',
   standalone: true,
-  imports: [JiroButtonComponent, JiroIconComponent, JiroEmptyStateComponent, JiroPageHeaderComponent],
+  imports: [JiroSkeletonComponent, JiroButtonComponent, JiroIconComponent, JiroEmptyStateComponent, JiroPageHeaderComponent],
   template: `
     <div class="discover-detail">
       <!-- Loading -->
       @if (loading()) {
-        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+        <div class="state-loading" role="status" aria-label="Loading split"><jiro-skeleton width="40%" height="32px" /><jiro-skeleton width="25%" height="14px" /><div class="routines-grid">@for (i of [1, 2, 3]; track i) { <jiro-skeleton height="200px" /> }</div></div>
       }
 
       <!-- Error -->
@@ -104,13 +105,13 @@ import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-he
 
     .discover-detail { max-width: 900px; width: 100%; }
 
-    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
+    .state-loading { display: flex; flex-direction: column; gap: var(--space-md); }
 
     .tag-row { display: flex; flex-wrap: wrap; gap: 4px; margin: calc(-1 * var(--space-md)) 0 var(--space-lg); }
 
     .tag-chip {
       font-size: 11px; font-weight: 500;
-      padding: 2px 8px; border-radius: 10px;
+      padding: 2px 8px; border-radius: var(--border-radius-pill);
       background: rgba(var(--color-primary-rgb), 0.08); color: var(--color-primary);
       border: 1px solid rgba(var(--color-primary-rgb), 0.18);
     }
@@ -145,9 +146,9 @@ import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-he
     }
 
     .day-chip {
-      background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary);
+      background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary-text);
       font-size: var(--font-size-xs); font-weight: 600;
-      padding: 2px 8px; border-radius: 10px; white-space: nowrap;
+      padding: 2px 8px; border-radius: var(--border-radius-pill); white-space: nowrap;
     }
 
     .routine-name { font-weight: 600; font-size: var(--font-size-sm); }
@@ -157,7 +158,7 @@ import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-he
     .exercise-row {
       display: flex; align-items: center; justify-content: space-between;
       padding: var(--space-xs) var(--space-sm);
-      border-radius: 4px; transition: background 0.1s;
+      border-radius: var(--border-radius-sm); transition: background 0.1s;
     }
 
     .exercise-row:hover { background: var(--bg-canvas); }
@@ -170,8 +171,8 @@ import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-he
 
     .ex-sets {
       font-size: var(--font-size-xs); font-weight: 600;
-      color: var(--color-primary); background: rgba(var(--color-primary-rgb), 0.1);
-      padding: 2px 8px; border-radius: 8px; white-space: nowrap;
+      color: var(--color-primary-text); background: rgba(var(--color-primary-rgb), 0.1);
+      padding: 2px 8px; border-radius: var(--border-radius-pill); white-space: nowrap;
     }
 
     .no-exercises {

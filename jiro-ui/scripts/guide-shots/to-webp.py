@@ -1,13 +1,4 @@
-"""Convert a guide's raw screenshots into the webp pairs the app serves.
-
-    python scripts/guide-shots/to-webp.py <guide> [name ...]
-
-Reads scripts/guide-shots/.raw/<guide>/<name>-{light,dark}.png (from
-capture.mjs) and writes public/images/guide/<guide>/<name>-{light,dark}.webp,
-at most 1600px wide, lowering the quality until each file is under the size
-budget. Prints each file's width, height and size: width and height go
-straight into <guide-shot [width] [height]>.
-"""
+"""Convert raw guide shots to webp pairs: python scripts/guide-shots/to-webp.py <guide> [name ...]"""
 import os
 import sys
 from PIL import Image

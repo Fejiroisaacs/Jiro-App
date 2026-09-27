@@ -21,21 +21,23 @@ const PRESET_TAGS = [
 const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
   { key: 'vegan', label: 'Vegan' },
   { key: 'vegetarian', label: 'Vegetarian' },
-  { key: 'gluten_free', label: 'Gluten-Free' },
-  { key: 'dairy_free', label: 'Dairy-Free' },
-  { key: 'nut_free', label: 'Nut-Free' },
+  { key: 'gluten_free', label: 'Gluten-free' },
+  { key: 'dairy_free', label: 'Dairy-free' },
+  { key: 'nut_free', label: 'Nut-free' },
 ];
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 
 @Component({
   selector: 'app-recipe-form',
   standalone: true,
-  imports: [FormsModule, JiroButtonComponent],
+  imports: [JiroIconComponent, FormsModule, JiroButtonComponent],
   template: `
     <form (ngSubmit)="onSubmit()" class="recipe-form">
       <!-- Title -->
       <div class="field">
-        <label class="field-label">Title <span class="required">*</span></label>
+        <label class="field-label" for="rf-title">Title <span class="required">*</span></label>
         <input
+          id="rf-title"
           class="field-input"
           type="text"
           [(ngModel)]="title"
@@ -46,8 +48,9 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
 
       <!-- Description -->
       <div class="field">
-        <label class="field-label">Description</label>
+        <label class="field-label" for="rf-description">Description</label>
         <textarea
+          id="rf-description"
           class="field-input field-textarea"
           [(ngModel)]="description"
           name="description"
@@ -76,14 +79,16 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
           @for (tag of customTagsList; track tag) {
 <span class="custom-tag">
             {{ tag }}
-            <button type="button" class="custom-tag-remove" (click)="removeTag(tag)" title="Remove">×</button>
+            <button type="button" class="custom-tag-remove" (click)="removeTag(tag)" [attr.aria-label]="'Remove tag ' + tag" title="Remove"><jiro-icon name="x" [size]="12" /></button>
           </span>
 }
         </div>
 }
         <!-- Custom tag input -->
+        <label class="sub-label" for="rf-custom-tag">Custom tag</label>
         <div class="custom-tag-input-row">
           <input
+            id="rf-custom-tag"
             class="field-input custom-tag-input"
             type="text"
             [(ngModel)]="customTagInput"
@@ -102,8 +107,14 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
 
       <!-- Ingredients -->
       <div class="field">
-        <label class="field-label">Base Ingredients</label>
+        <label class="field-label">Base ingredients</label>
         <div class="ingredient-list">
+          @if (ingredients.length > 0) {
+            <div class="ingredient-row ingredient-head" aria-hidden="true">
+              <span class="sub-label">Item</span>
+              <span class="sub-label">Amount</span>
+            </div>
+          }
           @for (ing of ingredients; track ing; let i = $index) {
 <div class="ingredient-row">
             <input
@@ -111,15 +122,18 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
               type="text"
               [(ngModel)]="ing.item"
               [name]="'item_' + i"
+              [attr.aria-label]="'Ingredient ' + (i + 1) + ' item'"
               placeholder="Item (e.g. flour)" />
             <input
               class="field-input ing-amount"
               type="text"
               [(ngModel)]="ing.amount"
               [name]="'amount_' + i"
+              [attr.aria-label]="'Ingredient ' + (i + 1) + ' amount'"
               placeholder="Amount (e.g. 500g)" />
-            <button type="button" class="remove-btn" (click)="removeIngredient(i)" title="Remove">
-              &times;
+            <button type="button" class="remove-btn" (click)="removeIngredient(i)" title="Remove"
+              [attr.aria-label]="'Remove ingredient ' + (i + 1)">
+              <jiro-icon name="x" [size]="14" />
             </button>
           </div>
 }
@@ -131,8 +145,9 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
 
       <!-- Instructions -->
       <div class="field">
-        <label class="field-label">Instructions</label>
+        <label class="field-label" for="rf-instructions">Instructions</label>
         <textarea
+          id="rf-instructions"
           class="field-input field-textarea"
           [(ngModel)]="instructions"
           name="instructions"
@@ -140,9 +155,9 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
           rows="5"></textarea>
       </div>
 
-      <!-- Dietary Flags -->
+      <!-- Dietary flags -->
       <div class="field">
-        <label class="field-label">Dietary Flags</label>
+        <label class="field-label">Dietary flags</label>
         <div class="tag-chips">
           @for (flag of dietaryFlagOptions; track flag) {
 <button
@@ -162,20 +177,20 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
         <label class="field-label">Nutrition <span class="field-hint">(optional, per serving)</span></label>
         <div class="macro-grid">
           <div class="macro-field">
-            <label class="macro-label">Calories</label>
-            <input class="field-input macro-input" type="number" min="0" [(ngModel)]="nutrition.calories" name="cal" placeholder="—" />
+            <label class="macro-label" for="rf-cal">Calories</label>
+            <input id="rf-cal" class="field-input macro-input" type="number" min="0" [(ngModel)]="nutrition.calories" name="cal" />
           </div>
           <div class="macro-field">
-            <label class="macro-label">Protein (g)</label>
-            <input class="field-input macro-input" type="number" min="0" [(ngModel)]="nutrition.protein" name="pro" placeholder="—" />
+            <label class="macro-label" for="rf-pro">Protein (g)</label>
+            <input id="rf-pro" class="field-input macro-input" type="number" min="0" [(ngModel)]="nutrition.protein" name="pro" />
           </div>
           <div class="macro-field">
-            <label class="macro-label">Carbs (g)</label>
-            <input class="field-input macro-input" type="number" min="0" [(ngModel)]="nutrition.carbs" name="carb" placeholder="—" />
+            <label class="macro-label" for="rf-carb">Carbs (g)</label>
+            <input id="rf-carb" class="field-input macro-input" type="number" min="0" [(ngModel)]="nutrition.carbs" name="carb" />
           </div>
           <div class="macro-field">
-            <label class="macro-label">Fat (g)</label>
-            <input class="field-input macro-input" type="number" min="0" [(ngModel)]="nutrition.fat" name="fat" placeholder="—" />
+            <label class="macro-label" for="rf-fat">Fat (g)</label>
+            <input id="rf-fat" class="field-input macro-input" type="number" min="0" [(ngModel)]="nutrition.fat" name="fat" />
           </div>
         </div>
       </div>
@@ -183,20 +198,22 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
       <!-- Collection (create only) -->
       @if (!recipe) {
 <div class="field">
-        <label class="field-label">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-          Add to Collection
+        <label class="field-label" for="rf-collection">
+          <jiro-icon name="folder" [size]="14" />
+          Add to collection
         </label>
-        <select class="field-input" [(ngModel)]="selectedCollectionId" name="collection" (change)="onCollectionSelectChange()">
+        <select id="rf-collection" class="field-input" [(ngModel)]="selectedCollectionId" name="collection" (change)="onCollectionSelectChange()">
           <option value="">None</option>
           @for (col of collections(); track col) {
 <option [value]="col.id">{{ col.name }}</option>
 }
-          <option value="__new__">+ New Collection</option>
+          <option value="__new__">+ New collection</option>
         </select>
         @if (showNewCollectionInForm) {
+<label class="sub-label" for="rf-new-collection">New collection name</label>
 <div class="new-col-row">
           <input
+            id="rf-new-collection"
             class="field-input"
             [(ngModel)]="newCollectionNameInForm"
             name="newColName"
@@ -217,7 +234,7 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
       <div class="form-actions">
         <button type="button" class="btn-ghost" (click)="cancelled.emit()">Cancel</button>
         <jiro-button variant="primary" type="submit" [loading]="saving()">
-          {{ recipe ? 'Save Changes' : 'Create Recipe' }}
+          {{ recipe ? 'Save changes' : 'Create recipe' }}
         </jiro-button>
       </div>
     </form>
@@ -240,15 +257,12 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
     }
 
     .field-label {
-      font-family: var(--font-family-display);
-      font-size: var(--font-size-md);
-      font-weight: 600;
-      color: var(--text-primary);
-      text-transform: capitalize;
-      letter-spacing: 0.01em;
-      border-bottom: 1px dashed var(--border-color);
-      padding-bottom: 4px;
-      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      font-size: var(--font-size-sm);
+      font-weight: 500;
+      color: var(--text-secondary);
     }
 
     .required {
@@ -271,7 +285,7 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
 
     .field-input:focus {
       border-color: var(--color-primary);
-      box-shadow: 0 0 0 3px rgba(122, 59, 46, 0.12);
+      box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.12);
     }
 
     .field-input::placeholder {
@@ -293,7 +307,7 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
     .tag-chip {
       padding: 6px 14px;
       border: 1px solid var(--border-color);
-      border-radius: 4px; /* Paper label look */
+      border-radius: var(--border-radius-pill);
       background: var(--bg-surface);
       color: var(--text-secondary);
       font-size: var(--font-size-xs);
@@ -308,14 +322,14 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
       border-color: var(--color-primary);
       color: var(--color-primary);
       transform: translate(-1px, -1px);
-      box-shadow: 2px 2px 0px rgba(92, 64, 51, 0.15);
+      box-shadow: var(--shadow-sm);
     }
 
     .tag-chip--active {
       background: var(--color-primary);
       border-color: var(--color-primary);
       color: var(--text-on-primary);
-      box-shadow: 2px 2px 0px rgba(92, 64, 51, 0.25);
+      box-shadow: var(--shadow-sm);
     }
 
     .custom-tags-row {
@@ -330,18 +344,20 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
       align-items: center;
       gap: 4px;
       padding: 3px 8px 3px 10px;
-      background: rgba(122, 59, 46, 0.12);
+      background: rgba(var(--color-primary-rgb), 0.12);
       border: 1px solid var(--color-primary);
-      border-radius: 20px;
-      color: var(--color-primary);
+      border-radius: var(--border-radius-pill);
+      color: var(--color-primary-text);
       font-size: var(--font-size-xs);
       font-weight: 500;
     }
 
     .custom-tag-remove {
+      display: inline-flex;
+      align-items: center;
       background: none;
       border: none;
-      color: var(--color-primary);
+      color: var(--color-primary-text);
       cursor: pointer;
       font-size: 14px;
       padding: 0;
@@ -353,6 +369,15 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
     .custom-tag-remove:hover {
       opacity: 1;
     }
+
+    .sub-label {
+      font-size: var(--font-size-sm);
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-top: var(--space-xs);
+    }
+
+    .ingredient-head .sub-label { margin-top: 0; }
 
     .custom-tag-input-row {
       display: flex;
@@ -420,7 +445,7 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
     .remove-btn:hover {
       color: var(--color-danger);
       border-color: var(--color-danger);
-      box-shadow: 2px 2px 0px rgba(193, 88, 42, 0.15);
+      box-shadow: 2px 2px 0px rgba(var(--color-danger-rgb), 0.15);
       transform: translate(-1px, -1px);
     }
 
@@ -465,7 +490,6 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
       padding: var(--space-md);
       border: 1px solid var(--border-color);
       border-radius: var(--border-radius);
-      box-shadow: 2px 2px 0px rgba(92, 64, 51, 0.05);
     }
 
     .macro-field { 
@@ -483,7 +507,6 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
     }
 
     .macro-label {
-      font-family: var(--font-family-display);
       font-size: var(--font-size-sm);
       color: var(--text-secondary);
       font-weight: 500;
@@ -537,7 +560,9 @@ const DIETARY_FLAG_OPTIONS: { key: keyof DietaryFlags; label: string }[] = [
     }
 
     @media (max-width: 480px) {
-      .macro-grid { grid-template-columns: repeat(2, 1fr); }
+      .macro-grid { display: grid; grid-template-columns: repeat(2, 1fr); }
+      .macro-field, .macro-field:last-child { border-right: none; padding-right: 0; }
+      .ingredient-row { grid-template-columns: 1fr 96px 32px; }
     }
   `]
 })

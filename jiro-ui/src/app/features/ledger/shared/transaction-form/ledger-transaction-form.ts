@@ -5,6 +5,7 @@ import {
   LedgerService, LedgerAccount, CategoryTree, LedgerCategory, LedgerTransaction, RecurrenceInterval,
 } from '../../../../core/services/ledger.service';
 import { JiroButtonComponent } from '../../../../shared/components/jiro-button/jiro-button';
+import { JiroIconComponent } from '../../../../shared/components/jiro-icon/jiro-icon';
 import { SettingsService } from '../../../../core/services/settings.service';
 import { todayKey } from '../../../../core/utils/day';
 import { LedgerCategoryDialogComponent } from '../category-dialog/ledger-category-dialog';
@@ -28,7 +29,7 @@ let formSeq = 0;
 @Component({
   selector: 'ledger-transaction-form',
   standalone: true,
-  imports: [FormsModule, JiroButtonComponent, LedgerCategoryDialogComponent],
+  imports: [FormsModule, JiroButtonComponent, JiroIconComponent, LedgerCategoryDialogComponent],
   template: `
     <form class="tx-form" (ngSubmit)="submit()">
 
@@ -71,7 +72,7 @@ let formSeq = 0;
         <div class="form-group">
           <div class="label-row">
             <label class="form-label" [for]="uid + '-category'">Category <span class="optional-label">(optional)</span></label>
-            <button type="button" class="new-cat-btn" (click)="showCatDialog.set(true)">+ New category</button>
+            <button type="button" class="new-cat-btn" (click)="showCatDialog.set(true)"><jiro-icon name="plus" [size]="14" /> New category</button>
           </div>
           <select class="form-input" [id]="uid + '-category'" [(ngModel)]="form.category_id" name="category_id">
             <option value="">Uncategorised</option>
@@ -193,9 +194,10 @@ let formSeq = 0;
     .label-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); }
 
     .new-cat-btn {
+      display: inline-flex; align-items: center; gap: 4px;
       background: none; border: none; padding: 8px 0; min-height: 32px;
       font-size: var(--font-size-sm); font-weight: 500;
-      color: var(--color-primary); cursor: pointer; line-height: 1;
+      color: var(--color-primary-text); cursor: pointer; line-height: 1;
     }
     .new-cat-btn:hover { opacity: 0.75; }
 
@@ -259,7 +261,7 @@ let formSeq = 0;
     /* Repeat switch */
     .toggle-row { display: flex; align-items: center; justify-content: space-between; }
     .toggle-btn {
-      width: 44px; height: 24px; border-radius: 12px;
+      width: 44px; height: 24px; border-radius: var(--border-radius-pill);
       border: none; background: var(--border-color);
       cursor: pointer; position: relative; transition: background 0.2s; padding: 0;
     }

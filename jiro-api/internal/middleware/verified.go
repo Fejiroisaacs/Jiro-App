@@ -19,17 +19,13 @@ var exemptFromVerification = map[string]bool{
 // DemoReadOnlyMessage is what every blocked write from the demo account gets.
 const DemoReadOnlyMessage = "The demo is look-only. Create an account to save your own."
 
-// WriteAccessChecker is the per-request lookup the write gate needs;
-// *services.UserService implements it.
+// WriteAccessChecker is the per-request lookup the write gate needs.
 type WriteAccessChecker interface {
 	WriteAccess(ctx context.Context, id uuid.UUID) (verified, demo bool, err error)
 }
 
-// RequireWriteAccess blocks writes (anything but GET/HEAD/OPTIONS): from the
-// shared demo account always (403 DEMO_READ_ONLY), and from an account whose
-// email is not yet verified outside exemptFromVerification (403
-// EMAIL_NOT_VERIFIED). Reads are always allowed. Must run after
-// AuthRequired, which is what puts user_id in the context.
+// RequireWriteAccess blocks writes from the demo (DEMO_READ_ONLY) and unverified accounts (EMAIL_NOT_VERIFIED).
+// Must run after AuthRequired, which puts user_id in the context.
 func RequireWriteAccess(users WriteAccessChecker) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		switch c.Request.Method {
@@ -47,8 +43,7 @@ func RequireWriteAccess(users WriteAccessChecker) gin.HandlerFunc {
 			return
 		}
 
-		// Fails closed, matching AdminRequired: if the account's status can't
-		// be confirmed, the write isn't allowed through.
+		// Fails closed, like AdminRequired: an unconfirmed status blocks the write.
 		verified, demo, err := users.WriteAccess(c.Request.Context(), userID)
 		if err == nil && demo {
 			c.AbortWithStatusJSON(http.StatusForbidden, models.ErrorResponse{

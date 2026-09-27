@@ -1,14 +1,6 @@
 import { Component, ViewEncapsulation } from '@angular/core';
 
-/**
- * Numbered steps. Put plain `<li>`s inside; each can hold links, `<strong>`
- * for on-screen labels, and `<kbd>` for keys.
- *
- *   <guide-steps>
- *     <li>Open <a routerLink="/jym">Jym</a>.</li>
- *     <li>Select <strong>Start workout</strong>.</li>
- *   </guide-steps>
- */
+/** Numbered steps: put plain <li>s inside. */
 @Component({
   selector: 'guide-steps',
   standalone: true,

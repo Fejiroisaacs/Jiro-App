@@ -421,8 +421,7 @@ func (h *JymHandler) ReplaceRoutineItems(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
-// ReplaceSplitItems saves the full item lists of several days of one split
-// in one transaction (a drag between days changes two of them).
+// ReplaceSplitItems saves several days of one split in one transaction (a drag touches two).
 func (h *JymHandler) ReplaceSplitItems(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 	splitID, err := uuid.Parse(c.Param("id"))
@@ -566,8 +565,7 @@ func (h *JymHandler) UpdateSession(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()}})
 		return
 	}
-	// Only a request that carries ended_at finishes the session. Saving notes
-	// or the session type mid-workout must leave it running.
+	// Only a request with ended_at finishes the session; notes or type edits keep it running.
 	sess, err := h.jymService.UpdateSession(c.Request.Context(), userID, sessionID, &req)
 	if err != nil {
 		if err == services.ErrSessionNotFound {
@@ -1007,8 +1005,7 @@ func (h *JymHandler) ImportShare(c *gin.Context) {
 	c.JSON(http.StatusCreated, models.ImportShareResponse{SplitID: newSplitID.String()})
 }
 
-// respondSessionEnded is the 409 for writes that only make sense while a
-// session is live (logging a set, finishing it).
+// respondSessionEnded is the 409 for writes that need a live session.
 func respondSessionEnded(c *gin.Context) {
 	c.JSON(http.StatusConflict, models.ErrorResponse{Error: models.ErrorDetail{Code: "SESSION_ENDED", Message: "This session has already finished"}})
 }

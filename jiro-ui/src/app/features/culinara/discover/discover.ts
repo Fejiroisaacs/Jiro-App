@@ -4,11 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { RecipeService, Recipe } from '../../../core/services/recipe.service';
 import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-card';
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 
 @Component({
   selector: 'app-discover',
   standalone: true,
-  imports: [FormsModule, JiroCardComponent, JiroPageHeaderComponent],
+  imports: [JiroSkeletonComponent, FormsModule, JiroCardComponent, JiroPageHeaderComponent],
   template: `
     <div class="discover-page">
       <jiro-page-header heading="Discover" subtitle="Recipes shared publicly by the community" />
@@ -17,15 +18,21 @@ import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-he
         <input
           class="search-input"
           type="text"
+          aria-label="Search public recipes"
           placeholder="Search public recipes..."
           [(ngModel)]="searchQuery"
           (input)="onSearch()" />
       </div>
 
       @if (loading()) {
-<div class="state-message">
-        <span class="spinner"></span>
-        <p>Loading...</p>
+<div class="recipe-grid" role="status" aria-label="Loading recipes">
+        @for (i of [1, 2, 3, 4, 5, 6]; track i) {
+          <div class="sk-card">
+            <jiro-skeleton width="75%" height="20px" />
+            <jiro-skeleton [lines]="2" height="12px" />
+            <jiro-skeleton width="40%" height="18px" />
+          </div>
+        }
       </div>
 }
 
@@ -131,8 +138,8 @@ import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-he
     .tag-chips-row { display: flex; flex-wrap: wrap; gap: 4px; }
     .recipe-tag {
       font-size: var(--font-size-xs); padding: 2px 8px;
-      background: rgba(122, 59, 46, 0.08); color: var(--color-primary);
-      border-radius: 10px; font-weight: 500;
+      background: rgba(var(--color-primary-rgb), 0.08); color: var(--color-primary-text);
+      border-radius: var(--border-radius-pill); font-weight: 500;
     }
 
     .load-more-row { display: flex; justify-content: center; margin-top: var(--space-xl); }
@@ -146,7 +153,11 @@ import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-he
     .load-more-btn:hover:not(:disabled) { border-color: var(--color-primary); color: var(--color-primary); }
     .load-more-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    @keyframes spin { to { transform: rotate(360deg); } }
+    .sk-card {
+      display: flex; flex-direction: column; gap: var(--space-sm);
+      padding: var(--space-lg); border: 1px solid var(--border-color);
+      border-radius: var(--border-radius-lg); background: var(--bg-surface);
+    }
   `]
 })
 export class DiscoverComponent implements OnInit {

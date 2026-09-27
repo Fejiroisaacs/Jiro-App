@@ -13,7 +13,7 @@ import { SettingsService } from '../../../core/services/settings.service';
 import { isDayKey, relativeDayName, todayKey } from '../../../core/utils/day';
 import { ToastService } from '../../../core/services/toast.service';
 import { LedgerTransactionFormComponent, TransactionPayload } from '../shared/transaction-form/ledger-transaction-form';
-import { intervalLabel, parseDateOnly, formatSignedCurrency, transactionColor } from '../shared/ledger-utils';
+import { categoryColor, categoryTint, intervalLabel, formatSignedCurrency, transactionColor } from '../shared/ledger-utils';
 import {
   LedgerService,
   LedgerTransaction,
@@ -23,6 +23,7 @@ import {
   TransactionFilters,
   TransactionUpdate,
 } from '../../../core/services/ledger.service';
+import { formatDay } from '../../../core/utils/format-date';
 
 interface TransactionGroup {
   date: string;
@@ -125,11 +126,7 @@ interface TransactionGroup {
       <!-- ── Mobile Filter Toggle ────────────────────────────────────────────── -->
       <div class="mobile-filter-header">
         <button class="mobile-filter-toggle" type="button" [attr.aria-expanded]="mobileFiltersOpen()" (click)="mobileFiltersOpen.set(!mobileFiltersOpen())">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <line x1="4" y1="6" x2="20" y2="6"/>
-            <line x1="8" y1="12" x2="16" y2="12"/>
-            <line x1="10" y1="18" x2="14" y2="18"/>
-          </svg>
+          <jiro-icon name="funnel-simple" [size]="14" />
           Filters
           @if (activeFilterCount() > 0) {
 <span class="filter-badge">{{ activeFilterCount() }}</span>
@@ -251,19 +248,14 @@ interface TransactionGroup {
                 <span
                   class="tx-type-bar"
                   aria-hidden="true"
-                  [style.background]="tx.category_color || transactionColor(tx.type)">
+                  [style.background]="tx.category_color ? categoryColor(tx.category_color) : transactionColor(tx.type)">
                 </span>
                 <span class="tx-details">
                   <span class="tx-description">
                     <span class="tx-desc-text">{{ tx.description || 'Untitled' }}</span>
                     @if (tx.series_interval) {
                       <span class="recurring-badge">
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                          <path d="M17 1l4 4-4 4"/>
-                          <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-                          <path d="M7 23l-4-4 4-4"/>
-                          <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
-                        </svg>
+                        <jiro-icon name="repeat" [size]="10" />
                         {{ intervalLabel(tx.series_interval) }}
                       </span>
                     }
@@ -272,9 +264,7 @@ interface TransactionGroup {
                     @if (tx.category_name) {
                       <span
                         class="category-chip"
-                        [style.background]="(tx.category_color || 'var(--text-muted)') + '22'"
-                        [style.color]="tx.category_color || 'var(--text-muted)'"
-                        [style.border-color]="(tx.category_color || 'var(--text-muted)') + '55'">
+                        [style.--chip]="categoryColor(tx.category_color)" [style.background]="categoryTint(tx.category_color)">
                         {{ tx.category_name }}
                       </span>
                     }
@@ -295,9 +285,7 @@ interface TransactionGroup {
                   {{ formatAmount(tx.amount, tx.type) }}
                 </span>
                 <span class="tx-date-small">{{ formatDateShort(tx.date) }}</span>
-                <svg class="tx-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                  <polyline points="9,18 15,12 9,6"/>
-                </svg>
+                <jiro-icon name="caret-right" [size]="14" class="tx-chevron" />
               </span>
             </button>
           }
@@ -492,7 +480,7 @@ interface TransactionGroup {
       min-height: 44px;
     }
 
-    .mobile-filter-toggle:hover { border-color: var(--color-primary); color: var(--color-primary); }
+    .mobile-filter-toggle:hover { border-color: var(--color-primary); color: var(--color-primary-text); }
 
     .filter-badge {
       display: inline-flex; align-items: center; justify-content: center;
@@ -533,7 +521,7 @@ interface TransactionGroup {
       margin-top: var(--space-sm);
       font-size: var(--font-size-sm);
       font-weight: 600;
-      color: var(--color-primary);
+      color: var(--color-primary-text);
     }
 
     .date-separator {
@@ -591,7 +579,7 @@ interface TransactionGroup {
     .tx-type-bar {
       display: block;
       width: 4px; height: 36px;
-      border-radius: 2px; flex-shrink: 0;
+      border-radius: var(--border-radius-pill); flex-shrink: 0;
     }
 
     .tx-details { display: block; flex: 1; min-width: 0; }
@@ -614,7 +602,7 @@ interface TransactionGroup {
       color: var(--text-muted);
       background: var(--bg-canvas);
       border: 1px solid var(--border-color);
-      border-radius: 10px; padding: 1px 7px;
+      border-radius: var(--border-radius-pill); padding: 1px 7px;
       flex-shrink: 0;
     }
 
@@ -624,10 +612,18 @@ interface TransactionGroup {
     }
 
     .category-chip {
-      font-size: var(--font-size-xs); font-weight: 600;
-      padding: 1px 7px; border-radius: 10px;
-      border: 1px solid transparent;
+      font-size: var(--font-size-xs); font-weight: 600; color: var(--text-primary);
+      padding: 1px 7px; border-radius: var(--border-radius-pill);
       white-space: nowrap;
+    }
+    .category-chip::before {
+      content: '';
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      margin-right: 5px;
+      border-radius: 50%;
+      background: var(--chip);
     }
 
     .account-name {
@@ -673,7 +669,7 @@ interface TransactionGroup {
     .tx-type-pill {
       font-size: var(--font-size-xs); font-weight: 700;
       text-transform: uppercase; letter-spacing: 0.4px;
-      padding: 3px 10px; border-radius: 10px;
+      padding: 3px 10px; border-radius: var(--border-radius-pill);
     }
 
     .tx-type-account {
@@ -730,7 +726,7 @@ interface TransactionGroup {
     .toggle-btn {
       width: 44px; height: 24px;
       background: var(--border-color);
-      border: none; border-radius: 12px;
+      border: none; border-radius: var(--border-radius-pill);
       cursor: pointer; position: relative;
       transition: background 0.2s;
       flex-shrink: 0;
@@ -777,8 +773,6 @@ interface TransactionGroup {
 
       .type-btn { padding: 6px 8px; font-size: var(--font-size-xs); min-height: 44px; }
     }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
   `],
 })
 export class TransactionLogComponent implements OnInit {
@@ -829,6 +823,8 @@ export class TransactionLogComponent implements OnInit {
   addInitial = signal<Partial<TransactionPayload> | null>(null);
   private readonly toast = inject(ToastService);
   readonly transactionColor = transactionColor;
+  readonly categoryColor = categoryColor;
+  readonly categoryTint = categoryTint;
 
   readonly typeOptions = [
     { label: 'All', value: '' },
@@ -890,11 +886,7 @@ export class TransactionLogComponent implements OnInit {
     this.openFromUrl();
   }
 
-  /**
-   * Deep links from the day view: ?tx=<id> opens that transaction's edit
-   * dialog, ?new=1&date=YYYY-MM-DD opens Log transaction for that day. The
-   * params are dropped when the dialog closes so a reload does not reopen it.
-   */
+  /** Day view deep links (?tx=<id>, ?new=1&date=); cleared on close so a reload doesn't reopen the dialog. */
   private openFromUrl() {
     const q = this.route.snapshot.queryParamMap;
     const txId = q.get('tx');
@@ -1062,8 +1054,7 @@ export class TransactionLogComponent implements OnInit {
         this.saving.set(false);
         this.closeEditModal();
         this.toast.success('Transaction saved');
-        // Its date or account may have moved it; the list order and the
-        // other rows of a series come from the server.
+        // Its date or account may have moved it; order and series rows come from the server.
         this.loadTransactions();
       },
       error: err => {
@@ -1132,8 +1123,7 @@ export class TransactionLogComponent implements OnInit {
         this.saving.set(false);
         this.closeAddModal();
         this.toast.success('Transaction logged');
-        // Reload rather than prepend: a back-dated repeating transaction
-        // brings its copies with it, and the list stays in date order.
+        // Reload rather than prepend: a back-dated repeat brings its copies, and order stays by date.
         this.loadAccounts();
         this.loadTransactions();
       },
@@ -1160,23 +1150,22 @@ export class TransactionLogComponent implements OnInit {
     return this.accounts().find(a => a.id === accountId)?.name ?? '';
   }
 
-  /** "Checking → Savings": a transfer is listed once, from its source side. */
+  /** "Checking to Savings": a transfer is listed once, from its source side. */
   transferLabel(tx: LedgerTransaction): string {
     const from = this.getAccountName(tx.account_id) || 'Unknown account';
     const to = this.getAccountName(tx.transfer_to_account_id) || 'a deleted account';
-    return `${from} → ${to}`;
+    return `${from} to ${to}`;
   }
 
   formatDateSeparator(dateStr: string): string {
-    const d = parseDateOnly(dateStr);
     // "Today" is the user's day (settings zone), as everywhere else.
     const rel = relativeDayName(dateStr.slice(0, 10), todayKey(this.settings.timezone()));
     if (rel) return rel;
-    return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    return formatDay(dateStr, { weekday: true });
   }
 
   formatDateShort(dateStr: string): string {
-    return parseDateOnly(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    return formatDay(dateStr);
   }
 
   getGroupTotal(group: TransactionGroup): string {

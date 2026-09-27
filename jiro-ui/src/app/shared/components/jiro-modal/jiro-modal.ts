@@ -47,7 +47,7 @@ export function isJiroModalOpen(): boolean {
     .modal-backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.5);
+      background: var(--scrim);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -131,10 +131,7 @@ export class JiroModalComponent implements AfterViewInit, OnDestroy {
     openModals.push(this);
   }
 
-  // cdkTrapFocusAutoCapture moves focus to [cdkFocusInitial] or the first
-  // tabbable element, and hands it back to the opener on destroy. This runs
-  // after it: honour a consumer's autofocus, and fall back to the dialog
-  // itself when it has nothing tabbable.
+  // Runs after cdkTrapFocusAutoCapture: honour a consumer's autofocus, else focus the dialog if nothing is tabbable.
   ngAfterViewInit() {
     afterNextRender(() => {
       const dialog = this.dialog().nativeElement;

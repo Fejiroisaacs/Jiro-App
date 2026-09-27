@@ -56,7 +56,10 @@ Only `name` and `path` are required.
 - `path`: the app URL to open.
 - `waitFor`: a CSS selector to wait for before anything else.
 - `actions`: run in order. `click` takes a CSS selector or `{ "role", "name" }`
-  (add `"exact": true` for an exact name match). `fill` takes a selector and a
+  (add `"exact": true` for an exact name match). A selector clicks its first
+  match and can use `:has()`, so pick by content, not by date: the demo's dates
+  move daily (`".wv-day:has(.wv-note) .wv-add"` opens the first day with an
+  entry). `fill` takes a selector and a
   `value`. `press` takes a key such as `Control+k` or `Escape`. `wait` takes
   milliseconds. `scroll` scrolls a selector into view.
 - `clip`: a CSS selector for the element to capture. It is scrolled into view
@@ -68,3 +71,12 @@ Only `name` and `path` are required.
 
 Keep shots tight: a dialog or one card reads better than a whole page, and
 stays under the size budget.
+
+## Landing screenshots
+
+`landing-shots.mjs` re-shoots `public/images/landing/*-{light,dark}.webp` from
+the demo, with the demo bar hidden. Each shot's framing, final size and byte
+budget are in the `SHOTS` list at the top of the script.
+
+    node scripts/guide-shots/landing-shots.mjs            # all six
+    node scripts/guide-shots/landing-shots.mjs jym ledger # only these

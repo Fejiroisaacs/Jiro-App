@@ -12,17 +12,19 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
 import { StarRatingComponent } from '../../../shared/components/star-rating/star-rating';
 import { SettingsService } from '../../../core/services/settings.service';
 import { dayKey, todayKey, zonedNoonISO } from '../../../core/utils/day';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 
 @Component({
   selector: 'app-trial-modal',
   standalone: true,
-  imports: [FormsModule, JiroButtonComponent, StarRatingComponent],
+  imports: [JiroIconComponent, FormsModule, JiroButtonComponent, StarRatingComponent],
   template: `
     <form (ngSubmit)="onSubmit()" class="trial-form">
       <!-- Date cooked -->
       <div class="field">
-        <label class="field-label">Date Cooked</label>
+        <label class="field-label" for="trial-date">Date cooked</label>
         <input
+          id="trial-date"
           class="field-input"
           type="date"
           [(ngModel)]="dateCookedStr"
@@ -34,6 +36,12 @@ import { dayKey, todayKey, zonedNoonISO } from '../../../core/utils/day';
         <label class="field-label">Modifications</label>
         <p class="field-hint">What did you change from the base recipe?</p>
         <div class="mod-list">
+          @if (modifications.length > 0) {
+            <div class="mod-row" aria-hidden="true">
+              <span class="field-label">Ingredient</span>
+              <span class="field-label">Change</span>
+            </div>
+          }
           @for (mod of modifications; track mod; let i = $index) {
 <div class="mod-row">
             <input
@@ -41,14 +49,16 @@ import { dayKey, todayKey, zonedNoonISO } from '../../../core/utils/day';
               type="text"
               [(ngModel)]="mod.item"
               [name]="'mod_item_' + i"
+              [attr.aria-label]="'Modification ' + (i + 1) + ' ingredient'"
               placeholder="Ingredient (e.g. flour)" />
             <input
               class="field-input mod-change"
               type="text"
               [(ngModel)]="mod.change"
               [name]="'mod_change_' + i"
+              [attr.aria-label]="'Modification ' + (i + 1) + ' change'"
               placeholder="Change (e.g. +50g, toasted)" />
-            <button type="button" class="remove-btn" (click)="removeMod(i)">&times;</button>
+            <button type="button" class="remove-btn" (click)="removeMod(i)" [attr.aria-label]="'Remove modification ' + (i + 1)"><jiro-icon name="x" [size]="14" /></button>
           </div>
 }
           <button type="button" class="add-link" (click)="addMod()">+ Add modification</button>
@@ -57,8 +67,9 @@ import { dayKey, todayKey, zonedNoonISO } from '../../../core/utils/day';
 
       <!-- Notes -->
       <div class="field">
-        <label class="field-label">Notes</label>
+        <label class="field-label" for="trial-notes">Notes</label>
         <textarea
+          id="trial-notes"
           class="field-input field-textarea"
           [(ngModel)]="notes"
           name="notes"
@@ -81,7 +92,7 @@ import { dayKey, todayKey, zonedNoonISO } from '../../../core/utils/day';
       <div class="form-actions">
         <button type="button" class="btn-ghost" (click)="cancelled.emit()">Cancel</button>
         <jiro-button variant="primary" type="submit" [loading]="saving()">
-          {{ trial ? 'Save Changes' : 'Log Trial' }}
+          {{ trial ? 'Save changes' : 'Log trial' }}
         </jiro-button>
       </div>
     </form>
@@ -124,7 +135,7 @@ import { dayKey, todayKey, zonedNoonISO } from '../../../core/utils/day';
 
     .field-input:focus {
       border-color: var(--color-primary);
-      box-shadow: 0 0 0 3px rgba(122, 59, 46, 0.12);
+      box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.12);
     }
 
     .field-input::placeholder {
@@ -150,6 +161,9 @@ import { dayKey, todayKey, zonedNoonISO } from '../../../core/utils/day';
     }
 
     .remove-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       width: 32px;
       height: 32px;
       border: 1px solid var(--border-color);
@@ -289,11 +303,7 @@ export class TrialModalComponent implements OnInit {
     }
   }
 
-  /**
-   * The instant to send for the chosen day: local noon in the user's zone, so
-   * the trial counts on that day everywhere (day view, cook streak). An edit
-   * that leaves the day alone sends the stored instant back unchanged.
-   */
+  /** Local noon on the chosen day in the user's zone; an unchanged day sends the stored instant back. */
   private dateCookedFor(trial: RecipeTrial | null): string | undefined {
     if (!this.dateCookedStr) return undefined;
     if (trial?.date_cooked && this.dateCookedStr === this.originalDay) return trial.date_cooked;

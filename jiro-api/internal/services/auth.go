@@ -221,10 +221,7 @@ func (s *AuthService) ValidateRefreshToken(ctx context.Context, rawToken string)
 		// explainable by a concurrent-tab race, only by a copy of the token
 		// surviving past its legitimate single use. Kill every session,
 		// including whatever the thief rotated it into.
-		//
-		// Except on the shared demo account, where "every session" means every
-		// visitor's: one visitor's stale tab would sign out everyone else. It
-		// holds nothing worth stealing and cannot write, so only this token dies.
+		// On the shared demo only this token dies, or one stale tab signs out every visitor.
 		if isDemo {
 			s.db.Exec(ctx, "DELETE FROM refresh_tokens WHERE token_hash = $1", tokenHash)
 		} else {

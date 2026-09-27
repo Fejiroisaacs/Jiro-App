@@ -1,8 +1,10 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AdminService, AnalyticsEvent } from '../../core/services/admin.service';
+import { SettingsService } from '../../core/services/settings.service';
+import { formatInstant } from '../../core/utils/format-date';
 
 const EVENT_TYPES = [
   '', 'user.register', 'user.login',
@@ -21,12 +23,12 @@ const EVENT_TYPES = [
       <h1 class="page-title">Events</h1>
 
       <form class="filter-bar" (ngSubmit)="search()">
-        <select class="filter-input" [(ngModel)]="eventFilter" name="event">
+        <select class="filter-input" [(ngModel)]="eventFilter" name="event" aria-label="Event type">
           @for (e of eventTypes; track e) {
 <option [value]="e">{{ e || 'All events' }}</option>
 }
         </select>
-        <input class="filter-input uid-input" type="text" [(ngModel)]="userIdFilter" name="uid" placeholder="Filter by user ID..." />
+        <input class="filter-input uid-input" type="text" [(ngModel)]="userIdFilter" name="uid" aria-label="Filter by user ID" placeholder="Filter by user ID..." />
         <button class="search-btn" type="submit">Filter</button>
       </form>
 
@@ -38,7 +40,7 @@ const EVENT_TYPES = [
 }
 
       @if (!loading() && events().length > 0) {
-<div class="table-wrap">
+<div class="table-wrap" tabindex="0" role="region" aria-label="Events table">
         <table class="events-table">
           <thead>
             <tr>
@@ -61,11 +63,11 @@ const EVENT_TYPES = [
                   </span>
                 
 } @else {
-<span class="dim">—</span>
+<span class="dim">Anonymous</span>
 }
                 
               </td>
-              <td class="props-cell hide-sm">{{ e.properties ? (e.properties | json) : '—' }}</td>
+              <td class="props-cell hide-sm">{{ e.properties ? (e.properties | json) : 'None' }}</td>
             </tr>
 }
           </tbody>
@@ -90,19 +92,20 @@ const EVENT_TYPES = [
     .page-title { font-size: 24px; font-weight: 700; margin-bottom: 20px; }
     .filter-bar { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
     .filter-input {
-      padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px;
+      padding: 8px 12px; border: 1px solid var(--border-color); border-radius: var(--border-radius);
       background: var(--bg-surface); color: var(--text-primary); font-size: 14px;
     }
     .filter-input:focus { border-color: var(--color-primary); }
     select.filter-input { min-width: 150px; }
     .uid-input { flex: 1; min-width: 160px; }
     .search-btn {
-      padding: 8px 18px; background: var(--color-primary); color: #fff;
-      border: none; border-radius: 6px; font-size: 14px; cursor: pointer; white-space: nowrap;
+      padding: 8px 18px; background: var(--color-primary); color: var(--text-on-primary);
+      border: none; border-radius: var(--border-radius); font-size: 14px; cursor: pointer; white-space: nowrap;
     }
     .state-msg { color: var(--text-secondary); }
-    .error-msg { color: #e05c5c; }
-    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .error-msg { color: var(--color-negative); }
+    .table-wrap { position: relative; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .table-wrap:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
     .events-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 520px; }
     .events-table th {
       text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border-color);
@@ -112,12 +115,12 @@ const EVENT_TYPES = [
     .events-table td { padding: 8px 10px; border-bottom: 1px solid var(--border-color); vertical-align: middle; }
     .time-cell { color: var(--text-secondary); white-space: nowrap; font-size: 12px; }
     .event-chip {
-      background: rgba(122,59,46,0.12); color: var(--color-primary);
-      padding: 2px 8px; border-radius: 8px; font-size: 12px; font-weight: 500; white-space: nowrap;
+      background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary-text);
+      padding: 2px 8px; border-radius: var(--border-radius-pill); font-size: 12px; font-weight: 500; white-space: nowrap;
     }
     .user-cell { max-width: 180px; }
     .user-name {
-      font-size: 13px; color: var(--color-primary); cursor: pointer;
+      font-size: 13px; color: var(--color-primary-text); cursor: pointer;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;
     }
     .user-name:hover { text-decoration: underline; }
@@ -125,7 +128,7 @@ const EVENT_TYPES = [
     .props-cell { font-size: 11px; color: var(--text-secondary); font-family: monospace; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .pagination { display: flex; align-items: center; gap: 12px; margin-top: 20px; }
     .page-btn {
-      padding: 7px 16px; border: 1px solid var(--border-color); border-radius: 6px;
+      padding: 7px 16px; border: 1px solid var(--border-color); border-radius: var(--border-radius);
       background: var(--bg-surface); color: var(--text-primary); cursor: pointer; font-size: 13px;
     }
     .page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -139,6 +142,7 @@ const EVENT_TYPES = [
   `]
 })
 export class AdminEventsComponent implements OnInit {
+  private readonly settings = inject(SettingsService);
   events = signal<AnalyticsEvent[]>([]);
   loading = signal(true);
   error = signal('');
@@ -169,8 +173,7 @@ export class AdminEventsComponent implements OnInit {
   }
 
   formatTime(iso: string) {
-    return new Date(iso).toLocaleString('en-GB', {
-      day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit'
-    });
+    const tz = this.settings.timezone();
+    return `${formatInstant(iso, tz)}, ${new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: tz })}`;
   }
 }

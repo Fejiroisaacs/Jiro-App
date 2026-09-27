@@ -3,8 +3,16 @@ import { inject } from '@angular/core';
 import { catchError, switchMap, throwError, EMPTY } from 'rxjs';
 import { AuthService } from '../services/auth.service';
 import { ToastService } from '../services/toast.service';
+import { environment } from '../../../environments/environment';
+
+const API_PREFIX = `${environment.apiUrl}/`;
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
+  // The token is for our API only: never send it to storage, CDNs or any other host.
+  if (!req.url.startsWith(API_PREFIX)) {
+    return next(req);
+  }
+
   const authService = inject(AuthService);
   const toast = inject(ToastService);
   const token = authService.getToken();
@@ -23,9 +31,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(req).pipe(
     catchError((error: HttpErrorResponse) => {
-      // A write from the look-only demo. Say why once, here, rather than in
-      // every component; the caller still gets the error to reset its state.
-      // Never a reason to refresh or sign out.
+      // Demo write refused: explain once here, never refresh or sign out; the caller still gets the error.
       if (error.status === 403 && error.error?.error?.code === 'DEMO_READ_ONLY') {
         toast.readOnlyNotice(error.error.error.message);
         return throwError(() => error);

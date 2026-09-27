@@ -12,6 +12,7 @@ import {
 } from '../../../core/services/journal.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { UploadService } from '../../../core/services/upload.service';
 import { promptForDay, localDateKey } from '../writing-prompts';
 import { SettingsService } from '../../../core/services/settings.service';
@@ -19,6 +20,7 @@ import { dayKey, isDayKey, todayKey, zonedNoonISO } from '../../../core/utils/da
 import { AuthService } from '../../../core/services/auth.service';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { formatDay } from '../../../core/utils/format-date';
 
 /** A photo picked for an entry that does not exist yet; it uploads on publish. */
 interface PendingPhoto { file: File; url: string; }
@@ -29,16 +31,14 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
 @Component({
   selector: 'app-journal-editor',
   standalone: true,
-  imports: [FormsModule, RouterLink, JiroButtonComponent, JiroIconComponent],
+  imports: [FormsModule, RouterLink, JiroButtonComponent, JiroIconComponent, JiroSkeletonComponent],
   template: `
     <div class="editor-page" [class.immersive]="immersive()">
 
       <!-- Top bar -->
       <div class="editor-topbar">
         <button class="back-btn" (click)="goBack()" aria-label="Back">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="15,18 9,12 15,6"/>
-          </svg>
+          <jiro-icon name="caret-left" [size]="18" />
           @if (!immersive()) {
 <span>Back</span>
 }
@@ -66,22 +66,29 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
 
       <!-- Loading skeleton -->
       @if (loading()) {
-<div class="state-center">
-        <span class="spinner"></span>
+<div class="editor-body editor-body--loading" aria-hidden="true">
+        <jiro-skeleton height="12px" width="64px" />
+        <jiro-skeleton height="28px" width="50%" />
+        <jiro-skeleton [lines]="6" height="16px" />
       </div>
+      <span class="sr-only" role="status">Loading entry</span>
 }
 
       @if (!loading()) {
 <div class="editor-body">
 
         <!-- Title -->
+        <div class="title-field">
+        <label class="toolbar-label" for="entry-title">Title (optional)</label>
         <input
+          id="entry-title"
           type="text"
           class="title-input"
-          placeholder="Title (optional)"
+          placeholder="Untitled"
           [(ngModel)]="title"
           maxlength="255"
           (focus)="immersive.set(true)" />
+        </div>
 
         <!-- ── Writing prompt (new entries only) ─────────────────────── -->
         @if (promptVisible()) {
@@ -147,17 +154,18 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
 
           <!-- Tags -->
           <div class="toolbar-section">
-            <span class="toolbar-label">Tags</span>
+            <label class="toolbar-label" for="entry-tags">Tags</label>
             <div class="tag-editor">
               <div class="tag-chips">
                 @for (t of tags; track t) {
 <span class="tag-chip">
                   {{ t }}
-                  <button class="tag-remove" (click)="removeTag(t)" [attr.aria-label]="'Remove tag ' + t" type="button">×</button>
+                  <button class="tag-remove" (click)="removeTag(t)" [attr.aria-label]="'Remove tag ' + t" type="button"><jiro-icon name="x" [size]="12" /></button>
                 </span>
 }
               </div>
               <input
+                id="entry-tags"
                 type="text"
                 class="tag-input"
                 placeholder="Add tag and press Enter..."
@@ -181,9 +189,7 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
                   aria-label="Add a photo"
                   (change)="onFileSelected($event)"
                   [disabled]="uploading() || saving()" />
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                </svg>
+                <jiro-icon name="plus" [size]="14" />
                 {{ uploading() ? 'Uploading...' : 'Add' }}
               </label>
 }
@@ -202,9 +208,7 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
                   height="80"
                   (click)="openLightbox(img.file_url, imageAlt($index))" />
                 <button class="img-remove" (click)="deleteImage(img)" [disabled]="deletingImgId() === img.id" type="button" aria-label="Remove image">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                  </svg>
+                  <jiro-icon name="x" [size]="12" />
                 </button>
               </div>
 }
@@ -212,9 +216,7 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
 <div class="img-thumb">
                 <img [src]="p.url" [alt]="'Photo to upload: ' + p.file.name" width="80" height="80" />
                 <button class="img-remove" (click)="removePending(p)" [disabled]="saving()" type="button" [attr.aria-label]="'Remove ' + p.file.name">
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                  </svg>
+                  <jiro-icon name="x" [size]="12" />
                 </button>
               </div>
 }
@@ -238,9 +240,7 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
                 [class.selected]="selectedCollections().has(c.id)"
                 [attr.aria-pressed]="selectedCollections().has(c.id)"
                 (click)="toggleCollection(c.id)">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                </svg>
+                <jiro-icon name="folder" [size]="12" />
                 {{ c.name }}
               </button>
 }
@@ -298,7 +298,7 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
       margin: 0 auto;
       display: flex;
       flex-direction: column;
-      min-height: calc(100vh - var(--topbar-height, 56px) - var(--space-xl) * 2);
+      min-height: calc(100dvh - var(--topbar-height, 56px) - var(--space-xl) * 2);
     }
 
     /* Top bar */
@@ -338,10 +338,10 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
     .for-date-badge {
       font-size: var(--font-size-xs);
       font-weight: 500;
-      color: var(--color-primary);
+      color: var(--color-primary-text);
       background: rgba(var(--color-primary-rgb), 0.1);
       padding: 2px 8px;
-      border-radius: 10px;
+      border-radius: var(--border-radius-pill);
     }
     .editor-topbar-actions { flex-shrink: 0; }
     .day-link {
@@ -352,13 +352,14 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
       margin: calc(var(--space-md) - var(--space-xl)) 0 var(--space-md);
       font-size: var(--font-size-sm);
       font-weight: 600;
-      color: var(--color-primary);
+      color: var(--color-primary-text);
     }
 
     /* Editor body */
     .editor-body { display: flex; flex-direction: column; gap: var(--space-md); flex: 1; }
 
     /* Title */
+    .title-field { display: flex; flex-direction: column; gap: var(--space-xs); }
     .title-input {
       font-family: inherit;
       font-size: 1.35rem;
@@ -405,7 +406,7 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
       cursor: pointer;
       transition: color 0.15s;
     }
-    .prompt-question:hover { color: var(--color-primary); }
+    .prompt-question:hover { color: var(--color-primary-text); }
     .prompt-actions { display: flex; gap: var(--space-xs); flex-shrink: 0; }
     .prompt-btn {
       display: inline-flex;
@@ -472,7 +473,7 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
       gap: 5px;
       padding: 7px 12px;
       border: 1.5px solid var(--border-color);
-      border-radius: 99px;
+      border-radius: var(--border-radius-pill);
       background: var(--bg-canvas);
       color: var(--text-secondary);
       font-size: var(--font-size-xs);
@@ -483,11 +484,11 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
       transition: border-color 0.15s, color 0.15s, background 0.15s;
       min-height: 44px;
     }
-    .mood-chip:hover { border-color: var(--color-primary); color: var(--color-primary); }
+    .mood-chip:hover { border-color: var(--color-primary); color: var(--color-primary-text); }
     .mood-chip.selected {
       border-color: var(--color-primary);
       background: color-mix(in srgb, var(--color-primary) 12%, transparent);
-      color: var(--color-primary);
+      color: var(--color-primary-text);
       font-weight: 500;
     }
     /* Tags */
@@ -500,8 +501,8 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
       font-size: var(--font-size-xs);
       padding: 4px 8px;
       background: color-mix(in srgb, var(--color-primary) 12%, transparent);
-      color: var(--color-primary);
-      border-radius: 99px;
+      color: var(--color-primary-text);
+      border-radius: var(--border-radius-pill);
     }
     .tag-remove {
       background: none;
@@ -534,7 +535,7 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
       gap: 5px;
       font-size: var(--font-size-xs);
       font-family: inherit;
-      color: var(--color-primary);
+      color: var(--color-primary-text);
       cursor: pointer;
       border: 1px solid var(--color-primary);
       border-radius: var(--border-radius-sm);
@@ -565,9 +566,9 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
       width: 20px;
       height: 20px;
       border-radius: 50%;
-      background: rgba(0, 0, 0, 0.6);
-      color: #FFFFFF;
-      border: none;
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -593,18 +594,18 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
       gap: 6px;
       padding: 6px 12px;
       border: 1.5px solid var(--border-color);
-      border-radius: 99px;
+      border-radius: var(--border-radius-pill);
       font-size: var(--font-size-xs);
       color: var(--text-secondary);
       cursor: pointer;
       transition: border-color 0.15s, color 0.15s, background 0.15s;
       min-height: 36px;
     }
-    .coll-option:hover { border-color: var(--color-primary); color: var(--color-primary); }
+    .coll-option:hover { border-color: var(--color-primary); color: var(--color-primary-text); }
     .coll-option.selected {
       border-color: var(--color-primary);
       background: color-mix(in srgb, var(--color-primary) 12%, transparent);
-      color: var(--color-primary);
+      color: var(--color-primary-text);
       font-weight: 500;
     }
 
@@ -614,13 +615,13 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
     .bottom-spacer { flex: 1; }
 
     /* State */
-    .state-center { display: flex; justify-content: center; padding: var(--space-xl) 0; }
+    .editor-body--loading { gap: var(--space-sm); }
 
     /* Lightbox */
     .lightbox {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.85);
+      background: var(--scrim);
       z-index: var(--z-overlay);
       display: flex;
       align-items: center;
@@ -629,7 +630,7 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
     }
     .lightbox img {
       max-width: 90vw;
-      max-height: 90vh;
+      max-height: 90dvh;
       object-fit: contain;
       border-radius: var(--border-radius);
     }
@@ -652,7 +653,7 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
         left: 0;
         right: 0;
         border-radius: var(--border-radius) var(--border-radius) 0 0;
-        max-height: 50vh;
+        max-height: 50dvh;
         overflow-y: auto;
         z-index: var(--z-sticky);
         box-shadow: 0 -4px 20px rgba(var(--shadow-rgb), 0.2);
@@ -827,8 +828,7 @@ export class JournalEditorComponent implements OnInit, OnDestroy {
       req.collection_ids = [...this.selectedCollections()].filter(id => known.has(id));
     }
     if (this.forDate && !this.editId) {
-      // Noon on the chosen day in the user's zone, so the entry lands on that
-      // day in the day view, the week view, the strip and the streak.
+      // Noon on the chosen day in the user's zone, so the entry lands on that day everywhere.
       req.created_at = zonedNoonISO(this.forDate, this.settings.timezone());
     }
 
@@ -846,11 +846,7 @@ export class JournalEditorComponent implements OnInit, OnDestroy {
     }
   }
 
-  /**
-   * The entry exists now, so the photos picked before publishing can upload.
-   * If any fail, the editor stays open on the saved entry (as an edit) so
-   * nothing typed is lost and the photo can be added again.
-   */
+  /** Uploads photos picked before publishing; on failure the editor stays on the saved entry so nothing is lost. */
   private async afterCreate(e: JournalEntry) {
     const pending = this.pendingPhotos();
     let failed = 0;
@@ -959,7 +955,7 @@ export class JournalEditorComponent implements OnInit, OnDestroy {
 
   /**
    * Uploads carry no caption, so name each one by its position and the entry it
-   * belongs to — otherwise a screen reader announces three identical images.
+   * belongs to; otherwise a screen reader announces three identical images.
    */
   imageAlt(index: number): string {
     const subject = this.title.trim() || 'this entry';
@@ -994,8 +990,7 @@ export class JournalEditorComponent implements OnInit, OnDestroy {
 
   formatForDate(): string {
     if (!this.forDate) return '';
-    const d = new Date(this.forDate + 'T12:00:00');
-    return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+    return formatDay(this.forDate, { weekday: true });
   }
 }
 

@@ -1,23 +1,7 @@
 import { Component, ViewEncapsulation, computed, inject, input, numberAttribute } from '@angular/core';
 import { SettingsService } from '../../../core/services/settings.service';
 
-/**
- * A screenshot pair from the demo, shown for the app's current theme.
- * Resolves to `/images/guide/<guide>/<name>-light.webp` and `-dark.webp`.
- *
- *   <guide-shot guide="jym" name="session-player" [width]="1600" [height]="1000"
- *     alt="A workout in progress: three logged sets of bench press." />
- *
- * `width` and `height` are the webp's real pixel size (printed by
- * scripts/guide-shots/to-webp.py); they reserve the space so nothing jumps.
- * Shots are captured at 2x, so the image is never shown wider than half its
- * pixel width: a small dialog stays dialog-sized instead of being blown up.
- *
- * One <img> whose src follows the app's dark-mode setting, so only the
- * active theme's image is ever requested; switching theme swaps it. (Two
- * images with one hidden relied on the browser skipping a hidden lazy image,
- * which it did not reliably do on long pages.)
- */
+/** Theme-matched demo shot; one <img> so only the active theme loads. width/height are the webp's real pixels. */
 @Component({
   selector: 'guide-shot',
   standalone: true,

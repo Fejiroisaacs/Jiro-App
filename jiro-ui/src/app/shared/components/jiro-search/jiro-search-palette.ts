@@ -12,6 +12,8 @@ import {
 } from 'rxjs';
 import { SearchItem, SearchResponse, SearchService } from '../../../core/services/search.service';
 import { SearchPaletteService } from '../../../core/search-palette.service';
+import { SettingsService } from '../../../core/services/settings.service';
+import { formatInstant } from '../../../core/utils/format-date';
 import { JiroIconComponent } from '../jiro-icon/jiro-icon';
 import { JiroSkeletonComponent } from '../jiro-skeleton/jiro-skeleton';
 import { IconName } from '../../icons/icons.generated';
@@ -186,7 +188,7 @@ interface TextPart { text: string; match: boolean; }
       position: fixed;
       inset: 0;
       z-index: var(--z-modal);
-      background: rgba(0, 0, 0, 0.5);
+      background: var(--scrim);
       display: flex;
       justify-content: center;
       align-items: flex-start;
@@ -325,7 +327,7 @@ interface TextPart { text: string; match: boolean; }
 
     mark {
       background: rgba(var(--color-primary-rgb), 0.18);
-      color: inherit;
+      color: var(--color-primary-text);
       font-weight: 700;
       border-radius: var(--border-radius-sm);
       padding: 0 1px;
@@ -390,6 +392,7 @@ export class JiroSearchPaletteComponent implements AfterViewInit, OnDestroy {
   readonly palette = inject(SearchPaletteService);
   private readonly api = inject(SearchService);
   private readonly router = inject(Router);
+  private readonly settings = inject(SettingsService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
 
@@ -598,8 +601,8 @@ export class JiroSearchPaletteComponent implements AfterViewInit, OnDestroy {
     if (o.group === 'exercises' && item.subtitle) parts.push(capitalise(item.subtitle));
     if (o.group === 'sessions' && item.subtitle && item.subtitle !== 'normal') parts.push(capitalise(item.subtitle));
     if (o.group === 'journal' && item.group_id) parts.push('Group post');
-    if (item.date) parts.push(formatDate(item.date));
-    return parts.join(' · ');
+    if (item.date) parts.push(formatInstant(item.date, this.settings.timezone()));
+    return parts.join(', ');
   }
 
   /** Splits text around case-insensitive matches of the query that produced the results. */
@@ -654,8 +657,4 @@ export class JiroSearchPaletteComponent implements AfterViewInit, OnDestroy {
 
 function capitalise(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }

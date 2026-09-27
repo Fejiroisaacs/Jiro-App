@@ -7,16 +7,15 @@ import {
   JournalEntry,
   moodColor as moodColorFor,
   moodLabel as moodLabelFor,
-  moodMeta,
 } from '../../../core/services/journal.service';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { SettingsService } from '../../../core/services/settings.service';
-import { addDays, dayKey, dayStartISO, mondayOfKey, shortDayLabel, todayKey } from '../../../core/utils/day';
+import { addDays, dayKey, dayStartISO, mondayOfKey, todayKey } from '../../../core/utils/day';
+import { formatDay } from '../../../core/utils/format-date';
 
 // ─── Exported helpers used by parent components ──────────────────────────────
-// Weeks are Monday-to-Sunday calendar weeks of day keys in the user's zone
-// (settings, else the browser's), the same days the day view and the
-// dashboard strip use.
+// Weeks are Monday-to-Sunday day keys in the user's zone, as in the day view.
 
 /** This week's first and last day keys in `timeZone`. */
 export function currentWeekBounds(timeZone: string): { from: string; to: string } {
@@ -24,11 +23,7 @@ export function currentWeekBounds(timeZone: string): { from: string; to: string 
   return { from, to: addDays(from, 6) };
 }
 
-/**
- * A week of day keys as the instants the entries endpoint filters on
- * (created_at >= from AND created_at <= to). Bare dates would be read as UTC
- * midnights, which cut the week in the wrong place and drop Sunday entirely.
- */
+/** A week of day keys as instants for the entries filter; bare dates would be UTC and drop Sunday. */
 export function weekRangeQuery(week: { from: string; to: string }, timeZone: string): { from: string; to: string } {
   return { from: dayStartISO(week.from, timeZone), to: dayStartISO(addDays(week.to, 1), timeZone) };
 }
@@ -38,16 +33,14 @@ export function weekRangeQuery(week: { from: string; to: string }, timeZone: str
 @Component({
   selector: 'journal-week-view',
   standalone: true,
-  imports: [JiroSkeletonComponent],
+  imports: [JiroSkeletonComponent, JiroIconComponent],
   template: `
     <div class="wv">
 
       <!-- Navigation header -->
       <div class="wv-nav">
         <button class="wv-nav-btn" (click)="prevWeek()" aria-label="Previous week">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="15,18 9,12 15,6"/>
-          </svg>
+          <jiro-icon name="caret-left" [size]="16" />
         </button>
 
         <div class="wv-center">
@@ -56,9 +49,7 @@ export function weekRangeQuery(week: { from: string; to: string }, timeZone: str
         </div>
 
         <button class="wv-nav-btn" (click)="nextWeek()" aria-label="Next week">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="9,18 15,12 9,6"/>
-          </svg>
+          <jiro-icon name="caret-right" [size]="16" />
         </button>
       </div>
 
@@ -89,10 +80,7 @@ export function weekRangeQuery(week: { from: string; to: string }, timeZone: str
             type="button"
             (click)="dayClick.emit(iso(day))"
             [attr.aria-label]="'Open ' + dayAbbr(day) + ' ' + dayNum(day)">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-              <line x1="12" y1="5" x2="12" y2="19"/>
-              <line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
+            <jiro-icon name="plus" [size]="11" />
           </button>
 
           <!-- Sticky notes -->
@@ -167,14 +155,13 @@ export function weekRangeQuery(week: { from: string; to: string }, timeZone: str
     .wv-label { font-weight: 600; font-size: var(--font-size-sm); }
     .wv-today {
       font-size: var(--font-size-xs);
-      color: var(--color-primary);
+      color: var(--color-primary-text);
       background: none;
       border: none;
       cursor: pointer;
       padding: 0;
-      opacity: 0.8;
     }
-    .wv-today:hover { opacity: 1; text-decoration: underline; }
+    .wv-today:hover { text-decoration: underline; }
 
     /* ── Days grid ───────────────────────────────────────── */
     .wv-grid {
@@ -220,7 +207,7 @@ export function weekRangeQuery(week: { from: string; to: string }, timeZone: str
       line-height: 1.15;
       color: var(--text-primary);
     }
-    .wv-day--today .wv-day-num { color: var(--color-primary); }
+    .wv-day--today .wv-day-num { color: var(--color-primary-text); }
 
     /* Day body */
     .wv-day-body {
@@ -246,13 +233,13 @@ export function weekRangeQuery(week: { from: string; to: string }, timeZone: str
       word-break: break-word;
     }
     .wv-note:hover {
-      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
-      transform: translateY(-1px);
+      box-shadow: var(--shadow-sm);
+      transform: translate(-1px, -1px);
     }
     .wv-note-author {
       font-size: 0.6rem;
       font-weight: 700;
-      color: var(--color-primary);
+      color: var(--color-primary-text);
       margin-bottom: 2px;
       white-space: nowrap;
       overflow: hidden;
@@ -298,7 +285,7 @@ export function weekRangeQuery(week: { from: string; to: string }, timeZone: str
     }
     .wv-add:hover {
       border-color: var(--color-primary);
-      color: var(--color-primary);
+      color: var(--color-primary-text);
       opacity: 1;
       background: color-mix(in srgb, var(--color-primary) 5%, transparent);
     }
@@ -336,7 +323,7 @@ export class JournalWeekViewComponent implements OnChanges, AfterViewInit {
 
   weekLabel = computed(() => {
     const days = this.weekDays();
-    return `${shortDayLabel(days[0])} – ${shortDayLabel(days[6])}, ${days[6].slice(0, 4)}`;
+    return `${formatDay(days[0], { year: 'never' })} to ${formatDay(days[6], { year: 'always' })}`;
   });
 
   entriesByDay = computed(() => {
@@ -380,7 +367,8 @@ export class JournalWeekViewComponent implements OnChanges, AfterViewInit {
     const grid: HTMLElement | null = this.elRef.nativeElement.querySelector('.wv-grid');
     const todayCol: HTMLElement | null = this.elRef.nativeElement.querySelector('.wv-day--today');
     if (grid && todayCol) {
-      grid.scrollTo({ left: todayCol.offsetLeft - 16, behavior: 'smooth' });
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      grid.scrollTo({ left: todayCol.offsetLeft - 16, behavior: reduce ? 'auto' : 'smooth' });
     }
   }
 
@@ -401,10 +389,6 @@ export class JournalWeekViewComponent implements OnChanges, AfterViewInit {
   /** The palette lives beside MOODS in the service; a note with no mood keeps the hairline. */
   moodColor(mood: string | null | undefined): string {
     return mood ? moodColorFor(mood) : 'var(--border-color)';
-  }
-
-  moodIcon(mood: string): string {
-    return moodMeta(mood)?.icon ?? '';
   }
 
   moodLabel(mood: string): string {

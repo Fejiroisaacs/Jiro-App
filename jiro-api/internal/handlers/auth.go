@@ -52,8 +52,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	// The demo's domain is reserved: nobody may hold demo@jiro.invalid
-	// before the demo account is first created.
+	// The demo's domain is reserved for the demo account.
 	if services.IsReservedDemoEmail(req.Email) {
 		c.JSON(http.StatusConflict, models.ErrorResponse{
 			Error: models.ErrorDetail{Code: "EMAIL_TAKEN", Message: "Email is already registered"},
@@ -171,8 +170,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	// The demo has no usable password anyway; refuse it outright so it only
-	// ever starts through POST /auth/demo.
+	// The demo only ever signs in through POST /auth/demo.
 	if user.IsDemo || !h.authService.VerifyPassword(user.PasswordHash, req.Password) {
 		h.failTracker.RecordFail(c.Request.Context(), ip)
 		c.JSON(http.StatusUnauthorized, models.ErrorResponse{
@@ -201,10 +199,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	})
 }
 
-// Demo handles POST /auth/demo: it signs the caller in to the shared,
-// look-only demo account, creating it with its sample data on first use and
-// otherwise sliding the data's dates up to today. The response is the same as
-// Login's: an access token, the user, and a refresh cookie.
+// Demo handles POST /auth/demo: signs in to the shared look-only demo, seeding it on first use.
 func (h *AuthHandler) Demo(c *gin.Context) {
 	userID, err := h.demoService.Login(c.Request.Context())
 	if err != nil {
@@ -407,8 +402,7 @@ func (h *AuthHandler) ForgotPassword(c *gin.Context) {
 
 	user, err := h.userService.GetByEmail(c.Request.Context(), req.Email)
 	if err != nil || user.IsDemo {
-		// User not found (or the demo, whose .invalid address can't receive
-		// mail) — still return 200
+		// User not found (or the demo, which has no mailbox): still return 200
 		c.JSON(http.StatusOK, gin.H{"message": "If that email is registered, you'll receive a reset link"})
 		return
 	}

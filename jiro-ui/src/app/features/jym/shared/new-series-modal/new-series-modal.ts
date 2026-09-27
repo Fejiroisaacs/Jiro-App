@@ -9,16 +9,13 @@ type Duration = 'open' | 'weeks' | 'sessions';
 
 let seq = 0;
 
-/**
- * "Start series" dialog, shared by Plan's split cards and the split page so
- * both ask the same question in the same words. Creates the series and opens it.
- */
+/** "Start series" dialog shared by Plan's split cards and the split page; creates and opens the series. */
 @Component({
   selector: 'jym-new-series-modal',
   standalone: true,
   imports: [FormsModule, JiroButtonComponent, JiroModalComponent],
   template: `
-    <jiro-modal title="Start Series" maxWidth="440px" (close)="closed.emit()">
+    <jiro-modal title="Start series" maxWidth="440px" (close)="closed.emit()">
       <form class="series-form" (ngSubmit)="create()">
         <div class="form-group">
           <label class="form-label" [for]="uid + '-name'">Series name</label>
@@ -58,7 +55,7 @@ let seq = 0;
         <div class="form-actions">
           <jiro-button variant="secondary" type="button" (click)="closed.emit()">Cancel</jiro-button>
           <jiro-button variant="primary" type="submit" [disabled]="saving() || !name.trim()">
-            {{ saving() ? 'Starting...' : 'Start Series' }}
+            {{ saving() ? 'Starting...' : 'Start series' }}
           </jiro-button>
         </div>
       </form>

@@ -13,11 +13,13 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { LedgerTransactionFormComponent, TransactionPayload } from '../shared/transaction-form/ledger-transaction-form';
-import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hexWithAlpha, parseDateOnly } from '../shared/ledger-utils';
+import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, categoryColor, categoryTint } from '../shared/ledger-utils';
 import { SettingsService } from '../../../core/services/settings.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { todayKey } from '../../../core/utils/day';
+import { formatMonth } from '../../../core/utils/format-date';
 
 @Component({
   selector: 'app-ledger-hub',
@@ -30,6 +32,7 @@ import { todayKey } from '../../../core/utils/day';
     JiroIconComponent,
     JiroPageHeaderComponent,
     JiroEmptyStateComponent,
+    JiroSkeletonComponent,
     LedgerTransactionFormComponent,
   ],
   template: `
@@ -45,7 +48,27 @@ import { todayKey } from '../../../core/utils/day';
 
       <!-- ── Loading ── -->
       @if (loading()) {
-        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+        <div class="ledger-skeleton" aria-hidden="true">
+          <div class="summary-bar">
+            @for (i of [0, 1, 2, 3]; track i) {
+              <div class="summary-item">
+                <jiro-skeleton height="12px" width="64px" />
+                <jiro-skeleton height="26px" width="96px" />
+              </div>
+            }
+          </div>
+          <div class="hub-body">
+            <div class="sk-col">
+              <jiro-skeleton height="20px" width="120px" />
+              <jiro-skeleton [lines]="3" height="72px" />
+            </div>
+            <div class="sk-col">
+              <jiro-skeleton height="20px" width="180px" />
+              <jiro-skeleton [lines]="5" height="44px" />
+            </div>
+          </div>
+        </div>
+        <span class="sr-only" role="status">Loading your ledger</span>
       }
 
       <!-- ── No Accounts Empty State ── -->
@@ -111,7 +134,7 @@ import { todayKey } from '../../../core/utils/day';
               @for (b of budgets(); track b.id) {
 <div class="budget-card">
                 <div class="budget-card-top">
-                  <span class="budget-cat-dot" aria-hidden="true" [style.background]="b.category_color || 'var(--text-muted)'"></span>
+                  <span class="budget-cat-dot" aria-hidden="true" [style.background]="categoryColor(b.category_color)"></span>
                   <span class="budget-cat-name">{{ b.category_name }}</span>
                   <span class="budget-pct" [class.pct-ok]="b.pct_used < 80" [class.pct-warn]="b.pct_used >= 80 && b.pct_used < 100" [class.pct-over]="b.pct_used >= 100">
                     {{ b.pct_used | number:'1.0-0' }}%
@@ -163,7 +186,7 @@ import { todayKey } from '../../../core/utils/day';
                       @if (t.type === 'transfer') {
                         <span class="txn-sub">{{ transferLabel(t) }}</span>
                       } @else if (t.category_name) {
-                        <span class="cat-chip" [style.background]="hexWithAlpha(t.category_color, 0.12)" [style.color]="t.category_color || 'var(--text-muted)'">
+                        <span class="cat-chip" [style.--chip]="categoryColor(t.category_color)" [style.background]="categoryTint(t.category_color)">
                           {{ t.category_name }}
                         </span>
                       }
@@ -187,12 +210,12 @@ import { todayKey } from '../../../core/utils/day';
 
       <!-- ── Add Transaction Modal ── -->
       @if (showTxnModal()) {
-<jiro-modal title="Log Transaction" maxWidth="520px" (close)="closeAddTransaction()">
+<jiro-modal title="Log transaction" maxWidth="520px" (close)="closeAddTransaction()">
         <ledger-transaction-form
           [accounts]="accounts()"
           [saving]="txnSaving()"
           [error]="txnError()"
-          submitLabel="Log Transaction"
+          submitLabel="Log transaction"
           (formSubmit)="onTxnSubmit($event)"
           (formCancel)="closeAddTransaction()">
         </ledger-transaction-form>
@@ -254,7 +277,7 @@ import { todayKey } from '../../../core/utils/day';
 
     .summary-value.expense { color: var(--color-danger); }
 
-    .summary-value.savings { color: var(--color-primary); }
+    .summary-value.savings { color: var(--color-primary-text); }
 
 
     /* ── Hub body ── */
@@ -283,7 +306,7 @@ import { todayKey } from '../../../core/utils/day';
 
     .section-link {
       font-size: var(--font-size-sm);
-      color: var(--color-primary);
+      color: var(--color-primary-text);
       text-decoration: none;
       font-weight: 500;
       transition: opacity 0.15s;
@@ -345,13 +368,13 @@ import { todayKey } from '../../../core/utils/day';
     .budget-bar-track {
       height: 6px;
       background: var(--bg-canvas);
-      border-radius: 3px;
+      border-radius: var(--border-radius-pill);
       overflow: hidden;
     }
 
     .budget-bar-fill {
       height: 100%;
-      border-radius: 3px;
+      border-radius: var(--border-radius-pill);
       transition: width 0.3s ease;
       min-width: 2px;
     }
@@ -420,12 +443,23 @@ import { todayKey } from '../../../core/utils/day';
       text-overflow: ellipsis;
     }
 
+    .cat-chip::before {
+      content: '';
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      margin-right: 5px;
+      border-radius: 50%;
+      background: var(--chip);
+    }
+
     .cat-chip {
       display: inline-block;
       font-size: var(--font-size-xs);
       font-weight: 600;
+      color: var(--text-primary);
       padding: 2px 8px;
-      border-radius: 10px;
+      border-radius: var(--border-radius-pill);
       max-width: 100%;
       width: max-content;
       overflow: hidden;
@@ -472,8 +506,8 @@ import { todayKey } from '../../../core/utils/day';
 
 
 
-    /* ── Spinner ── */
-    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
+    /* ── Loading ── */
+    .sk-col { display: flex; flex-direction: column; gap: var(--space-md); min-width: 0; }
 
 
     /* ── FAB ── */
@@ -523,13 +557,13 @@ export class LedgerHubComponent implements OnInit {
 
   /** This month in the user's timezone (settings), as YYYY-MM: the API's summary month. */
   readonly currentMonth = computed(() => todayKey(this.settings.timezone()).slice(0, 7));
-  readonly currentMonthLabel = computed(() =>
-    parseDateOnly(this.currentMonth() + '-01').toLocaleString('en-US', { month: 'long', year: 'numeric' }));
+  readonly currentMonthLabel = computed(() => formatMonth(this.currentMonth()));
 
   readonly formatDate = formatDate;
   readonly formatPct = formatPct;
   readonly clamp = clamp;
-  readonly hexWithAlpha = hexWithAlpha;
+  readonly categoryColor = categoryColor;
+  readonly categoryTint = categoryTint;
 
   constructor(private ledgerService: LedgerService, public router: Router) {}
 
@@ -599,9 +633,9 @@ export class LedgerHubComponent implements OnInit {
     return formatSignedCurrency(t.amount, this.settings.currency(), t.type === 'transfer' ? 'never' : 'exceptZero');
   }
 
-  /** "Checking → Savings": a transfer is listed once, with its direction. */
+  /** "Checking to Savings": a transfer is listed once, with its direction. */
   transferLabel(t: LedgerTransaction): string {
     const name = (id: string | null) => this.accounts().find(a => a.id === id)?.name;
-    return `${name(t.account_id) ?? 'Unknown account'} → ${name(t.transfer_to_account_id) ?? 'a deleted account'}`;
+    return `${name(t.account_id) ?? 'Unknown account'} to ${name(t.transfer_to_account_id) ?? 'a deleted account'}`;
   }
 }

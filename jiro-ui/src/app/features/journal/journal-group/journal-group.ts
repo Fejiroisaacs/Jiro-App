@@ -9,7 +9,8 @@ import {
   JournalEntry,
   JournalInviteLink,
   INVITE_LINK_DAYS,
-  MOODS,
+  moodMeta,
+  moodLabel as moodLabelFor,
 } from '../../../core/services/journal.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { JournalWeekViewComponent, currentWeekBounds } from '../journal-week-view/journal-week-view';
@@ -18,14 +19,17 @@ import { dayKey } from '../../../core/utils/day';
 import { JournalDayModalComponent } from '../journal-day-modal/journal-day-modal';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
-import { SafeHtmlPipe } from '../../../shared/pipes/safe-html.pipe';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
+import { IconName } from '../../../shared/icons/icons.generated';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { formatInstant } from '../../../core/utils/format-date';
 
 @Component({
   selector: 'app-journal-group',
   standalone: true,
-  imports: [FormsModule, RouterLink, JournalWeekViewComponent, JournalDayModalComponent, JiroButtonComponent, JiroModalComponent, SafeHtmlPipe],
+  imports: [FormsModule, RouterLink, JournalWeekViewComponent, JournalDayModalComponent, JiroButtonComponent, JiroModalComponent, JiroIconComponent, JiroSkeletonComponent],
   template: `
     <div class="group-page">
 
@@ -33,9 +37,7 @@ import { ToastService } from '../../../core/services/toast.service';
       <div class="page-header">
         <div class="header-left">
           <a routerLink="/journal/groups" class="back-link">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="15,18 9,12 15,6"/>
-            </svg>
+            <jiro-icon name="caret-left" [size]="16" />
             Groups
           </a>
           @if (group()) {
@@ -51,14 +53,11 @@ import { ToastService } from '../../../core/services/toast.service';
         @if (group()) {
 <div class="header-actions">
           <jiro-button variant="secondary" type="button" (click)="openMembers()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
+            <jiro-icon name="users" [size]="14" />
             Members
           </jiro-button>
           <jiro-button variant="primary" type="button" (click)="writeEntry()">
-            + Write
+            <jiro-icon name="plus" [size]="14" /> Write
           </jiro-button>
         </div>
 }
@@ -66,10 +65,17 @@ import { ToastService } from '../../../core/services/toast.service';
 
       <!-- Loading -->
       @if (loading()) {
-<div class="state-center">
-        <span class="spinner"></span>
-        <p>Loading group...</p>
+<div class="group-loading" aria-hidden="true">
+        <div class="group-header-info">
+          <div class="group-avatar-lg"></div>
+          <div class="sk-stack">
+            <jiro-skeleton height="24px" width="180px" />
+            <jiro-skeleton height="12px" width="80px" />
+          </div>
+        </div>
+        <jiro-skeleton height="120px" />
       </div>
+      <span class="sr-only" role="status">Loading group</span>
 }
 
       <!-- Not found -->
@@ -97,8 +103,16 @@ import { ToastService } from '../../../core/services/toast.service';
 
         <!-- Feed: entries for current week -->
         @if (loadingEntries()) {
-<div class="state-center">
-          <span class="spinner"></span>
+<div class="entries-feed" aria-hidden="true">
+          @for (i of [0, 1]; track i) {
+            <div class="entry-card sk-stack">
+              <div class="entry-author">
+                <div class="author-avatar"></div>
+                <jiro-skeleton height="14px" width="120px" />
+              </div>
+              <jiro-skeleton [lines]="3" height="14px" />
+            </div>
+          }
         </div>
 }
 
@@ -106,7 +120,7 @@ import { ToastService } from '../../../core/services/toast.service';
 <div class="state-center">
           <h3>No entries this week</h3>
           <p class="text-secondary">Click any day above or use "Write" to add an entry.</p>
-          <jiro-button variant="primary" type="button" (click)="writeEntry()">Write Entry</jiro-button>
+          <jiro-button variant="primary" type="button" (click)="writeEntry()">Write entry</jiro-button>
         </div>
 }
 
@@ -121,21 +135,16 @@ import { ToastService } from '../../../core/services/toast.service';
                 <span class="entry-date text-secondary">{{ formatDate(e.created_at) }}</span>
               </div>
               @if (e.mood) {
-<span class="mood-chip" [innerHTML]="moodIcon(e.mood) | safeHtml"></span>
+<span class="mood-chip"><jiro-icon [name]="moodIcon(e.mood)" [label]="moodLabel(e.mood)" /></span>
 }
               <!-- Edit/delete for own entries -->
               @if (isOwnEntry(e)) {
 <div class="entry-actions">
                 <button class="icon-btn" (click)="router.navigate(['/journal', e.id, 'edit'])" aria-label="Edit">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                  </svg>
+                  <jiro-icon name="pencil-simple" [size]="13" />
                 </button>
                 <button class="icon-btn danger" type="button" (click)="deleteEntry(e)" aria-label="Delete this entry">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                  </svg>
+                  <jiro-icon name="trash" [size]="13" />
                 </button>
               </div>
 }
@@ -210,9 +219,7 @@ import { ToastService } from '../../../core/services/toast.service';
             (click)="removeMember(m)"
             [attr.aria-label]="removeLabel(m)"
             [disabled]="removingMemberId() === m.user_id">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
+            <jiro-icon name="x" [size]="13" />
           </button>
 }
         </div>
@@ -340,18 +347,20 @@ import { ToastService } from '../../../core/services/toast.service';
       text-decoration: none;
       transition: color 0.15s;
     }
-    .back-link:hover { color: var(--color-primary); text-decoration: none; }
+    .back-link:hover { color: var(--color-primary-text); text-decoration: none; }
     .group-header-info { display: flex; align-items: center; gap: var(--space-md); }
     .group-avatar-lg {
       width: 48px; height: 48px; border-radius: 50%;
       background: color-mix(in srgb, var(--color-primary) 20%, transparent);
-      color: var(--color-primary); display: flex; align-items: center; justify-content: center;
+      color: var(--color-primary-text); display: flex; align-items: center; justify-content: center;
       font-weight: 700; font-size: var(--font-size-lg); flex-shrink: 0;
     }
     .group-header-info h1 { margin: 0 0 2px; }
     .header-actions { display: flex; gap: var(--space-sm); flex-shrink: 0; }
 
     /* State */
+    .group-loading { display: flex; flex-direction: column; gap: var(--space-lg); }
+    .sk-stack { display: flex; flex-direction: column; gap: var(--space-sm); }
     .state-center { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--space-sm); padding: var(--space-xl) 0; }
 
     /* Feed */
@@ -366,7 +375,7 @@ import { ToastService } from '../../../core/services/toast.service';
     .author-avatar {
       width: 34px; height: 34px; border-radius: 50%;
       background: color-mix(in srgb, var(--color-primary) 15%, transparent);
-      color: var(--color-primary); display: flex; align-items: center; justify-content: center;
+      color: var(--color-primary-text); display: flex; align-items: center; justify-content: center;
       font-weight: 700; font-size: var(--font-size-sm); flex-shrink: 0;
     }
     .author-info { display: flex; flex-direction: column; gap: 1px; flex: 1; }
@@ -384,7 +393,7 @@ import { ToastService } from '../../../core/services/toast.service';
     .entry-images { display: flex; gap: var(--space-sm); flex-wrap: wrap; margin-bottom: var(--space-sm); }
     .entry-image { width: 100px; height: 80px; object-fit: cover; border-radius: var(--border-radius-sm); cursor: zoom-in; }
     .tag-list { display: flex; flex-wrap: wrap; gap: 4px; }
-    .tag-chip { font-size: 0.65rem; padding: 2px 6px; background: var(--bg-surface-hover); border-radius: 99px; color: var(--text-secondary); }
+    .tag-chip { font-size: 0.65rem; padding: 2px 6px; background: var(--bg-surface-hover); border-radius: var(--border-radius-pill); color: var(--text-secondary); }
 
     /* Members modal */
     .members-list { display: flex; flex-direction: column; gap: var(--space-xs); margin-bottom: var(--space-lg); }
@@ -402,7 +411,7 @@ import { ToastService } from '../../../core/services/toast.service';
     .member-name { font-size: var(--font-size-sm); font-weight: 500; }
     .member-status { font-size: var(--font-size-xs); }
     .member-status.pending { color: var(--color-warning); }
-    .owner-badge { font-size: var(--font-size-xs); padding: 2px 8px; background: color-mix(in srgb, var(--color-primary) 15%, transparent); color: var(--color-primary); border-radius: 99px; }
+    .owner-badge { font-size: var(--font-size-xs); padding: 2px 8px; background: color-mix(in srgb, var(--color-primary) 15%, transparent); color: var(--color-primary-text); border-radius: var(--border-radius-pill); }
 
     /* Invite */
     .invite-section, .rename-section { margin-top: var(--space-lg); padding-top: var(--space-lg); border-top: 1px solid var(--border-color); }
@@ -440,15 +449,15 @@ import { ToastService } from '../../../core/services/toast.service';
       color: var(--text-primary);
       transition: border-color 0.15s, color 0.15s; display: flex; align-items: center; justify-content: center;
     }
-    .mood-chip-sm.selected { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 12%, transparent); color: var(--color-primary); }
+    .mood-chip-sm.selected { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 12%, transparent); color: var(--color-primary-text); }
     .modal-actions { display: flex; justify-content: flex-end; gap: var(--space-sm); }
 
     /* Lightbox */
     .lightbox {
-      position: fixed; inset: 0; background: rgba(0, 0, 0, 0.85); z-index: var(--z-overlay);
+      position: fixed; inset: 0; background: var(--scrim); z-index: var(--z-overlay);
       display: flex; align-items: center; justify-content: center; cursor: zoom-out;
     }
-    .lightbox img { max-width: 90vw; max-height: 90vh; object-fit: contain; border-radius: var(--border-radius); }
+    .lightbox img { max-width: 90vw; max-height: 90dvh; object-fit: contain; border-radius: var(--border-radius); }
 
     @media (max-width: 600px) {
       .page-header { flex-direction: column; }
@@ -717,8 +726,7 @@ export class JournalGroupComponent implements OnInit {
       await navigator.clipboard.writeText(url);
       this.toast.success('Invite link copied');
     } catch {
-      // No clipboard access (older browser, insecure context): select it so
-      // the owner can copy it themselves.
+      // No clipboard access: select the link so the owner can copy it.
       input.focus();
       input.select();
       this.toast.error('Could not copy. The link is selected; copy it from there.');
@@ -726,7 +734,8 @@ export class JournalGroupComponent implements OnInit {
   }
 
   formatExpiry(s: string): string {
-    return new Date(s).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: this.settings.timezone() });
+    const tz = this.settings.timezone();
+    return `${formatInstant(s, tz)}, ${new Date(s).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz })}`;
   }
 
   async removeMember(m: JournalGroupMember) {
@@ -825,10 +834,14 @@ export class JournalGroupComponent implements OnInit {
   }
 
   formatDate(s: string): string {
-    return new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return formatInstant(s, this.settings.timezone());
   }
 
-  moodIcon(value: string): string {
-    return MOODS.find(m => m.value === value)?.icon ?? '';
+  moodIcon(value: string): IconName {
+    return moodMeta(value)?.icon ?? 'smiley';
+  }
+
+  moodLabel(value: string): string {
+    return moodLabelFor(value);
   }
 }

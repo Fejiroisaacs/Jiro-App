@@ -9,11 +9,14 @@ import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-m
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
+import { SettingsService } from '../../../core/services/settings.service';
+import { formatInstant } from '../../../core/utils/format-date';
 
 @Component({
   selector: 'app-series-list',
   standalone: true,
-  imports: [
+  imports: [JiroSkeletonComponent, 
     JiroButtonComponent, JiroModalComponent, JiroIconComponent,
     JiroPageHeaderComponent, JiroEmptyStateComponent,
   ],
@@ -24,7 +27,7 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
       }
 
       @if (loading()) {
-        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+        <div class="series-grid" role="status" aria-label="Loading series">@for (i of [1, 2, 3]; track i) { <jiro-skeleton height="170px" /> }</div>
       }
 
       <!-- Active Series -->
@@ -44,9 +47,7 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
 
             <div class="card-meta">
               <span class="meta-item">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-                </svg>
+                <jiro-icon name="calendar-blank" [size]="12" />
                 Started {{ formatDate(sr.started_at) }}
               </span>
             </div>
@@ -71,9 +72,7 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
 
               <div class="card-footer-actions">
                 <jiro-button variant="primary" type="button" (click)="$event.stopPropagation(); startFromSeriesSplit(sr.split_id, sr.id)">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                    <polygon points="5,3 19,12 5,21"/>
-                  </svg>
+                  <jiro-icon name="play:fill" [size]="11" />
                   Start
                 </jiro-button>
                 <button class="view-btn" (click)="view(sr.id)">View</button>
@@ -140,19 +139,17 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
       @if (!loading() && series().length > 0) {
 <div class="start-cta">
         <a (click)="goToSplits.emit()" class="start-link">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-          Start a new series from your Splits
+          <jiro-icon name="plus" [size]="13" />
+          Start a new series from your splits
         </a>
       </div>
 }
 
       <!-- Routine Picker Modal -->
       @if (showRoutinePicker()) {
-<jiro-modal title="Choose Routine" maxWidth="420px" (close)="showRoutinePicker.set(false)">
+<jiro-modal title="Choose routine" maxWidth="420px" (close)="showRoutinePicker.set(false)">
         @if (loadingRoutines()) {
-          <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+          <div class="sk-list" role="status" aria-label="Loading routines">@for (i of [1, 2, 3]; track i) { <jiro-skeleton height="48px" /> }</div>
         }
         @if (!loadingRoutines()) {
 <div class="routine-list">
@@ -186,7 +183,7 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
       color: var(--text-secondary); margin-bottom: var(--space-md);
     }
 
-    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
+    .sk-list { display: flex; flex-direction: column; gap: var(--space-xs); }
 
     /* Series grid */
     .series-grid {
@@ -213,7 +210,7 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
 
     .status-badge {
       font-size: var(--font-size-xs); font-weight: 600; padding: 3px 10px;
-      border-radius: 10px; white-space: nowrap; flex-shrink: 0;
+      border-radius: var(--border-radius-pill); white-space: nowrap; flex-shrink: 0;
     }
     .status-badge.active { background: rgba(var(--color-accent-rgb), 0.12); color: var(--color-positive); }
     .status-badge.ended { background: var(--bg-canvas); color: var(--text-muted); border: 1px solid var(--border-color); }
@@ -234,8 +231,8 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
 
 
     .sessions-pill, .duration-pill {
-      font-size: var(--font-size-xs); padding: 3px 10px; border-radius: 10px;
-      background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary); font-weight: 500;
+      font-size: var(--font-size-xs); padding: 3px 10px; border-radius: var(--border-radius-pill);
+      background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary-text); font-weight: 500;
     }
 
     .duration-pill.open { background: var(--bg-canvas); color: var(--text-muted); }
@@ -333,6 +330,7 @@ export class SeriesListComponent implements OnInit {
 
   private readonly confirmService = inject(ConfirmService);
   private readonly toast = inject(ToastService);
+  private readonly settings = inject(SettingsService);
 
   constructor(private jymService: JymService, public router: Router) { }
 
@@ -407,7 +405,7 @@ export class SeriesListComponent implements OnInit {
     return Math.floor(days / 7);
   }
 
-  formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' });
+  formatDate(instant: string): string {
+    return formatInstant(instant, this.settings.timezone());
   }
 }

@@ -9,7 +9,7 @@
       }
     ],
     "hide": [
-      ".jym-dash > .splits-summary:last-of-type"
+      ".jym-dash > .splits-summary ~ .splits-summary"
     ]
   },
   {

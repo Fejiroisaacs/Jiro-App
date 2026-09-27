@@ -10,7 +10,7 @@ let menuSeq = 0;
 
 /**
  * Avatar button that opens the account menu: Settings, Send feedback,
- * Dark mode, Log out. Used in the desktop sidebar footer (opens upward)
+ * Dark mode, Sign out. Used in the desktop sidebar footer (opens upward)
  * and the mobile top bar (opens downward). Keyboard: Enter/Space or
  * Arrow keys open, arrows move, Escape closes and returns focus, Tab leaves.
  */
@@ -60,7 +60,7 @@ let menuSeq = 0;
             <span class="um-state">{{ dark() ? 'On' : 'Off' }}</span>
           </button>
           <button role="menuitem" class="um-item um-item--danger" type="button" (click)="logout()">
-            <jiro-icon name="sign-out" [size]="16" /> Log out
+            <jiro-icon name="sign-out" [size]="16" /> Sign out
           </button>
         </div>
       }

@@ -36,11 +36,11 @@
         }
       },
       {
-        "fill": ".modal-content .ingredient-row:nth-child(1) .ing-item",
+        "fill": ".modal-content .ingredient-row:not(.ingredient-head) .ing-item >> nth=0",
         "value": "Spaghetti"
       },
       {
-        "fill": ".modal-content .ingredient-row:nth-child(1) .ing-amount",
+        "fill": ".modal-content .ingredient-row:not(.ingredient-head) .ing-amount >> nth=0",
         "value": "200g"
       },
       {
@@ -50,11 +50,11 @@
         }
       },
       {
-        "fill": ".modal-content .ingredient-row:nth-child(2) .ing-item",
+        "fill": ".modal-content .ingredient-row:not(.ingredient-head) .ing-item >> nth=1",
         "value": "Garlic"
       },
       {
-        "fill": ".modal-content .ingredient-row:nth-child(2) .ing-amount",
+        "fill": ".modal-content .ingredient-row:not(.ingredient-head) .ing-amount >> nth=1",
         "value": "3 cloves"
       },
       {
@@ -154,7 +154,7 @@
       {
         "click": {
           "role": "button",
-          "name": "+ Log Trial"
+          "name": "+ Log trial"
         }
       },
       {

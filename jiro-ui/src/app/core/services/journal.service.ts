@@ -3,6 +3,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { SettingsService } from './settings.service';
+import { IconName } from '../../shared/icons/icons.generated';
 
 const API_URL = `${environment.apiUrl}/journal`;
 
@@ -137,22 +138,21 @@ export interface ListEntriesParams {
  * energetic end first, through to the cool and heavy end. Anything that lists
  * or charts moods should follow this order rather than sorting alphabetically.
  *
- * `color` is a literal hex rather than a token on purpose. It is a categorical
- * scale: the eight values have to stay distinguishable from one another and
- * stable across themes, the way MUSCLE_COLORS does in the Jym summary, and the
- * chart needs a plain string. Every hue clears 3:1 as a non-text fill against
- * both surface colours, light (#FFFDF9) and dark (#261D18).
+ * `color` is a data palette colour, so it follows the theme: the eight moods
+ * stay distinguishable in light and dark, and each clears 3:1 as a non-text
+ * fill. It is a CSS value such as var(--data-3); use it for fills, bars and marks,
+ * never as text.
  */
 export const MOODS = [
-  { value: 'happy', label: 'Happy', color: '#AE7E22', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>' },
-  { value: 'grateful', label: 'Grateful', color: '#9C6EA8', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>' },
-  { value: 'energised', label: 'Energised', color: '#BD5629', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>' },
-  { value: 'calm', label: 'Calm', color: '#5A8060', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z"/></svg>' },
-  { value: 'tired', label: 'Tired', color: '#8A7F76', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>' },
-  { value: 'sad', label: 'Sad', color: '#5D7A99', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 16s-1.5-2-4-2-4 2-4 2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>' },
-  { value: 'anxious', label: 'Anxious', color: '#3F8579', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' },
-  { value: 'stressed', label: 'Stressed', color: '#B55048', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>' },
-] as const;
+  { value: 'happy', label: 'Happy', color: 'var(--data-3)', icon: 'smiley' },
+  { value: 'grateful', label: 'Grateful', color: 'var(--data-6)', icon: 'heart' },
+  { value: 'energised', label: 'Energised', color: 'var(--data-9)', icon: 'lightning' },
+  { value: 'calm', label: 'Calm', color: 'var(--data-4)', icon: 'cloud' },
+  { value: 'tired', label: 'Tired', color: 'var(--data-7)', icon: 'moon' },
+  { value: 'sad', label: 'Sad', color: 'var(--data-5)', icon: 'smiley-sad' },
+  { value: 'anxious', label: 'Anxious', color: 'var(--data-12)', icon: 'warning-circle' },
+  { value: 'stressed', label: 'Stressed', color: 'var(--data-1)', icon: 'fire' },
+] as const satisfies readonly { value: string; label: string; color: string; icon: IconName }[];
 
 export type Mood = (typeof MOODS)[number];
 
@@ -180,11 +180,7 @@ export class JournalService {
 
   private readonly settings = inject(SettingsService);
 
-  /**
-   * The browser's zone as a hint for the day-based endpoints (streak,
-   * calendar). The API only uses it for an account with no timezone setting,
-   * exactly as GET /day does, so every view counts the same days.
-   */
+  /** Browser zone hint for day-based endpoints; the API uses it only when the account has no timezone. */
   private tzParams(): HttpParams {
     return new HttpParams().set('tz', this.settings.timezone());
   }
@@ -206,12 +202,7 @@ export class JournalService {
     return this.http.get<JournalEntry[]>(`${API_URL}/entries`, { params: p });
   }
 
-  /**
-   * One page of entries plus the number matching the filters, read from the
-   * X-Total-Count header. Without the header the total is a lower bound
-   * (what this page proves exists), so a pager never offers a page that
-   * cannot be shown.
-   */
+  /** One page plus X-Total-Count; without the header the total is a lower bound. */
   listEntriesPage(params: ListEntriesParams = {}): Observable<{ entries: JournalEntry[]; total: number }> {
     let p = new HttpParams();
     if (params.q) p = p.set('q', params.q);

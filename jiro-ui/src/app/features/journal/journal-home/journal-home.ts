@@ -10,7 +10,6 @@ import {
   MOODS,
   moodColor as moodColorFor,
   moodLabel as moodLabelFor,
-  moodMeta,
 } from '../../../core/services/journal.service';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
@@ -22,6 +21,8 @@ import { addDays, dayKey, todayKey } from '../../../core/utils/day';
 import { MoodTrendComponent } from '../mood-trend/mood-trend';
 import { JournalDayModalComponent } from '../journal-day-modal/journal-day-modal';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { formatInstant } from '../../../core/utils/format-date';
 
 @Component({
   selector: 'app-journal-home',
@@ -29,7 +30,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
   imports: [
     FormsModule, JiroPageHeaderComponent, JournalWeekViewComponent,
     JournalDayModalComponent, JiroButtonComponent, JiroEmptyStateComponent,
-    MoodTrendComponent,
+    MoodTrendComponent, JiroIconComponent,
   ],
   template: `
     <div class="journal-home">
@@ -130,15 +131,12 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
             <div class="entry-meta">
               <span class="entry-date">{{ formatDate(e.created_at) }}</span>
               @if (e.mood) {
-<span class="mood-chip" [style.border-left-color]="moodColor(e.mood)">{{ moodLabel(e.mood) }}</span>
+<span class="mood-chip" [style.--chip]="moodColor(e.mood)">{{ moodLabel(e.mood) }}</span>
 }
             </div>
             <div class="entry-card-actions" (click)="$event.stopPropagation()">
               <button class="icon-btn danger" type="button" (click)="deleteEntry(e)" [attr.aria-label]="'Delete the entry from ' + formatDate(e.created_at)">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                  <path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
-                </svg>
+                <jiro-icon name="trash" [size]="14" />
               </button>
             </div>
           </div>
@@ -154,10 +152,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
             </div>
             @if (e.images?.length) {
 <span class="img-badge">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
-                <polyline points="21,15 16,10 5,21"/>
-              </svg>
+              <jiro-icon name="image" [size]="12" />
               {{ e.images?.length }}
             </span>
 }
@@ -198,7 +193,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
       margin-bottom: var(--space-xl);
     }
     .streak-info { display: flex; align-items: baseline; gap: var(--space-xs); }
-    .streak-count { font-size: var(--font-size-xl); font-weight: 700; color: var(--color-primary); }
+    .streak-count { font-size: var(--font-size-xl); font-weight: 700; color: var(--color-primary-text); }
     .streak-label { font-size: var(--font-size-sm); color: var(--text-secondary); }
     .streak-divider { width: 1px; height: 28px; background: var(--border-color); margin: 0 var(--space-xs); }
     .streak-stat { display: flex; flex-direction: column; align-items: center; }
@@ -218,7 +213,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
     }
     .list-clear {
       background: none; border: none; padding: 0;
-      color: var(--color-primary); font: inherit; font-size: var(--font-size-sm);
+      color: var(--color-primary-text); font: inherit; font-size: var(--font-size-sm);
       cursor: pointer; text-decoration: underline; white-space: nowrap;
     }
     .filter-input, .filter-select {
@@ -238,16 +233,18 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
       border-radius: var(--border-radius); padding: var(--space-md) var(--space-lg);
       cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s;
     }
-    .entry-card:hover { border-color: var(--color-primary); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .entry-card:hover { border-color: var(--color-primary); box-shadow: var(--shadow-sm); }
     .entry-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-xs); }
     .entry-meta { display: flex; align-items: center; gap: var(--space-sm); }
     .entry-date { font-size: var(--font-size-xs); color: var(--text-secondary); }
     .mood-chip {
-      font-size: var(--font-size-xs); padding: 2px 8px 2px 7px;
-      background: var(--bg-canvas); color: var(--text-secondary);
-      border: 1px solid var(--border-color);
-      border-left: 3px solid var(--border-color);
-      border-radius: var(--border-radius-sm);
+      font-size: var(--font-size-xs); padding: 2px 8px;
+      background: color-mix(in srgb, var(--chip) 18%, var(--bg-surface)); color: var(--text-primary);
+      border-radius: var(--border-radius-pill);
+    }
+    .mood-chip::before {
+      content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 5px;
+      border-radius: 50%; background: var(--chip);
     }
     .entry-card-actions { display: flex; gap: var(--space-xs); opacity: 0.45; transition: opacity 0.15s; }
     .entry-card:hover .entry-card-actions { opacity: 1; }
@@ -257,7 +254,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
     .entry-excerpt { font-size: var(--font-size-sm); color: var(--text-secondary); margin: 0 0 var(--space-sm); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
     .entry-footer { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); }
     .tag-list { display: flex; flex-wrap: wrap; gap: 4px; }
-    .tag-chip { font-size: 0.7rem; padding: 2px 8px; background: var(--bg-canvas); border-radius: 99px; color: var(--text-secondary); border: 1px solid var(--border-color); }
+    .tag-chip { font-size: 0.7rem; padding: 2px 8px; background: var(--bg-canvas); border-radius: var(--border-radius-pill); color: var(--text-secondary); border: 1px solid var(--border-color); }
     .img-badge { display: flex; align-items: center; gap: 3px; font-size: var(--font-size-xs); color: var(--text-secondary); flex-shrink: 0; }
 
     /* Modal */
@@ -435,14 +432,13 @@ export class JournalHomeComponent implements OnInit {
   }
 
   formatDate(s: string): string {
-    return new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return formatInstant(s, this.settings.timezone());
   }
 
   excerpt(body: string): string {
     return body.length > 180 ? body.slice(0, 180) + '...' : body;
   }
 
-  moodIcon(value: string): string { return moodMeta(value)?.icon ?? ''; }
   moodLabel(value: string): string { return moodLabelFor(value); }
   moodColor(value: string): string { return moodColorFor(value); }
 }

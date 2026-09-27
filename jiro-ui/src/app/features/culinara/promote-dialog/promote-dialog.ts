@@ -2,11 +2,12 @@ import { Component, EventEmitter, Input, Output, signal } from '@angular/core';
 
 import { RecipeService, RecipeTrial, Recipe, Modification } from '../../../core/services/recipe.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 
 @Component({
   selector: 'app-promote-dialog',
   standalone: true,
-  imports: [JiroButtonComponent],
+  imports: [JiroIconComponent, JiroButtonComponent],
   template: `
     <div class="promote-dialog">
       <p class="promote-desc">
@@ -22,7 +23,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
           @for (mod of modifications(); track mod) {
 <div class="mod-row">
             <span class="mod-item">{{ mod.item }}</span>
-            <span class="mod-arrow">→</span>
+            <jiro-icon name="arrow-right" [size]="12" class="mod-arrow" label="changed to" />
             <span class="mod-change">{{ mod.change }}</span>
           </div>
 }
@@ -45,7 +46,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
       <div class="dialog-actions">
         <button class="btn-ghost" (click)="cancelled.emit()">Cancel</button>
         <jiro-button variant="primary" type="button" [loading]="promoting()" (click)="onPromote()">
-          Promote to Base
+          Promote to base
         </jiro-button>
       </div>
     </div>
@@ -97,7 +98,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
     }
 
     .mod-arrow {
-      text-align: center;
+      justify-self: center;
       color: var(--text-muted);
     }
 

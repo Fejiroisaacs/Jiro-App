@@ -56,10 +56,7 @@
     "waitFor": ".wv-grid",
     "actions": [
       {
-        "click": {
-          "role": "button",
-          "name": "Open Tue 22"
-        }
+        "click": ".wv-day:has(.wv-note) .wv-add"
       },
       {
         "wait": 600
@@ -111,7 +108,8 @@
       {
         "click": {
           "role": "button",
-          "name": "+ New"
+          "name": "New",
+          "exact": true
         }
       },
       {
@@ -150,7 +148,7 @@
       {
         "click": {
           "role": "button",
-          "name": "+ New Group"
+          "name": "Create group"
         }
       },
       {

@@ -14,11 +14,13 @@ import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-he
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 
 Chart.register(...registerables);
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
+import { formatDay } from '../../../core/utils/format-date';
 
 @Component({
   selector: 'app-body-weight',
   standalone: true,
-  imports: [CommonModule, FormsModule, JiroButtonComponent, JiroIconComponent, JiroPageHeaderComponent, JiroEmptyStateComponent],
+  imports: [JiroSkeletonComponent, CommonModule, FormsModule, JiroButtonComponent, JiroIconComponent, JiroPageHeaderComponent, JiroEmptyStateComponent],
   template: `
     <div class="body-weight">
       @if (!embedded()) {
@@ -48,7 +50,7 @@ Chart.register(...registerables);
 
       <!-- Loading -->
       @if (loading()) {
-        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+        <div class="state-loading" role="status" aria-label="Loading body weight"><jiro-skeleton height="260px" /><jiro-skeleton [lines]="5" height="40px" /></div>
       }
 
       @if (!loading()) {
@@ -79,7 +81,7 @@ Chart.register(...registerables);
                 <th>Date</th>
                 <th>Weight</th>
                 <th>Change</th>
-                <th></th>
+                <th><span class="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
@@ -94,7 +96,7 @@ Chart.register(...registerables);
                   </span>
 }
                   @if (i === weights().length - 1) {
-<span class="text-muted">—</span>
+<span class="text-muted">-</span>
 }
                 </td>
                 <td class="del-cell">
@@ -159,7 +161,7 @@ Chart.register(...registerables);
 
     .form-input:focus { border-bottom-color: var(--color-primary); }
 
-    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
+    .state-loading { display: flex; flex-direction: column; gap: var(--space-md); }
 
     .chart-section { margin-bottom: var(--space-xl); }
 
@@ -180,6 +182,7 @@ Chart.register(...registerables);
     }
 
     .weight-table th {
+      position: relative;
       padding: var(--space-sm) var(--space-md); text-align: left;
       font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.5px;
       color: var(--text-muted); background: var(--bg-canvas);
@@ -349,8 +352,8 @@ export class BodyWeightComponent implements OnInit, AfterViewInit, OnDestroy {
     return ws[index].weight_kg - ws[index + 1].weight_kg;
   }
 
-  formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' });
+  formatDate(day: string): string {
+    return formatDay(day);
   }
 
 }

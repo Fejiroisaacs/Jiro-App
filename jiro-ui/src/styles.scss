@@ -106,17 +106,34 @@
   --color-secondary-hover: #C9B898;
   --color-accent: var(--jiro-green);
   --color-accent-rgb: 74, 103, 65;
-  --color-danger: var(--jiro-burnt-orange);
-  --color-danger-hover: #A84A22;
-  --color-danger-rgb: 189, 86, 41;
+  // Danger and warning are a shade deeper than the brand swatch so they pass
+  // 4.5:1 as small text on page, canvas and surface in all three light themes.
+  --color-danger: #AD4E25;
+  --color-danger-hover: #9A4420;
+  --color-danger-rgb: 173, 78, 37;
 
   // Data and status colours. Tinted to the palette; distinct from the accent.
   // All pass 4.5:1 as text on --bg-surface.
   --color-positive: #3F6B37;
   --color-negative: #A84A22;
-  --color-warning: #956B3D;
-  --color-warning-rgb: 149, 107, 61;
+  --color-warning: #8A6237;
+  --color-warning-rgb: 138, 98, 55;
   --color-info: #475B70;
+  /* Primary as text on a primary tint; mixed toward the text colour in dark mode for AA. */
+  --color-primary-text: var(--color-primary);
+  /* Data palette: categories, muscle groups, moods. Fills and marks; chip text uses --text-primary on a tint. */
+  --data-1: #A8563F;
+  --data-2: #5E7040;
+  --data-3: #A77B2E;
+  --data-4: #5F8069;
+  --data-5: #4F6A80;
+  --data-6: #8C5A6A;
+  --data-7: #7A6A55;
+  --data-8: #466B4E;
+  --data-9: #B0714F;
+  --data-10: #59626B;
+  --data-11: #8A7040;
+  --data-12: #6B4E3D;
   --color-success: var(--color-positive);
 
   // Surfaces
@@ -133,16 +150,20 @@
   --mark-fg: #5D4037;
   --mark-cut: var(--mark-bg);
 
+  // Backdrop behind modals, lightboxes and the search palette
+  --scrim: rgba(26, 19, 16, 0.5);
+
   // Text (muted passes 4.5:1 on the page colour in all three light themes)
   --text-primary: #2D2420;
   --text-secondary: #6B5E57;
   --text-muted: #756861;
   --text-on-dark: #F5F0E8;
-  --text-on-primary: #FFFFFF;
-  --text-on-accent: #FFFFFF;
+  --text-on-primary: #FFFDF9;
+  --text-on-accent: #FFFDF9;
 
   // Borders and radius
   --border-color: #E0D6C8;
+  /* Radius scale: sm = small bits, base = buttons and inputs, lg = cards and dialogs, pill = chips and badges. */
   --border-radius-sm: 4px;
   --border-radius: 8px;
   --border-radius-md: var(--border-radius);
@@ -225,6 +246,7 @@ html.theme-forest {
   --border-color: #C8D8C0;
   --mark-bg: #DCE6D4;
   --shadow-rgb: 46, 66, 40;
+  --scrim: rgba(18, 26, 16, 0.5);
 }
 
 html.theme-slate {
@@ -238,9 +260,15 @@ html.theme-slate {
   --bg-canvas: #F7F8FA;
   --bg-surface: #FDFDFE;
   --bg-surface-hover: #E0E6EE;
+  // A step deeper than Earth's so they keep 4.5:1 on this darker hover surface.
+  --color-danger: #A64B23;
+  --color-danger-rgb: 166, 75, 35;
+  --color-warning: #855E35;
+  --color-warning-rgb: 133, 94, 53;
   --border-color: #C8D0DC;
   --mark-bg: #D9E0E8;
   --shadow-rgb: 46, 63, 82;
+  --scrim: rgba(18, 23, 28, 0.5);
 }
 
 // ========================================
@@ -259,6 +287,7 @@ html.dark {
   --mark-bg: rgba(241, 233, 223, 0.10);
   --mark-fg: #F1E9DF;
   --mark-cut: #1A1310;
+  --scrim: rgba(8, 5, 4, 0.7);
 
   --text-primary: #F1E9DF;
   --text-secondary: #B8A89C;
@@ -282,6 +311,19 @@ html.dark {
   --color-warning: #D2A468;
   --color-warning-rgb: 210, 164, 104;
   --color-info: #8FAAC6;
+  --color-primary-text: color-mix(in srgb, var(--color-primary) 75%, var(--text-primary));
+  --data-1: #D98B72;
+  --data-2: #9DB079;
+  --data-3: #D8AE62;
+  --data-4: #93B49D;
+  --data-5: #8FA9BF;
+  --data-6: #C495A4;
+  --data-7: #B8A68E;
+  --data-8: #86AE8E;
+  --data-9: #E0A283;
+  --data-10: #A3ADB8;
+  --data-11: #C9AC76;
+  --data-12: #B99680;
 
   --shadow-sm: 2px 2px 0px rgba(0, 0, 0, 0.45);
   --shadow-md: 4px 4px 0px rgba(0, 0, 0, 0.45);
@@ -298,6 +340,7 @@ html.dark.theme-forest {
   --mark-bg: rgba(230, 240, 225, 0.10);
   --mark-fg: #EAF0E6;
   --mark-cut: #121A10;
+  --scrim: rgba(5, 8, 5, 0.7);
   --text-primary: #EAF0E6;
   --text-secondary: #B3BFAE;
   --text-muted: #94A08F;
@@ -323,6 +366,7 @@ html.dark.theme-slate {
   --mark-bg: rgba(225, 232, 240, 0.10);
   --mark-fg: #E7ECF1;
   --mark-cut: #12171C;
+  --scrim: rgba(5, 7, 9, 0.7);
   --text-primary: #E7ECF1;
   --text-secondary: #AEB8C3;
   --text-muted: #8F99A4;
@@ -370,8 +414,7 @@ html {
 body::after {
   content: "";
   position: fixed;
-  top: 0; left: 0;
-  width: 100vw; height: 100vh;
+  inset: 0;
   pointer-events: none;
   z-index: var(--z-texture);
   opacity: 0.035;
@@ -435,6 +478,27 @@ input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
   outline-offset: 0;
+}
+
+// ========================================
+// Pressed state. The `translate` property composes with a hover `transform`
+// lift instead of replacing it. Text links and fields are left out, and
+// jiro-button has its own press.
+// ========================================
+
+@media (prefers-reduced-motion: no-preference) {
+  :is(
+    button,
+    [role="button"],
+    [role="tab"],
+    [role="menuitem"],
+    [role="option"],
+    summary,
+    .jiro-card.clickable,
+    a[href]:is([class*="btn"], [class*="cta"], [class*="chip"], [class*="card"], [class*="tile"], .nav-item, .mobile-nav-item)
+  ):not(:disabled, [aria-disabled="true"], .jiro-btn, input, textarea, select):active {
+    translate: 0 1px;
+  }
 }
 
 // ========================================

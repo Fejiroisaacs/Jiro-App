@@ -12,11 +12,12 @@ import { JiroCardComponent } from '../../shared/components/jiro-card/jiro-card';
 import { JiroButtonComponent } from '../../shared/components/jiro-button/jiro-button';
 import { JiroInputComponent } from '../../shared/components/jiro-input/jiro-input';
 import { JiroPageHeaderComponent } from '../../shared/components/jiro-page-header/jiro-page-header';
+import { JiroIconComponent } from '../../shared/components/jiro-icon/jiro-icon';
 import { ToastService } from '../../core/services/toast.service';
 @Component({
   selector: 'app-settings',
   standalone: true,
-  imports: [FormsModule, JiroCardComponent, JiroButtonComponent, JiroInputComponent, JiroPageHeaderComponent],
+  imports: [FormsModule, JiroCardComponent, JiroButtonComponent, JiroInputComponent, JiroPageHeaderComponent, JiroIconComponent],
   template: `
     <div class="settings">
       <jiro-page-header heading="Settings" subtitle="Account, profile, preferences and theme" />
@@ -27,15 +28,12 @@ import { ToastService } from '../../core/services/toast.service';
         @if (authService.user(); as user) {
 <div class="setting-row">
           <div>
-            <label class="setting-label">Email</label>
+            <span class="setting-label">Email</span>
             <p class="text-secondary">{{ user.email }}</p>
           </div>
           @if (user.email_verified) {
 <div class="verified-badge">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-              <polyline points="22 4 12 14.01 9 11.01"/>
-            </svg>
+            <jiro-icon name="check-circle" [size]="14" />
             Verified
           </div>
 }
@@ -79,30 +77,32 @@ import { ToastService } from '../../core/services/toast.service';
         </div>
 
         <div class="profile-form">
-          <div class="form-field">
-            <label class="setting-label">Display Name</label>
-            <p class="text-secondary setting-desc">How your name appears across the app</p>
+          <label class="form-field">
+            <span class="setting-label">Display name</span>
+            <span class="text-secondary setting-desc">How your name appears across the app</span>
             <jiro-input
               [(ngModel)]="displayName"
               placeholder="Your name"
               [style.margin-top]="'8px'">
             </jiro-input>
-          </div>
+          </label>
 
-          <div class="form-field">
-            <label class="setting-label">Username</label>
-            <p class="text-secondary setting-desc">Lowercase letters, numbers and underscores. Used in share links.</p>
+          <label class="form-field">
+            <span class="setting-label">Username</span>
+            <span class="text-secondary setting-desc">Lowercase letters, numbers and underscores. Used in share links.</span>
             <jiro-input
               [(ngModel)]="username"
               [placeholder]="usernamePlaceholder"
               [style.margin-top]="'8px'">
             </jiro-input>
-          </div>
+          </label>
 
           <div class="form-field">
-            <label class="setting-label">Bio</label>
-            <p class="text-secondary setting-desc">A short description about yourself</p>
+            <label class="setting-label" for="setting-bio">Bio</label>
+            <p class="text-secondary setting-desc" id="setting-bio-desc">A short description about yourself</p>
             <textarea
+              id="setting-bio"
+              aria-describedby="setting-bio-desc"
               [(ngModel)]="bio"
               class="bio-textarea"
               rows="3"
@@ -111,7 +111,7 @@ import { ToastService } from '../../core/services/toast.service';
 
           <div class="profile-actions">
             <jiro-button variant="primary" (click)="saveProfile()" [disabled]="profileSaving()">
-              {{ profileSaving() ? 'Saving...' : 'Save Profile' }}
+              {{ profileSaving() ? 'Saving...' : 'Save profile' }}
             </jiro-button>
             @if (profileError()) {
 <span class="profile-error">{{ profileError() }}</span>
@@ -126,7 +126,7 @@ import { ToastService } from '../../core/services/toast.service';
 
         <div class="setting-row">
           <div>
-            <label class="setting-label" for="setting-weight-unit">Weight Unit</label>
+            <label class="setting-label" for="setting-weight-unit">Weight unit</label>
             <p class="text-secondary setting-desc">Used across all fitness tracking</p>
           </div>
           <select id="setting-weight-unit" [ngModel]="weightUnit" (ngModelChange)="pickWeightUnit($event)" class="jiro-select">
@@ -198,14 +198,21 @@ import { ToastService } from '../../core/services/toast.service';
         <!-- Dark mode toggle -->
         <div class="setting-row">
           <div>
-            <label class="setting-label">Dark Mode</label>
+            <span class="setting-label" id="dark-mode-label">Dark mode</span>
             <p class="text-secondary setting-desc">Switch between light and dark interface</p>
           </div>
-          <button class="dark-mode-toggle" [class.active]="settingsService.darkMode()" (click)="settingsService.toggleDarkMode()">
-            <span class="toggle-track">
+          <button
+            type="button"
+            role="switch"
+            class="dark-mode-toggle"
+            [class.active]="settingsService.darkMode()"
+            [attr.aria-checked]="settingsService.darkMode()"
+            aria-labelledby="dark-mode-label dark-mode-state"
+            (click)="settingsService.toggleDarkMode()">
+            <span class="toggle-track" aria-hidden="true">
               <span class="toggle-thumb"></span>
             </span>
-            <span>{{ settingsService.darkMode() ? 'On' : 'Off' }}</span>
+            <span id="dark-mode-state">{{ settingsService.darkMode() ? 'On' : 'Off' }}</span>
           </button>
         </div>
 
@@ -354,7 +361,7 @@ import { ToastService } from '../../core/services/toast.service';
       color: var(--color-accent);
       background: rgba(var(--color-accent-rgb, 74, 103, 65), 0.1);
       padding: 4px 10px;
-      border-radius: 20px;
+      border-radius: var(--border-radius-pill);
     }
 
     .unverified-badge {
@@ -362,7 +369,7 @@ import { ToastService } from '../../core/services/toast.service';
       color: var(--text-secondary);
       background: var(--bg-surface-hover);
       padding: 4px 10px;
-      border-radius: 20px;
+      border-radius: var(--border-radius-pill);
     }
 
     .profile-form {
@@ -375,6 +382,7 @@ import { ToastService } from '../../core/services/toast.service';
       display: flex;
       flex-direction: column;
     }
+    .form-field .setting-desc { display: block; }
 
     .bio-textarea {
       margin-top: 8px;
@@ -445,7 +453,7 @@ import { ToastService } from '../../core/services/toast.service';
       width: 40px;
       height: 22px;
       background: var(--border-color);
-      border-radius: 11px;
+      border-radius: var(--border-radius-pill);
       transition: background 0.2s;
       display: block;
     }
@@ -459,11 +467,12 @@ import { ToastService } from '../../core/services/toast.service';
       width: 16px;
       height: 16px;
       border-radius: 50%;
-      background: white;
-      transition: transform 0.2s;
+      background: var(--text-secondary);
+      transition: transform 0.2s, background 0.2s;
       display: block;
     }
     .dark-mode-toggle.active .toggle-thumb {
+      background: var(--text-on-primary);
       transform: translateX(18px);
     }
 
@@ -676,12 +685,7 @@ export class SettingsComponent implements OnInit {
     });
   }
 
-  /**
-   * Saves one preference. The app only applies it once the server has
-   * accepted it (AuthService updates the user on success); if the server
-   * refuses (an unverified email, a bad value, no connection), the control
-   * goes back to the saved value and the reason is shown.
-   */
+  /** Saves one preference; applied only once the server accepts it, else the control reverts and shows why. */
   private save(updates: Partial<UserSettings>, revert: () => void) {
     this.prefError.set(null);
     this.authService.updateSettings(updates).subscribe({

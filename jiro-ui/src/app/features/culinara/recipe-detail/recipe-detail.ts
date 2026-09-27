@@ -19,13 +19,16 @@ import { PromoteDialogComponent } from '../promote-dialog/promote-dialog';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JiroMenuComponent, JiroMenuItem } from '../../../shared/components/jiro-menu/jiro-menu';
 import { ToastService } from '../../../core/services/toast.service';
+import { SettingsService } from '../../../core/services/settings.service';
+import { formatInstant } from '../../../core/utils/format-date';
 
 type MobileTab = 'recipe' | 'trials';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 
 @Component({
   selector: 'app-recipe-detail',
   standalone: true,
-  imports: [
+  imports: [JiroSkeletonComponent, 
     RouterLink,
     JiroButtonComponent,
     JiroIconComponent,
@@ -39,8 +42,18 @@ type MobileTab = 'recipe' | 'trials';
     <div class="detail-wrapper">
       <!-- Loading -->
       @if (loading()) {
-<div class="state-center">
-        <span class="spinner"></span>
+<div class="detail-layout" role="status" aria-label="Loading recipe">
+        <div class="sk-stack">
+          <jiro-skeleton width="120px" height="14px" />
+          <jiro-skeleton height="220px" />
+          <jiro-skeleton width="60%" height="32px" />
+          <jiro-skeleton [lines]="2" />
+          <jiro-skeleton [lines]="6" height="18px" />
+        </div>
+        <div class="sk-stack sk-trials">
+          <jiro-skeleton width="40%" height="20px" />
+          <jiro-skeleton [lines]="3" height="72px" />
+        </div>
       </div>
 }
 
@@ -48,7 +61,7 @@ type MobileTab = 'recipe' | 'trials';
       @if (!loading() && !recipe()) {
 <div class="state-center">
         <p class="text-secondary">Recipe not found.</p>
-        <a routerLink="/culinara" class="back-link">← Back to Culinara</a>
+        <a routerLink="/culinara" class="back-link"><jiro-icon name="arrow-left" [size]="14" /> Back to Culinara</a>
       </div>
 }
 
@@ -67,7 +80,7 @@ type MobileTab = 'recipe' | 'trials';
             class="mobile-tab"
             [class.mobile-tab--active]="mobileTab() === 'trials'"
             (click)="mobileTab.set('trials')">
-            Trial Log
+            Trial log
             @if (r.trials && r.trials.length) {
 <span class="tab-count">{{ r.trials.length }}</span>
 }
@@ -78,7 +91,7 @@ type MobileTab = 'recipe' | 'trials';
           <!-- Left: Recipe base -->
           <div class="recipe-panel" [class.mobile-hidden]="mobileTab() !== 'recipe'">
             <!-- Back nav -->
-            <a routerLink="/culinara" class="back-link">← Culinara</a>
+            <a routerLink="/culinara" class="back-link"><jiro-icon name="arrow-left" [size]="14" /> Culinara</a>
 
             <!-- Cover photo -->
             @if (r.cover_image_url) {
@@ -86,11 +99,11 @@ type MobileTab = 'recipe' | 'trials';
               <img [src]="r.cover_image_url" [alt]="r.title" class="cover-hero-img">
               <div class="cover-hero-actions">
                 <label class="cover-action-btn" title="Change cover photo" aria-label="Change cover photo">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                  <jiro-icon name="camera" [size]="14" />
                   <input type="file" accept="image/jpeg,image/png,image/webp" (change)="onCoverFileChange($event)" style="display:none">
                 </label>
                 <button class="cover-action-btn cover-action-btn--danger" type="button" title="Remove cover photo" aria-label="Remove cover photo" (click)="removeCoverImage()">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                  <jiro-icon name="trash" [size]="14" />
                 </button>
               </div>
             </div>
@@ -100,7 +113,7 @@ type MobileTab = 'recipe' | 'trials';
             @if (!r.cover_image_url && !coverUploading()) {
 <div class="cover-empty">
               <label class="cover-add-btn">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                <jiro-icon name="camera" [size]="14" />
                 Add cover photo
                 <input type="file" accept="image/jpeg,image/png,image/webp" (change)="onCoverFileChange($event)" style="display:none">
               </label>
@@ -139,15 +152,12 @@ type MobileTab = 'recipe' | 'trials';
             <!-- Share link banner -->
             @if (shareUrl()) {
 <div class="share-banner">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0">
-                <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
-                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-              </svg>
+              <jiro-icon name="share-network" [size]="13" />
               <div class="share-url-row">
                 <input class="share-url-input" [value]="shareUrl()" readonly>
                 <button class="share-copy-btn" (click)="copyShareUrl()">{{ shareCopied() ? 'Copied!' : 'Copy' }}</button>
               </div>
-              <button class="share-close-btn" (click)="shareUrl.set('')">✕</button>
+              <button class="share-close-btn" type="button" (click)="shareUrl.set('')" aria-label="Close share link"><jiro-icon name="x" [size]="14" /></button>
             </div>
 }
 
@@ -189,32 +199,32 @@ type MobileTab = 'recipe' | 'trials';
 <div class="dietary-row">
               @if (r.dietary_flags.vegan) {
 <span class="dietary-pill">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.9C15.5 4.9 17 3.5 19 1c1 2 2 4.5 2 8 0 5.5-4.5 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>
+                <jiro-icon name="leaf" [size]="13" />
                 Vegan
               </span>
 }
               @if (r.dietary_flags.vegetarian) {
 <span class="dietary-pill">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 20h10"/><path d="M10 20c5.5-2.5 8-6.5 8-12"/><path d="M6 20c-2-5-2.5-10 0-15 3 2 6 3 10 3"/></svg>
+                <jiro-icon name="plant" [size]="13" />
                 Vegetarian
               </span>
 }
               @if (r.dietary_flags.gluten_free) {
 <span class="dietary-pill">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 22 16 8"/><path d="M3.47 12.53 5 11l1.53 1.53a3.5 3.5 0 0 1 0 4.94L5 19l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z"/><path d="M7.47 8.53 9 7l1.53 1.53a3.5 3.5 0 0 1 0 4.94L9 15l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z"/><path d="M11.47 4.53 13 3l1.53 1.53a3.5 3.5 0 0 1 0 4.94L13 11l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z"/><line x1="20" y1="2" x2="22" y2="4"/><path d="M17.47 8.53 19 7l1.53 1.53a3.5 3.5 0 0 1 0 4.94L19 15l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z"/></svg>
-                Gluten-Free
+                <jiro-icon name="grains-slash" [size]="13" />
+                Gluten-free
               </span>
 }
               @if (r.dietary_flags.dairy_free) {
 <span class="dietary-pill">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 2 1.88 1.88"/><path d="M14.12 3.88 16 2"/><path d="M9 7.13v-1a3.003 3.003 0 1 1 6 0v1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 .67-2.22 2.75 2.75 0 0 1 4.78 0A4 4 0 0 1 12 11"/><path d="M12 20c3.3 0 6-2.7 6-6v-3a4 4 0 0 0-.67-2.22 2.75 2.75 0 0 0-4.78 0A4 4 0 0 0 12 11"/><path d="M2 2 22 22"/></svg>
-                Dairy-Free
+                <jiro-icon name="drop-slash" [size]="13" />
+                Dairy-free
               </span>
 }
               @if (r.dietary_flags.nut_free) {
 <span class="dietary-pill">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
-                Nut-Free
+                <jiro-icon name="prohibit" [size]="13" />
+                Nut-free
               </span>
 }
             </div>
@@ -242,7 +252,7 @@ type MobileTab = 'recipe' | 'trials';
             @if (collections().length > 0) {
 <div class="collection-picker">
               <button class="collection-toggle" (click)="showCollectionPicker.set(!showCollectionPicker()); $event.stopPropagation()">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                <jiro-icon name="folder" [size]="14" />
                 {{ recipeCollectionIds().size > 0 ? recipeCollectionIds().size + ' collection' + (recipeCollectionIds().size > 1 ? 's' : '') : 'Add to collection' }}
               </button>
               @if (showCollectionPicker()) {
@@ -253,7 +263,7 @@ type MobileTab = 'recipe' | 'trials';
                   class="collection-option"
                   [class.collection-option--active]="recipeCollectionIds().has(col.id)"
                   (click)="toggleCollection(col)">
-                  <span class="col-check">{{ recipeCollectionIds().has(col.id) ? '✓' : '' }}</span>
+                  <span class="col-check">@if (recipeCollectionIds().has(col.id)) {<jiro-icon name="check" [size]="12" />}</span>
                   {{ col.name }}
                 </button>
 }
@@ -272,13 +282,13 @@ type MobileTab = 'recipe' | 'trials';
 }
               @if (latestRating() != null) {
 <div class="stat">
-                <span class="stat-value star-val">★ {{ latestRating() }}</span>
+                <span class="stat-value star-val"><jiro-icon name="star:fill" [size]="16" /> {{ latestRating() }}</span>
                 <span class="stat-label">Latest</span>
               </div>
 }
               @if (avgRating() != null) {
 <div class="stat">
-                <span class="stat-value star-val">★ {{ avgRating() }}</span>
+                <span class="stat-value star-val"><jiro-icon name="star:fill" [size]="16" /> {{ avgRating() }}</span>
                 <span class="stat-label">Average</span>
               </div>
 }
@@ -288,13 +298,9 @@ type MobileTab = 'recipe' | 'trials';
             @if (r.base_ingredients && r.base_ingredients.length) {
 <div class="section">
               <div class="section-header">
-                <h2 class="section-title">Base Ingredients</h2>
+                <h2 class="section-title">Base ingredients</h2>
                 <button class="add-grocery-btn" type="button" (click)="addToGrocery()" title="Add to grocery list" aria-label="Add these ingredients to the grocery list">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
-                    <line x1="3" y1="6" x2="21" y2="6"/>
-                    <path d="M16 10a4 4 0 0 1-8 0"/>
-                  </svg>
+                  <jiro-icon name="basket" [size]="13" />
                   Add to grocery list
                 </button>
               </div>
@@ -321,9 +327,9 @@ type MobileTab = 'recipe' | 'trials';
           <!-- Right: Trials -->
           <div class="trials-panel" [class.mobile-hidden]="mobileTab() !== 'trials'">
             <div class="trials-header">
-              <h2 class="trials-title">Trial Log</h2>
+              <h2 class="trials-title">Trial log</h2>
               <jiro-button variant="primary" type="button" (click)="openNewTrial()">
-                + Log Trial
+                + Log trial
               </jiro-button>
             </div>
 
@@ -346,7 +352,7 @@ type MobileTab = 'recipe' | 'trials';
                     <span class="trial-date">{{ formatDate(trial.date_cooked) }}</span>
                     @if (trial.rating) {
 <div class="trial-rating">
-                      <span class="star">★</span> {{ trial.rating }}/5
+                      <jiro-icon name="star:fill" [size]="12" class="star" /> {{ trial.rating }}/5
                     </div>
 }
                   </div>
@@ -379,7 +385,7 @@ type MobileTab = 'recipe' | 'trials';
                   @for (mod of trial.modifications; track mod) {
 <div class="mod-row">
                     <span class="mod-item">{{ mod.item }}</span>
-                    <span class="mod-sep">→</span>
+                    <jiro-icon name="arrow-right" [size]="12" class="mod-sep" label="changed to" />
                     <span class="mod-change">{{ mod.change }}</span>
                   </div>
 }
@@ -403,7 +409,7 @@ type MobileTab = 'recipe' | 'trials';
       @if (showEdit() && recipe()) {
 <jiro-modal
        
-        title="Edit Recipe"
+        title="Edit recipe"
         maxWidth="600px"
         (close)="showEdit.set(false)">
         <app-recipe-form
@@ -418,7 +424,7 @@ type MobileTab = 'recipe' | 'trials';
       @if (showTrial() && recipe()) {
 <jiro-modal
        
-        title="Log Trial"
+        title="Log trial"
         maxWidth="560px"
         (close)="showTrial.set(false)">
         <app-trial-modal
@@ -433,7 +439,7 @@ type MobileTab = 'recipe' | 'trials';
       @if (editingTrial()) {
 <jiro-modal
        
-        title="Edit Trial"
+        title="Edit trial"
         maxWidth="560px"
         (close)="editingTrial.set(null)">
         <app-trial-modal
@@ -448,7 +454,7 @@ type MobileTab = 'recipe' | 'trials';
       @if (promotingTrial() && recipe()) {
 <jiro-modal
        
-        title="Promote Trial to Base"
+        title="Promote trial to base"
         maxWidth="480px"
         (close)="promotingTrial.set(null)">
         <app-promote-dialog
@@ -534,7 +540,9 @@ type MobileTab = 'recipe' | 'trials';
 
     /* Back link */
     .back-link {
-      display: inline-block;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
       color: var(--text-muted);
       font-size: var(--font-size-sm);
       text-decoration: none;
@@ -576,19 +584,21 @@ type MobileTab = 'recipe' | 'trials';
       width: 30px;
       height: 30px;
       border-radius: 50%;
-      background: rgba(0, 0, 0, 0.55);
-      color: var(--text-on-primary);
+      background: var(--scrim);
+      color: var(--text-on-dark);
       border: none;
       cursor: pointer;
       transition: background 0.15s;
     }
 
     .cover-action-btn:hover {
-      background: rgba(0, 0, 0, 0.75);
+      background: var(--color-primary);
+      color: var(--text-on-primary);
     }
 
     .cover-action-btn--danger:hover {
-      background: rgba(180, 40, 40, 0.85);
+      background: var(--color-danger);
+      color: var(--text-on-primary);
     }
 
     .cover-empty {
@@ -623,7 +633,7 @@ type MobileTab = 'recipe' | 'trials';
       flex: 1;
       height: 4px;
       background: var(--border-color);
-      border-radius: 2px;
+      border-radius: var(--border-radius-sm);
       overflow: hidden;
     }
 
@@ -710,9 +720,9 @@ type MobileTab = 'recipe' | 'trials';
     .recipe-tag {
       font-size: var(--font-size-xs);
       padding: 3px 10px;
-      background: rgba(122, 59, 46, 0.08);
-      color: var(--color-primary);
-      border-radius: 12px;
+      background: rgba(var(--color-primary-rgb), 0.08);
+      color: var(--color-primary-text);
+      border-radius: var(--border-radius-pill);
       font-weight: 500;
     }
 
@@ -734,8 +744,14 @@ type MobileTab = 'recipe' | 'trials';
     }
 
     .star-val {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
       color: var(--color-warning);
     }
+
+    .sk-stack { display: flex; flex-direction: column; gap: var(--space-md); }
+    .sk-trials { padding: var(--space-lg); border: 1px solid var(--border-color); border-radius: var(--border-radius-lg); }
 
     .stat-label {
       font-size: var(--font-size-xs);
@@ -754,9 +770,9 @@ type MobileTab = 'recipe' | 'trials';
 
     .dietary-pill {
       font-size: var(--font-size-xs); padding: 3px 10px;
-      background: rgba(122, 59, 46, 0.08); color: var(--color-primary);
-      border: 1px solid rgba(122, 59, 46, 0.2);
-      border-radius: 12px; font-weight: 500;
+      background: rgba(var(--color-primary-rgb), 0.08); color: var(--color-primary-text);
+      border: 1px solid rgba(var(--color-primary-rgb), 0.2);
+      border-radius: var(--border-radius-pill); font-weight: 500;
       display: inline-flex; align-items: center; gap: 4px;
     }
 
@@ -782,7 +798,7 @@ type MobileTab = 'recipe' | 'trials';
       gap: 4px;
       padding: 4px 12px;
       border: 1px solid var(--border-color);
-      border-radius: 20px;
+      border-radius: var(--border-radius-pill);
       background: var(--bg-surface);
       color: var(--text-secondary);
       font-size: var(--font-size-xs);
@@ -805,7 +821,7 @@ type MobileTab = 'recipe' | 'trials';
       background: var(--bg-surface);
       border: 1px solid var(--border-color);
       border-radius: var(--border-radius);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      box-shadow: var(--shadow-md);
       z-index: 1;
       min-width: 160px;
       overflow: hidden;
@@ -837,18 +853,20 @@ type MobileTab = 'recipe' | 'trials';
     }
 
     .col-check {
+      display: inline-flex;
+      justify-content: center;
       width: 14px;
-      text-align: center;
       font-size: 12px;
       color: var(--color-primary);
     }
 
     .section-title {
-      font-size: var(--font-size-sm);
+      font-family: var(--font-family);
+      font-size: var(--font-size-xs);
       font-weight: 600;
       color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 1px;
+      letter-spacing: 0.5px;
       margin-bottom: var(--space-sm);
     }
 
@@ -938,7 +956,7 @@ type MobileTab = 'recipe' | 'trials';
       padding: var(--space-lg);
       position: sticky;
       top: 80px;
-      max-height: calc(100vh - 120px);
+      max-height: calc(100dvh - 120px);
       overflow-y: auto;
     }
 
@@ -1004,6 +1022,9 @@ type MobileTab = 'recipe' | 'trials';
     }
 
     .trial-rating {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
       font-size: var(--font-size-xs);
       color: var(--color-warning);
       font-weight: 500;
@@ -1024,13 +1045,13 @@ type MobileTab = 'recipe' | 'trials';
       cursor: pointer;
       color: var(--color-primary);
       padding: 4px 8px;
-      border-radius: 4px;
+      border-radius: var(--border-radius-sm);
       font-weight: 500;
       transition: background 0.15s;
     }
 
     .text-btn:hover {
-      background: rgba(122, 59, 46, 0.08);
+      background: rgba(var(--color-primary-rgb), 0.08);
     }
 
     .text-btn.danger {
@@ -1038,7 +1059,7 @@ type MobileTab = 'recipe' | 'trials';
     }
 
     .text-btn.danger:hover {
-      background: rgba(var(--color-danger-rgb, 180, 60, 60), 0.08);
+      background: rgba(var(--color-danger-rgb), 0.08);
     }
 
     .trial-mods {
@@ -1068,7 +1089,7 @@ type MobileTab = 'recipe' | 'trials';
     }
 
     .mod-sep {
-      text-align: center;
+      justify-self: center;
       color: var(--text-muted);
     }
 
@@ -1090,7 +1111,7 @@ type MobileTab = 'recipe' | 'trials';
       width: 32px;
       height: 32px;
       border-radius: 50%;
-      background: rgba(122, 59, 46, 0.12);
+      background: rgba(var(--color-primary-rgb), 0.12);
       color: var(--color-primary);
       font-weight: 700;
       font-size: var(--font-size-sm);
@@ -1137,10 +1158,8 @@ type MobileTab = 'recipe' | 'trials';
     .toggle-switch {
       position: relative;
       width: 40px; height: 22px;
-      border: none; border-radius: 11px;
-      /* Off: a muted track, not the border colour, which all but vanished
-         against the surface in dark mode. The thumb is the surface colour,
-         so it contrasts with the track in either theme. */
+      border: none; border-radius: var(--border-radius-pill);
+      /* Off: a muted track (the border colour vanished in dark mode); the surface-coloured thumb contrasts. */
       background: var(--text-muted);
       cursor: pointer;
       transition: background 0.2s;
@@ -1247,10 +1266,6 @@ type MobileTab = 'recipe' | 'trials';
         overflow-y: visible;
         border-radius: var(--border-radius);
       }
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
     }
   `]
 })
@@ -1375,10 +1390,8 @@ export class RecipeDetailComponent implements OnInit {
     }
   }
 
-  formatDate(dateStr: string): string {
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      year: 'numeric', month: 'short', day: 'numeric'
-    });
+  formatDate(instant: string): string {
+    return formatInstant(instant, this.settings.timezone());
   }
 
   openNewTrial() {
@@ -1422,6 +1435,7 @@ export class RecipeDetailComponent implements OnInit {
   private readonly confirmService = inject(ConfirmService);
   private readonly toast = inject(ToastService);
   private readonly grocery = inject(GroceryService);
+  private readonly settings = inject(SettingsService);
 
   async deleteTrial(trial: RecipeTrial) {
     const ok = await this.confirmService.confirm({

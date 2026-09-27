@@ -35,9 +35,7 @@ func groupIDParam(c *gin.Context) (uuid.UUID, bool) {
 	return id, true
 }
 
-// POST /journal/groups/:id/invite-link
-// Makes a new link (the previous one stops working). The token is in this
-// response only; the server keeps its hash.
+// CreateInviteLink handles POST /journal/groups/:id/invite-link; the raw token is in this response only.
 func (h *JournalHandler) CreateInviteLink(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 	groupID, ok := groupIDParam(c)
@@ -52,8 +50,7 @@ func (h *JournalHandler) CreateInviteLink(c *gin.Context) {
 	c.JSON(http.StatusCreated, link)
 }
 
-// GET /journal/groups/:id/invite-link
-// {"link": {...}} for a working link (never its token), {"link": null} otherwise.
+// GetInviteLink handles GET /journal/groups/:id/invite-link: the working link (never its token) or null.
 func (h *JournalHandler) GetInviteLink(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 	groupID, ok := groupIDParam(c)
@@ -82,9 +79,7 @@ func (h *JournalHandler) RevokeInviteLink(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Invite link turned off"})
 }
 
-// GET /journal/groups/join/preview?token=xxx
-// What a link or emailed invite opens, before joining. A read, so the
-// look-only demo gets an answer too.
+// PreviewInvite handles GET /journal/groups/join/preview?token=: what a token opens, before joining.
 func (h *JournalHandler) PreviewInvite(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 	rawToken := c.Query("token")

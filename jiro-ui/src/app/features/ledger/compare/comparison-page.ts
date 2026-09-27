@@ -14,13 +14,16 @@ import { FormsModule } from '@angular/forms';
 import { chartTones } from '../../../shared/chart-theme';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import { LedgerService, ComparisonResponse, ComparisonCategory, ComparisonValue } from '../../../core/services/ledger.service';
-import { formatCurrency, formatPctChange, formatSignedCurrency, parseDateOnly } from '../shared/ledger-utils';
+import { categoryColor, formatCurrency, formatPctChange, formatSignedCurrency } from '../shared/ledger-utils';
 import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-card';
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { SettingsService } from '../../../core/services/settings.service';
 import { todayKey } from '../../../core/utils/day';
+import { formatDay } from '../../../core/utils/format-date';
 
 Chart.register(...registerables);
 
@@ -33,21 +36,13 @@ interface DateRange {
   bTo: string;
 }
 
-/**
- * The calendar date a Date's local fields name, as YYYY-MM-DD. The ranges
- * below are built with local-field arithmetic, so reading them back through
- * toISOString (UTC) would shift every bound a day early east of UTC.
- */
+/** A Date's local calendar date as YYYY-MM-DD; toISOString would shift it a day early east of UTC. */
 function isoDate(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-/**
- * The preset's two periods. A is the previous period (the base) and B the
- * current one, so the change (B - A) reads naturally: up means the current
- * period is higher. `today` is the user's day key (settings zone).
- */
+/** The preset's periods: A the previous (base), B the current, so a rise in B - A means higher now. */
 export function computePresetRanges(preset: Preset, today: string): DateRange | null {
   const [ty, tm, td] = today.split('-').map(Number);
   const now = new Date(ty, tm - 1, td);
@@ -101,7 +96,7 @@ type SortColumn = 'name' | 'a' | 'b' | 'delta' | 'delta_pct';
   standalone: true,
   imports: [
     CommonModule, FormsModule, JiroCardComponent, JiroButtonComponent,
-    JiroPageHeaderComponent, JiroEmptyStateComponent,
+    JiroPageHeaderComponent, JiroEmptyStateComponent, JiroSkeletonComponent, JiroIconComponent,
   ],
   template: `
     <div class="comparison-page">
@@ -195,7 +190,21 @@ type SortColumn = 'name' | 'a' | 'b' | 'delta' | 'delta_pct';
 
       <!-- ── Loading ── -->
       @if (loading()) {
-        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+        <div class="results-body" aria-hidden="true">
+          <div class="summary-grid">
+            @for (i of [0, 1, 2]; track i) {
+              <jiro-card>
+                <div class="summary-card">
+                  <jiro-skeleton height="14px" width="50%" />
+                  <jiro-skeleton [lines]="2" height="18px" />
+                  <jiro-skeleton height="12px" width="70%" />
+                </div>
+              </jiro-card>
+            }
+          </div>
+          <jiro-skeleton height="260px" />
+        </div>
+        <span class="sr-only" role="status">Loading the comparison</span>
       }
 
       <!-- ── Empty / No data state ── -->
@@ -285,9 +294,7 @@ type SortColumn = 'name' | 'a' | 'b' | 'delta' | 'delta_pct';
                       <th scope="col" [class.th-num]="col.key !== 'name'" [attr.aria-sort]="ariaSort(col.key)">
                         <button type="button" class="sort-btn" (click)="toggleSort(col.key)">
                           {{ col.label }}
-                          <svg class="sort-icon" [class.active-col]="sortColumn() === col.key" [class.dir-asc]="sortColumn() === col.key && sortDir() === 'asc'" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                            <polyline points="6,9 12,15 18,9"/>
-                          </svg>
+                          <jiro-icon name="caret-down" [size]="10" class="sort-icon" [class.active-col]="sortColumn() === col.key" [class.dir-asc]="sortColumn() === col.key && sortDir() === 'asc'" />
                         </button>
                       </th>
                     }
@@ -297,7 +304,7 @@ type SortColumn = 'name' | 'a' | 'b' | 'delta' | 'delta_pct';
                   @for (cat of sortedCategories(); track cat.type + (cat.category_id ?? 'none')) {
 <tr>
                     <th scope="row" class="cat-name-cell">
-                      <span class="cat-color-dot" aria-hidden="true" [style.background]="cat.color || 'var(--text-muted)'"></span>
+                      <span class="cat-color-dot" aria-hidden="true" [style.background]="categoryColor(cat.color)"></span>
                       <span class="cat-name-text">{{ cat.name }}</span>
                       <span class="cat-type">{{ cat.type === 'income' ? 'Income' : 'Spending' }}</span>
                     </th>
@@ -320,7 +327,7 @@ type SortColumn = 'name' | 'a' | 'b' | 'delta' | 'delta_pct';
               @for (cat of sortedCategories(); track cat.type + (cat.category_id ?? 'none')) {
 <li class="mobile-cat-card">
                 <div class="mcc-header">
-                  <span class="cat-color-dot" aria-hidden="true" [style.background]="cat.color || 'var(--text-muted)'"></span>
+                  <span class="cat-color-dot" aria-hidden="true" [style.background]="categoryColor(cat.color)"></span>
                   <span class="mcc-name">{{ cat.name }}</span>
                   <span class="cat-type">{{ cat.type === 'income' ? 'Income' : 'Spending' }}</span>
                 </div>
@@ -421,7 +428,7 @@ type SortColumn = 'name' | 'a' | 'b' | 'delta' | 'delta_pct';
     .preset-btn {
       padding: 7px 16px;
       border: 1px solid var(--border-color);
-      border-radius: 20px;
+      border-radius: var(--border-radius-pill);
       background: none;
       cursor: pointer;
       font-size: var(--font-size-sm);
@@ -430,11 +437,11 @@ type SortColumn = 'name' | 'a' | 'b' | 'delta' | 'delta_pct';
       transition: all 0.15s;
       white-space: nowrap;
     }
-    .preset-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
+    .preset-btn:hover { border-color: var(--color-primary); color: var(--color-primary-text); }
     .preset-btn.active {
       background: var(--color-primary);
       border-color: var(--color-primary);
-      color: white;
+      color: var(--text-on-primary);
       font-weight: 600;
     }
 
@@ -535,7 +542,6 @@ type SortColumn = 'name' | 'a' | 'b' | 'delta' | 'delta_pct';
     .custom-apply { display: flex; justify-content: flex-end; }
 
     /* ── State messages ── */
-    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
 
 
 
@@ -574,7 +580,7 @@ type SortColumn = 'name' | 'a' | 'b' | 'delta' | 'delta_pct';
     }
     .income-icon  { background: rgba(var(--color-accent-rgb), 0.12); color: var(--color-accent); }
     .expense-icon { background: rgba(var(--color-danger-rgb), 0.12); color: var(--color-danger); }
-    .net-icon     { background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary); }
+    .net-icon     { background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary-text); }
 
     .summary-title {
       font-size: var(--font-size-xs);
@@ -611,7 +617,7 @@ type SortColumn = 'name' | 'a' | 'b' | 'delta' | 'delta_pct';
       font-size: var(--font-size-sm);
       font-weight: 600;
       padding: 4px 8px;
-      border-radius: 12px;
+      border-radius: var(--border-radius-pill);
       align-self: flex-start;
     }
 
@@ -621,8 +627,8 @@ type SortColumn = 'name' | 'a' | 'b' | 'delta' | 'delta_pct';
     }
 
     .delta-negative {
-      background: rgba(var(--color-danger-rgb), 0.12);
-      color: var(--color-danger);
+      background: rgba(var(--color-danger-rgb), 0.08);
+      color: var(--color-negative);
     }
 
     .delta-neutral {
@@ -666,7 +672,7 @@ type SortColumn = 'name' | 'a' | 'b' | 'delta' | 'delta_pct';
 
     .legend-dot {
       width: 10px; height: 10px;
-      border-radius: 2px;
+      border-radius: var(--border-radius-sm);
       flex-shrink: 0;
     }
 
@@ -702,7 +708,7 @@ type SortColumn = 'name' | 'a' | 'b' | 'delta' | 'delta_pct';
       background: var(--bg-canvas);
       border: 1px solid var(--border-color);
       padding: 2px 8px;
-      border-radius: 10px;
+      border-radius: var(--border-radius-pill);
     }
 
     /* ── Desktop table ── */
@@ -772,7 +778,7 @@ type SortColumn = 'name' | 'a' | 'b' | 'delta' | 'delta_pct';
       opacity: 0.25;
       transition: opacity 0.15s, transform 0.15s;
     }
-    .sort-icon.active-col { opacity: 1; color: var(--color-primary); }
+    .sort-icon.active-col { opacity: 1; color: var(--color-primary-text); }
     .sort-icon.dir-asc { transform: rotate(180deg); }
 
     .cat-table td {
@@ -810,7 +816,7 @@ type SortColumn = 'name' | 'a' | 'b' | 'delta' | 'delta_pct';
     .delta-badge {
       display: inline-block;
       padding: 2px 8px;
-      border-radius: 10px;
+      border-radius: var(--border-radius-pill);
       font-size: var(--font-size-xs);
       font-weight: 600;
       white-space: nowrap;
@@ -822,8 +828,8 @@ type SortColumn = 'name' | 'a' | 'b' | 'delta' | 'delta_pct';
     }
 
     .delta-badge.delta-negative {
-      background: rgba(var(--color-danger-rgb), 0.12);
-      color: var(--color-danger);
+      background: rgba(var(--color-danger-rgb), 0.08);
+      color: var(--color-negative);
     }
 
     .delta-badge.delta-neutral {
@@ -939,6 +945,7 @@ type SortColumn = 'name' | 'a' | 'b' | 'delta' | 'delta_pct';
   `],
 })
 export class ComparisonPageComponent implements OnInit, AfterViewInit, OnDestroy {
+  readonly categoryColor = categoryColor;
   @ViewChild('compareChart') chartCanvasRef!: ElementRef<HTMLCanvasElement>;
 
   // ── State ──────────────────────────────────────────────────────────────────
@@ -1198,7 +1205,7 @@ export class ComparisonPageComponent implements OnInit, AfterViewInit, OnDestroy
   }
 
   rangeText(from: string, to: string): string {
-    const fmt = (s: string) => parseDateOnly(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const fmt = (s: string) => formatDay(s, { year: 'always' });
     return `${fmt(from)} to ${fmt(to)}`;
   }
 }

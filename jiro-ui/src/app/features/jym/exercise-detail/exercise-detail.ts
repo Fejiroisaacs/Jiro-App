@@ -7,10 +7,12 @@ import { SettingsService } from '../../../core/services/settings.service';
 import { chartTones } from '../../../shared/chart-theme';
 import { UploadService } from '../../../core/services/upload.service';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
+import { formatInstant } from '../../../core/utils/format-date';
 
 Chart.register(...registerables);
 
@@ -21,12 +23,17 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
 @Component({
   selector: 'app-exercise-detail',
   standalone: true,
-  imports: [CommonModule, JiroIconComponent, JiroPageHeaderComponent, JymPrBadgeComponent],
+  imports: [CommonModule, JiroIconComponent, JiroSkeletonComponent, JiroPageHeaderComponent, JymPrBadgeComponent],
   template: `
     <div class="exercise-detail">
       <!-- Loading -->
       @if (loading()) {
-        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+        <div class="state-loading" role="status" aria-label="Loading exercise">
+          <jiro-skeleton width="40%" height="32px" />
+          <jiro-skeleton width="20%" height="24px" />
+          <jiro-skeleton height="310px" />
+          <jiro-skeleton [lines]="5" height="20px" />
+        </div>
       }
 
       @if (!loading() && exercise()) {
@@ -42,7 +49,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
           @if (exercise()!.history.length > 0) {
 <div class="pr-stats">
             <div class="stat">
-              <span class="stat-label">Best Weight</span>
+              <span class="stat-label">Best weight</span>
               <span class="stat-value">{{ settingsService.toDisplay(exercise()!.best_weight) | number:'1.1-1' }} {{ settingsService.unitLabel() }}</span>
             </div>
             <div class="stat">
@@ -60,28 +67,24 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
         <!-- Plateau / Decline banner -->
         @if (plateauStatus() === 'plateau') {
 <div class="plateau-banner plateau">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
+          <jiro-icon name="warning-circle" [size]="16" />
           <div>
-            <strong>Plateau detected</strong> — your max weight has been the same for the last 3 sessions.
+            <strong>Plateau detected.</strong> Your max weight has been the same for the last 3 sessions.
             Consider a small weight increase, extra reps, or a deload week to break through.
           </div>
         </div>
 }
         @if (plateauStatus() === 'decline') {
 <div class="plateau-banner decline">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="23,18 13.5,8.5 8.5,13.5 1,6"/><polyline points="17,18 23,18 23,12"/>
-          </svg>
+          <jiro-icon name="trend-down" [size]="16" />
           <div>
-            <strong>Declining trend</strong> — your peak lift has dropped across the last 3 sessions.
+            <strong>Declining trend.</strong> Your peak lift has dropped across the last 3 sessions.
             Consider a deload, technique check, or extra recovery before pushing again.
           </div>
         </div>
 }
 
-        <!-- Chart section — shown whenever there is any history -->
+        <!-- Chart section, shown whenever there is any history -->
         @if (exercise()!.history.length > 0) {
 <div class="chart-section">
 
@@ -89,7 +92,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
           <div class="chart-tabs">
             <button class="chart-tab" [class.active]="selectedChart() === '1rm'"         (click)="switchChart('1rm')">Est. 1RM</button>
             <button class="chart-tab" [class.active]="selectedChart() === 'volume'"      (click)="switchChart('volume')">Volume</button>
-            <button class="chart-tab" [class.active]="selectedChart() === 'maxweight'"   (click)="switchChart('maxweight')">Max Weight</button>
+            <button class="chart-tab" [class.active]="selectedChart() === 'maxweight'"   (click)="switchChart('maxweight')">Max weight</button>
             <button class="chart-tab" [class.active]="selectedChart() === 'repsatweight'" (click)="switchChart('repsatweight')">Reps @ Weight</button>
           </div>
 
@@ -123,11 +126,11 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
         <div class="section-panel">
         <div class="section-tabs-bar">
           <button class="section-tab" [class.active]="activeSection() === 'history'" (click)="setSection('history')">
-            Set History
+            Set history
             <span class="tab-count">{{ exercise()!.history.length }}</span>
           </button>
           <button class="section-tab" [class.active]="activeSection() === 'form'" (click)="setSection('form')">
-            Form Progression
+            Form progression
             @if (formChecks().length > 0) {
 <span class="tab-count">{{ formChecks().length }}</span>
 }
@@ -150,24 +153,25 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
 }
 
           @if (exercise()!.history.length > 0) {
+<div class="table-scroll">
 <table class="history-table">
             <thead>
               <tr>
                 <th class="th-sort" (click)="sortBy('date')">
                   Date
-                  <svg class="sort-chevron" [class.col-active]="sortCol() === 'date'" [class.dir-asc]="sortCol() === 'date' && sortDir() === 'asc'" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg>
+                  <jiro-icon name="caret-down" [size]="10" class="sort-chevron" [class.col-active]="sortCol() === 'date'" [class.dir-asc]="sortCol() === 'date' && sortDir() === 'asc'" />
                 </th>
                 <th class="th-sort" (click)="sortBy('weight')">
                   Weight
-                  <svg class="sort-chevron" [class.col-active]="sortCol() === 'weight'" [class.dir-asc]="sortCol() === 'weight' && sortDir() === 'asc'" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg>
+                  <jiro-icon name="caret-down" [size]="10" class="sort-chevron" [class.col-active]="sortCol() === 'weight'" [class.dir-asc]="sortCol() === 'weight' && sortDir() === 'asc'" />
                 </th>
                 <th class="th-sort" (click)="sortBy('reps')">
                   Reps
-                  <svg class="sort-chevron" [class.col-active]="sortCol() === 'reps'" [class.dir-asc]="sortCol() === 'reps' && sortDir() === 'asc'" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg>
+                  <jiro-icon name="caret-down" [size]="10" class="sort-chevron" [class.col-active]="sortCol() === 'reps'" [class.dir-asc]="sortCol() === 'reps' && sortDir() === 'asc'" />
                 </th>
                 <th class="th-sort" (click)="sortBy('est_1rm')">
                   Est. 1RM
-                  <svg class="sort-chevron" [class.col-active]="sortCol() === 'est_1rm'" [class.dir-asc]="sortCol() === 'est_1rm' && sortDir() === 'asc'" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg>
+                  <jiro-icon name="caret-down" [size]="10" class="sort-chevron" [class.col-active]="sortCol() === 'est_1rm'" [class.dir-asc]="sortCol() === 'est_1rm' && sortDir() === 'asc'" />
                 </th>
                 <th><span class="sr-only">Personal record</span></th>
               </tr>
@@ -188,6 +192,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
 }
             </tbody>
           </table>
+</div>
 }
 
           @if (historyTotalPages() > 1) {
@@ -210,15 +215,16 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
         @if (activeSection() === 'form') {
 <div class="tab-panel">
           @if (formChecksLoading()) {
-<div class="fc-loading">
-            <div class="spinner-sm"></div>
-            <span>Loading clips...</span>
+<div class="fc-grid" role="status" aria-label="Loading clips">
+            @for (i of [1, 2, 3]; track i) {
+              <jiro-skeleton height="160px" />
+            }
           </div>
 }
 
           @if (!formChecksLoading() && groupedFormChecks().length === 0) {
 <div class="no-history">
-            <p class="text-secondary">No form check clips yet. Tap "+ Form Check" during a session to add one.</p>
+            <p class="text-secondary">No form check clips yet. Tap "+ Form check" during a session to add one.</p>
           </div>
 }
 
@@ -308,9 +314,9 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
   styles: [`
     :host { display: block; }
 
-    .exercise-detail { max-width: 900px; width: 100%; overflow-x: hidden; }
+    .exercise-detail { max-width: 900px; width: 100%; overflow-x: hidden; position: relative; }
 
-    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
+    .state-loading { display: flex; flex-direction: column; gap: var(--space-lg); }
 
     .detail-body { display: flex; flex-direction: column; gap: var(--space-xl); }
 
@@ -326,7 +332,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
     .mg-badge {
       background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary);
       font-size: var(--font-size-sm); font-weight: 500;
-      padding: 4px 12px; border-radius: 12px;
+      padding: 4px 12px; border-radius: var(--border-radius-pill);
     }
 
     .pr-stats { display: flex; gap: var(--space-xl); }
@@ -351,7 +357,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
       border-radius: var(--border-radius); border: 1px solid;
       font-size: var(--font-size-sm); line-height: 1.5;
     }
-    .plateau-banner svg { flex-shrink: 0; margin-top: 1px; }
+    .plateau-banner jiro-icon { margin-top: 2px; }
     .plateau-banner.plateau { background: rgba(var(--color-warning-rgb), 0.1); border-color: rgba(var(--color-warning-rgb), 0.4); color: var(--color-warning); }
     .plateau-banner.decline { background: rgba(var(--color-danger-rgb), 0.08); border-color: rgba(var(--color-danger-rgb), 0.3); color: var(--color-danger); }
     .plateau-banner strong { font-weight: 600; }
@@ -365,7 +371,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
     .chart-tab {
       padding: 6px 14px;
       border: 1px solid var(--border-color);
-      border-radius: 20px;
+      border-radius: var(--border-radius-pill);
       background: none;
       cursor: pointer;
       font-size: var(--font-size-sm);
@@ -378,7 +384,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
     .chart-tab.active {
       background: var(--color-primary);
       border-color: var(--color-primary);
-      color: white;
+      color: var(--text-on-primary);
       font-weight: 500;
     }
 
@@ -442,7 +448,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
       background: var(--bg-canvas);
       border: 1px solid var(--border-color);
       color: var(--text-muted);
-      padding: 1px 7px; border-radius: 10px;
+      padding: 1px 7px; border-radius: var(--border-radius-pill);
       font-weight: 400;
     }
 
@@ -466,6 +472,9 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
       padding: var(--space-xl); text-align: center;
       border: 1px dashed var(--border-color); border-radius: var(--border-radius);
     }
+
+    /* the table scrolls inside its own box, never the page */
+    .table-scroll { position: relative; overflow-x: auto; max-width: 100%; }
 
     .history-table {
       width: 100%; border-collapse: collapse;
@@ -542,16 +551,6 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
     .page-info { font-size: var(--font-size-sm); color: var(--text-secondary); min-width: 60px; text-align: center; }
 
     /* ── Form Progression ── */
-    .fc-loading {
-      display: flex; align-items: center; gap: var(--space-sm);
-      color: var(--text-secondary); font-size: var(--font-size-sm);
-    }
-
-    .spinner-sm {
-      width: 16px; height: 16px; border: 2px solid var(--border-color);
-      border-top-color: var(--color-primary); border-radius: 50%;
-      animation: spin 0.8s linear infinite; flex-shrink: 0;
-    }
 
     .fc-groups { display: flex; flex-direction: column; gap: var(--space-xl); }
 
@@ -581,7 +580,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
       position: absolute; top: 6px; right: 6px;
       width: 24px; height: 24px;
       display: flex; align-items: center; justify-content: center;
-      background: rgba(0, 0, 0, 0.55); color: #FFFFFF;
+      background: var(--scrim); color: var(--text-on-dark);
       border: none; border-radius: 50%; cursor: pointer;
       padding: 0; transition: background 0.15s;
     }
@@ -593,14 +592,12 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
     .spinner-xs {
       width: 10px; height: 10px; border: 1.5px solid color-mix(in srgb, currentColor 40%, transparent);
       border-top-color: currentColor; border-radius: 50%;
-      animation: spin 0.7s linear infinite;
+      animation: jiro-spin 0.7s linear infinite;
     }
 
     .fc-label {
       font-size: var(--font-size-xs); color: var(--text-secondary); margin: 0; line-height: 1.4;
     }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
 
     .notes-list { display: flex; flex-direction: column; gap: var(--space-sm); padding: var(--space-md); }
     .notes-item {
@@ -622,6 +619,8 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
     @media (max-width: 600px) {
       .section-tab { padding: var(--space-sm) var(--space-md); }
       .fc-grid { grid-template-columns: 1fr 1fr; }
+      .history-table th, .history-table td { padding: var(--space-sm) var(--space-xs); }
+      .history-table th:first-child, .history-table td:first-child { padding-left: var(--space-sm); }
     }
   `]
 })
@@ -871,7 +870,7 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
     const values = data.map(d => Math.round(this.settingsService.toDisplay(d.volume) * 10) / 10);
     this.chart = new Chart(this.canvasRef.nativeElement,
       this.lineConfig(labels, values, `Volume (${unit}×reps)`, chartTones().warning,
-        'Total Session Volume', `Volume (${unit}×reps)`, `${unit}×reps`));
+        'Total session volume', `Volume (${unit}×reps)`, `${unit}×reps`));
   }
 
   private drawMaxWeightChart(unit: string) {
@@ -882,8 +881,8 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
     const labels = data.map(d => this.formatDate(d.date));
     const values = data.map(d => Math.round(this.settingsService.toDisplay(d.weight) * 10) / 10);
     this.chart = new Chart(this.canvasRef.nativeElement,
-      this.lineConfig(labels, values, `Max Weight (${unit})`, chartTones().accent,
-        'Heaviest Set Per Session', `Weight (${unit})`, unit));
+      this.lineConfig(labels, values, `Max weight (${unit})`, chartTones().accent,
+        'Heaviest set per session', `Weight (${unit})`, unit));
   }
 
   private drawRepsAtWeightChart() {
@@ -1053,8 +1052,8 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
     return Array.from(weights).sort((a, b) => b - a);
   }
 
-  formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' });
+  formatDate(instant: string): string {
+    return formatInstant(instant, this.settingsService.timezone());
   }
 
   goBack() { this.router.navigate(['/jym/exercises']); }

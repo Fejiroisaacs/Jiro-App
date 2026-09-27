@@ -67,7 +67,7 @@ import { JiroLogoComponent } from '../../shared/components/jiro-logo/jiro-logo';
   `,
   styles: [`
     .auth-page {
-      min-height: 100vh;
+      min-height: 100dvh;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -157,7 +157,7 @@ export class ResetPasswordComponent implements OnInit {
     this.token = new URLSearchParams(fragment).get('token') ?? this.route.snapshot.queryParams['token'] ?? '';
     if (!this.token) {
       this.invalidLink.set(true);
-      this.errorMessage.set('Invalid reset link — no token provided.');
+      this.errorMessage.set('This reset link is invalid: it has no token.');
     }
   }
 

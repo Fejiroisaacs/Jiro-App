@@ -10,18 +10,12 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// A recurring transaction is a series: its first transaction (the head,
-// is_recurring) carries the interval, the anchor day and the next due date
-// (recurrence_next_date). Whenever the user opens Ledger, every due date up
-// to today in their timezone is written as a copy pointing back at the head
-// (recurrence_source_id), and the head's next date moves on. There is no
-// background job: a series that nobody looks at catches up on the next visit.
+// A recurring series is its head row; due copies are written lazily when the user opens Ledger.
 
 // ErrInvalidRecurrence: an unknown interval, or a copy asked to repeat itself.
 var ErrInvalidRecurrence = errors.New("invalid recurrence")
 
-// maxCatchUpPerSeries bounds one catch-up pass. A weekly series left alone
-// for years still finishes: the rest is written on the next visit.
+// maxCatchUpPerSeries bounds one catch-up pass; the rest is written on the next visit.
 const maxCatchUpPerSeries = 400
 
 var recurrenceIntervals = map[string]bool{"weekly": true, "biweekly": true, "monthly": true, "yearly": true}
@@ -45,11 +39,7 @@ func clampAnchor(anchor int) int {
 	return anchor
 }
 
-// advanceRecurrence is the scheduled date after d. Weekly and biweekly step
-// by 7 and 14 days. Monthly and yearly step by calendar months and land on
-// the anchor day, or the month's last day when it is shorter: a series
-// anchored on the 31st runs Jan 31, Feb 28, Mar 31, never drifting to the
-// 28th. Dates are calendar dates at UTC midnight.
+// advanceRecurrence is the scheduled date after d; monthly and yearly clamp to the anchor day.
 func advanceRecurrence(d time.Time, interval string, anchor int) time.Time {
 	switch interval {
 	case "weekly":
@@ -69,8 +59,7 @@ func advanceRecurrence(d time.Time, interval string, anchor int) time.Time {
 	return time.Date(first.Year(), first.Month(), day, 0, 0, 0, 0, time.UTC)
 }
 
-// nextOccurrenceAfter is the first scheduled date of a series that starts on
-// start and is strictly after `after`.
+// nextOccurrenceAfter is the first scheduled date strictly after `after`.
 func nextOccurrenceAfter(start time.Time, interval string, anchor int, after time.Time) time.Time {
 	d := advanceRecurrence(start, interval, anchor)
 	for !d.After(after) {
@@ -79,8 +68,7 @@ func nextOccurrenceAfter(start time.Time, interval string, anchor int, after tim
 	return d
 }
 
-// dueOccurrences lists the dates from next through today (inclusive), at most
-// limit of them, and returns the series' next date after those.
+// dueOccurrences lists due dates from next through today (at most limit) and the next date after.
 func dueOccurrences(next, today time.Time, interval string, anchor, limit int) ([]time.Time, time.Time) {
 	var due []time.Time
 	for !next.After(today) && len(due) < limit {
@@ -111,14 +99,8 @@ type recurringHead struct {
 	next        time.Time
 }
 
-// CatchUpRecurring writes every occurrence of the user's series that is due
-// by today in their timezone (settings, else tzHint, else UTC) and returns how
-// many it wrote. It never runs for the demo account, which is look-only and
-// has its dates slid by the demo service instead.
-//
-// Safe under concurrent calls: the due heads are locked FOR UPDATE, so a
-// second request waits and then finds nothing due; the unique index on
-// (recurrence_source_id, date) backs that up.
+// CatchUpRecurring writes every occurrence due by the user's today and returns the count; never for the demo.
+// Safe concurrently: due heads are locked FOR UPDATE, backed by the unique (recurrence_source_id, date) index.
 func (s *LedgerService) CatchUpRecurring(ctx context.Context, userID uuid.UUID, tzHint string, now time.Time) (int, error) {
 	var isDemo bool
 	var tzName *string
@@ -182,8 +164,7 @@ func (s *LedgerService) CatchUpRecurring(ctx context.Context, userID uuid.UUID, 
 
 	written := 0
 	for _, h := range heads {
-		// A series that can no longer be written (unknown interval, or a
-		// transfer whose destination account was deleted) stops.
+		// A series that can no longer be written (unknown interval, deleted transfer target) stops.
 		if !ValidRecurrenceInterval(h.interval) || (h.txType == "transfer" && h.transferTo == nil) {
 			if _, err := tx.Exec(ctx,
 				`UPDATE ledger_transactions SET is_recurring = FALSE, recurrence_next_date = NULL, updated_at = NOW() WHERE id = $1`,
@@ -213,8 +194,7 @@ func (s *LedgerService) CatchUpRecurring(ctx context.Context, userID uuid.UUID, 
 	return written, tx.Commit(ctx)
 }
 
-// writeOccurrence writes one copy of the head on date d and moves the
-// balances, unless that copy already exists. It returns 1 if it wrote one.
+// writeOccurrence writes one copy of the head on d and moves balances unless it exists; returns 1 if written.
 func writeOccurrence(ctx context.Context, tx pgx.Tx, userID uuid.UUID, h recurringHead, d time.Time) (int, error) {
 	var id uuid.UUID
 	err := tx.QueryRow(ctx,

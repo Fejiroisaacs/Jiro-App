@@ -374,9 +374,7 @@ func applyModifications(base, mods json.RawMessage) json.RawMessage {
 		return base
 	}
 
-	// Names match ignoring case and surrounding or repeated whitespace, so a
-	// trial's "feta" updates the recipe's "Feta" instead of adding a second
-	// feta. The recipe keeps its own spelling of the name.
+	// Names match ignoring case and whitespace; the recipe keeps its own spelling.
 	idx := make(map[string]int)
 	for i, ing := range ingredients {
 		key := normalizeIngredientName(ing.Item)
@@ -402,8 +400,7 @@ func applyModifications(base, mods json.RawMessage) json.RawMessage {
 	return result
 }
 
-// GetCookStreak counts cook days in the user's location (settings timezone,
-// else tzHint, else UTC), the days GET /day lists a trial under.
+// GetCookStreak counts cook days in the user's location, as GET /day does.
 func (s *RecipeService) GetCookStreak(ctx context.Context, userID uuid.UUID, tzHint string) (*models.CookStreakResponse, error) {
 	loc, err := userLocation(ctx, s.db, userID, tzHint)
 	if err != nil {

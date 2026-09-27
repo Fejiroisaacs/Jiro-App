@@ -1,12 +1,7 @@
 import { Component, ViewEncapsulation } from '@angular/core';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 
-/**
- * One short aside: a shortcut, a caveat, or where else a feature shows up.
- * Keep it to a sentence or two.
- *
- *   <guide-tip>Press <kbd>Ctrl</kbd> <kbd>K</kbd> from any page to search.</guide-tip>
- */
+/** One short aside: a shortcut, a caveat, or where else a feature shows up. */
 @Component({
   selector: 'guide-tip',
   standalone: true,

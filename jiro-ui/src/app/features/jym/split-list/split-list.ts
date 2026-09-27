@@ -12,11 +12,12 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-series-modal';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 
 @Component({
   selector: 'app-split-list',
   standalone: true,
-  imports: [
+  imports: [JiroSkeletonComponent, 
     FormsModule, JiroCardComponent, JiroButtonComponent, JiroModalComponent,
     JiroIconComponent, JiroPageHeaderComponent, JiroEmptyStateComponent, JymNewSeriesModalComponent,
   ],
@@ -43,7 +44,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
 
       <!-- Loading -->
       @if (loading()) {
-        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+        <div class="splits-grid" role="status" aria-label="Loading splits">@for (i of [1, 2, 3, 4]; track i) { <jiro-skeleton height="170px" /> }</div>
       }
 
       <!-- Empty state -->
@@ -86,17 +87,13 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
             </div>
             <div class="btn-slot">
               <jiro-button variant="secondary" type="button" (click)="openNewSeries(split)">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                  <polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/>
-                </svg>
+                <jiro-icon name="pulse" [size]="13" />
                 Series
               </jiro-button>
             </div>
             <div class="btn-slot">
               <jiro-button variant="primary" type="button" (click)="startFromSplitCard(split)">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                  <polygon points="5,3 19,12 5,21"/>
-                </svg>
+                <jiro-icon name="play:fill" [size]="13" />
                 Start
               </jiro-button>
             </div>
@@ -112,10 +109,10 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
 
       <!-- Create Split Modal -->
       @if (showCreate()) {
-<jiro-modal title="New Training Split" maxWidth="480px" (close)="showCreate.set(false)">
+<jiro-modal title="New training split" maxWidth="480px" (close)="showCreate.set(false)">
         <form class="create-form" (ngSubmit)="createSplit()">
           <div class="form-group">
-            <label class="form-label" for="new-split-name">Split Name</label>
+            <label class="form-label" for="new-split-name">Split name</label>
             <input
               id="new-split-name"
               class="form-input"
@@ -148,7 +145,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
           <div class="form-actions">
             <jiro-button variant="secondary" type="button" (click)="showCreate.set(false)">Cancel</jiro-button>
             <jiro-button variant="primary" type="submit" [disabled]="saving() || !newName.trim()">
-              {{ saving() ? 'Creating...' : 'Create Split' }}
+              {{ saving() ? 'Creating...' : 'Create split' }}
             </jiro-button>
           </div>
         </form>
@@ -162,9 +159,9 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
 
       <!-- Start Session: choose routine modal -->
       @if (showRoutinePicker()) {
-<jiro-modal title="Choose Routine" maxWidth="420px" (close)="showRoutinePicker.set(false)">
+<jiro-modal title="Choose routine" maxWidth="420px" (close)="showRoutinePicker.set(false)">
         @if (loadingRoutines()) {
-          <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+          <div class="sk-list" role="status" aria-label="Loading routines">@for (i of [1, 2, 3]; track i) { <jiro-skeleton height="48px" /> }</div>
         }
         @if (!loadingRoutines()) {
 <div class="routine-list">
@@ -213,14 +210,14 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
       font-size: var(--font-size-xs); 
       font-weight: 600;
       padding: 4px 8px; 
-      border-radius: 2px;
+      border-radius: var(--border-radius-pill);
       border: 1px dashed var(--border-color);
       box-shadow: 1px 1px 0 var(--border-color);
       white-space: nowrap;
     }
 
     /* ── State messages ── */
-    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
+    .sk-list { display: flex; flex-direction: column; gap: var(--space-xs); }
 
     .splits-grid {
       display: grid;
@@ -244,7 +241,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
       font-size: var(--font-size-xs);
       font-weight: 600;
       padding: 4px 8px;
-      border-radius: 2px;
+      border-radius: var(--border-radius-pill);
       border: 1px solid var(--border-color);
       box-shadow: 1px 1px 0 rgba(var(--shadow-rgb), 0.1);
       white-space: nowrap;
@@ -335,9 +332,6 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
 
     @media (max-width: 600px) {
       .split-actions { gap: 0.3rem; }
-
-
-      .split-actions svg { width: 10px; height: 10px; }
 
       .delete-split-btn { width: 2rem; height: 2rem; }
     }

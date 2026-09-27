@@ -203,8 +203,7 @@ type exportCulinaraData struct {
 	// Every week the account has planned, not just the current one: an export
 	// is meant to be the whole record.
 	MealPlans []exportMealPlan `json:"meal_plans"`
-	// The grocery list. The key predates the list moving from the browser
-	// to the account (it was always empty then), so it keeps its old name.
+	// The grocery list; the key keeps its old name.
 	ShoppingList []exportShoppingItem `json:"shopping_list"`
 }
 

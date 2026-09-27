@@ -86,9 +86,7 @@ func (s *UserService) IsAdmin(ctx context.Context, id uuid.UUID) (bool, error) {
 	return isAdmin, nil
 }
 
-// WriteAccess returns what the write gate needs in one query. It is read per
-// request rather than carried in the JWT, so verifying takes effect
-// immediately instead of at the next token refresh.
+// WriteAccess returns what the write gate needs, read per request so verifying applies at once.
 func (s *UserService) WriteAccess(ctx context.Context, id uuid.UUID) (verified, demo bool, err error) {
 	err = s.db.QueryRow(ctx, `SELECT email_verified, is_demo FROM users WHERE id = $1`, id).Scan(&verified, &demo)
 	if err != nil {

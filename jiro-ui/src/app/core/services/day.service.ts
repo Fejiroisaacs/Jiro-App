@@ -73,10 +73,7 @@ export class DayService {
   private readonly http = inject(HttpClient);
   private readonly apiUrl = `${environment.apiUrl}/day`;
 
-  /**
-   * `timeZone` is only a fallback for an account with no timezone setting, so
-   * the API cuts the day where this browser does.
-   */
+  /** `timeZone` is only the API's fallback for an account with no timezone setting. */
   getDay(date: string, timeZone: string): Observable<DayView> {
     const params = new HttpParams().set('date', date).set('tz', timeZone);
     return this.http.get<DayView>(this.apiUrl, { params });

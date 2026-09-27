@@ -1,9 +1,7 @@
 /** Shared utilities for the Ledger module. Import instead of duplicating per component. */
+import { formatDay } from '../../../core/utils/format-date';
 
-/**
- * Money in the user's one currency (SettingsService.currency): thousands
- * separators, the currency's own decimals (two for most), and a minus sign when negative.
- */
+/** Money in the user's currency, with its own decimals and a minus sign when negative. */
 export function formatCurrency(value: number, currency = 'USD'): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -36,10 +34,7 @@ export function currencySymbol(currency: string): string {
   return part?.value ?? currency;
 }
 
-/**
- * The currencies Settings offers, most used first. Any ISO 4217 code works
- * with the API; this is the list people pick from.
- */
+/** The currencies Settings offers, most used first; the API takes any ISO 4217 code. */
 export const CURRENCIES: { code: string; name: string }[] = [
   { code: 'USD', name: 'US dollar' },
   { code: 'EUR', name: 'Euro' },
@@ -67,11 +62,7 @@ export const CURRENCIES: { code: string; name: string }[] = [
   { code: 'AED', name: 'UAE dirham' },
 ];
 
-/**
- * A change between two periods as a percentage: "+12.5%", "-3.0%", or,
- * when the earlier period is zero so there is no base, "new" (something
- * appeared) or "n/a" (still nothing).
- */
+/** Period change as "+12.5%", or "new" / "n/a" when the earlier period is zero. */
 export function formatPctChange(pct: number | null, current: number): string {
   if (pct === null) return current !== 0 ? 'new' : 'n/a';
   return new Intl.NumberFormat('en-US', {
@@ -81,12 +72,7 @@ export function formatPctChange(pct: number | null, current: number): string {
   }).format(pct) + '%';
 }
 
-/**
- * Net worth from the accounts, the one rule the Accounts page and "Take
- * snapshot" share: every account counts, inactive ones too, at its real
- * signed balance. A positive balance is an asset and a negative one a
- * liability (a credit card owing money is stored negative).
- */
+/** Net worth over every account, inactive too, at its signed balance (negative is a liability). */
 export function netWorthTotals(accounts: { balance: number }[]): { assets: number; liabilities: number; net: number } {
   let assets = 0;
   let liabilities = 0;
@@ -98,27 +84,36 @@ export function netWorthTotals(accounts: { balance: number }[]): { assets: numbe
   return { assets: round(assets), liabilities: round(liabilities), net: round(assets - liabilities) };
 }
 
-/**
- * Category colours: the default categories' own palette, so a custom
- * category sits with them. The API picks the next unused one when none is
- * chosen.
- */
-export const CATEGORY_PALETTE: { hex: string; name: string }[] = [
-  { hex: '#8D6E63', name: 'Clay' },
-  { hex: '#E57373', name: 'Coral' },
-  { hex: '#64B5F6', name: 'Sky' },
-  { hex: '#81C784', name: 'Sage' },
-  { hex: '#FFD54F', name: 'Mustard' },
-  { hex: '#F48FB1', name: 'Rose' },
-  { hex: '#90A4AE', name: 'Slate' },
-  { hex: '#CE93D8', name: 'Lilac' },
-  { hex: '#BCAAA4', name: 'Sand' },
-  { hex: '#66BB6A', name: 'Leaf' },
-  { hex: '#4DB6AC', name: 'Teal' },
-  { hex: '#FFA726', name: 'Amber' },
-  { hex: '#AB47BC', name: 'Plum' },
-  { hex: '#78909C', name: 'Steel' },
+/** Category colours: palette keys the API stores, drawn from the theme's data palette. */
+export const CATEGORY_PALETTE: { key: string; name: string }[] = [
+  { key: 'data-1', name: 'Terracotta' },
+  { key: 'data-2', name: 'Olive' },
+  { key: 'data-3', name: 'Ochre' },
+  { key: 'data-4', name: 'Sage' },
+  { key: 'data-5', name: 'Slate' },
+  { key: 'data-6', name: 'Rose' },
+  { key: 'data-7', name: 'Taupe' },
+  { key: 'data-8', name: 'Forest' },
+  { key: 'data-9', name: 'Copper' },
+  { key: 'data-10', name: 'Steel' },
+  { key: 'data-11', name: 'Mustard' },
+  { key: 'data-12', name: 'Walnut' },
 ];
+
+const PALETTE_KEY = /^data-([1-9]|1[0-2])$/;
+
+/** A category colour as CSS: data-3 becomes var(--data-3), a legacy hex passes through. */
+export function categoryColor(color: string | null | undefined): string {
+  const c = (color ?? '').trim().toLowerCase();
+  if (PALETTE_KEY.test(c)) return `var(--${c})`;
+  if (/^#[0-9a-f]{6}$/.test(c)) return c;
+  return 'var(--text-muted)';
+}
+
+/** The tint behind a category chip; chip text stays var(--text-primary). */
+export function categoryTint(color: string | null | undefined): string {
+  return `color-mix(in srgb, ${categoryColor(color)} 18%, var(--bg-surface))`;
+}
 
 /**
  * Parse a calendar date (no time component) as a LOCAL date.
@@ -131,8 +126,9 @@ export function parseDateOnly(value: string): Date {
   return new Date(y, m - 1, d);
 }
 
+/** A DATE value in the app's style: "25 Sep", with the year when it isn't this year. */
 export function formatDate(iso: string): string {
-  return parseDateOnly(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return formatDay(iso);
 }
 
 export function formatPct(value: number): string {
@@ -141,14 +137,6 @@ export function formatPct(value: number): string {
 
 export function clamp(val: number, min: number, max: number): number {
   return Math.min(Math.max(val, min), max);
-}
-
-export function hexWithAlpha(hex: string | null | undefined, alpha: number): string {
-  if (!hex) return `rgba(155,143,136,${alpha})`;
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r},${g},${b},${alpha})`;
 }
 
 export function periodLabel(period: string): string {

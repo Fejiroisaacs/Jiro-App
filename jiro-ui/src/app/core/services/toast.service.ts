@@ -41,17 +41,12 @@ export class ToastService {
   }
 
   error(message: string, duration = 4500) {
-    // Just after a read-only notice, a component's own "could not save" toast
-    // would say the same thing in other words.
+    // Right after a read-only notice, a "could not save" toast would only repeat it.
     if (Date.now() < this.quietUntil) return -1;
     return this.show(message, { kind: 'error', duration });
   }
 
-  /**
-   * Why a write was refused on the look-only demo. One save can fire several
-   * requests, so this shows once per burst: repeats within `burstMs` of the
-   * last one are dropped, and so are error toasts in that window.
-   */
+  /** Why a demo write was refused, once per burst: repeats and error toasts within `burstMs` are dropped. */
   readOnlyNotice(message: string, burstMs = 2000) {
     const now = Date.now();
     const inBurst = now - this.lastNoticeAt < burstMs;

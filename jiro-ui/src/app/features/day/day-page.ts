@@ -14,7 +14,7 @@ import { JiroButtonComponent } from '../../shared/components/jiro-button/jiro-bu
 import { JiroIconComponent } from '../../shared/components/jiro-icon/jiro-icon';
 import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
 import { JiroSkeletonComponent } from '../../shared/components/jiro-skeleton/jiro-skeleton';
-import { formatCurrency, formatSignedCurrency, transactionColor } from '../ledger/shared/ledger-utils';
+import { categoryColor, formatCurrency, formatSignedCurrency, transactionColor } from '../ledger/shared/ledger-utils';
 
 type LoadState =
   | { status: 'loading'; key: string }
@@ -23,12 +23,7 @@ type LoadState =
 
 const SLOT_LABELS: Record<string, string> = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snack' };
 
-/**
- * One of the user's days across all four modules (/day/:date). The date is
- * the URL, so the arrows push history and Back works; /day, an invalid date
- * or a future one is replaced with today. Days are cut in the settings
- * timezone, the same one the API and the dashboard strip use.
- */
+/** One of the user's days across all modules (/day/:date); arrows push history, bad dates become today. */
 @Component({
   selector: 'app-day-page',
   standalone: true,
@@ -218,7 +213,7 @@ const SLOT_LABELS: Record<string, string> = { breakfast: 'Breakfast', lunch: 'Lu
                             <span class="row-title">{{ t.description || 'Transaction' }}</span>
                             <span class="row-meta">
                               @if (t.category_name) {
-                                <span class="cat-dot" [style.background]="t.category_color || 'var(--text-muted)'" aria-hidden="true"></span>{{ t.category_name }} ·
+                                <span class="cat-dot" [style.background]="categoryColor(t.category_color)" aria-hidden="true"></span>{{ t.category_name }} ·
                               }
                               {{ t.type === 'transfer' && t.transfer_to_account_name ? t.account_name + ' to ' + t.transfer_to_account_name : t.account_name }}
                             </span>
@@ -268,7 +263,7 @@ const SLOT_LABELS: Record<string, string> = { breakfast: 'Breakfast', lunch: 'Lu
       font-weight: 600;
       letter-spacing: 0.06em;
       text-transform: uppercase;
-      color: var(--color-primary);
+      color: var(--color-primary-text);
     }
     .day-nav { display: flex; align-items: center; gap: var(--space-sm); }
     .day-arrow, .day-today {
@@ -369,7 +364,7 @@ const SLOT_LABELS: Record<string, string> = { breakfast: 'Breakfast', lunch: 'Lu
       background: var(--bg-surface-hover);
       color: var(--text-secondary);
     }
-    .pill--pr { background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary); }
+    .pill--pr { background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary-text); }
 
     .quiet {
       margin: 0;
@@ -385,7 +380,7 @@ const SLOT_LABELS: Record<string, string> = { breakfast: 'Breakfast', lunch: 'Lu
       align-items: center;
       min-height: 44px;
       font-weight: 600;
-      color: var(--color-primary);
+      color: var(--color-primary-text);
     }
 
     .sub-title {
@@ -422,6 +417,7 @@ const SLOT_LABELS: Record<string, string> = { breakfast: 'Breakfast', lunch: 'Lu
   `],
 })
 export class DayPageComponent {
+  readonly categoryColor = categoryColor;
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly days = inject(DayService);
@@ -477,10 +473,7 @@ export class DayPageComponent {
 
   retry() { this.retry$.next(); }
 
-  /**
-   * The control that moved the day can vanish (Today, or Next on reaching
-   * today); when focus falls to the body, put it on the heading instead.
-   */
+  /** If the control that moved the day vanished and focus fell to body, focus the heading. */
   private afterDayChange() {
     afterNextRender(() => {
       const active = document.activeElement;
@@ -489,22 +482,22 @@ export class DayPageComponent {
   }
 
   sessionLink(s: SessionSummary): { path: unknown[]; query: Record<string, string> | null } {
-    // Completed sessions open read-only in history; the player would restart
-    // its timer (same rule as global search).
+    // Completed sessions open read-only in history; the player would restart its timer.
     return s.ended_at
       ? { path: ['/jym/track'], query: { tab: 'sessions', session: s.id } }
       : { path: ['/jym/session', s.id], query: null };
   }
 
+  /** "7:30 AM · 45 min, 12 sets, 3,400 kg": one middle dot after the time, commas after that. */
   sessionMeta(s: SessionSummary): string {
-    const parts = [this.time(s.started_at)];
+    const parts: string[] = [];
     if (s.ended_at) {
       const mins = Math.max(1, Math.round((new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()) / 60000));
       parts.push(mins < 60 ? `${mins} min` : `${Math.floor(mins / 60)} h ${mins % 60} min`);
     }
     parts.push(this.plural(s.set_count, 'set', 'sets'));
     if (s.total_volume > 0) parts.push(`${Math.round(this.settings.toDisplay(s.total_volume)).toLocaleString('en-US')} ${this.settings.unitLabel()}`);
-    return parts.join(' · ');
+    return `${this.time(s.started_at)} · ${parts.join(', ')}`;
   }
 
   weight(kg: number): string {

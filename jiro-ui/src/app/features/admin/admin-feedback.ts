@@ -1,6 +1,9 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 
 import { AdminService, FeedbackItem } from '../../core/services/admin.service';
+import { JiroIconComponent } from '../../shared/components/jiro-icon/jiro-icon';
+import { SettingsService } from '../../core/services/settings.service';
+import { formatInstant } from '../../core/utils/format-date';
 
 const TYPE_LABELS: Record<string, string> = {
   bug: 'Bug',
@@ -11,7 +14,7 @@ const TYPE_LABELS: Record<string, string> = {
 @Component({
   selector: 'app-admin-feedback',
   standalone: true,
-  imports: [],
+  imports: [JiroIconComponent],
   template: `
     <div class="feedback-page">
       <h1 class="page-title">Feedback</h1>
@@ -24,7 +27,7 @@ const TYPE_LABELS: Record<string, string> = {
 }
 
       @if (!loading() && items().length > 0) {
-<div class="table-wrap">
+<div class="table-wrap" tabindex="0" role="region" aria-label="Feedback table">
         <table class="feedback-table">
           <thead>
             <tr>
@@ -32,7 +35,7 @@ const TYPE_LABELS: Record<string, string> = {
               <th>User</th>
               <th>Type</th>
               <th>Message</th>
-              <th></th>
+              <th><span class="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody>
@@ -48,7 +51,7 @@ const TYPE_LABELS: Record<string, string> = {
               <td><span class="type-chip" [class]="'type-chip--' + item.type">{{ typeLabel(item.type) }}</span></td>
               <td class="msg-cell">{{ item.message }}</td>
               <td>
-                <button class="del-btn" (click)="delete(item.id)" title="Delete">✕</button>
+                <button class="del-btn" type="button" (click)="delete(item.id)" title="Delete"><jiro-icon name="x" [size]="14" label="Delete feedback" /></button>
               </td>
             </tr>
 }
@@ -73,8 +76,9 @@ const TYPE_LABELS: Record<string, string> = {
   styles: [`
     .page-title { font-size: 24px; font-weight: 700; margin-bottom: 20px; }
     .state-msg { color: var(--text-secondary); }
-    .error-msg { color: #e05c5c; }
-    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .error-msg { color: var(--color-negative); }
+    .table-wrap { position: relative; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .table-wrap:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
     .feedback-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 560px; }
     .feedback-table th {
       text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border-color);
@@ -87,22 +91,22 @@ const TYPE_LABELS: Record<string, string> = {
     .user-email { color: var(--text-primary); }
     .dim { color: var(--text-secondary); }
     .type-chip {
-      display: inline-block; padding: 2px 10px; border-radius: 10px;
+      display: inline-block; padding: 2px 10px; border-radius: var(--border-radius-pill);
       font-size: 12px; font-weight: 500; white-space: nowrap;
       background: color-mix(in srgb, var(--color-primary) 10%, transparent);
-      color: var(--color-primary);
+      color: var(--color-primary-text);
     }
-    .type-chip--bug { background: rgba(220,53,69,0.1); color: #c0392b; }
-    .type-chip--feature { background: rgba(40,167,69,0.1); color: #1e7e34; }
+    .type-chip--bug { background: color-mix(in srgb, var(--color-negative) 12%, transparent); color: var(--text-primary); }
+    .type-chip--feature { background: color-mix(in srgb, var(--color-positive) 14%, transparent); color: var(--text-primary); }
     .msg-cell { max-width: 360px; line-height: 1.4; color: var(--text-primary); }
     .del-btn {
       background: none; border: none; cursor: pointer; color: var(--text-secondary);
-      font-size: 14px; padding: 2px 6px; border-radius: 4px; transition: color 0.15s;
+      display: inline-flex; padding: 4px 6px; border-radius: var(--border-radius); transition: color 0.15s;
     }
     .del-btn:hover { color: var(--color-danger); }
     .pagination { display: flex; align-items: center; gap: 12px; margin-top: 20px; }
     .page-btn {
-      padding: 7px 16px; border: 1px solid var(--border-color); border-radius: 6px;
+      padding: 7px 16px; border: 1px solid var(--border-color); border-radius: var(--border-radius);
       background: var(--bg-surface); color: var(--text-primary); cursor: pointer; font-size: 13px;
     }
     .page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -110,6 +114,7 @@ const TYPE_LABELS: Record<string, string> = {
   `]
 })
 export class AdminFeedbackComponent implements OnInit {
+  private readonly settings = inject(SettingsService);
   items = signal<FeedbackItem[]>([]);
   loading = signal(true);
   error = signal('');
@@ -146,8 +151,7 @@ export class AdminFeedbackComponent implements OnInit {
   }
 
   formatTime(iso: string) {
-    return new Date(iso).toLocaleString('en-GB', {
-      day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
-    });
+    const tz = this.settings.timezone();
+    return `${formatInstant(iso, tz)}, ${new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: tz })}`;
   }
 }

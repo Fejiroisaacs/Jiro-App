@@ -115,9 +115,9 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
             </a>
             <jiro-user-menu direction="up" [compact]="collapsed()" />
           } @else {
-            <a routerLink="/login" class="nav-item">
-              <jiro-icon name="sign-out" [size]="22" />
-              @if (!collapsed()) { <span class="nav-label">Log in</span> }
+            <a routerLink="/login" class="nav-item" [attr.aria-label]="collapsed() ? 'Sign in' : null">
+              <jiro-icon name="sign-in" [size]="22" />
+              @if (!collapsed()) { <span class="nav-label">Sign in</span> }
             </a>
             @if (!collapsed()) {
               <a routerLink="/register" class="guest-cta">Get started</a>
@@ -335,7 +335,7 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
       font-size: var(--font-size-xs);
       text-transform: uppercase;
       letter-spacing: 1px;
-      opacity: 0.5;
+      opacity: 0.7; /* 5:1 on the Earth sidebar */
     }
 
     .sidebar-footer {
@@ -479,8 +479,7 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
     }
     .verify-banner-close:hover { color: var(--text-primary); background: rgba(var(--color-primary-rgb), 0.1); }
 
-    /* Shown on every page of the demo, so it stays one slim row where it
-       fits and wraps the button under the text where it does not. */
+    /* The demo banner: one slim row where it fits, wrapping the button where it does not. */
     .demo-bar {
       display: flex;
       flex-wrap: wrap;

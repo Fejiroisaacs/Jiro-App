@@ -23,8 +23,7 @@ func TestDemoDayShift(t *testing.T) {
 		anchor, now string
 		want        int
 	}{
-		// The anchor is a date (UTC midnight of a New York date); now is an
-		// instant, read in New York.
+		// The anchor is a New York date at UTC midnight; now is an instant.
 		{"2026-09-24T00:00:00Z", "2026-09-24T23:59:00Z", 0},  // 19:59 in New York, same day
 		{"2026-09-24T00:00:00Z", "2026-09-25T03:59:00Z", 0},  // UTC is on the 25th, New York is not
 		{"2026-09-24T00:00:00Z", "2026-09-25T04:00:00Z", 1},  // New York midnight (EDT)
@@ -38,9 +37,7 @@ func TestDemoDayShift(t *testing.T) {
 	}
 }
 
-// Every seeded instant must fall on the same calendar date in UTC and in the
-// demo's timezone, or items drift to the previous New York evening (UTC hours
-// 00-04) and break "yesterday" and the streaks.
+// Every seeded instant must share its UTC and New York date, or the streaks break.
 func TestDemoTimesLandOnTheirNewYorkDay(t *testing.T) {
 	loc, err := time.LoadLocation(demoTimeZone)
 	if err != nil {
@@ -293,8 +290,7 @@ func TestDemoDatasetReferences(t *testing.T) {
 	}
 }
 
-// Everything must look recent at seed time and stay in the past after any
-// whole-day slide: timestamps before the seed day, dates no later than it.
+// Seeded data must look recent and stay in the past after any whole-day slide.
 func TestDemoDatasetDatesRelativeToNow(t *testing.T) {
 	ds := buildDemoDataset(demoNow)
 	seedDay := utcDay(demoNow)
@@ -388,8 +384,7 @@ func TestDemoDatasetDatesRelativeToNow(t *testing.T) {
 	}
 }
 
-// Copy rules: no em or en dashes and no placeholder text in anything a
-// visitor reads.
+// Copy rules: no em or en dashes and no placeholder text a visitor reads.
 func TestDemoDatasetCopy(t *testing.T) {
 	ds := buildDemoDataset(demoNow)
 	var texts []string

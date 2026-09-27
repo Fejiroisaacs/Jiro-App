@@ -50,8 +50,8 @@ export const MODULES: ModuleNav[] = [
     tabs: [
       { label: 'Culinara', route: '/culinara', exact: true, mark: 'culinara' },
       { label: 'Discover', route: '/culinara/discover', icon: 'magnifying-glass' },
-      { label: 'Meal Planner', mobileLabel: 'Planner', route: '/culinara/meal-planner', icon: 'calendar-blank' },
-      { label: 'Grocery List', mobileLabel: 'Grocery', route: '/culinara/grocery-list', icon: 'basket' },
+      { label: 'Meal planner', mobileLabel: 'Planner', route: '/culinara/meal-planner', icon: 'calendar-blank' },
+      { label: 'Grocery list', mobileLabel: 'Grocery', route: '/culinara/grocery-list', icon: 'basket' },
     ],
   },
   {
@@ -76,7 +76,7 @@ export const MODULES: ModuleNav[] = [
       { label: 'Transactions', mobileLabel: 'Activity', route: '/ledger/transactions', icon: 'receipt' },
       { label: 'Accounts', route: '/ledger/accounts', icon: 'bank' },
       { label: 'Budgets', route: '/ledger/budgets', icon: 'wallet' },
-      { label: 'Net Worth', route: '/ledger/networth', icon: 'chart-line-up', mobile: false },
+      { label: 'Net worth', route: '/ledger/networth', icon: 'chart-line-up', mobile: false },
       { label: 'Compare', route: '/ledger/compare', icon: 'arrows-left-right', mobile: false },
     ],
   },

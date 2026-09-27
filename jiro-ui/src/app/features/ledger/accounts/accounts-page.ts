@@ -14,10 +14,11 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
 import { JiroMenuComponent, JiroMenuItem } from '../../../shared/components/jiro-menu/jiro-menu';
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { SettingsService } from '../../../core/services/settings.service';
-import { currencySymbol, formatCurrency, formatSignedCurrency, formatDate, hexWithAlpha, netWorthTotals } from '../shared/ledger-utils';
+import { currencySymbol, formatCurrency, formatSignedCurrency, formatDate, categoryColor, categoryTint, netWorthTotals } from '../shared/ledger-utils';
 
 type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
 
@@ -33,6 +34,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
     JiroMenuComponent,
     JiroPageHeaderComponent,
     JiroEmptyStateComponent,
+    JiroSkeletonComponent,
   ],
   template: `
     <div class="accounts-page">
@@ -47,7 +49,18 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
 
       <!-- ── Loading ── -->
       @if (loading()) {
-        <div class="state-loading" aria-busy="true"><span class="spinner"></span></div>
+        <div class="accounts-grid" aria-hidden="true">
+          @for (i of [0, 1, 2]; track i) {
+            <jiro-card>
+              <div class="acct-card sk-stack">
+                <jiro-skeleton height="40px" width="40px" />
+                <jiro-skeleton height="16px" width="60%" />
+                <jiro-skeleton height="28px" width="45%" />
+              </div>
+            </jiro-card>
+          }
+        </div>
+        <span class="sr-only" role="status">Loading accounts</span>
       }
 
       <!-- ── Empty State ── -->
@@ -77,48 +90,27 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
 
                     <!-- Checking: bank -->
                     @case ('checking') {
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <line x1="3" y1="22" x2="21" y2="22"/>
-                      <rect x="2" y="8" width="20" height="14"/>
-                      <path d="M12 2L2 8h20L12 2z"/>
-                      <rect x="9" y="12" width="2" height="6"/>
-                      <rect x="13" y="12" width="2" height="6"/>
-                    </svg>
+<jiro-icon name="bank" [size]="20" />
 }
 
                     <!-- Savings: piggy bank -->
                     @case ('savings') {
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M19 11c0 4.4-3.6 8-8 8s-8-3.6-8-8 3.6-8 8-8c1 0 2 .2 2.9.5"/>
-                      <path d="M19 11h2l1 3-2 1"/>
-                      <circle cx="9" cy="11" r="1" fill="currentColor"/>
-                      <path d="M7 19v2M13 19v2"/>
-                    </svg>
+<jiro-icon name="piggy-bank" [size]="20" />
 }
 
                     <!-- Credit: credit card -->
                     @case ('credit') {
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <rect x="1" y="4" width="22" height="16" rx="2"/>
-                      <line x1="1" y1="10" x2="23" y2="10"/>
-                    </svg>
+<jiro-icon name="credit-card" [size]="20" />
 }
 
                     <!-- Investment: trending up -->
                     @case ('investment') {
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
-                      <polyline points="17 6 23 6 23 12"/>
-                    </svg>
+<jiro-icon name="trend-up" [size]="20" />
 }
 
                     <!-- Cash: banknotes -->
                     @default {
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <rect x="1" y="6" width="22" height="12" rx="2"/>
-                      <circle cx="12" cy="12" r="3"/>
-                      <path d="M5 12h.01M19 12h.01"/>
-                    </svg>
+<jiro-icon name="money" [size]="20" />
 }
                   }
 
@@ -169,9 +161,10 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
                 <span class="detail-title">Recent transactions</span>
               </div>
               @if (detailLoading()) {
-<div class="detail-loading">
-                <span class="spinner spinner--sm"></span>
+<div class="detail-loading" aria-hidden="true">
+                <jiro-skeleton [lines]="3" height="36px" />
               </div>
+              <span class="sr-only" role="status">Loading recent transactions</span>
 }
               @if (!detailLoading() && selectedAccountDetail()?.recent_transactions?.length === 0) {
 <div class="detail-empty">
@@ -187,12 +180,10 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
                     @if (t.type === 'transfer') {
                       <span class="detail-txn-sub">{{ transferLabel(t) }}</span>
                     } @else if (t.category_name) {
-<span class="cat-chip"
-                      [style.background]="hexWithAlpha(t.category_color, 0.12)"
-                      [style.color]="t.category_color || 'var(--text-muted)'">
+                    <span class="cat-chip" [style.--chip]="categoryColor(t.category_color)" [style.background]="categoryTint(t.category_color)">
                       {{ t.category_name }}
                     </span>
-}
+                    }
                   </div>
                   <div class="detail-txn-right">
                     <!-- Signed for this account: a transfer out is minus, one in is plus. -->
@@ -242,7 +233,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
 
       <!-- ── Add Account Modal ── -->
       @if (showAddModal()) {
-<jiro-modal title="Add Account" maxWidth="480px" (close)="closeAddModal()">
+<jiro-modal title="Add account" maxWidth="480px" (close)="closeAddModal()">
         <form class="modal-form" (ngSubmit)="submitAddAccount()">
           <div class="form-group">
             <label class="form-label" for="acct-add-name">Account name</label>
@@ -260,7 +251,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
             <select id="acct-add-type" class="form-input" [(ngModel)]="addForm.type" name="type" required>
               <option value="checking">Checking</option>
               <option value="savings">Savings</option>
-              <option value="credit">Credit Card</option>
+              <option value="credit">Credit card</option>
               <option value="investment">Investment</option>
               <option value="cash">Cash</option>
             </select>
@@ -287,7 +278,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
           <div class="form-actions">
             <jiro-button variant="secondary" type="button" (click)="closeAddModal()">Cancel</jiro-button>
             <jiro-button variant="primary" type="submit" [disabled]="addSaving() || !addForm.name.trim()">
-              {{ addSaving() ? 'Saving...' : 'Add Account' }}
+              {{ addSaving() ? 'Saving...' : 'Add account' }}
             </jiro-button>
           </div>
         </form>
@@ -296,7 +287,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
 
       <!-- ── Edit Account Modal ── -->
       @if (showEditModal()) {
-<jiro-modal title="Edit Account" maxWidth="480px" (close)="closeEditModal()">
+<jiro-modal title="Edit account" maxWidth="480px" (close)="closeEditModal()">
         <form class="modal-form" (ngSubmit)="submitEditAccount()">
           <div class="form-group">
             <label class="form-label" for="acct-edit-name">Account name</label>
@@ -314,7 +305,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
             <select id="acct-edit-type" class="form-input" [(ngModel)]="editForm.type" name="type">
               <option value="checking">Checking</option>
               <option value="savings">Savings</option>
-              <option value="credit">Credit Card</option>
+              <option value="credit">Credit card</option>
               <option value="investment">Investment</option>
               <option value="cash">Cash</option>
             </select>
@@ -342,7 +333,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
           <div class="form-actions">
             <jiro-button variant="secondary" type="button" (click)="closeEditModal()">Cancel</jiro-button>
             <jiro-button variant="primary" type="submit" [disabled]="editSaving() || !editForm.name.trim()">
-              {{ editSaving() ? 'Saving...' : 'Save Changes' }}
+              {{ editSaving() ? 'Saving...' : 'Save changes' }}
             </jiro-button>
           </div>
         </form>
@@ -375,7 +366,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
 
     /* ── Loading ── */
 
-    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
+    .sk-stack { display: flex; flex-direction: column; gap: var(--space-sm); }
 
     /* ── Accounts grid ── */
     .accounts-grid {
@@ -412,7 +403,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
     .acct-type-checking  { background: rgba(var(--color-accent-rgb), 0.12); color: var(--color-accent); }
     .acct-type-savings   { background: rgba(var(--color-accent-rgb), 0.20); color: var(--color-accent); }
     .acct-type-credit    { background: rgba(var(--color-danger-rgb), 0.12);  color: var(--color-danger); }
-    .acct-type-investment{ background: rgba(var(--color-primary-rgb), 0.12);  color: var(--color-primary); }
+    .acct-type-investment{ background: rgba(var(--color-primary-rgb), 0.12);  color: var(--color-primary-text); }
     .acct-type-cash      { background: rgba(var(--shadow-rgb), 0.12);  color: var(--text-secondary); }
 
     .acct-badges {
@@ -435,7 +426,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
       font-size: var(--font-size-xs);
       font-weight: 600;
       padding: 2px 8px;
-      border-radius: 10px;
+      border-radius: var(--border-radius-pill);
       background: rgba(var(--shadow-rgb), 0.15);
       color: var(--text-muted);
     }
@@ -507,7 +498,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
       cursor: pointer;
       border-radius: var(--border-radius-sm);
     }
-    .acct-disclosure:hover { color: var(--color-primary); }
+    .acct-disclosure:hover { color: var(--color-primary-text); }
 
     .acct-collapse {
       display: block;
@@ -522,7 +513,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
       font-size: var(--font-size-sm);
       cursor: pointer;
     }
-    .acct-collapse:hover { color: var(--color-primary); }
+    .acct-collapse:hover { color: var(--color-primary-text); }
 
 
     /* ── Detail panel ── */
@@ -544,11 +535,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
       letter-spacing: 0.5px;
     }
 
-    .detail-loading {
-      display: flex;
-      justify-content: center;
-      padding: var(--space-lg);
-    }
+    .detail-loading { padding: var(--space-sm) 0; }
 
     .detail-empty {
       text-align: center;
@@ -588,12 +575,23 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
       text-overflow: ellipsis;
     }
 
+    .cat-chip::before {
+      content: '';
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      margin-right: 5px;
+      border-radius: 50%;
+      background: var(--chip);
+    }
+
     .cat-chip {
       display: inline-block;
       font-size: var(--font-size-xs);
       font-weight: 600;
+      color: var(--text-primary);
       padding: 2px 8px;
-      border-radius: 10px;
+      border-radius: var(--border-radius-pill);
       width: max-content;
       max-width: 100%;
       overflow: hidden;
@@ -703,7 +701,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
     .toggle-btn {
       width: 44px;
       height: 24px;
-      border-radius: 12px;
+      border-radius: var(--border-radius-pill);
       background: var(--border-color);
       border: none;
       cursor: pointer;
@@ -765,7 +763,8 @@ export class AccountsPageComponent implements OnInit {
   readonly currency = this.settings.currency;
   readonly symbol = computed(() => currencySymbol(this.settings.currency()));
   readonly formatDate = formatDate;
-  readonly hexWithAlpha = hexWithAlpha;
+  readonly categoryColor = categoryColor;
+  readonly categoryTint = categoryTint;
 
   accounts = signal<LedgerAccount[]>([]);
   loading = signal(true);
@@ -968,7 +967,7 @@ export class AccountsPageComponent implements OnInit {
     const labels: Record<AccountType, string> = {
       checking: 'Checking',
       savings: 'Savings',
-      credit: 'Credit Card',
+      credit: 'Credit card',
       investment: 'Investment',
       cash: 'Cash',
     };

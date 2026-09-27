@@ -13,6 +13,7 @@ import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-he
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { JiroMenuComponent, JiroMenuItem } from '../../../shared/components/jiro-menu/jiro-menu';
+import { formatDay } from '../../../core/utils/format-date';
 
 const MUSCLE_GROUPS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs', 'Glutes', 'Core', 'Cardio'];
 
@@ -187,7 +188,7 @@ const ROW_ACTIONS: JiroMenuItem[] = [
     .mg-chip {
       min-height: 32px; padding: 4px 14px;
       border: 1px dashed var(--border-color);
-      border-radius: 2px;
+      border-radius: var(--border-radius-pill);
       background: var(--bg-surface);
       cursor: pointer;
       font-size: var(--font-size-sm); font-family: inherit;
@@ -254,7 +255,7 @@ const ROW_ACTIONS: JiroMenuItem[] = [
       font-size: var(--font-size-xs);
       font-weight: 600;
       padding: 3px 8px;
-      border-radius: 2px;
+      border-radius: var(--border-radius-pill);
       border: 1px solid var(--border-color);
       box-shadow: 1px 1px 0 var(--border-color);
       white-space: nowrap;
@@ -392,11 +393,7 @@ export class ExerciseLibraryComponent implements OnInit {
     if (days === 1) return 'yesterday';
     if (days < 14) return `${days} days ago`;
     if (days < 56) return `${Math.round(days / 7)} weeks ago`;
-    return d.toLocaleDateString(undefined, {
-      month: 'short', day: 'numeric',
-      year: d.getUTCFullYear() === now.getUTCFullYear() ? undefined : 'numeric',
-      timeZone: 'UTC',
-    });
+    return formatDay(iso);
   }
 
   hasFilters(): boolean {

@@ -17,14 +17,14 @@ interface GroceryGroup {
 /** Heading for items typed in by hand. */
 const MANUAL_GROUP = 'Added by hand';
 
-/**
- * The grocery list, saved to the account. Items are grouped under the
- * recipe they came from, in the order they were added.
- */
+/** The account's grocery list, grouped by source recipe in the order added. */
+import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
+
 @Component({
   selector: 'app-shopping-list',
   standalone: true,
-  imports: [FormsModule, RouterLink, JiroButtonComponent, JiroPageHeaderComponent],
+  imports: [JiroSkeletonComponent, JiroIconComponent, FormsModule, RouterLink, JiroButtonComponent, JiroPageHeaderComponent],
   template: `
     <div class="shopping-list">
       <jiro-page-header
@@ -57,18 +57,17 @@ const MANUAL_GROUP = 'Added by hand';
       </form>
 
       @if (!loaded()) {
-        <div class="state-loading" aria-busy="true"><div class="spinner"></div></div>
+        <div class="state-loading" role="status" aria-label="Loading grocery list">
+          <jiro-skeleton width="30%" height="20px" />
+          <jiro-skeleton [lines]="5" height="36px" />
+        </div>
       } @else if (items().length === 0) {
         <div class="empty-state">
           <div class="empty-icon" aria-hidden="true">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
-              <line x1="3" y1="6" x2="21" y2="6"/>
-              <path d="M16 10a4 4 0 0 1-8 0"/>
-            </svg>
+            <jiro-icon name="basket" [size]="48" />
           </div>
           <h2>Your grocery list is empty</h2>
-          <p class="text-secondary">Open a recipe and select "Add to grocery list", add your planned week from the Meal Planner, or type an item above.</p>
+          <p class="text-secondary">Open a recipe and select "Add to grocery list", add your planned week from the meal planner, or type an item above.</p>
           <a class="browse-link" routerLink="/culinara">Browse recipes</a>
         </div>
       }
@@ -91,7 +90,7 @@ const MANUAL_GROUP = 'Added by hand';
                   <span class="item-amount">{{ item.amount }}</span>
                 </label>
                 <button class="remove-item" type="button" (click)="removeItem(item)" title="Remove"
-                  [attr.aria-label]="'Remove ' + item.item + ' from the list'">×</button>
+                  [attr.aria-label]="'Remove ' + item.item + ' from the list'"><jiro-icon name="x" [size]="16" /></button>
               </li>
             }
           </ul>
@@ -158,7 +157,7 @@ const MANUAL_GROUP = 'Added by hand';
     .add-input--amount { flex: 0 0 110px; }
     .add-input:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
 
-    .state-loading { display: flex; justify-content: center; padding: var(--space-2xl); }
+    .state-loading { display: flex; flex-direction: column; gap: var(--space-sm); margin-top: var(--space-lg); }
 
     .empty-state {
       display: flex;
@@ -180,8 +179,7 @@ const MANUAL_GROUP = 'Added by hand';
 
     .empty-state p { max-width: 44ch; }
 
-    /* A link that looks like the primary button: it navigates, so it is an
-       <a>, and there is only one element to focus. */
+    /* A link styled as the primary button, since it navigates. */
     .browse-link {
       display: inline-flex;
       align-items: center;
@@ -295,12 +293,12 @@ const MANUAL_GROUP = 'Added by hand';
     }
 
     .shop-item--checked .item-name {
-      opacity: 0.55;
+      color: var(--text-muted);
       text-decoration: line-through;
     }
 
     .shop-item--checked .item-amount {
-      opacity: 0.55;
+      color: var(--text-muted);
     }
 
     .remove-item {
@@ -315,7 +313,7 @@ const MANUAL_GROUP = 'Added by hand';
       color: var(--text-muted);
       font-size: 18px;
       cursor: pointer;
-      border-radius: 4px;
+      border-radius: var(--border-radius-sm);
       transition: color 0.15s, background 0.15s;
     }
 
@@ -369,12 +367,7 @@ export class ShoppingListComponent implements OnInit {
     });
   }
 
-  /**
-   * Once per browser: a list saved here before the list moved to the
-   * account is uploaded when the account's list is empty, then removed from
-   * the browser. When the account already has a list, that list wins and the
-   * old browser copy is dropped. The look-only demo never touches it.
-   */
+  /** Once per browser: the old local list fills an empty account list, then is dropped either way (not on the demo). */
   private migrateLegacyOr(serverItems: GroceryItem[]) {
     const legacy = this.auth.isDemo() ? null : this.grocery.readLegacyList();
     if (!legacy) {

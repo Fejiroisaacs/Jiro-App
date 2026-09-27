@@ -10,7 +10,7 @@ import { JiroTabStripComponent, TabOption, tabFromRoute, writeTabToUrl } from '.
 type Tab = 'sessions' | 'bodyweight';
 const TABS: TabOption<Tab>[] = [
   { value: 'sessions', label: 'Sessions' },
-  { value: 'bodyweight', label: 'Body Weight' },
+  { value: 'bodyweight', label: 'Body weight' },
 ];
 
 @Component({

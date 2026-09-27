@@ -72,8 +72,7 @@ func TestAdvanceRecurrence(t *testing.T) {
 }
 
 func TestMonthlyNeverDrifts(t *testing.T) {
-	// Anchored on the 31st: the short months take their last day, and the
-	// long months get the 31st back.
+	// Anchored on the 31st: short months take their last day, long ones get the 31st back.
 	want := []string{"2026-01-31", "2026-02-28", "2026-03-31", "2026-04-30", "2026-05-31", "2026-06-30", "2026-07-31"}
 	d := day(want[0])
 	got := []string{d.Format(dayLayout)}
@@ -121,9 +120,7 @@ func TestDueOccurrencesCatchUp(t *testing.T) {
 	}
 }
 
-// Running the catch-up again with the next date it returned finds nothing:
-// the sequence is idempotent at the date level (the database adds the row
-// lock and the unique index on top).
+// A second catch-up from the returned next date finds nothing.
 func TestDueOccurrencesIdempotent(t *testing.T) {
 	today := day("2026-09-25")
 	first, next := dueOccurrences(day("2026-05-31"), today, "monthly", 31, maxCatchUpPerSeries)
@@ -294,40 +291,42 @@ func TestCheckCategoryMove(t *testing.T) {
 }
 
 func TestPickCategoryColor(t *testing.T) {
-	if got := pickCategoryColor(nil); got != categoryPalette[0] {
-		t.Errorf("first colour = %s, want %s", got, categoryPalette[0])
+	if got := pickCategoryColor(nil); got != "data-1" {
+		t.Errorf("first colour = %s, want data-1", got)
 	}
-	// The defaults use the whole palette but for one: the free one is picked,
-	// matched case-insensitively.
-	used := []string{}
-	for _, c := range categoryPalette {
-		if c != "#4DB6AC" {
-			used = append(used, c)
-		}
+	// The defaults leave data-2 free; it is picked, ignoring case, spaces and legacy hex values.
+	used := []string{"DATA-1", " data-3", "#E57373"}
+	for _, c := range categoryPalette[3:] {
+		used = append(used, c)
 	}
-	used[0] = "#8d6e63"
-	if got := pickCategoryColor(used); got != "#4DB6AC" {
-		t.Errorf("free colour = %s, want #4DB6AC", got)
+	if got := pickCategoryColor(used); got != "data-2" {
+		t.Errorf("free colour = %s, want data-2", got)
 	}
-	// All taken: the palette in turn, still a palette colour.
-	all := append([]string{}, categoryPalette...)
-	got := pickCategoryColor(all)
-	found := false
-	for _, c := range categoryPalette {
-		found = found || c == got
-	}
-	if !found {
-		t.Errorf("all taken gave %s, not a palette colour", got)
+	// All taken: the palette in turn, still a palette key.
+	got := pickCategoryColor(append([]string{}, categoryPalette...))
+	if _, err := normaliseColor(got); err != nil {
+		t.Errorf("all taken gave %s, not a palette key", got)
 	}
 }
 
 func TestNormaliseColor(t *testing.T) {
-	if got, err := normaliseColor(" #64b5f6 "); err != nil || got != "#64B5F6" {
-		t.Errorf("normaliseColor = %q, %v", got, err)
+	for in, want := range map[string]string{" data-5 ": "data-5", "DATA-12": "data-12", "data-1": "data-1"} {
+		if got, err := normaliseColor(in); err != nil || got != want {
+			t.Errorf("normaliseColor(%q) = %q, %v, want %q", in, got, err, want)
+		}
 	}
-	for _, bad := range []string{"", "red", "#fff", "64B5F6", "#64B5F6AA"} {
+	for _, bad := range []string{"", "red", "#64B5F6", "data-0", "data-13", "data-01", "data-", "var(--data-1)"} {
 		if _, err := normaliseColor(bad); !errors.Is(err, ErrLedgerInvalid) {
 			t.Errorf("normaliseColor(%q) = %v, want ErrLedgerInvalid", bad, err)
+		}
+	}
+}
+
+func TestDefaultCategoryColorsAreKeys(t *testing.T) {
+	ds := buildDemoDataset(time.Now())
+	for _, c := range ds.Categories {
+		if _, err := normaliseColor(c.Color); err != nil {
+			t.Errorf("demo category %s colour %q is not a palette key", c.Name, c.Color)
 		}
 	}
 }
