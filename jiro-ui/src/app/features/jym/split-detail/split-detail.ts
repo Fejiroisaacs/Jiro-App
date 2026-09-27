@@ -1,5 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -12,11 +11,13 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-series-modal';
+import { SettingsService } from '../../../core/services/settings.service';
+import { formatInstant } from '../../../core/utils/format-date';
 
 @Component({
   selector: 'app-split-detail',
   standalone: true,
-  imports: [DatePipe, FormsModule, DragDropModule, JiroButtonComponent, JiroModalComponent, JiroIconComponent, JiroSkeletonComponent, JymNewSeriesModalComponent],
+  imports: [FormsModule, DragDropModule, JiroButtonComponent, JiroModalComponent, JiroIconComponent, JiroSkeletonComponent, JymNewSeriesModalComponent],
   template: `
     @if (!split() && loading()) {
       <div class="split-detail" role="status" aria-label="Loading split">
@@ -122,7 +123,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
           </button>
         </div>
         @if (shareExpiresAt()) {
-          <span class="share-expiry">Expires {{ shareExpiresAt() | date: 'MMM d, y' }}</span>
+          <span class="share-expiry">Expires {{ expiryLabel() }}</span>
         }
         <button class="share-revoke-btn" (click)="revokeShare()">Revoke link</button>
       </div>
@@ -706,6 +707,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
 export class SplitDetailComponent implements OnInit {
   private readonly confirmService = inject(ConfirmService);
   private readonly toast = inject(ToastService);
+  private readonly settings = inject(SettingsService);
 
   split = signal<SplitWithRoutines | null>(null);
   routines = signal<(Routine & { items: RoutineItem[] })[]>([]);
@@ -733,6 +735,7 @@ export class SplitDetailComponent implements OnInit {
   shareId = signal('');
   shareUrl = signal('');
   shareExpiresAt = signal('');
+  expiryLabel = computed(() => this.shareExpiresAt() ? formatInstant(this.shareExpiresAt(), this.settings.timezone()) : '');
   sharing = signal(false);
   copied = signal(false);
 

@@ -12,6 +12,7 @@ import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-he
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
+import { formatInstant } from '../../../core/utils/format-date';
 
 Chart.register(...registerables);
 
@@ -1051,8 +1052,8 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
     return Array.from(weights).sort((a, b) => b - a);
   }
 
-  formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' });
+  formatDate(instant: string): string {
+    return formatInstant(instant, this.settingsService.timezone());
   }
 
   goBack() { this.router.navigate(['/jym/exercises']); }

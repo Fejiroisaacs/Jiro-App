@@ -10,6 +10,8 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
+import { SettingsService } from '../../../core/services/settings.service';
+import { formatInstant } from '../../../core/utils/format-date';
 
 @Component({
   selector: 'app-series-list',
@@ -328,6 +330,7 @@ export class SeriesListComponent implements OnInit {
 
   private readonly confirmService = inject(ConfirmService);
   private readonly toast = inject(ToastService);
+  private readonly settings = inject(SettingsService);
 
   constructor(private jymService: JymService, public router: Router) { }
 
@@ -402,7 +405,7 @@ export class SeriesListComponent implements OnInit {
     return Math.floor(days / 7);
   }
 
-  formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' });
+  formatDate(instant: string): string {
+    return formatInstant(instant, this.settings.timezone());
   }
 }

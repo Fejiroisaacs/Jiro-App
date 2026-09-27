@@ -16,6 +16,7 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
 import { dayKey, todayKey } from '../../../core/utils/day';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
+import { formatInstant } from '../../../core/utils/format-date';
 
 @Component({
   selector: 'app-session-history',
@@ -638,8 +639,8 @@ export class SessionHistoryComponent implements OnInit {
     return Array.from(map.values());
   }
 
-  formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  formatDate(instant: string): string {
+    return formatInstant(instant, this.settingsService.timezone(), { weekday: true });
   }
 
   formatDuration(start: string, end: string): string {

@@ -15,6 +15,7 @@ import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-he
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { suggestDeload } from '../deload-rule';
 import { muscleColor } from '../shared/muscle-colors';
+import { formatDay } from '../../../core/utils/format-date';
 
 /** Snooze stamp for the deload suggestion: the epoch ms of the last "Not now". */
 const DELOAD_SNOOZED_KEY = 'jiro_jym_deload_snoozed';
@@ -622,11 +623,10 @@ export class JymDashboardComponent implements OnInit {
     const days: { date: string; count: number; label: string; future: boolean }[] = [];
     for (let i = 0; i < 16 * 7; i++) {
       const key = addDays(start, i);
-      const [y, m, d] = key.split('-').map(Number);
       days.push({
         date: key,
         count: countByDay.get(key) || 0,
-        label: new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }),
+        label: formatDay(key, { weekday: true }),
         future: key > today,
       });
     }

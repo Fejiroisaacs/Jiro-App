@@ -13,6 +13,7 @@ import { chartTones } from '../../../shared/chart-theme';
 Chart.register(...registerables);
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
+import { formatInstant } from '../../../core/utils/format-date';
 
 @Component({
   selector: 'app-series-detail',
@@ -657,8 +658,8 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
     return '';
   }
 
-  formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' });
+  formatDate(instant: string): string {
+    return formatInstant(instant, this.settings.timezone());
   }
 
   goBack() { this.router.navigate(['/jym/series']); }

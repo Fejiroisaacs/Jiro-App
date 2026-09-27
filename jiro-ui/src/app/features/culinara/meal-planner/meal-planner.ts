@@ -9,7 +9,8 @@ import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-he
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { SettingsService } from '../../../core/services/settings.service';
-import { addDays, mondayOfKey, shortDayLabel, todayKey } from '../../../core/utils/day';
+import { addDays, mondayOfKey, todayKey } from '../../../core/utils/day';
+import { formatDay } from '../../../core/utils/format-date';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const SLOTS: { key: MealSlot; label: string }[] = [
@@ -423,7 +424,7 @@ export class MealPlannerComponent implements OnInit {
 
   weekLabel = computed(() => {
     const mon = this.currentMonday();
-    return `${shortDayLabel(mon)} to ${shortDayLabel(addDays(mon, 6))}, ${mon.slice(0, 4)}`;
+    return `${formatDay(mon)} to ${formatDay(addDays(mon, 6))}`;
   });
 
   dayHeaders = computed(() => {
@@ -431,7 +432,7 @@ export class MealPlannerComponent implements OnInit {
     const today = todayKey(this.settings.timezone());
     return DAYS.map((name, i) => {
       const key = addDays(mon, i);
-      return { name, date: shortDayLabel(key), isToday: key === today };
+      return { name, date: formatDay(key, { year: 'never' }), isToday: key === today };
     });
   });
 

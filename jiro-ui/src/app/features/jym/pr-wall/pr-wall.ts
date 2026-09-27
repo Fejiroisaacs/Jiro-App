@@ -7,6 +7,7 @@ import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-he
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
+import { formatInstant } from '../../../core/utils/format-date';
 
 @Component({
   selector: 'app-pr-wall',
@@ -226,9 +227,7 @@ export class PrWallComponent implements OnInit {
     });
   }
 
-  formatDate(dateStr: string): string {
-    return new Date(dateStr).toLocaleDateString('en-GB', {
-      day: '2-digit', month: 'short', year: 'numeric',
-    });
+  formatDate(instant: string): string {
+    return formatInstant(instant, this.settingsService.timezone());
   }
 }

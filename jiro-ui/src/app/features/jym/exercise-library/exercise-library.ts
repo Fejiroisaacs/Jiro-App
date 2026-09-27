@@ -13,6 +13,7 @@ import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-he
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { JiroMenuComponent, JiroMenuItem } from '../../../shared/components/jiro-menu/jiro-menu';
+import { formatDay } from '../../../core/utils/format-date';
 
 const MUSCLE_GROUPS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs', 'Glutes', 'Core', 'Cardio'];
 
@@ -392,11 +393,7 @@ export class ExerciseLibraryComponent implements OnInit {
     if (days === 1) return 'yesterday';
     if (days < 14) return `${days} days ago`;
     if (days < 56) return `${Math.round(days / 7)} weeks ago`;
-    return d.toLocaleDateString(undefined, {
-      month: 'short', day: 'numeric',
-      year: d.getUTCFullYear() === now.getUTCFullYear() ? undefined : 'numeric',
-      timeZone: 'UTC',
-    });
+    return formatDay(iso);
   }
 
   hasFilters(): boolean {

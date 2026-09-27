@@ -13,6 +13,8 @@ import { RecipeFormComponent } from '../recipe-form/recipe-form';
 
 type SortKey = 'newest' | 'trials' | 'rating' | 'az';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
+import { SettingsService } from '../../../core/services/settings.service';
+import { formatInstant } from '../../../core/utils/format-date';
 
 @Component({
   selector: 'app-recipe-list',
@@ -650,6 +652,7 @@ export class RecipeListComponent implements OnInit {
   collections = signal<Collection[]>([]);
   collectionsLoaded = signal(false);
   private readonly toast = inject(ToastService);
+  private readonly settings = inject(SettingsService);
   private readonly injector = inject(Injector);
   activeCollection = signal<string | null>(null);
   loading = signal(true);
@@ -814,6 +817,6 @@ export class RecipeListComponent implements OnInit {
     if (diffDays === 1) return 'yesterday';
     if (diffDays < 7) return `${diffDays} days ago`;
     if (diffDays < 30) return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) > 1 ? 's' : ''} ago`;
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return formatInstant(date, this.settings.timezone());
   }
 }
