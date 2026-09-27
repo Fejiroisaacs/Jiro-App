@@ -84,7 +84,17 @@ func (h *JymHandler) GetExercise(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid exercise ID"}})
 		return
 	}
-	ex, err := h.jymService.GetExerciseWithHistory(c.Request.Context(), userID, exerciseID)
+	// ?limit= trims the set list for callers that only need recent sets (the workout's suggestions).
+	var limit *int
+	if l := c.Query("limit"); l != "" {
+		n, perr := strconv.Atoi(l)
+		if perr != nil || n < 1 || n > 500 {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_LIMIT", Message: "limit must be 1 to 500"}})
+			return
+		}
+		limit = &n
+	}
+	ex, err := h.jymService.GetExerciseWithHistory(c.Request.Context(), userID, exerciseID, limit)
 	if err != nil {
 		if err == services.ErrExerciseNotFound {
 			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Exercise not found"}})

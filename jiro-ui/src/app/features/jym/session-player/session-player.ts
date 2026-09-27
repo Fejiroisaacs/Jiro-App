@@ -1770,7 +1770,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     this.blocks.update(bs => [...bs, newBlock]);
 
     // Fetch history to generate progressive overload suggestion
-    this.jymService.getExercise(ex.id).subscribe({
+    this.jymService.getExercise(ex.id, { limit: SUGGESTION_SETS }).subscribe({
       next: exWithHistory => {
         const { suggestion, ghostWeight, ghostReps } = this.computeSuggestion(exWithHistory.history);
         this.blocks.update(bs => bs.map(b => b.exerciseId === ex.id ? {
@@ -1857,7 +1857,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
 
   private loadSuggestionsForBlocks(blocks: ExerciseBlock[]) {
     for (const block of blocks) {
-      this.jymService.getExercise(block.exerciseId).subscribe({
+      this.jymService.getExercise(block.exerciseId, { limit: SUGGESTION_SETS }).subscribe({
         next: ex => {
           const { suggestion, ghostWeight, ghostReps } = this.computeSuggestion(ex.history);
           if (!suggestion) return;
@@ -1876,7 +1876,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   }
 
   private computeSuggestion(history: SetHistory[]): { suggestion: string | null; ghostWeight: string | null; ghostReps: string | null } {
-    const nonDeload = history.filter(h => h.session_type !== 'deload');
+    const nonDeload = history.filter(h => h.session_type !== 'deload' && !h.is_warmup);
     if (nonDeload.length === 0) return { suggestion: null, ghostWeight: null, ghostReps: null };
 
     // Get max weight per session, take the most recent
@@ -1901,6 +1901,9 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     };
   }
 }
+
+/** Recent sets fetched per exercise for the "last time" suggestion. */
+const SUGGESTION_SETS = 60;
 
 /** Sets (or, with no value, removes) one key of a Map held in a signal. */
 function setKey<T>(sig: WritableSignal<Map<string, T>>, key: string, value?: T) {

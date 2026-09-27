@@ -70,3 +70,37 @@ func TestListSessionsSinceKeepsUnfinishedOnes(t *testing.T) {
 		t.Fatalf("since window = %v; want the recent and the old unfinished session, not the old finished one", sessionIDs(got))
 	}
 }
+
+func TestExerciseHistoryHeaderCoversAllWorkingSets(t *testing.T) {
+	svc, userID := testJymDB(t)
+	ctx := context.Background()
+	ex := prTestSetup(t, svc, userID, "Test Pull")
+	sess := startSession(t, svc, userID, "")
+	warm := true
+	if _, err := svc.LogSet(ctx, userID, sess, &models.CreateSetRequest{
+		ExerciseID: ex, SetNumber: 1, Weight: 200, RepsPerformed: 1, IsWarmup: &warm,
+	}); err != nil {
+		t.Fatalf("log warm-up: %v", err)
+	}
+	logSet(t, svc, userID, sess, ex, 2, 100, 5)
+	logSet(t, svc, userID, sess, ex, 3, 90, 10)
+
+	limit := 1
+	got, err := svc.GetExerciseWithHistory(ctx, userID, ex, &limit)
+	if err != nil {
+		t.Fatalf("history: %v", err)
+	}
+	if got.BestWeight != 100 || got.Est1RM != 120 {
+		t.Fatalf("header best %v, e1RM %v; want 100 and 120 from working sets only", got.BestWeight, got.Est1RM)
+	}
+	if len(got.History) != 1 {
+		t.Fatalf("limit 1 returned %d sets", len(got.History))
+	}
+	all, err := svc.GetExerciseWithHistory(ctx, userID, ex, nil)
+	if err != nil {
+		t.Fatalf("full history: %v", err)
+	}
+	if len(all.History) != 3 || !all.History[0].IsWarmup || all.History[0].SetNumber != 1 {
+		t.Fatalf("full history = %+v; want 3 sets in set order, the warm-up flagged", all.History)
+	}
+}

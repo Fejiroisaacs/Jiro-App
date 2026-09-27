@@ -123,7 +123,9 @@ func (s *JymService) ListExercises(ctx context.Context, userID uuid.UUID, search
 	return exercises, nil
 }
 
-func (s *JymService) GetExerciseWithHistory(ctx context.Context, userID, exerciseID uuid.UUID) (*models.ExerciseWithHistory, error) {
+// GetExerciseWithHistory returns the exercise, its best working set over all history, and its sets newest first
+// (every set, or the latest `limit` when set).
+func (s *JymService) GetExerciseWithHistory(ctx context.Context, userID, exerciseID uuid.UUID, limit *int) (*models.ExerciseWithHistory, error) {
 	ex := &models.ExerciseWithHistory{}
 	err := s.db.QueryRow(ctx,
 		`SELECT id, user_id, name, muscle_group, notes, created_at, updated_at
@@ -137,15 +139,30 @@ func (s *JymService) GetExerciseWithHistory(ctx context.Context, userID, exercis
 		return nil, err
 	}
 
-	// Fetch last 100 sets for this exercise with session_type
+	// Header stats cover every working set, however many sets the list returns.
+	var best1RM float64
+	if err := s.db.QueryRow(ctx,
+		`SELECT COALESCE(MAX(ss.weight), 0),
+		        COALESCE(MAX(CASE WHEN ss.reps_performed = 1 THEN ss.weight
+		                          ELSE ss.weight * (1 + ss.reps_performed / 30.0) END), 0)
+		 FROM session_sets ss
+		 JOIN sessions s ON ss.session_id = s.id
+		 WHERE ss.exercise_id = $1 AND s.user_id = $2 AND NOT ss.is_warmup`,
+		exerciseID, userID,
+	).Scan(&ex.BestWeight, &best1RM); err != nil {
+		return nil, err
+	}
+	ex.Est1RM = math.Round(best1RM*10) / 10
+
 	rows, err := s.db.Query(ctx,
-		`SELECT ss.session_id, s.started_at, ss.weight, ss.reps_performed, ss.is_pr, s.session_type, ss.exercise_note
+		`SELECT ss.session_id, s.started_at, ss.set_number, ss.weight, ss.reps_performed, ss.rpe, ss.is_warmup,
+		        ss.is_pr, s.session_type, ss.exercise_note
 		 FROM session_sets ss
 		 JOIN sessions s ON ss.session_id = s.id
 		 WHERE ss.exercise_id = $1 AND s.user_id = $2
-		 ORDER BY s.started_at DESC
-		 LIMIT 100`,
-		exerciseID, userID,
+		 ORDER BY s.started_at DESC, ss.set_number ASC, ss.created_at ASC
+		 LIMIT $3`,
+		exerciseID, userID, limit,
 	)
 	if err != nil {
 		return nil, err
@@ -153,27 +170,16 @@ func (s *JymService) GetExerciseWithHistory(ctx context.Context, userID, exercis
 	defer rows.Close()
 
 	ex.History = []models.SetHistory{}
-	var bestWeight float64
 	for rows.Next() {
 		var h models.SetHistory
-		if err := rows.Scan(&h.SessionID, &h.Date, &h.Weight, &h.Reps, &h.IsPR, &h.SessionType, &h.ExerciseNote); err != nil {
+		if err := rows.Scan(&h.SessionID, &h.Date, &h.SetNumber, &h.Weight, &h.Reps, &h.RPE, &h.IsWarmup,
+			&h.IsPR, &h.SessionType, &h.ExerciseNote); err != nil {
 			return nil, err
 		}
 		h.Est1RM = epley1RM(h.Weight, h.Reps)
 		ex.History = append(ex.History, h)
-		if h.Weight > bestWeight {
-			bestWeight = h.Weight
-		}
 	}
-	ex.BestWeight = bestWeight
-	var maxEst1RM float64
-	for _, h := range ex.History {
-		if h.Est1RM > maxEst1RM {
-			maxEst1RM = h.Est1RM
-		}
-	}
-	ex.Est1RM = maxEst1RM
-	return ex, nil
+	return ex, rows.Err()
 }
 
 func (s *JymService) UpdateExercise(ctx context.Context, userID, exerciseID uuid.UUID, req *models.UpdateExerciseRequest) (*models.Exercise, error) {

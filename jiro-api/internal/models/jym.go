@@ -25,8 +25,11 @@ type Exercise struct {
 type SetHistory struct {
 	SessionID    uuid.UUID `json:"session_id"`
 	Date         time.Time `json:"date"`
+	SetNumber    int       `json:"set_number"`
 	Weight       float64   `json:"weight"`
 	Reps         int       `json:"reps"`
+	RPE          *int      `json:"rpe"`
+	IsWarmup     bool      `json:"is_warmup"`
 	Est1RM       float64   `json:"est_1rm"`
 	IsPR         bool      `json:"is_pr"`
 	SessionType  string    `json:"session_type"`

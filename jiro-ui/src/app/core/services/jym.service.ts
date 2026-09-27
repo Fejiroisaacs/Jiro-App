@@ -23,8 +23,11 @@ export interface Exercise {
 export interface SetHistory {
   session_id: string;
   date: string;
+  set_number: number;
   weight: number;
   reps: number;
+  rpe: number | null;
+  is_warmup: boolean;
   est_1rm: number;
   is_pr: boolean;
   session_type: string;
@@ -285,8 +288,10 @@ export class JymService {
     return this.http.get<Exercise[]>(`${API_URL}/exercises`, { params });
   }
 
-  getExercise(id: string): Observable<ExerciseWithHistory> {
-    return this.http.get<ExerciseWithHistory>(`${API_URL}/exercises/${id}`);
+  /** Every logged set by default; `limit` keeps only the latest ones. */
+  getExercise(id: string, opts: { limit?: number } = {}): Observable<ExerciseWithHistory> {
+    const params = opts.limit ? new HttpParams().set('limit', String(opts.limit)) : undefined;
+    return this.http.get<ExerciseWithHistory>(`${API_URL}/exercises/${id}`, { params });
   }
 
   createExercise(req: CreateExerciseRequest): Observable<Exercise> {
