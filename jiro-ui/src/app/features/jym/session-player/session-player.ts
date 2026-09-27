@@ -12,6 +12,7 @@ import {
 import { UploadService } from '../../../core/services/upload.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { todayKey } from '../../../core/utils/day';
+import { suggestNextWeight } from '../weight-suggestion';
 import { AuthService } from '../../../core/services/auth.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
@@ -1889,11 +1890,9 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     const last = sorted[0];
 
-    const increment = last.weight >= 50 ? 2.5 : 1.25;
-    const suggestKg = Math.round((last.weight + increment) * 4) / 4;
     const unit = this.settingsService.unitLabel();
     const lastDisp = +(this.settingsService.toDisplay(last.weight)).toFixed(2);
-    const suggestDisp = +(this.settingsService.toDisplay(suggestKg)).toFixed(2);
+    const suggestDisp = suggestNextWeight(lastDisp, unit);
 
     return {
       suggestion: `Last: ${lastDisp} ${unit} × ${last.reps}, try ${suggestDisp} ${unit}`,

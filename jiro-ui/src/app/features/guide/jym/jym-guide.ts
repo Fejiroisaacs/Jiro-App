@@ -90,7 +90,7 @@ import { GUIDE } from '../shared';
           <li>Use <strong>+ Add set</strong> for another set and <strong>+ Add exercise</strong> for another exercise. The x on a logged set removes it.</li>
         </guide-steps>
         <guide-shot guide="jym" name="session-sets" [width]="1400" [height]="1204"
-          alt="Bench Press during a workout: a note from last time, a warm-up set of 95 lbs, four logged sets of 175 lbs with the 6-rep set marked PR, and a sixth row suggesting 180.8 lbs and 5 reps." />
+          alt="Bench Press during a workout: a note from last time, a warm-up set of 95 lbs, four logged sets of 175 lbs with the 6-rep set marked PR, and a sixth row suggesting 180 lbs and 5 reps." />
         <guide-tip>A set is a PR when it is the heaviest weight you have logged for that exercise, or the same top weight for more reps. Warm-ups are left out on both sides: they never count as a PR and never raise the bar for one. Marking a PR set as a warm-up takes its badge away.</guide-tip>
       </guide-section>
 
