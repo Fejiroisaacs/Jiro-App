@@ -59,7 +59,7 @@ import { GUIDE } from '../shared';
         <guide-shot guide="journaly" name="week-view" [width]="1600" [height]="540"
           alt="The week of 21 Sep to 27 Sep with arrows either side and a Today link. Wednesday, Thursday and Friday each hold a note showing the start of the entry and its mood." />
         <guide-shot guide="journaly" name="day-popup" [width]="1200" [height]="764"
-          alt="The window for Wed 23 Sep: a See the whole day link, one entry marked Grateful at 7:35 PM with family and cooking tags and a Delete button, and a New entry button." />
+          alt="The window for one day: a See the whole day link, an entry with its mood, time, tags and a Delete button, and a New entry button." />
         <p>Below the calendar, <strong>Entries this week</strong> lists the same week's entries. Select one to open it.</p>
       </guide-section>
 
