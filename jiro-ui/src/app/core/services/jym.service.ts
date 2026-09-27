@@ -141,6 +141,8 @@ export interface SplitSeries {
 export interface SplitSeriesSummary extends SplitSeries {
   split_name: string;
   session_count: number;
+  /** The day to train next in an active series. */
+  next_routine: { id: string; name: string; day_order: number } | null;
 }
 
 export interface SeriesSessionPoint {

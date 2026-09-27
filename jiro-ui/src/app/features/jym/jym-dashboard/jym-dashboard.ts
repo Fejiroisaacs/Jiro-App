@@ -43,6 +43,53 @@ const DELOAD_SNOOZE_DAYS = 7;
         </jiro-empty-state>
       }
 
+      <!-- In Progress Sessions -->
+      @if (inProgressSessions().length > 0) {
+<div class="in-progress-section">
+        <h2 class="section-title">In progress</h2>
+        @for (s of inProgressSessions(); track s) {
+<div class="ipc" (click)="router.navigate(['/jym/session', s.id])">
+          <div class="ipc-info">
+            <div class="ipc-name">{{ s.routine_name || 'Freestyle session' }}</div>
+            <div class="ipc-meta">Started {{ formatSessionTime(s.started_at) }}
+              @if (s.set_count > 0) {
+<span> · {{ s.set_count }} sets logged</span>
+}
+            </div>
+          </div>
+          <div class="ipc-actions">
+            <jiro-button variant="primary" type="button" (click)="$event.stopPropagation(); router.navigate(['/jym/session', s.id])">
+              Resume
+            </jiro-button>
+            <button class="ipc-discard-btn" type="button" title="Discard session"
+              [attr.aria-label]="'Discard ' + (s.routine_name || 'freestyle session')"
+              (click)="$event.stopPropagation(); discardSession(s)">
+              <jiro-icon name="trash" [size]="15" />
+            </button>
+          </div>
+        </div>
+}
+      </div>
+}
+
+      <!-- Up next: the next day of the most recently started active series -->
+      @if (inProgressSessions().length === 0 && upNext(); as next) {
+        <section class="up-next" aria-labelledby="up-next-heading">
+          <div class="up-next-info">
+            <h2 class="section-title up-next-label" id="up-next-heading">Up next</h2>
+            <div class="up-next-name">{{ next.next_routine!.name }}</div>
+            <div class="up-next-series">{{ next.name }}</div>
+          </div>
+          <div class="up-next-actions">
+            <jiro-button variant="secondary" type="button" (click)="startFromSeriesSplit(next.split_id, next.id)">Other day</jiro-button>
+            <jiro-button variant="primary" type="button" [loading]="launcher.starting()" (click)="startNext(next)">
+              <jiro-icon name="play:fill" [size]="11" />
+              Start
+            </jiro-button>
+          </div>
+        </section>
+      }
+
       <!-- Deload suggestion -->
       @if (deloadSuggestion(); as d) {
         <section class="deload-card" aria-labelledby="deload-heading">
@@ -133,35 +180,6 @@ const DELOAD_SNOOZE_DAYS = 7;
       </div>
 }
 
-      <!-- In Progress Sessions -->
-      @if (inProgressSessions().length > 0) {
-<div class="in-progress-section">
-        <h2 class="section-title">In progress</h2>
-        @for (s of inProgressSessions(); track s) {
-<div class="ipc" (click)="router.navigate(['/jym/session', s.id])">
-          <div class="ipc-info">
-            <div class="ipc-name">{{ s.routine_name || 'Freestyle session' }}</div>
-            <div class="ipc-meta">Started {{ formatSessionTime(s.started_at) }}
-              @if (s.set_count > 0) {
-<span> · {{ s.set_count }} sets logged</span>
-}
-            </div>
-          </div>
-          <div class="ipc-actions">
-            <jiro-button variant="primary" type="button" (click)="$event.stopPropagation(); router.navigate(['/jym/session', s.id])">
-              Resume
-            </jiro-button>
-            <button class="ipc-discard-btn" type="button" title="Discard session"
-              [attr.aria-label]="'Discard ' + (s.routine_name || 'freestyle session')"
-              (click)="$event.stopPropagation(); discardSession(s)">
-              <jiro-icon name="trash" [size]="15" />
-            </button>
-          </div>
-        </div>
-}
-      </div>
-}
-
       <!-- Active Series -->
       @if (activeSeries().length > 0) {
 <div class="active-series-section">
@@ -172,6 +190,9 @@ const DELOAD_SNOOZE_DAYS = 7;
             <div class="asc-info">
               <div class="asc-split-label">{{ sr.split_name }}</div>
               <div class="asc-name">{{ sr.name }}</div>
+              @if (sr.next_routine) {
+                <div class="asc-next">Next: {{ sr.next_routine.name }}</div>
+              }
               <div class="asc-pills">
                 @if (!(sr.duration_type === 'sessions' && sr.target_sessions)) {
 <span class="asc-pill">{{ sr.session_count }} sessions</span>
@@ -190,7 +211,7 @@ const DELOAD_SNOOZE_DAYS = 7;
             </div>
             <div class="asc-actions">
               <button class="asc-view-btn" (click)="router.navigate(['/jym/series', sr.id])">View</button>
-              <jiro-button variant="primary" type="button" (click)="startFromSeriesSplit(sr.split_id, sr.id)">
+              <jiro-button variant="primary" type="button" (click)="sr.next_routine ? startNext(sr) : startFromSeriesSplit(sr.split_id, sr.id)">
                 <jiro-icon name="play:fill" [size]="11" />
                 Start
               </jiro-button>
@@ -383,6 +404,26 @@ const DELOAD_SNOOZE_DAYS = 7;
     }
 
     .active-series-list { display: flex; flex-direction: column; gap: var(--space-sm); }
+
+    .up-next {
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+      gap: var(--space-md); margin-bottom: var(--space-xl);
+      padding: var(--space-md) var(--space-lg);
+      background: var(--bg-surface); border: 1px solid var(--border-color);
+      border-left: 3px solid var(--color-primary);
+      border-radius: var(--border-radius);
+    }
+    .up-next-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .up-next-label { margin-bottom: 2px; }
+    .up-next-name { font-size: var(--font-size-lg); font-weight: 600; color: var(--text-primary); }
+    .up-next-series { font-size: var(--font-size-sm); color: var(--text-secondary); }
+    .up-next-actions { display: flex; gap: var(--space-sm); flex-shrink: 0; }
+    @media (max-width: 480px) {
+      .up-next-actions { width: 100%; }
+      .up-next-actions jiro-button { flex: 1; --jiro-btn-width: 100%; }
+    }
+
+    .asc-next { font-size: var(--font-size-sm); color: var(--text-secondary); }
 
     .asc {
       display: flex; align-items: center; justify-content: space-between;
@@ -622,6 +663,9 @@ export class JymDashboardComponent implements OnInit {
     this.deloadSnoozed() ? null : suggestDeload(this.allSessions())
   );
 
+  /** The most recently started active series that knows its next day. */
+  readonly upNext = computed(() => this.activeSeries().find(sr => !!sr.next_routine) ?? null);
+
   heatmapDays = computed(() => {
     const sessions = this.allSessions();
     // Days are the user's calendar days (settings zone), like the day view.
@@ -799,6 +843,11 @@ export class JymDashboardComponent implements OnInit {
       routine_id: routineId,
       ...(this.selectedSeriesId ? { series_id: this.selectedSeriesId } : {}),
     });
+  }
+
+  /** One tap into a series' next day. */
+  startNext(sr: SplitSeriesSummary) {
+    if (sr.next_routine) this.launcher.start({ routine_id: sr.next_routine.id, series_id: sr.id });
   }
 
   startFreeWithSplit() {
