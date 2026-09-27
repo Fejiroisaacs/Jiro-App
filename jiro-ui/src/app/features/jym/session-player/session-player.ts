@@ -13,7 +13,7 @@ import {
 import { UploadService } from '../../../core/services/upload.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { todayKey } from '../../../core/utils/day';
-import { suggestNextWeight } from '../weight-suggestion';
+import { nextSets } from '../weight-suggestion';
 import { AuthService } from '../../../core/services/auth.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
@@ -56,6 +56,8 @@ interface ExerciseBlock {
   ghostSets: { weight: number; reps: number }[];
   suggestion: string | null;
   exerciseNote: string;
+  /** The routine's target for this exercise, when the workout follows one. */
+  plan?: { sets: number; reps: number };
 }
 
 @Component({
@@ -200,6 +202,9 @@ interface ExerciseBlock {
               @if (block.muscleGroup) {
 <span class="mg-tag">{{ block.muscleGroup }}</span>
 }
+              @if (block.plan) {
+                <span class="plan-tag">Plan {{ block.plan.sets }} × {{ block.plan.reps }}</span>
+              }
               @if (isCollapsed(bi) && savedCount(bi) > 0) {
 <span class="sets-done-tag">{{ savedCount(bi) }} sets</span>
 }
@@ -224,7 +229,7 @@ interface ExerciseBlock {
           <div [id]="'block-body-' + bi">
           @if (!isCollapsed(bi)) {
 
-            <!-- Progressive overload suggestion -->
+            <!-- Last time, and what to aim for today -->
             @if (block.suggestion && !allSaved(bi)) {
 <div class="overload-hint">
               <jiro-icon name="trend-up" [size]="12" />
@@ -257,7 +262,7 @@ interface ExerciseBlock {
             <!-- Set rows -->
             @for (row of block.sets; track row; let si = $index) {
 
-              <div class="set-row" [class.set-done]="row.saved" [class.set-warmup]="row.isWarmup">
+              <div class="set-row" [class.set-done]="row.saved" [class.set-warmup]="row.isWarmup" [class.set-short]="isShort(block, row)">
                 <span class="set-num-cell">{{ row.setNumber }}</span>
 
                 <input
@@ -273,14 +278,14 @@ interface ExerciseBlock {
                   [disabled]="row.saved" />
 
                 <input
-                  class="set-input"
+                  class="set-input reps-input"
                   type="number"
                   min="1"
                   [(ngModel)]="row.reps"
                   (ngModelChange)="saveDraftSoon()"
                   [placeholder]="row.ghostReps || '0'"
                   [class.has-ghost]="row.ghostReps && !row.reps"
-                  [attr.aria-label]="'Set ' + row.setNumber + ' reps'"
+                  [attr.aria-label]="'Set ' + row.setNumber + ' reps' + (isShort(block, row) ? ', below plan' : '')"
                   [disabled]="row.saved" />
 
                 <input
@@ -754,7 +759,9 @@ interface ExerciseBlock {
     }
     .block-toggle:focus-visible { outline: none; } /* drawn on the whole header above */
 
-    .block-title { display: flex; align-items: center; gap: var(--space-sm); flex: 1; min-width: 0; }
+    .block-title { display: flex; flex-wrap: wrap; align-items: center; gap: 2px var(--space-sm); flex: 1; min-width: 0; }
+
+    .plan-tag { font-size: var(--font-size-xs); color: var(--text-secondary); font-weight: 500; white-space: nowrap; }
 
     .block-title h2 { font-size: var(--font-size-md); font-weight: 600; }
 
@@ -829,6 +836,9 @@ interface ExerciseBlock {
     .set-row.set-done { background: rgba(var(--color-primary-rgb), 0.04); }
 
     .set-row.set-warmup { background: rgba(var(--color-warning-rgb), 0.08); }
+
+    /* A logged working set below the plan's reps */
+    .set-row.set-short .reps-input { color: var(--color-warning); font-weight: 600; opacity: 1; }
 
     .warmup-btn {
       width: 40px; height: 40px; border-radius: var(--border-radius-sm);
@@ -1164,6 +1174,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
 
   // Plan exercises (routine targets), and those removed from the plan on this device.
   private targetIds = new Set<string>();
+  private targetById = new Map<string, RoutineItem>();
   private removedTargets = new Set<string>();
   private draftReady = false;
   private closed = false;
@@ -1815,7 +1826,9 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     if (existing) return;
 
     this.removedTargets.delete(ex.id);
-    const newBlock = this.emptyBlock(ex.id, ex.name, ex.muscle_group, [this.newRow(1)]);
+    // A plan exercise added back comes back with its plan.
+    const target = this.targetById.get(ex.id);
+    const newBlock = target ? this.blockFromTarget(target) : this.emptyBlock(ex.id, ex.name, ex.muscle_group, [this.newRow(1)]);
     this.blocks.update(bs => [...bs, newBlock]);
 
     this.loadSuggestionsForBlocks([newBlock]);
@@ -1845,9 +1858,10 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     const logged = this.buildBlocksFromSets(sets);
     const loggedIds = new Set(logged.map(b => b.exerciseId));
     // A plan exercise logged part-way keeps its remaining planned rows.
-    const targetById = new Map(targets.map(t => [t.exercise_id, t]));
+    this.targetById = new Map(targets.map(t => [t.exercise_id, t]));
     for (const b of logged) {
-      const t = targetById.get(b.exerciseId);
+      const t = this.targetById.get(b.exerciseId);
+      if (t) b.plan = { sets: t.target_sets, reps: t.target_reps };
       const last = b.sets[b.sets.length - 1];
       for (let n = b.sets.length + 1; t && n <= t.target_sets; n++) {
         b.sets.push(this.newRow(n, { ghostWeight: last?.weight ?? '', ghostReps: String(t.target_reps) }));
@@ -1855,8 +1869,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     }
     const planned = targets
       .filter(t => !loggedIds.has(t.exercise_id) && !this.removedTargets.has(t.exercise_id))
-      .map(t => this.emptyBlock(t.exercise_id, t.exercise_name, t.muscle_group,
-        Array.from({ length: t.target_sets }, (_, i) => this.newRow(i + 1, { ghostReps: String(t.target_reps) }))));
+      .map(t => this.blockFromTarget(t));
     const added = draft.added
       .filter(a => !loggedIds.has(a.exerciseId) && !this.targetIds.has(a.exerciseId))
       .map(a => this.emptyBlock(a.exerciseId, a.exerciseName, a.muscleGroup, [this.newRow(1)]));
@@ -1872,7 +1885,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
       }
       b.sets.sort((x, y) => x.setNumber - y.setNumber);
     }
-    this.loadSuggestionsForBlocks([...planned, ...added]);
+    this.loadSuggestionsForBlocks(blocks);
     return blocks;
   }
 
@@ -1882,6 +1895,15 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
       saved: false, isPR: false, saving: false, id: null,
       ghostWeight: '', ghostReps: '', isWarmup: false,
       ...init,
+    };
+  }
+
+  /** An unlogged plan exercise: its planned rows, with the planned reps as ghosts. */
+  private blockFromTarget(t: RoutineItem): ExerciseBlock {
+    return {
+      ...this.emptyBlock(t.exercise_id, t.exercise_name, t.muscle_group,
+        Array.from({ length: t.target_sets }, (_, i) => this.newRow(i + 1, { ghostReps: String(t.target_reps) }))),
+      plan: { sets: t.target_sets, reps: t.target_reps },
     };
   }
 
@@ -2046,21 +2068,66 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     }
   }
 
-  /** Last time's top set and the next weight to try, as ghosts on the exercise's unlogged rows. */
+  /**
+   * Last time and today's aim as the block's hint line. Before the first set of the
+   * day the aim is also the ghost on every row; after it, rows keep what was just lifted.
+   */
   private applySuggestion(exerciseId: string) {
     const history = this.historyByExercise.get(exerciseId);
-    if (!history) return;
-    const { suggestion, ghostWeight, ghostReps } = this.computeSuggestion(history);
-    if (!suggestion) return;
+    const block = this.blocks().find(b => b.exerciseId === exerciseId);
+    if (!history || !block) return;
+    const next = this.suggestionFor(block, history);
+    if (!next) return;
+    const setGhosts = !block.sets.some(s => s.saved);
     this.blocks.update(bs => bs.map(b => b.exerciseId === exerciseId ? {
       ...b,
-      suggestion,
-      sets: b.sets.map(s => !s.saved ? {
-        ...s,
-        ghostWeight: ghostWeight ?? s.ghostWeight,
-        ghostReps: ghostReps ?? s.ghostReps,
-      } : s),
+      suggestion: next.text,
+      sets: setGhosts ? b.sets.map(s => !s.saved ? { ...s, ghostWeight: next.ghostWeight, ghostReps: next.ghostReps } : s) : b.sets,
     } : b));
+  }
+
+  /** The hint line ("Last time ... Stay at ...") and the ghost values, from nextSets(). */
+  private suggestionFor(block: ExerciseBlock, history: SetHistory[]): { text: string; ghostWeight: string; ghostReps: string } | null {
+    const unit = this.settingsService.unitLabel();
+    const next = nextSets(history, {
+      excludeSessionId: this.sessionId,
+      plan: block.plan ?? null,
+      unit,
+      toDisplay: kg => this.settingsService.toDisplay(kg),
+    });
+    if (!next) return null;
+
+    const w = (x: number) => `${+x.toFixed(2)} ${unit}`;
+    const working = next.last.filter(s => !s.warmup);
+    const oneWeight = working.every(s => s.weight === working[0].weight);
+    const last = working[0].weight === 0 && oneWeight
+      ? `${working.map(s => s.reps).join(', ')} reps`
+      : oneWeight
+        ? `${w(working[0].weight)} × ${working.map(s => s.reps).join(', ')}`
+        : working.map(s => `${w(s.weight)} × ${s.reps}`).join(', ');
+
+    let advice: string;
+    if (next.move === 'reps') {
+      advice = `Aim for ${next.reps} reps.`;
+    } else if (next.move === 'up') {
+      advice = block.plan
+        ? `Hit ${block.plan.sets} × ${block.plan.reps}, try ${w(next.weight)}.`
+        : `Try ${w(next.weight)} × ${next.reps}.`;
+    } else {
+      advice = next.reason === 'plan'
+        ? `Stay at ${w(next.weight)} until every set hits ${next.reps}.`
+        : `That was RPE 9 or more, so stay at ${w(next.weight)} and aim for ${next.reps}.`;
+    }
+    return {
+      text: `Last time ${last}. ${advice}`,
+      ghostWeight: String(+next.weight.toFixed(2)),
+      ghostReps: String(next.reps),
+    };
+  }
+
+  /** A logged working set below the plan's reps. */
+  isShort(block: ExerciseBlock, row: SetRow): boolean {
+    return !!block.plan && row.saved && !row.isWarmup && +row.reps < block.plan.reps;
   }
 
   private convertText(value: string, from: string, to: string): string {
@@ -2080,32 +2147,6 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     })));
     if (this.bwValue) this.bwValue = this.settingsService.convertWeight(this.bwValue, from, to);
     for (const b of this.blocks()) this.applySuggestion(b.exerciseId);
-  }
-
-  private computeSuggestion(history: SetHistory[]): { suggestion: string | null; ghostWeight: string | null; ghostReps: string | null } {
-    const nonDeload = history.filter(h => h.session_type !== 'deload' && !h.is_warmup);
-    if (nonDeload.length === 0) return { suggestion: null, ghostWeight: null, ghostReps: null };
-
-    // Get max weight per session, take the most recent
-    const bySession = new Map<string, SetHistory>();
-    for (const h of nonDeload) {
-      if (!bySession.has(h.session_id) || h.weight > bySession.get(h.session_id)!.weight) {
-        bySession.set(h.session_id, h);
-      }
-    }
-    const sorted = Array.from(bySession.values())
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    const last = sorted[0];
-
-    const unit = this.settingsService.unitLabel();
-    const lastDisp = +(this.settingsService.toDisplay(last.weight)).toFixed(2);
-    const suggestDisp = suggestNextWeight(lastDisp, unit);
-
-    return {
-      suggestion: `Last: ${lastDisp} ${unit} × ${last.reps}, try ${suggestDisp} ${unit}`,
-      ghostWeight: String(suggestDisp),
-      ghostReps: String(last.reps),
-    };
   }
 }
 

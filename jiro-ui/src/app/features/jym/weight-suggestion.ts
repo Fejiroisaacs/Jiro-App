@@ -7,11 +7,6 @@ export function nextPlateWeight(top: number, unit: string): number {
   return Math.round((Math.floor(top / step + 1e-9) + 1) * step * 100) / 100;
 }
 
-/** @deprecated Use nextPlateWeight; kept until the player moves to nextSets. */
-export function suggestNextWeight(lastTop: number, unit: string): number {
-  return nextPlateWeight(lastTop, unit);
-}
-
 /** The fields of a logged set the suggestion reads; SetHistory is assignable to this. */
 export interface PastSet {
   session_id: string;
