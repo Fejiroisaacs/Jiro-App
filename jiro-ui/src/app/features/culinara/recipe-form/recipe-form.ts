@@ -560,7 +560,9 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
     }
 
     @media (max-width: 480px) {
-      .macro-grid { grid-template-columns: repeat(2, 1fr); }
+      .macro-grid { display: grid; grid-template-columns: repeat(2, 1fr); }
+      .macro-field, .macro-field:last-child { border-right: none; padding-right: 0; }
+      .ingredient-row { grid-template-columns: 1fr 96px 32px; }
     }
   `]
 })
