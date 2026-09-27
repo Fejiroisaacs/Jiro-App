@@ -111,7 +111,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 
     .tag-chip {
       font-size: 11px; font-weight: 500;
-      padding: 2px 8px; border-radius: 10px;
+      padding: 2px 8px; border-radius: var(--border-radius-pill);
       background: rgba(var(--color-primary-rgb), 0.08); color: var(--color-primary);
       border: 1px solid rgba(var(--color-primary-rgb), 0.18);
     }
@@ -146,9 +146,9 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     }
 
     .day-chip {
-      background: rgba(var(--color-primary-rgb), 0.12); color: color-mix(in srgb, var(--color-primary) 75%, var(--text-primary));
+      background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary-text);
       font-size: var(--font-size-xs); font-weight: 600;
-      padding: 2px 8px; border-radius: 10px; white-space: nowrap;
+      padding: 2px 8px; border-radius: var(--border-radius-pill); white-space: nowrap;
     }
 
     .routine-name { font-weight: 600; font-size: var(--font-size-sm); }
@@ -158,7 +158,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .exercise-row {
       display: flex; align-items: center; justify-content: space-between;
       padding: var(--space-xs) var(--space-sm);
-      border-radius: 4px; transition: background 0.1s;
+      border-radius: var(--border-radius-sm); transition: background 0.1s;
     }
 
     .exercise-row:hover { background: var(--bg-canvas); }
@@ -171,8 +171,8 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 
     .ex-sets {
       font-size: var(--font-size-xs); font-weight: 600;
-      color: color-mix(in srgb, var(--color-primary) 75%, var(--text-primary)); background: rgba(var(--color-primary-rgb), 0.1);
-      padding: 2px 8px; border-radius: 8px; white-space: nowrap;
+      color: var(--color-primary-text); background: rgba(var(--color-primary-rgb), 0.1);
+      padding: 2px 8px; border-radius: var(--border-radius-pill); white-space: nowrap;
     }
 
     .no-exercises {

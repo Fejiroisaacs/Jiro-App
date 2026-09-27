@@ -16,6 +16,7 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
 import { dayKey, todayKey } from '../../../core/utils/day';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
+import { formatInstant } from '../../../core/utils/format-date';
 
 @Component({
   selector: 'app-session-history',
@@ -172,7 +173,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
               @if (detail()!.attachments.length > 0) {
 <div class="attachments-panel" (click)="$event.stopPropagation()">
                 <div class="attachments-header">
-                  <span class="section-label">Form Check / Photos</span>
+                  <span class="section-label">Form check / photos</span>
                 </div>
 
                 <div class="attachments-grid">
@@ -317,14 +318,14 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 
     .session-routine {
       font-size: var(--font-size-sm); color: var(--text-primary);
-      background: var(--color-secondary); padding: 2px 10px; border-radius: 10px;
+      background: var(--color-secondary); padding: 2px 10px; border-radius: var(--border-radius-pill);
     }
 
     .session-routine.freestyle { color: var(--text-muted); font-style: italic; background: none; }
 
     .type-badge {
       font-size: var(--font-size-xs); font-weight: 600;
-      padding: 2px 8px; border-radius: 10px;
+      padding: 2px 8px; border-radius: var(--border-radius-pill);
     }
 
     .type-badge.deload { background: rgba(var(--color-danger-rgb), 0.1); color: var(--color-danger); }
@@ -337,7 +338,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 
     .delete-session-btn {
       background: none; border: none; cursor: pointer;
-      color: var(--text-muted); padding: 6px; border-radius: 4px;
+      color: var(--text-muted); padding: 6px; border-radius: var(--border-radius-sm);
       display: flex; align-items: center; transition: all 0.15s;
       flex-shrink: 0;
     }
@@ -346,8 +347,8 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 
     .stat-pill {
       font-size: var(--font-size-xs); padding: 3px 10px;
-      background: rgba(var(--color-primary-rgb), 0.1); color: color-mix(in srgb, var(--color-primary) 75%, var(--text-primary));
-      border-radius: 10px; font-weight: 500;
+      background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary-text);
+      border-radius: var(--border-radius-pill); font-weight: 500;
     }
 
     .vol-pill { background: var(--bg-canvas); color: var(--text-secondary); border: 1px solid var(--border-color); }
@@ -475,7 +476,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .attachment-delete-btn {
       flex-shrink: 0; width: 20px; height: 20px;
       display: flex; align-items: center; justify-content: center;
-      background: none; border: none; border-radius: 4px;
+      background: none; border: none; border-radius: var(--border-radius-sm);
       color: var(--text-muted); cursor: pointer; padding: 0;
       transition: background 0.15s, color 0.15s;
     }
@@ -638,8 +639,8 @@ export class SessionHistoryComponent implements OnInit {
     return Array.from(map.values());
   }
 
-  formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+  formatDate(instant: string): string {
+    return formatInstant(instant, this.settingsService.timezone(), { weekday: true });
   }
 
   formatDuration(start: string, end: string): string {

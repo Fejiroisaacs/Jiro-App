@@ -13,6 +13,8 @@ import { RecipeFormComponent } from '../recipe-form/recipe-form';
 
 type SortKey = 'newest' | 'trials' | 'rating' | 'az';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
+import { SettingsService } from '../../../core/services/settings.service';
+import { formatInstant } from '../../../core/utils/format-date';
 
 @Component({
   selector: 'app-recipe-list',
@@ -309,7 +311,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .sort-pill {
       padding: 6px 14px;
       border: 1px solid var(--border-color);
-      border-radius: 20px;
+      border-radius: var(--border-radius-pill);
       background: var(--bg-surface);
       color: var(--text-secondary);
       font-size: var(--font-size-xs);
@@ -341,7 +343,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .tag-chip {
       padding: 4px 12px;
       border: 1px solid var(--border-color);
-      border-radius: 20px;
+      border-radius: var(--border-radius-pill);
       background: var(--bg-surface);
       color: var(--text-secondary);
       font-size: var(--font-size-xs);
@@ -450,8 +452,8 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
       font-size: var(--font-size-xs);
       padding: 2px 8px;
       background: rgba(var(--color-primary-rgb), 0.08);
-      color: color-mix(in srgb, var(--color-primary) 75%, var(--text-primary));
-      border-radius: 10px;
+      color: var(--color-primary-text);
+      border-radius: var(--border-radius-pill);
       font-weight: 500;
     }
 
@@ -540,7 +542,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .collection-chip {
       padding: 4px 12px;
       border: 1px solid var(--border-color);
-      border-radius: 20px;
+      border-radius: var(--border-radius-pill);
       background: var(--bg-surface);
       color: var(--text-secondary);
       font-size: var(--font-size-xs);
@@ -596,7 +598,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .new-collection-input {
       padding: 4px 10px;
       border: 1px solid var(--color-primary);
-      border-radius: 20px;
+      border-radius: var(--border-radius-pill);
       background: var(--bg-surface);
       color: var(--text-primary);
       font-size: var(--font-size-xs);
@@ -650,6 +652,7 @@ export class RecipeListComponent implements OnInit {
   collections = signal<Collection[]>([]);
   collectionsLoaded = signal(false);
   private readonly toast = inject(ToastService);
+  private readonly settings = inject(SettingsService);
   private readonly injector = inject(Injector);
   activeCollection = signal<string | null>(null);
   loading = signal(true);
@@ -664,8 +667,8 @@ export class RecipeListComponent implements OnInit {
 
   sortOptions: { key: SortKey; label: string }[] = [
     { key: 'newest', label: 'Newest' },
-    { key: 'trials', label: 'Most Trials' },
-    { key: 'rating', label: 'Highest Rated' },
+    { key: 'trials', label: 'Most trials' },
+    { key: 'rating', label: 'Highest rated' },
     { key: 'az', label: 'A-Z' },
   ];
 
@@ -814,6 +817,6 @@ export class RecipeListComponent implements OnInit {
     if (diffDays === 1) return 'yesterday';
     if (diffDays < 7) return `${diffDays} days ago`;
     if (diffDays < 30) return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) > 1 ? 's' : ''} ago`;
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return formatInstant(date, this.settings.timezone());
   }
 }

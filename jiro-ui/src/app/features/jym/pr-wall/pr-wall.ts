@@ -7,6 +7,7 @@ import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-he
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
+import { formatInstant } from '../../../core/utils/format-date';
 
 @Component({
   selector: 'app-pr-wall',
@@ -15,7 +16,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
   template: `
     <div class="pr-wall">
       @if (!embedded()) {
-        <jiro-page-header heading="PR Wall" subtitle="Your best lifts, all in one place" />
+        <jiro-page-header heading="PR wall" subtitle="Your best lifts, all in one place" />
       }
 
       <!-- Loading -->
@@ -42,7 +43,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
           </div>
           <div class="summary-item">
             <span class="summary-num">{{ muscleGroupCount() }}</span>
-            <span class="summary-label">Muscle Groups</span>
+            <span class="summary-label">Muscle groups</span>
           </div>
           <div class="summary-item">
             <span class="summary-num">{{ topEst1RM() | number:'1.1-1' }}</span>
@@ -61,7 +62,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
           <div class="pr-table">
             <div class="pr-header-row">
               <span class="col-exercise">Exercise</span>
-              <span class="col-lift">Best Lift</span>
+              <span class="col-lift">Best lift</span>
               <span class="col-1rm">Est. 1RM</span>
               <span class="col-date">Date</span>
             </div>
@@ -122,7 +123,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .mg-label { font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); }
 
     .mg-count {
-      font-size: var(--font-size-xs); padding: 1px 7px; border-radius: 10px;
+      font-size: var(--font-size-xs); padding: 1px 7px; border-radius: var(--border-radius-pill);
       background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary); font-weight: 500;
     }
 
@@ -226,9 +227,7 @@ export class PrWallComponent implements OnInit {
     });
   }
 
-  formatDate(dateStr: string): string {
-    return new Date(dateStr).toLocaleDateString('en-GB', {
-      day: '2-digit', month: 'short', year: 'numeric',
-    });
+  formatDate(instant: string): string {
+    return formatInstant(instant, this.settingsService.timezone());
   }
 }

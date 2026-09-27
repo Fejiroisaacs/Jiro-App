@@ -14,6 +14,8 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { suggestDeload } from '../deload-rule';
+import { muscleColor } from '../shared/muscle-colors';
+import { formatDay } from '../../../core/utils/format-date';
 
 /** Snooze stamp for the deload suggestion: the epoch ms of the last "Not now". */
 const DELOAD_SNOOZED_KEY = 'jiro_jym_deload_snoozed';
@@ -96,7 +98,7 @@ const DELOAD_SNOOZE_DAYS = 7;
           @if (muscleGroupStats().length > 0) {
 <div class="stats-panel mg-panel">
             <div class="stats-header">
-              <span class="stats-title">Muscle Groups</span>
+              <span class="stats-title">Muscle groups</span>
               <span class="stats-sub text-secondary">Last 4 weeks</span>
             </div>
             <div class="mg-list">
@@ -106,9 +108,7 @@ const DELOAD_SNOOZE_DAYS = 7;
                 <div class="mg-bar">
                   <div class="mg-fill"
                     [style.width.%]="(mg.sessionsLast28 / maxMgCount()) * 100"
-                    [class.mg-fill-fresh]="mg.daysSinceLast <= 7"
-                    [class.mg-fill-warm]="mg.daysSinceLast > 7 && mg.daysSinceLast <= 14"
-                    [class.mg-fill-cold]="mg.daysSinceLast > 14">
+                    [style.background]="muscleColor(mg.name)">
                   </div>
                 </div>
                 <span class="mg-days"
@@ -128,11 +128,11 @@ const DELOAD_SNOOZE_DAYS = 7;
       <!-- In Progress Sessions -->
       @if (inProgressSessions().length > 0) {
 <div class="in-progress-section">
-        <h2 class="section-title">In Progress</h2>
+        <h2 class="section-title">In progress</h2>
         @for (s of inProgressSessions(); track s) {
 <div class="ipc" (click)="router.navigate(['/jym/session', s.id])">
           <div class="ipc-info">
-            <div class="ipc-name">{{ s.routine_name || 'Freestyle Session' }}</div>
+            <div class="ipc-name">{{ s.routine_name || 'Freestyle session' }}</div>
             <div class="ipc-meta">Started {{ formatSessionTime(s.started_at) }}
               @if (s.set_count > 0) {
 <span> · {{ s.set_count }} sets logged</span>
@@ -270,7 +270,7 @@ const DELOAD_SNOOZE_DAYS = 7;
 
       <!-- Start Session: choose routine modal -->
       @if (showRoutinePicker()) {
-<jiro-modal title="Choose Routine" maxWidth="420px" (close)="showRoutinePicker.set(false)">
+<jiro-modal title="Choose routine" maxWidth="420px" (close)="showRoutinePicker.set(false)">
         @if (loadingRoutines()) {
 <div class="list-skeletons" role="status" aria-label="Loading routines">
             @for (i of [1, 2, 3]; track i) { <jiro-skeleton height="48px" /> }
@@ -397,8 +397,8 @@ const DELOAD_SNOOZE_DAYS = 7;
     .asc-pills { display: flex; gap: var(--space-xs); flex-wrap: wrap; margin-top: 4px; }
 
     .asc-pill {
-      font-size: var(--font-size-xs); padding: 2px 8px; border-radius: 10px;
-      background: rgba(var(--color-primary-rgb), 0.1); color: color-mix(in srgb, var(--color-primary) 75%, var(--text-primary)); font-weight: 500;
+      font-size: var(--font-size-xs); padding: 2px 8px; border-radius: var(--border-radius-pill);
+      background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary-text); font-weight: 500;
     }
 
     .asc-actions { display: flex; align-items: center; gap: var(--space-sm); flex-shrink: 0; }
@@ -509,7 +509,7 @@ const DELOAD_SNOOZE_DAYS = 7;
       width: max-content;
     }
 
-    .heat-cell { width: 11px; height: 11px; border-radius: 2px; }
+    .heat-cell { width: 11px; height: 11px; border-radius: var(--border-radius-sm); }
 
     .heat-none { background: var(--bg-canvas); border: 1px solid var(--border-color); }
 
@@ -535,15 +535,9 @@ const DELOAD_SNOOZE_DAYS = 7;
 
     .mg-name { font-size: var(--font-size-xs); font-weight: 500; min-width: 72px; color: var(--text-secondary); }
 
-    .mg-bar { flex: 1; height: 6px; background: var(--bg-canvas); border-radius: 3px; overflow: hidden; }
+    .mg-bar { flex: 1; height: 6px; background: var(--bg-canvas); border-radius: var(--border-radius-sm); overflow: hidden; }
 
-    .mg-fill { height: 100%; border-radius: 3px; transition: width 0.3s; min-width: 3px; }
-
-    .mg-fill-fresh { background: var(--color-positive); }
-
-    .mg-fill-warm { background: var(--color-warning); }
-
-    .mg-fill-cold { background: var(--border-color); }
+    .mg-fill { height: 100%; border-radius: var(--border-radius-sm); transition: width 0.3s; min-width: 3px; }
 
     .mg-days { font-size: var(--font-size-xs); min-width: 54px; text-align: right; color: var(--text-muted); }
 
@@ -591,6 +585,7 @@ const DELOAD_SNOOZE_DAYS = 7;
   `]
 })
 export class JymDashboardComponent implements OnInit {
+  readonly muscleColor = muscleColor;
   splits = signal<Split[]>([]);
   activeSeries = signal<SplitSeriesSummary[]>([]);
   allSessions = signal<SessionSummary[]>([]);
@@ -628,11 +623,10 @@ export class JymDashboardComponent implements OnInit {
     const days: { date: string; count: number; label: string; future: boolean }[] = [];
     for (let i = 0; i < 16 * 7; i++) {
       const key = addDays(start, i);
-      const [y, m, d] = key.split('-').map(Number);
       days.push({
         date: key,
         count: countByDay.get(key) || 0,
-        label: new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }),
+        label: formatDay(key, { weekday: true }),
         future: key > today,
       });
     }

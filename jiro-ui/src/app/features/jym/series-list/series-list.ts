@@ -10,6 +10,8 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
+import { SettingsService } from '../../../core/services/settings.service';
+import { formatInstant } from '../../../core/utils/format-date';
 
 @Component({
   selector: 'app-series-list',
@@ -138,14 +140,14 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 <div class="start-cta">
         <a (click)="goToSplits.emit()" class="start-link">
           <jiro-icon name="plus" [size]="13" />
-          Start a new series from your Splits
+          Start a new series from your splits
         </a>
       </div>
 }
 
       <!-- Routine Picker Modal -->
       @if (showRoutinePicker()) {
-<jiro-modal title="Choose Routine" maxWidth="420px" (close)="showRoutinePicker.set(false)">
+<jiro-modal title="Choose routine" maxWidth="420px" (close)="showRoutinePicker.set(false)">
         @if (loadingRoutines()) {
           <div class="sk-list" role="status" aria-label="Loading routines">@for (i of [1, 2, 3]; track i) { <jiro-skeleton height="48px" /> }</div>
         }
@@ -208,7 +210,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 
     .status-badge {
       font-size: var(--font-size-xs); font-weight: 600; padding: 3px 10px;
-      border-radius: 10px; white-space: nowrap; flex-shrink: 0;
+      border-radius: var(--border-radius-pill); white-space: nowrap; flex-shrink: 0;
     }
     .status-badge.active { background: rgba(var(--color-accent-rgb), 0.12); color: var(--color-positive); }
     .status-badge.ended { background: var(--bg-canvas); color: var(--text-muted); border: 1px solid var(--border-color); }
@@ -229,8 +231,8 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 
 
     .sessions-pill, .duration-pill {
-      font-size: var(--font-size-xs); padding: 3px 10px; border-radius: 10px;
-      background: rgba(var(--color-primary-rgb), 0.1); color: color-mix(in srgb, var(--color-primary) 75%, var(--text-primary)); font-weight: 500;
+      font-size: var(--font-size-xs); padding: 3px 10px; border-radius: var(--border-radius-pill);
+      background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary-text); font-weight: 500;
     }
 
     .duration-pill.open { background: var(--bg-canvas); color: var(--text-muted); }
@@ -328,6 +330,7 @@ export class SeriesListComponent implements OnInit {
 
   private readonly confirmService = inject(ConfirmService);
   private readonly toast = inject(ToastService);
+  private readonly settings = inject(SettingsService);
 
   constructor(private jymService: JymService, public router: Router) { }
 
@@ -402,7 +405,7 @@ export class SeriesListComponent implements OnInit {
     return Math.floor(days / 7);
   }
 
-  formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' });
+  formatDate(instant: string): string {
+    return formatInstant(instant, this.settings.timezone());
   }
 }

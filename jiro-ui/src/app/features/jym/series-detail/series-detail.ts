@@ -13,6 +13,7 @@ import { chartTones } from '../../../shared/chart-theme';
 Chart.register(...registerables);
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
+import { formatInstant } from '../../../core/utils/format-date';
 
 @Component({
   selector: 'app-series-detail',
@@ -51,10 +52,10 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
           @if (!series()!.ended_at) {
 <div class="header-btns">
             <jiro-button variant="primary" type="button" (click)="openRoutinePicker()">
-              Start Session
+              Start session
             </jiro-button>
             <jiro-button variant="secondary" type="button" (click)="endSeries()">
-              End Series
+              End series
             </jiro-button>
           </div>
 }
@@ -93,7 +94,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
           <!-- Volume chart -->
           @if (activeTab() === 'volume') {
 <div class="chart-block">
-            <h2 class="section-title">Total Volume per Session</h2>
+            <h2 class="section-title">Total volume per session</h2>
             <p class="section-sub">Sum of weight × reps across all sets. Excludes deload sessions.</p>
             <div class="chart-wrapper">
               <canvas #volumeCanvas></canvas>
@@ -123,7 +124,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
           <!-- Compare tab -->
           @if (activeTab() === 'compare') {
 <div class="compare-block">
-            <h2 class="section-title">Series Comparison</h2>
+            <h2 class="section-title">Series comparison</h2>
             <p class="section-sub">Compare performance with another series of the same split.</p>
             @if (otherSeries().length === 0) {
 <div class="no-compare">
@@ -207,7 +208,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 
       <!-- Routine picker modal -->
       @if (showRoutinePicker()) {
-<jiro-modal title="Start Session" maxWidth="440px" (close)="showRoutinePicker.set(false)">
+<jiro-modal title="Start session" maxWidth="440px" (close)="showRoutinePicker.set(false)">
         <div class="routine-picker">
           <p class="picker-sub">Pick a routine for this session, or go freestyle.</p>
           @if (loadingRoutines()) {
@@ -268,7 +269,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .header-meta { display: flex; align-items: center; gap: var(--space-sm); flex-wrap: wrap; }
 
     .status-badge {
-      font-size: var(--font-size-xs); font-weight: 600; padding: 2px 8px; border-radius: 10px;
+      font-size: var(--font-size-xs); font-weight: 600; padding: 2px 8px; border-radius: var(--border-radius-pill);
       background: rgba(var(--color-accent-rgb), 0.12); color: var(--color-positive);
     }
     .status-badge:not(.active) { background: var(--bg-canvas); color: var(--text-muted); border: 1px solid var(--border-color); }
@@ -282,11 +283,11 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .progress-value { color: var(--color-primary); font-weight: 600; }
 
     .progress-bar {
-      height: 8px; background: var(--bg-canvas); border-radius: 4px;
+      height: 8px; background: var(--bg-canvas); border-radius: var(--border-radius-sm);
       border: 1px solid var(--border-color); overflow: hidden;
     }
 
-    .progress-fill { height: 100%; background: var(--color-primary); border-radius: 4px; transition: width 0.3s; }
+    .progress-fill { height: 100%; background: var(--color-primary); border-radius: var(--border-radius-sm); transition: width 0.3s; }
 
     .tab-bar { display: flex; gap: 0; border-bottom: 2px solid var(--border-color); }
 
@@ -351,7 +352,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .num-cell { color: var(--text-muted); font-weight: 500; }
 
     .type-chip {
-      font-size: var(--font-size-xs); font-weight: 600; padding: 1px 6px; border-radius: 8px;
+      font-size: var(--font-size-xs); font-weight: 600; padding: 1px 6px; border-radius: var(--border-radius-pill);
     }
     .type-chip.normal { background: var(--bg-canvas); color: var(--text-secondary); border: 1px solid var(--border-color); }
     .type-chip.deload { background: rgba(var(--color-danger-rgb), 0.1); color: var(--color-negative); }
@@ -657,8 +658,8 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
     return '';
   }
 
-  formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' });
+  formatDate(instant: string): string {
+    return formatInstant(instant, this.settings.timezone());
   }
 
   goBack() { this.router.navigate(['/jym/series']); }

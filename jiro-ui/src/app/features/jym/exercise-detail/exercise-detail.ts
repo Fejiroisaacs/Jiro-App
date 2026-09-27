@@ -12,6 +12,7 @@ import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-he
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
+import { formatInstant } from '../../../core/utils/format-date';
 
 Chart.register(...registerables);
 
@@ -48,7 +49,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
           @if (exercise()!.history.length > 0) {
 <div class="pr-stats">
             <div class="stat">
-              <span class="stat-label">Best Weight</span>
+              <span class="stat-label">Best weight</span>
               <span class="stat-value">{{ settingsService.toDisplay(exercise()!.best_weight) | number:'1.1-1' }} {{ settingsService.unitLabel() }}</span>
             </div>
             <div class="stat">
@@ -91,7 +92,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
           <div class="chart-tabs">
             <button class="chart-tab" [class.active]="selectedChart() === '1rm'"         (click)="switchChart('1rm')">Est. 1RM</button>
             <button class="chart-tab" [class.active]="selectedChart() === 'volume'"      (click)="switchChart('volume')">Volume</button>
-            <button class="chart-tab" [class.active]="selectedChart() === 'maxweight'"   (click)="switchChart('maxweight')">Max Weight</button>
+            <button class="chart-tab" [class.active]="selectedChart() === 'maxweight'"   (click)="switchChart('maxweight')">Max weight</button>
             <button class="chart-tab" [class.active]="selectedChart() === 'repsatweight'" (click)="switchChart('repsatweight')">Reps @ Weight</button>
           </div>
 
@@ -125,11 +126,11 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
         <div class="section-panel">
         <div class="section-tabs-bar">
           <button class="section-tab" [class.active]="activeSection() === 'history'" (click)="setSection('history')">
-            Set History
+            Set history
             <span class="tab-count">{{ exercise()!.history.length }}</span>
           </button>
           <button class="section-tab" [class.active]="activeSection() === 'form'" (click)="setSection('form')">
-            Form Progression
+            Form progression
             @if (formChecks().length > 0) {
 <span class="tab-count">{{ formChecks().length }}</span>
 }
@@ -223,7 +224,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
 
           @if (!formChecksLoading() && groupedFormChecks().length === 0) {
 <div class="no-history">
-            <p class="text-secondary">No form check clips yet. Tap "+ Form Check" during a session to add one.</p>
+            <p class="text-secondary">No form check clips yet. Tap "+ Form check" during a session to add one.</p>
           </div>
 }
 
@@ -331,7 +332,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
     .mg-badge {
       background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary);
       font-size: var(--font-size-sm); font-weight: 500;
-      padding: 4px 12px; border-radius: 12px;
+      padding: 4px 12px; border-radius: var(--border-radius-pill);
     }
 
     .pr-stats { display: flex; gap: var(--space-xl); }
@@ -370,7 +371,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
     .chart-tab {
       padding: 6px 14px;
       border: 1px solid var(--border-color);
-      border-radius: 20px;
+      border-radius: var(--border-radius-pill);
       background: none;
       cursor: pointer;
       font-size: var(--font-size-sm);
@@ -447,7 +448,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
       background: var(--bg-canvas);
       border: 1px solid var(--border-color);
       color: var(--text-muted);
-      padding: 1px 7px; border-radius: 10px;
+      padding: 1px 7px; border-radius: var(--border-radius-pill);
       font-weight: 400;
     }
 
@@ -869,7 +870,7 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
     const values = data.map(d => Math.round(this.settingsService.toDisplay(d.volume) * 10) / 10);
     this.chart = new Chart(this.canvasRef.nativeElement,
       this.lineConfig(labels, values, `Volume (${unit}×reps)`, chartTones().warning,
-        'Total Session Volume', `Volume (${unit}×reps)`, `${unit}×reps`));
+        'Total session volume', `Volume (${unit}×reps)`, `${unit}×reps`));
   }
 
   private drawMaxWeightChart(unit: string) {
@@ -880,8 +881,8 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
     const labels = data.map(d => this.formatDate(d.date));
     const values = data.map(d => Math.round(this.settingsService.toDisplay(d.weight) * 10) / 10);
     this.chart = new Chart(this.canvasRef.nativeElement,
-      this.lineConfig(labels, values, `Max Weight (${unit})`, chartTones().accent,
-        'Heaviest Set Per Session', `Weight (${unit})`, unit));
+      this.lineConfig(labels, values, `Max weight (${unit})`, chartTones().accent,
+        'Heaviest set per session', `Weight (${unit})`, unit));
   }
 
   private drawRepsAtWeightChart() {
@@ -1051,8 +1052,8 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
     return Array.from(weights).sort((a, b) => b - a);
   }
 
-  formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' });
+  formatDate(instant: string): string {
+    return formatInstant(instant, this.settingsService.timezone());
   }
 
   goBack() { this.router.navigate(['/jym/exercises']); }

@@ -1,5 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -12,11 +11,13 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-series-modal';
+import { SettingsService } from '../../../core/services/settings.service';
+import { formatInstant } from '../../../core/utils/format-date';
 
 @Component({
   selector: 'app-split-detail',
   standalone: true,
-  imports: [DatePipe, FormsModule, DragDropModule, JiroButtonComponent, JiroModalComponent, JiroIconComponent, JiroSkeletonComponent, JymNewSeriesModalComponent],
+  imports: [FormsModule, DragDropModule, JiroButtonComponent, JiroModalComponent, JiroIconComponent, JiroSkeletonComponent, JymNewSeriesModalComponent],
   template: `
     @if (!split() && loading()) {
       <div class="split-detail" role="status" aria-label="Loading split">
@@ -42,7 +43,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
         <div class="header-left">
           <button class="back-btn" (click)="goBack()">
             <jiro-icon name="caret-left" [size]="16" />
-            All Splits
+            All splits
           </button>
           <div class="split-title-row">
             @if (!editingName()) {
@@ -94,14 +95,14 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
         <div class="header-btns">
           <jiro-button variant="secondary" type="button" (click)="openSeriesModal()">
             <jiro-icon name="play:fill" [size]="13" />
-            Start Series
+            Start series
           </jiro-button>
           <jiro-button variant="secondary" type="button" [disabled]="sharing()" (click)="shareSplit()">
             <jiro-icon name="share-network" [size]="13" />
             {{ sharing() ? 'Generating...' : 'Share' }}
           </jiro-button>
           <jiro-button variant="primary" type="button" (click)="showAddRoutine.set(true)">
-            Add Day
+            Add day
           </jiro-button>
         </div>
       </div>
@@ -122,7 +123,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
           </button>
         </div>
         @if (shareExpiresAt()) {
-          <span class="share-expiry">Expires {{ shareExpiresAt() | date: 'MMM d, y' }}</span>
+          <span class="share-expiry">Expires {{ expiryLabel() }}</span>
         }
         <button class="share-revoke-btn" (click)="revokeShare()">Revoke link</button>
       </div>
@@ -200,7 +201,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
           </div>
 
           <button class="add-ex-btn" (click)="openExercisePicker(ri)">
-            + Add Exercise
+            + Add exercise
           </button>
         </div>
 }
@@ -208,7 +209,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
         @if (routines().length === 0) {
 <div class="board-empty">
           <p class="text-secondary">No training days yet. Add your first day to start building.</p>
-          <jiro-button variant="primary" type="button" (click)="showAddRoutine.set(true)">+ Add Day</jiro-button>
+          <jiro-button variant="primary" type="button" (click)="showAddRoutine.set(true)">+ Add day</jiro-button>
         </div>
 }
       </div>
@@ -218,20 +219,20 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
 
     <!-- Add Routine Modal -->
     @if (showAddRoutine()) {
-<jiro-modal title="Add Training Day" maxWidth="400px" (close)="showAddRoutine.set(false)">
+<jiro-modal title="Add training day" maxWidth="400px" (close)="showAddRoutine.set(false)">
       <form class="simple-form" (ngSubmit)="addRoutine()">
         <div class="form-group">
-          <label class="form-label" for="add-day-name">Day Name</label>
+          <label class="form-label" for="add-day-name">Day name</label>
           <input id="add-day-name" class="form-input" type="text" [(ngModel)]="newRoutineName" name="name" placeholder="e.g. Push Day" required />
         </div>
         <div class="form-group">
-          <label class="form-label" for="add-day-order">Day Order</label>
+          <label class="form-label" for="add-day-order">Day order</label>
           <input id="add-day-order" class="form-input" type="number" [(ngModel)]="newRoutineDay" name="day" min="1" />
         </div>
         <div class="form-actions">
           <jiro-button variant="secondary" type="button" (click)="showAddRoutine.set(false)">Cancel</jiro-button>
           <jiro-button variant="primary" type="submit" [disabled]="saving() || !newRoutineName.trim()">
-            {{ saving() ? 'Adding...' : 'Add Day' }}
+            {{ saving() ? 'Adding...' : 'Add day' }}
           </jiro-button>
         </div>
       </form>
@@ -240,7 +241,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
 
     <!-- Exercise Picker Modal -->
     @if (showExPicker()) {
-<jiro-modal title="Add Exercise" maxWidth="480px" (close)="showExPicker.set(false)">
+<jiro-modal title="Add exercise" maxWidth="480px" (close)="showExPicker.set(false)">
       <div class="ex-picker">
         @if (!creatingExercise()) {
 <label class="sr-only" for="picker-search">Search exercises</label>
@@ -270,18 +271,18 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
         <!-- Create new exercise inline -->
         @if (!creatingExercise() && !pickerSelectedEx()) {
 <button class="create-ex-inline-btn" (click)="startCreateExercise()">
-          + Create New Exercise{{ exSearch.trim() ? ' "' + exSearch.trim() + '"' : '' }}
+          + Create new exercise{{ exSearch.trim() ? ' "' + exSearch.trim() + '"' : '' }}
         </button>
 }
 
         @if (creatingExercise()) {
 <div class="inline-create-form">
           <div class="form-group">
-            <label class="form-label" for="picker-new-name">Exercise Name *</label>
+            <label class="form-label" for="picker-new-name">Exercise name *</label>
             <input id="picker-new-name" class="form-input" type="text" [(ngModel)]="newExName" placeholder="e.g. Bulgarian Split Squat" />
           </div>
           <div class="form-group">
-            <label class="form-label" for="picker-new-mg">Muscle Group</label>
+            <label class="form-label" for="picker-new-mg">Muscle group</label>
             <select id="picker-new-mg" class="form-input" [(ngModel)]="newExMuscleGroup">
               <option value="">None</option>
               @for (mg of muscleGroups; track mg) {
@@ -387,7 +388,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
 
     .edit-btn {
       background: none; border: none; color: var(--text-muted);
-      cursor: pointer; padding: var(--space-xs); border-radius: 4px;
+      cursor: pointer; padding: var(--space-xs); border-radius: var(--border-radius-sm);
     }
 
     .edit-btn:hover { color: var(--color-primary); background: rgba(var(--color-primary-rgb), 0.1); }
@@ -418,7 +419,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
       font-size: var(--font-size-xs); 
       font-weight: 600;
       padding: 4px 8px; 
-      border-radius: 2px;
+      border-radius: var(--border-radius-pill);
       border: 1px dashed var(--border-color);
       box-shadow: 1px 1px 0 var(--border-color);
       white-space: nowrap;
@@ -427,7 +428,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
     .tag-edit-btn {
       display: flex; align-items: center; gap: 4px;
       background: none; border: 1px dashed var(--border-color);
-      border-radius: 10px; padding: 2px 8px;
+      border-radius: var(--border-radius-pill); padding: 2px 8px;
       color: var(--text-muted); font-size: 11px; cursor: pointer;
       transition: all 0.15s;
     }
@@ -492,7 +493,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
       font-size: var(--font-size-xs);
       font-weight: 600;
       padding: 4px 8px;
-      border-radius: 2px;
+      border-radius: var(--border-radius-pill);
       border: 1px solid var(--border-color);
       box-shadow: 1px 1px 0 rgba(var(--shadow-rgb), 0.1);
       white-space: nowrap;
@@ -505,7 +506,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
 
     .icon-btn {
       background: none; border: none; cursor: pointer;
-      color: var(--text-muted); padding: 4px; border-radius: 4px;
+      color: var(--text-muted); padding: 4px; border-radius: var(--border-radius-sm);
       display: flex; align-items: center; flex-shrink: 0;
     }
 
@@ -549,7 +550,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
       font-size: var(--font-size-xs);
       font-weight: 600;
       padding: 4px 8px;
-      border-radius: 2px;
+      border-radius: var(--border-radius-pill);
       border: 1px solid var(--border-color);
       box-shadow: 1px 1px 0 rgba(var(--shadow-rgb), 0.1);
       white-space: nowrap;
@@ -616,7 +617,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
     .ex-pick-btn {
       display: flex; align-items: center; justify-content: space-between;
       padding: var(--space-sm) var(--space-md); background: none;
-      border: none; border-radius: 4px; cursor: pointer;
+      border: none; border-radius: var(--border-radius-sm); cursor: pointer;
       text-align: left; width: 100%; transition: background 0.15s;
     }
 
@@ -706,6 +707,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
 export class SplitDetailComponent implements OnInit {
   private readonly confirmService = inject(ConfirmService);
   private readonly toast = inject(ToastService);
+  private readonly settings = inject(SettingsService);
 
   split = signal<SplitWithRoutines | null>(null);
   routines = signal<(Routine & { items: RoutineItem[] })[]>([]);
@@ -733,6 +735,7 @@ export class SplitDetailComponent implements OnInit {
   shareId = signal('');
   shareUrl = signal('');
   shareExpiresAt = signal('');
+  expiryLabel = computed(() => this.shareExpiresAt() ? formatInstant(this.shareExpiresAt(), this.settings.timezone()) : '');
   sharing = signal(false);
   copied = signal(false);
 

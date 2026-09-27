@@ -48,7 +48,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
             @if (imported()) {
 <jiro-icon name="check" [size]="14" />
 }
-            {{ importing() ? 'Saving...' : imported() ? 'Saved!' : 'Save to My Library' }}
+            {{ importing() ? 'Saving...' : imported() ? 'Saved!' : 'Save to my library' }}
           </button>
         </div>
 
@@ -217,7 +217,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .recipe-tag {
       font-size: var(--font-size-xs); padding: 3px 10px;
       background: rgba(var(--color-primary-rgb), 0.08); color: var(--color-primary);
-      border-radius: 10px; font-weight: 500;
+      border-radius: var(--border-radius-pill); font-weight: 500;
     }
 
     .dietary-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: var(--space-md); }
@@ -225,7 +225,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
       display: inline-flex; align-items: center; gap: 4px;
       font-size: var(--font-size-xs); padding: 3px 10px;
       background: var(--bg-surface); border: 1px solid var(--border-color);
-      border-radius: 10px; color: var(--text-secondary); font-weight: 500;
+      border-radius: var(--border-radius-pill); color: var(--text-secondary); font-weight: 500;
     }
 
     .macro-bar {

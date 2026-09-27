@@ -88,4 +88,5 @@ export const ICON_LIST = [
   'prohibit',
   'pulse',
   'video-camera',
+  'trophy',
 ] as const;

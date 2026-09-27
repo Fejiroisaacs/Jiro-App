@@ -56,7 +56,7 @@ interface ExerciseBlock {
     <div class="session-bar">
       <div class="session-bar-row">
         <div class="session-bar-left">
-          <span class="bar-label">Active Session</span>
+          <span class="bar-label">Active session</span>
           <span class="timer">{{ elapsedDisplay() }}</span>
         </div>
         <div class="session-bar-right">
@@ -320,7 +320,7 @@ interface ExerciseBlock {
 }
 
             <!-- Add set -->
-            <button class="add-set-btn" (click)="addSet(bi)">+ Add Set</button>
+            <button class="add-set-btn" (click)="addSet(bi)">+ Add set</button>
 
             <!-- Form check upload -->
             <div class="form-check-row">
@@ -330,7 +330,7 @@ interface ExerciseBlock {
                      [class.fc-disabled]="!canUploadFormCheck(bi, block.exerciseId)"
                      [title]="formCheckBtnTitle(bi, block.exerciseId)">
                 <jiro-icon name="camera" [size]="13" />
-                {{ isFormCheckUploading(block.exerciseId) ? 'Uploading...' : '+ Form Check' }}
+                {{ isFormCheckUploading(block.exerciseId) ? 'Uploading...' : '+ Form check' }}
               </label>
               <input type="file" [id]="'fc-input-' + block.exerciseId"
                 accept="video/mp4,video/webm,image/jpeg,image/png"
@@ -367,34 +367,34 @@ interface ExerciseBlock {
 }
 
         <!-- Add exercise -->
-        <button class="add-exercise-btn" (click)="addExercise()">+ Add Exercise</button>
+        <button class="add-exercise-btn" (click)="addExercise()">+ Add exercise</button>
       </div>
 }
     </div>
 
     <!-- Exit confirmation modal -->
     @if (showExitConfirm()) {
-<jiro-modal title="Exit Workout?" maxWidth="400px" (close)="showExitConfirm.set(false)">
+<jiro-modal title="Exit workout?" maxWidth="400px" (close)="showExitConfirm.set(false)">
       <p style="font-size:var(--font-size-sm);color:var(--text-secondary);line-height:1.6;margin-bottom:var(--space-lg)">
         Your sets are saved. You can resume this session any time from the Jym home page.
       </p>
       <div style="display:flex;flex-direction:column;gap:var(--space-sm)">
         <div style="display:flex;justify-content:flex-end;gap:var(--space-sm)">
-          <jiro-button variant="secondary" type="button" (click)="showExitConfirm.set(false)">Keep Training</jiro-button>
+          <jiro-button variant="secondary" type="button" (click)="showExitConfirm.set(false)">Keep training</jiro-button>
           <jiro-button variant="primary" type="button" (click)="exitSession()">Save & Exit</jiro-button>
         </div>
         <div style="border-top:1px solid var(--border-color);padding-top:var(--space-sm)">
           <jiro-button variant="danger" type="button" [disabled]="discarding()" (click)="discardSession()">
-            {{ discarding() ? 'Discarding...' : 'Discard Session' }}
+            {{ discarding() ? 'Discarding...' : 'Discard session' }}
           </jiro-button>
         </div>
       </div>
     </jiro-modal>
 }
 
-    <!-- Save as Template modal -->
+    <!-- Save as template modal -->
     @if (showTemplateSave()) {
-<jiro-modal title="Save as Template" maxWidth="420px" (close)="showTemplateSave.set(false)">
+<jiro-modal title="Save as template" maxWidth="420px" (close)="showTemplateSave.set(false)">
       <p style="font-size:var(--font-size-sm);color:var(--text-secondary);margin-bottom:var(--space-md);">
         Give this workout layout a name to reuse it in future sessions.
       </p>
@@ -414,7 +414,7 @@ interface ExerciseBlock {
       <div style="display:flex;justify-content:flex-end;gap:var(--space-sm);margin-top:var(--space-md)">
         <jiro-button variant="secondary" type="button" (click)="showTemplateSave.set(false)">Cancel</jiro-button>
         <jiro-button variant="primary" type="button" [disabled]="!templateName.trim() || templateSaving()" (click)="saveAsTemplate()">
-          {{ templateSaving() ? 'Saving...' : 'Save Template' }}
+          {{ templateSaving() ? 'Saving...' : 'Save template' }}
         </jiro-button>
       </div>
     </jiro-modal>
@@ -536,7 +536,7 @@ interface ExerciseBlock {
     .rest-presets { display: flex; gap: 4px; margin-left: auto; }
 
     .rest-chip {
-      min-height: 28px; padding: 2px 8px; border-radius: 10px;
+      min-height: 28px; padding: 2px 8px; border-radius: var(--border-radius-pill);
       border: 1px solid color-mix(in srgb, currentColor 35%, transparent); background: none;
       color: color-mix(in srgb, currentColor 88%, transparent); font-size: var(--font-size-xs);
       cursor: pointer; transition: all 0.15s; font-family: inherit; white-space: nowrap;
@@ -574,7 +574,7 @@ interface ExerciseBlock {
 
     .rest-skip-btn {
       display: inline-flex; align-items: center; justify-content: center;
-      min-height: 28px; padding: 3px 8px; border-radius: 10px;
+      min-height: 28px; padding: 3px 8px; border-radius: var(--border-radius-pill);
       border: 1px solid color-mix(in srgb, currentColor 30%, transparent); background: none;
       color: color-mix(in srgb, currentColor 88%, transparent); cursor: pointer;
       font-size: var(--font-size-xs); transition: all 0.15s; font-family: inherit;
@@ -595,7 +595,7 @@ interface ExerciseBlock {
     .rest-row.rest-done .rest-progress-fill { background: var(--color-positive); }
 
     .type-toggle {
-      display: flex; border-radius: 6px; overflow: hidden;
+      display: flex; border-radius: var(--border-radius); overflow: hidden;
       border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
     }
 
@@ -744,7 +744,7 @@ interface ExerciseBlock {
     .block-title h2 { font-size: var(--font-size-md); font-weight: 600; }
 
     .sets-done-tag {
-      font-size: var(--font-size-xs); padding: 2px 8px; border-radius: 10px;
+      font-size: var(--font-size-xs); padding: 2px 8px; border-radius: var(--border-radius-pill);
       background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary); font-weight: 500;
     }
 
@@ -755,8 +755,8 @@ interface ExerciseBlock {
     .chevron.open { transform: rotate(0deg); }
 
     .mg-tag {
-      background: rgba(var(--color-primary-rgb), 0.12); color: color-mix(in srgb, var(--color-primary) 75%, var(--text-primary));
-      font-size: var(--font-size-xs); padding: 2px 8px; border-radius: 10px;
+      background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary-text);
+      font-size: var(--font-size-xs); padding: 2px 8px; border-radius: var(--border-radius-pill);
     }
 
     /* Exercise note */
@@ -1050,7 +1050,7 @@ interface ExerciseBlock {
 
     .fc-progress-bar {
       flex: 1; height: 4px; background: var(--border-color);
-      border-radius: 2px; overflow: hidden;
+      border-radius: var(--border-radius-sm); overflow: hidden;
     }
 
     .fc-progress-fill {
@@ -1073,10 +1073,10 @@ interface ExerciseBlock {
     }
 
     .fc-clip-link { display: inline-flex; align-items: center; text-decoration: none; }
-    .fc-thumb { width: 32px; height: 32px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border-color); }
+    .fc-thumb { width: 32px; height: 32px; object-fit: cover; border-radius: var(--border-radius-sm); border: 1px solid var(--border-color); }
     .fc-thumb-video {
       width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
-      background: var(--surface-secondary); border-radius: 4px; border: 1px solid var(--border-color);
+      background: var(--surface-secondary); border-radius: var(--border-radius-sm); border: 1px solid var(--border-color);
       color: var(--text-secondary);
     }
   `]

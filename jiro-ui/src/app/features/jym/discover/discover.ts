@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, signal, inject } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -9,6 +9,8 @@ import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-car
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
+import { SettingsService } from '../../../core/services/settings.service';
+import { formatInstant } from '../../../core/utils/format-date';
 
 @Component({
   selector: 'app-discover',
@@ -161,9 +163,9 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .split-name { font-size: var(--font-size-lg); font-weight: 600; }
 
     .routine-badge {
-      background: rgba(var(--color-primary-rgb), 0.12); color: color-mix(in srgb, var(--color-primary) 75%, var(--text-primary));
+      background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary-text);
       font-size: var(--font-size-xs); font-weight: 600;
-      padding: 3px 10px; border-radius: 12px; white-space: nowrap; flex-shrink: 0;
+      padding: 3px 10px; border-radius: var(--border-radius-pill); white-space: nowrap; flex-shrink: 0;
     }
 
     .split-desc { font-size: var(--font-size-sm); line-height: 1.4; }
@@ -172,7 +174,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 
     .tag-chip {
       font-size: 11px; font-weight: 500;
-      padding: 2px 8px; border-radius: 10px;
+      padding: 2px 8px; border-radius: var(--border-radius-pill);
       background: rgba(var(--color-primary-rgb), 0.08); color: var(--color-primary);
       border: 1px solid rgba(var(--color-primary-rgb), 0.18);
     }
@@ -212,6 +214,8 @@ export class DiscoverComponent implements OnInit {
   searchQuery = '';
   tagFilter = '';
 
+  private readonly settings = inject(SettingsService);
+
   constructor(private jymService: JymService, public router: Router) { }
 
   ngOnInit() {
@@ -246,7 +250,7 @@ export class DiscoverComponent implements OnInit {
     });
   }
 
-  formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  formatDate(instant: string): string {
+    return formatInstant(instant, this.settings.timezone());
   }
 }

@@ -138,8 +138,8 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .tag-chips-row { display: flex; flex-wrap: wrap; gap: 4px; }
     .recipe-tag {
       font-size: var(--font-size-xs); padding: 2px 8px;
-      background: rgba(var(--color-primary-rgb), 0.08); color: color-mix(in srgb, var(--color-primary) 75%, var(--text-primary));
-      border-radius: 10px; font-weight: 500;
+      background: rgba(var(--color-primary-rgb), 0.08); color: var(--color-primary-text);
+      border-radius: var(--border-radius-pill); font-weight: 500;
     }
 
     .load-more-row { display: flex; justify-content: center; margin-top: var(--space-xl); }

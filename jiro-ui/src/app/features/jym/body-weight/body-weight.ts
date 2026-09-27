@@ -15,6 +15,7 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
 
 Chart.register(...registerables);
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
+import { formatDay } from '../../../core/utils/format-date';
 
 @Component({
   selector: 'app-body-weight',
@@ -351,8 +352,8 @@ export class BodyWeightComponent implements OnInit, AfterViewInit, OnDestroy {
     return ws[index].weight_kg - ws[index + 1].weight_kg;
   }
 
-  formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' });
+  formatDate(day: string): string {
+    return formatDay(day);
   }
 
 }

@@ -46,7 +46,7 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
       <div class="dialog-actions">
         <button class="btn-ghost" (click)="cancelled.emit()">Cancel</button>
         <jiro-button variant="primary" type="button" [loading]="promoting()" (click)="onPromote()">
-          Promote to Base
+          Promote to base
         </jiro-button>
       </div>
     </div>

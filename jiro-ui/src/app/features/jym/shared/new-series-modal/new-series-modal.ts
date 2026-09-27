@@ -15,7 +15,7 @@ let seq = 0;
   standalone: true,
   imports: [FormsModule, JiroButtonComponent, JiroModalComponent],
   template: `
-    <jiro-modal title="Start Series" maxWidth="440px" (close)="closed.emit()">
+    <jiro-modal title="Start series" maxWidth="440px" (close)="closed.emit()">
       <form class="series-form" (ngSubmit)="create()">
         <div class="form-group">
           <label class="form-label" [for]="uid + '-name'">Series name</label>
@@ -55,7 +55,7 @@ let seq = 0;
         <div class="form-actions">
           <jiro-button variant="secondary" type="button" (click)="closed.emit()">Cancel</jiro-button>
           <jiro-button variant="primary" type="submit" [disabled]="saving() || !name.trim()">
-            {{ saving() ? 'Starting...' : 'Start Series' }}
+            {{ saving() ? 'Starting...' : 'Start series' }}
           </jiro-button>
         </div>
       </form>

@@ -19,6 +19,8 @@ import { PromoteDialogComponent } from '../promote-dialog/promote-dialog';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JiroMenuComponent, JiroMenuItem } from '../../../shared/components/jiro-menu/jiro-menu';
 import { ToastService } from '../../../core/services/toast.service';
+import { SettingsService } from '../../../core/services/settings.service';
+import { formatInstant } from '../../../core/utils/format-date';
 
 type MobileTab = 'recipe' | 'trials';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
@@ -78,7 +80,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
             class="mobile-tab"
             [class.mobile-tab--active]="mobileTab() === 'trials'"
             (click)="mobileTab.set('trials')">
-            Trial Log
+            Trial log
             @if (r.trials && r.trials.length) {
 <span class="tab-count">{{ r.trials.length }}</span>
 }
@@ -210,19 +212,19 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
               @if (r.dietary_flags.gluten_free) {
 <span class="dietary-pill">
                 <jiro-icon name="grains-slash" [size]="13" />
-                Gluten-Free
+                Gluten-free
               </span>
 }
               @if (r.dietary_flags.dairy_free) {
 <span class="dietary-pill">
                 <jiro-icon name="drop-slash" [size]="13" />
-                Dairy-Free
+                Dairy-free
               </span>
 }
               @if (r.dietary_flags.nut_free) {
 <span class="dietary-pill">
                 <jiro-icon name="prohibit" [size]="13" />
-                Nut-Free
+                Nut-free
               </span>
 }
             </div>
@@ -296,7 +298,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
             @if (r.base_ingredients && r.base_ingredients.length) {
 <div class="section">
               <div class="section-header">
-                <h2 class="section-title">Base Ingredients</h2>
+                <h2 class="section-title">Base ingredients</h2>
                 <button class="add-grocery-btn" type="button" (click)="addToGrocery()" title="Add to grocery list" aria-label="Add these ingredients to the grocery list">
                   <jiro-icon name="basket" [size]="13" />
                   Add to grocery list
@@ -325,9 +327,9 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
           <!-- Right: Trials -->
           <div class="trials-panel" [class.mobile-hidden]="mobileTab() !== 'trials'">
             <div class="trials-header">
-              <h2 class="trials-title">Trial Log</h2>
+              <h2 class="trials-title">Trial log</h2>
               <jiro-button variant="primary" type="button" (click)="openNewTrial()">
-                + Log Trial
+                + Log trial
               </jiro-button>
             </div>
 
@@ -407,7 +409,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
       @if (showEdit() && recipe()) {
 <jiro-modal
        
-        title="Edit Recipe"
+        title="Edit recipe"
         maxWidth="600px"
         (close)="showEdit.set(false)">
         <app-recipe-form
@@ -422,7 +424,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
       @if (showTrial() && recipe()) {
 <jiro-modal
        
-        title="Log Trial"
+        title="Log trial"
         maxWidth="560px"
         (close)="showTrial.set(false)">
         <app-trial-modal
@@ -437,7 +439,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
       @if (editingTrial()) {
 <jiro-modal
        
-        title="Edit Trial"
+        title="Edit trial"
         maxWidth="560px"
         (close)="editingTrial.set(null)">
         <app-trial-modal
@@ -452,7 +454,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
       @if (promotingTrial() && recipe()) {
 <jiro-modal
        
-        title="Promote Trial to Base"
+        title="Promote trial to base"
         maxWidth="480px"
         (close)="promotingTrial.set(null)">
         <app-promote-dialog
@@ -631,7 +633,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
       flex: 1;
       height: 4px;
       background: var(--border-color);
-      border-radius: 2px;
+      border-radius: var(--border-radius-sm);
       overflow: hidden;
     }
 
@@ -719,8 +721,8 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
       font-size: var(--font-size-xs);
       padding: 3px 10px;
       background: rgba(var(--color-primary-rgb), 0.08);
-      color: var(--color-primary);
-      border-radius: 12px;
+      color: var(--color-primary-text);
+      border-radius: var(--border-radius-pill);
       font-weight: 500;
     }
 
@@ -768,9 +770,9 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 
     .dietary-pill {
       font-size: var(--font-size-xs); padding: 3px 10px;
-      background: rgba(var(--color-primary-rgb), 0.08); color: var(--color-primary);
+      background: rgba(var(--color-primary-rgb), 0.08); color: var(--color-primary-text);
       border: 1px solid rgba(var(--color-primary-rgb), 0.2);
-      border-radius: 12px; font-weight: 500;
+      border-radius: var(--border-radius-pill); font-weight: 500;
       display: inline-flex; align-items: center; gap: 4px;
     }
 
@@ -796,7 +798,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
       gap: 4px;
       padding: 4px 12px;
       border: 1px solid var(--border-color);
-      border-radius: 20px;
+      border-radius: var(--border-radius-pill);
       background: var(--bg-surface);
       color: var(--text-secondary);
       font-size: var(--font-size-xs);
@@ -819,7 +821,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
       background: var(--bg-surface);
       border: 1px solid var(--border-color);
       border-radius: var(--border-radius);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      box-shadow: var(--shadow-md);
       z-index: 1;
       min-width: 160px;
       overflow: hidden;
@@ -859,11 +861,12 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     }
 
     .section-title {
-      font-size: var(--font-size-sm);
+      font-family: var(--font-family);
+      font-size: var(--font-size-xs);
       font-weight: 600;
       color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 1px;
+      letter-spacing: 0.5px;
       margin-bottom: var(--space-sm);
     }
 
@@ -1042,7 +1045,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
       cursor: pointer;
       color: var(--color-primary);
       padding: 4px 8px;
-      border-radius: 4px;
+      border-radius: var(--border-radius-sm);
       font-weight: 500;
       transition: background 0.15s;
     }
@@ -1155,7 +1158,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .toggle-switch {
       position: relative;
       width: 40px; height: 22px;
-      border: none; border-radius: 11px;
+      border: none; border-radius: var(--border-radius-pill);
       /* Off: a muted track (the border colour vanished in dark mode); the surface-coloured thumb contrasts. */
       background: var(--text-muted);
       cursor: pointer;
@@ -1387,10 +1390,8 @@ export class RecipeDetailComponent implements OnInit {
     }
   }
 
-  formatDate(dateStr: string): string {
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      year: 'numeric', month: 'short', day: 'numeric'
-    });
+  formatDate(instant: string): string {
+    return formatInstant(instant, this.settings.timezone());
   }
 
   openNewTrial() {
@@ -1434,6 +1435,7 @@ export class RecipeDetailComponent implements OnInit {
   private readonly confirmService = inject(ConfirmService);
   private readonly toast = inject(ToastService);
   private readonly grocery = inject(GroceryService);
+  private readonly settings = inject(SettingsService);
 
   async deleteTrial(trial: RecipeTrial) {
     const ok = await this.confirmService.confirm({
