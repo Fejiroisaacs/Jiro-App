@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -514,6 +515,21 @@ func (h *JymHandler) StartSession(c *gin.Context) {
 	}
 	sess, err := h.jymService.StartSession(c.Request.Context(), userID, &req)
 	if err != nil {
+		var open *services.SessionInProgressError
+		if errors.As(err, &open) {
+			c.JSON(http.StatusConflict, gin.H{"error": gin.H{
+				"code":         "SESSION_IN_PROGRESS",
+				"message":      "Another workout is still in progress",
+				"session_id":   open.SessionID,
+				"routine_name": open.RoutineName,
+				"started_at":   open.StartedAt,
+			}})
+			return
+		}
+		if err == services.ErrRoutineNotInSeries {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "ROUTINE_NOT_IN_SERIES", Message: "That day is not part of the series' split"}})
+			return
+		}
 		if err == services.ErrRoutineNotFound {
 			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Routine not found"}})
 			return

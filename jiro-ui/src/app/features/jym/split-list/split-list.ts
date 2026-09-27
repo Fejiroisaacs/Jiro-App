@@ -3,6 +3,7 @@ import { Component, OnInit, inject, signal, input } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { JymService, Split } from '../../../core/services/jym.service';
+import { WorkoutLauncher } from '../shared/workout-launcher';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { JiroCardComponent } from '../../../shared/components/jiro-card/jiro-card';
@@ -357,6 +358,8 @@ export class SplitListComponent implements OnInit {
   // Series
   seriesSplit = signal<Split | null>(null);
 
+  private readonly launcher = inject(WorkoutLauncher);
+
   constructor(private jymService: JymService, public router: Router) { }
 
   ngOnInit() {
@@ -406,16 +409,12 @@ export class SplitListComponent implements OnInit {
 
   startWithRoutine(routineId: string) {
     this.showRoutinePicker.set(false);
-    this.jymService.startSession({ routine_id: routineId }).subscribe({
-      next: s => this.router.navigate(['/jym/session', s.id], { state: { targets: s.targets } }),
-    });
+    this.launcher.start({ routine_id: routineId });
   }
 
   startFreeWithSplit() {
     this.showRoutinePicker.set(false);
-    this.jymService.startSession({}).subscribe({
-      next: s => this.router.navigate(['/jym/session', s.id]),
-    });
+    this.launcher.start({});
   }
 
   async deleteSplit(split: Split) {

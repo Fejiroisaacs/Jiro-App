@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -164,5 +165,36 @@ func TestGetSessionListsExercisesInTheOrderDone(t *testing.T) {
 	order := []uuid.UUID{got.Sets[0].ExerciseID, got.Sets[1].ExerciseID, got.Sets[2].ExerciseID}
 	if order[0] != first || order[1] != first || order[2] != second {
 		t.Fatalf("set order by exercise = %v; want the first-done exercise's two sets, then the other", order)
+	}
+}
+
+func TestStartSessionGuardsAnOpenWorkoutAndTheSeriesSplit(t *testing.T) {
+	svc, userID := testJymDB(t)
+	ctx := context.Background()
+	first, err := svc.StartSession(ctx, userID, &models.CreateSessionRequest{})
+	if err != nil {
+		t.Fatalf("first start: %v", err)
+	}
+	_, err = svc.StartSession(ctx, userID, &models.CreateSessionRequest{})
+	var open *SessionInProgressError
+	if !errors.As(err, &open) || open.SessionID != first.ID {
+		t.Fatalf("second start: got %v, want SessionInProgressError naming the first", err)
+	}
+	if _, err := svc.StartSession(ctx, userID, &models.CreateSessionRequest{Force: true}); err != nil {
+		t.Fatalf("forced start: %v", err)
+	}
+
+	splitA, _ := svc.CreateSplit(ctx, userID, &models.CreateSplitRequest{Name: "A"})
+	splitB, _ := svc.CreateSplit(ctx, userID, &models.CreateSplitRequest{Name: "B"})
+	day, err := svc.CreateRoutine(ctx, userID, splitA.ID, &models.CreateRoutineRequest{Name: "Day 1", DayOrder: 1})
+	if err != nil {
+		t.Fatalf("create routine: %v", err)
+	}
+	seriesB, err := svc.CreateSeries(ctx, userID, &models.CreateSeriesRequest{SplitID: splitB.ID, Name: "B run", DurationType: "open"})
+	if err != nil {
+		t.Fatalf("create series: %v", err)
+	}
+	if _, err := svc.StartSession(ctx, userID, &models.CreateSessionRequest{RoutineID: &day.ID, SeriesID: &seriesB.ID, Force: true}); !errors.Is(err, ErrRoutineNotInSeries) {
+		t.Fatalf("day of split A in a series of split B: got %v, want ErrRoutineNotInSeries", err)
 	}
 }

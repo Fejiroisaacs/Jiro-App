@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { NavigationEnd, Router, RouterLink } from '@angular/router';
 import { filter } from 'rxjs';
 import { JymService, SessionSummary, SessionWithSets } from '../../../core/services/jym.service';
+import { WorkoutLauncher } from '../shared/workout-launcher';
 import { SettingsService } from '../../../core/services/settings.service';
 import { UploadService } from '../../../core/services/upload.service';
 import { ConfirmService } from '../../../core/services/confirm.service';
@@ -557,6 +558,8 @@ export class SessionHistoryComponent implements OnInit {
   exportFrom = '';
   exportTo = '';
 
+  private readonly launcher = inject(WorkoutLauncher);
+
   constructor(
     private jymService: JymService,
     public router: Router,
@@ -746,9 +749,7 @@ export class SessionHistoryComponent implements OnInit {
   }
 
   startNew() {
-    this.jymService.startSession({}).subscribe({
-      next: s => this.router.navigate(['/jym/session', s.id]),
-    });
+    this.launcher.start({});
   }
 
   downloadCSV() {

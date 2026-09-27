@@ -33,7 +33,17 @@ var (
 	ErrInvalidSessionType = errors.New("session type must be normal, deload or test")
 	ErrSessionEnded       = errors.New("session has already ended")
 	ErrDuplicateRoutine   = errors.New("routine listed more than once")
+	ErrRoutineNotInSeries = errors.New("routine is not a day of the series' split")
 )
+
+// SessionInProgressError is StartSession's answer while another session is unfinished and Force is off.
+type SessionInProgressError struct {
+	SessionID   uuid.UUID
+	RoutineName *string
+	StartedAt   time.Time
+}
+
+func (e *SessionInProgressError) Error() string { return "a session is already in progress" }
 
 // validSessionTypes mirrors the sessions.session_type CHECK constraint
 // (migration 000007); rejecting here gives a clear error instead of a
@@ -841,6 +851,35 @@ func (s *JymService) StartSession(ctx context.Context, userID uuid.UUID, req *mo
 			return nil, err
 		} else if !owned {
 			return nil, ErrSeriesNotFound
+		}
+	}
+	if req.RoutineID != nil && req.SeriesID != nil {
+		var inSplit bool
+		if err := s.db.QueryRow(ctx,
+			`SELECT EXISTS(SELECT 1 FROM routines r JOIN split_series sr ON sr.split_id = r.split_id
+			  WHERE r.id = $1 AND sr.id = $2)`,
+			*req.RoutineID, *req.SeriesID,
+		).Scan(&inSplit); err != nil {
+			return nil, err
+		}
+		if !inSplit {
+			return nil, ErrRoutineNotInSeries
+		}
+	}
+	if !req.Force {
+		open := &SessionInProgressError{}
+		err := s.db.QueryRow(ctx,
+			`SELECT s.id, r.name, s.started_at
+			 FROM sessions s LEFT JOIN routines r ON r.id = s.routine_id
+			 WHERE s.user_id = $1 AND s.ended_at IS NULL
+			 ORDER BY s.started_at DESC LIMIT 1`,
+			userID,
+		).Scan(&open.SessionID, &open.RoutineName, &open.StartedAt)
+		if err == nil {
+			return nil, open
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return nil, err
 		}
 	}
 

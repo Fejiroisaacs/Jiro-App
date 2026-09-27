@@ -341,6 +341,8 @@ type CreateSessionRequest struct {
 	RoutineID   *uuid.UUID `json:"routine_id"`
 	SeriesID    *uuid.UUID `json:"series_id"`
 	SessionType *string    `json:"session_type" binding:"omitempty,oneof=normal deload test"`
+	// Force starts even while another session is unfinished; without it that is a SessionInProgressError.
+	Force bool `json:"force"`
 }
 
 type UpdateSessionRequest struct {

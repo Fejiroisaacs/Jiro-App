@@ -21,7 +21,7 @@ func prTestSetup(t *testing.T, svc *JymService, userID uuid.UUID, name string) u
 
 func startSession(t *testing.T, svc *JymService, userID uuid.UUID, sessionType string) uuid.UUID {
 	t.Helper()
-	req := &models.CreateSessionRequest{}
+	req := &models.CreateSessionRequest{Force: true}
 	if sessionType != "" {
 		req.SessionType = &sessionType
 	}

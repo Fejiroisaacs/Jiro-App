@@ -3,6 +3,7 @@ import { DecimalPipe } from '@angular/common';
 
 import { Router, RouterLink } from '@angular/router';
 import { JymService, Split, SplitSeriesSummary, SessionSummary, Routine } from '../../../core/services/jym.service';
+import { WorkoutLauncher } from '../shared/workout-launcher';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { ToastService } from '../../../core/services/toast.service';
@@ -49,7 +50,7 @@ const DELOAD_SNOOZE_DAYS = 7;
             </p>
           </div>
           <div class="deload-actions">
-            <jiro-button variant="primary" type="button" [loading]="startingDeload()" (click)="startDeloadSession()">
+            <jiro-button variant="primary" type="button" [loading]="launcher.starting()" (click)="startDeloadSession()">
               Start next session as a deload
             </jiro-button>
             <jiro-button variant="secondary" type="button" (click)="snoozeDeload()">
@@ -602,7 +603,6 @@ export class JymDashboardComponent implements OnInit {
 
   hasCompletedSessions = computed(() => this.allSessions().some(s => !!s.ended_at));
 
-  startingDeload = signal(false);
   private readonly deloadSnoozed = signal(readDeloadSnoozed());
 
   /**
@@ -685,6 +685,8 @@ export class JymDashboardComponent implements OnInit {
 
   private selectedSeriesId = '';
 
+  readonly launcher = inject(WorkoutLauncher);
+
   constructor(private jymService: JymService, public router: Router) { }
 
   ngOnInit() {
@@ -707,9 +709,7 @@ export class JymDashboardComponent implements OnInit {
   }
 
   startFreeSession() {
-    this.jymService.startSession({}).subscribe({
-      next: s => this.router.navigate(['/jym/session', s.id]),
-    });
+    this.launcher.start({});
   }
 
   /**
@@ -717,14 +717,7 @@ export class JymDashboardComponent implements OnInit {
    * Deload selected without a second call.
    */
   startDeloadSession() {
-    this.startingDeload.set(true);
-    this.jymService.startSession({ session_type: 'deload' }).subscribe({
-      next: s => this.router.navigate(['/jym/session', s.id]),
-      error: () => {
-        this.startingDeload.set(false);
-        this.toast.error('Could not start the session.');
-      },
-    });
+    this.launcher.start({ session_type: 'deload' });
   }
 
   /** Quiets the suggestion for a week. A suggestion you cannot quiet is nagging. */
@@ -734,9 +727,7 @@ export class JymDashboardComponent implements OnInit {
   }
 
   startFromTemplate(t: Routine) {
-    this.jymService.startSession({ routine_id: t.id }).subscribe({
-      next: s => this.router.navigate(['/jym/session', s.id], { state: { targets: s.targets } }),
-    });
+    this.launcher.start({ routine_id: t.id });
   }
 
   async discardSession(s: SessionSummary) {
@@ -766,11 +757,12 @@ export class JymDashboardComponent implements OnInit {
   }
 
   startFromSeriesSplit(splitId: string, seriesId: string) {
-    this.selectedSeriesId = seriesId;
-    this.startFromSplit(splitId);
+    this.startFromSplit(splitId, seriesId);
   }
 
-  startFromSplit(splitId: string) {
+  /** Opens the day picker; only a series Start passes its series, so a split chip never inherits an old one. */
+  startFromSplit(splitId: string, seriesId = '') {
+    this.selectedSeriesId = seriesId;
     this.loadingRoutines.set(true);
     this.showRoutinePicker.set(true);
     this.jymService.getSplit(splitId).subscribe({
@@ -784,20 +776,16 @@ export class JymDashboardComponent implements OnInit {
 
   startWithRoutine(routineId: string) {
     this.showRoutinePicker.set(false);
-    this.jymService.startSession({
+    this.launcher.start({
       routine_id: routineId,
       ...(this.selectedSeriesId ? { series_id: this.selectedSeriesId } : {}),
-    }).subscribe({
-      next: s => this.router.navigate(['/jym/session', s.id], { state: { targets: s.targets } }),
     });
   }
 
   startFreeWithSplit() {
     this.showRoutinePicker.set(false);
-    this.jymService.startSession({
+    this.launcher.start({
       ...(this.selectedSeriesId ? { series_id: this.selectedSeriesId } : {}),
-    }).subscribe({
-      next: s => this.router.navigate(['/jym/session', s.id]),
     });
   }
 

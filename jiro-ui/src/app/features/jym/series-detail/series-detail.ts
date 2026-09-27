@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import { JymService, SplitSeriesDetail, ExerciseProgression, Routine } from '../../../core/services/jym.service';
+import { WorkoutLauncher } from '../shared/workout-launcher';
 import { SettingsService } from '../../../core/services/settings.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
@@ -410,6 +411,8 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
 
   readonly settings = inject(SettingsService);
 
+  private readonly launcher = inject(WorkoutLauncher);
+
   constructor(
     private jymService: JymService,
     private route: ActivatedRoute,
@@ -631,16 +634,12 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
 
   startWithRoutine(routineId: string) {
     this.showRoutinePicker.set(false);
-    this.jymService.startSession({ routine_id: routineId, series_id: this.seriesId }).subscribe({
-      next: s => this.router.navigate(['/jym/session', s.id], { state: { targets: s.targets } }),
-    });
+    this.launcher.start({ routine_id: routineId, series_id: this.seriesId });
   }
 
   startFreestyle() {
     this.showRoutinePicker.set(false);
-    this.jymService.startSession({ series_id: this.seriesId }).subscribe({
-      next: s => this.router.navigate(['/jym/session', s.id]),
-    });
+    this.launcher.start({ series_id: this.seriesId });
   }
 
   endSeries() {

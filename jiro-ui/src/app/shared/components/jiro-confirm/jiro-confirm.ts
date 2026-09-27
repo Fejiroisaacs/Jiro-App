@@ -10,13 +10,19 @@ import { JiroButtonComponent } from '../jiro-button/jiro-button';
   imports: [JiroModalComponent, JiroButtonComponent],
   template: `
     @if (confirmService.pending(); as p) {
-      <jiro-modal [title]="p.options.title" maxWidth="420px" (close)="confirmService.resolve(false)">
+      <jiro-modal [title]="p.options.title" maxWidth="420px" (close)="confirmService.resolve('cancel')">
         <p class="confirm-message">{{ p.options.message }}</p>
         <div class="confirm-actions">
-          <jiro-button variant="secondary" type="button" (click)="confirmService.resolve(false)">
+          <!-- With a middle choice, Cancel steps back to ghost so the two ways forward read first. -->
+          <jiro-button data-cancel [variant]="p.options.altLabel ? 'ghost' : 'secondary'" type="button" (click)="confirmService.resolve('cancel')">
             {{ p.options.cancelLabel }}
           </jiro-button>
-          <jiro-button [variant]="p.options.danger ? 'danger' : 'primary'" type="button" (click)="confirmService.resolve(true)">
+          @if (p.options.altLabel) {
+            <jiro-button variant="secondary" type="button" (click)="confirmService.resolve('alt')">
+              {{ p.options.altLabel }}
+            </jiro-button>
+          }
+          <jiro-button [variant]="p.options.danger ? 'danger' : 'primary'" type="button" (click)="confirmService.resolve('confirm')">
             {{ p.options.confirmLabel }}
           </jiro-button>
         </div>
@@ -44,12 +50,12 @@ export class JiroConfirmComponent {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   constructor() {
-    // Move focus to the safe action when a dialog opens; Escape and backdrop
-    // clicks are handled by jiro-modal and resolve to false.
+    // Move focus to Cancel, the safe action, when a dialog opens; Escape and
+    // backdrop clicks are handled by jiro-modal and resolve to 'cancel'.
     effect(() => {
       if (!this.confirmService.pending()) return;
       queueMicrotask(() => {
-        this.host.nativeElement.querySelector<HTMLButtonElement>('.jiro-btn--secondary')?.focus();
+        this.host.nativeElement.querySelector<HTMLButtonElement>('[data-cancel] button')?.focus();
       });
     });
   }

@@ -244,7 +244,7 @@ export interface UpdateRoutineRequest { name?: string; day_order?: number; }
 export interface ReplaceItemEntry { exercise_id: string; target_sets: number; target_reps: number; }
 export interface RoutineItemsEntry { routine_id: string; items: ReplaceItemEntry[]; }
 export interface RoutineItemsResult { routine_id: string; items: RoutineItem[]; }
-export interface CreateSessionRequest { routine_id?: string; series_id?: string; session_type?: 'normal' | 'deload' | 'test'; }
+export interface CreateSessionRequest { routine_id?: string; series_id?: string; session_type?: 'normal' | 'deload' | 'test'; /** Start even though another workout is open. */ force?: boolean; }
 export interface UpdateSessionRequest { ended_at?: string; notes?: string; session_type?: string; }
 export interface CreateSetRequest { exercise_id: string; set_number: number; weight: number; reps_performed: number; rpe?: number; is_warmup?: boolean; exercise_note?: string; }
 export interface UpdateSetRequest { weight?: number; reps_performed?: number; rpe?: number; is_warmup?: boolean; exercise_note?: string; }
