@@ -19,7 +19,7 @@ import { GUIDE } from '../shared';
           <li>Under the cards, select <strong>Jym</strong>, <strong>Culinara</strong>, <strong>Journaly</strong> or <strong>Ledger</strong> to open that module's home page.</li>
         </guide-steps>
         <guide-shot guide="basics" name="dashboard" [width]="1600" [height]="1231"
-          alt="The dashboard: a greeting and today's date, a Customise button, and cards for Last workout, Journal streak, Cook streak, Body weight and Recent recipes, each with a button such as Start a session or Write today." />
+          alt="The dashboard: a greeting and today's date, a Customise button, and cards for Last workout, Streak, Cook streak, Body weight and Recent recipes, each with a button such as Start a session or Write today." />
         <guide-tip>A card with nothing to show yet offers a first step instead, such as <strong>Plan your first split</strong> or <strong>Add your first account</strong>. Echo is marked Soon because it is not ready yet.</guide-tip>
       </guide-section>
 
@@ -47,7 +47,7 @@ import { GUIDE } from '../shared';
         <guide-steps>
           <li>From the dashboard, select a module in the row under the cards.</li>
           <li>Inside a module, the bar at the bottom shows its sections. Select <strong>Jiro</strong> at the left end of the bar to go back to the dashboard.</li>
-          <li>Sections that do not fit in the bar appear as buttons at the top of the page. In Ledger these are <strong>Net Worth</strong> and <strong>Compare</strong>.</li>
+          <li>Sections that do not fit in the bar appear as buttons at the top of the page. In Ledger these are <strong>Net worth</strong> and <strong>Compare</strong>.</li>
         </guide-steps>
         <guide-shot guide="basics" name="phone-module" [width]="780" [height]="1688"
           alt="Jym on a phone: a top bar with the Jym name, a search button and the account button, and a bottom bar with Jiro, Jym, Exercises, Plan and Track." />
@@ -63,7 +63,7 @@ import { GUIDE } from '../shared';
           <li>To jump to a recent day, select a day in <strong>Last 14 days</strong> on the <a routerLink="/dashboard">Dashboard</a>.</li>
         </guide-steps>
         <guide-shot guide="basics" name="day-page" [width]="1520" [height]="1600"
-          alt="The day page for yesterday: a Legs workout with 2 PRs and a weigh-in under Jym, then banana oat pancakes cooked and the day's planned breakfast, lunch and dinner under Culinara." />
+          alt="The day page for yesterday: a Legs workout with 2 PRs and a weigh-in under Jym, then banana oat pancakes cooked and a planned dinner out under Culinara." />
         <guide-shot guide="basics" name="last-14-days" [width]="1600" [height]="284"
           alt="The Last 14 days card: one column per day, with a red square on workout days and a green square on journal days." />
         <p>You can also reach a day from the item itself. Look for <strong>See this day</strong> when you open a journal entry, a workout's details in Jym, a workout summary, or a transaction in Ledger.</p>
@@ -101,13 +101,13 @@ import { GUIDE } from '../shared';
         lead="Choose how Jiro shows weights and money, which timezone your days follow, and how it looks.">
         <guide-steps>
           <li>Open <a routerLink="/settings">Settings</a> from the bottom of the sidebar, or from <strong>Settings</strong> in the bar at the bottom of a phone.</li>
-          <li>Under <strong>Preferences</strong>, pick <strong>Pounds (lbs)</strong> or <strong>Kilograms (kg)</strong> for <strong>Weight Unit</strong>. Every weight in Jym, including your body weight, is shown in that unit.</li>
+          <li>Under <strong>Preferences</strong>, pick <strong>Pounds (lbs)</strong> or <strong>Kilograms (kg)</strong> for <strong>Weight unit</strong>. Every weight in Jym, including your body weight, is shown in that unit.</li>
           <li>Pick your <strong>Timezone</strong>. It decides where each day starts and ends: Today, the day page, <strong>Last 14 days</strong>, your streaks and the date a new item starts on. Every timezone is listed with its offset from UTC; type a city in the search box above the list to find yours quickly, or select <strong>Use this device's timezone</strong>.</li>
           <li>Pick your <strong>Currency</strong>. Every Ledger account, total and budget is shown in it. It changes how amounts are labelled, not the amounts themselves.</li>
-          <li>Under <strong>Theme</strong>, turn <strong>Dark Mode</strong> on or off, and choose a <strong>Color theme</strong>: <strong>Earth</strong>, <strong>Forest</strong> or <strong>Slate</strong>.</li>
+          <li>Under <strong>Theme</strong>, turn <strong>Dark mode</strong> on or off, and choose a <strong>Color theme</strong>: <strong>Earth</strong>, <strong>Forest</strong> or <strong>Slate</strong>.</li>
         </guide-steps>
         <guide-shot guide="basics" name="settings-preferences" [width]="1280" [height]="1068"
-          alt="The Preferences card in Settings: Weight Unit set to Pounds (lbs), the Timezone search box above a list set to America/New York (UTC-04:00) with a Use this device's timezone button, and Currency set to USD (US dollar)." />
+          alt="The Preferences card in Settings: Weight unit set to Pounds (lbs), the Timezone search box above a list set to America/New York (UTC-04:00) with a Use this device's timezone button, and Currency set to USD (US dollar)." />
         <p>Each choice saves as soon as you make it; there is no Save button. Units, timezone, currency and colour theme are saved to your account. If a change cannot be saved (for example, before you have verified your email), Settings says why under the choices and puts the old value back. Dark mode is remembered on each device, so you can have it on your phone and off on your computer.</p>
         <guide-tip>You can also switch dark mode from the account menu: select your name at the bottom of the sidebar, or the round button with your initial at the top right on a phone, then <strong>Dark mode</strong>.</guide-tip>
       </guide-section>
@@ -139,11 +139,11 @@ import { GUIDE } from '../shared';
       <guide-section id="try-the-demo" title="Try the demo"
         lead="The demo is a sample account full of realistic data, so you can look around before you sign up.">
         <guide-steps>
-          <li>On the home page or the <strong>Log in</strong> page, select <strong>Try the demo</strong>.</li>
+          <li>On the home page or the <strong>Sign in</strong> page, select <strong>Try the demo</strong>.</li>
           <li>Explore any module. A bar at the top says <strong>You're exploring sample data.</strong></li>
           <li>When you are ready for your own account, select <strong>Create account</strong> in that bar. You leave the demo and go straight to sign-up.</li>
         </guide-steps>
-        <p>The demo is look-only, and everyone shares it. Anything that would save is refused with a short message, so nothing you try there is kept. Settings such as units and theme change for your visit only. To leave without signing up, choose <strong>Log out</strong> from the account menu.</p>
+        <p>The demo is look-only, and everyone shares it. Anything that would save is refused with a short message, so nothing you try there is kept. Settings such as units and theme change for your visit only. To leave without signing up, choose <strong>Sign out</strong> from the account menu.</p>
       </guide-section>
 
     </guide-page>

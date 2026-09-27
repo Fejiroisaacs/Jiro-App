@@ -15,12 +15,12 @@ import { GUIDE } from '../shared';
         <guide-steps>
           <li>Open <a routerLink="/ledger/accounts">Accounts</a> and select <strong>Add account</strong>.</li>
           <li>Enter an <strong>Account name</strong>, such as the name your bank uses.</li>
-          <li>Choose a <strong>Type</strong>: <strong>Checking</strong>, <strong>Savings</strong>, <strong>Credit Card</strong>, <strong>Investment</strong> or <strong>Cash</strong>.</li>
+          <li>Choose a <strong>Type</strong>: <strong>Checking</strong>, <strong>Savings</strong>, <strong>Credit card</strong>, <strong>Investment</strong> or <strong>Cash</strong>.</li>
           <li>Enter the <strong>Opening balance</strong>: what is in the account today. For a credit card or loan, enter what you owe as a negative number, such as -250.</li>
-          <li>Select <strong>Add Account</strong>.</li>
+          <li>Select <strong>Add account</strong>.</li>
         </guide-steps>
         <guide-shot guide="ledger" name="add-account" [width]="960" [height]="866"
-          alt="The Add Account window with Account name set to Everyday Checking, Type Checking and an Opening balance of 2500, above Cancel and Add Account buttons." />
+          alt="The Add account window with Account name set to Everyday Checking, Type Checking and an Opening balance of 2500, above Cancel and Add account buttons." />
         <p>
           Every account and every total is shown in one currency, the one you pick under
           <strong>Currency</strong> in <a routerLink="/settings">Settings</a>. It starts as US dollars.
@@ -52,10 +52,10 @@ import { GUIDE } from '../shared';
           <li>Pick a <strong>Category</strong> if you like, or leave it <strong>Uncategorised</strong>. The list only shows categories for the type you chose.</li>
           <li>Enter the <strong>Amount</strong> as a positive number. Ledger records an expense as money out for you.</li>
           <li>Add a <strong>Description</strong> and any <strong>Notes</strong>, and check the <strong>Date</strong>. It starts as today.</li>
-          <li>Select <strong>Log Transaction</strong>.</li>
+          <li>Select <strong>Log transaction</strong>.</li>
         </guide-steps>
         <guide-shot guide="ledger" name="log-transaction" [width]="1040" [height]="1440"
-          alt="The Log Transaction window with Expense selected, Select account and Uncategorised still to choose, an Amount of 42.50, the Description Weekly shop, empty Notes, today's Date and the Repeat switch turned off." />
+          alt="The Log transaction window with Expense selected, Select account and Uncategorised still to choose, an Amount of 42.50, the Description Weekly shop, empty Notes, today's Date and the Repeat switch turned off." />
       </guide-section>
 
       <guide-section id="repeat-a-transaction" title="Repeat rent, pay and subscriptions"
@@ -64,10 +64,10 @@ import { GUIDE } from '../shared';
           <li>Log the first one as usual, with its real date.</li>
           <li>Turn on <strong>Repeat</strong>.</li>
           <li>Choose how often in <strong>Repeat every</strong>: <strong>Week</strong>, <strong>Two weeks</strong>, <strong>Month</strong> or <strong>Year</strong>.</li>
-          <li>Select <strong>Log Transaction</strong>.</li>
+          <li>Select <strong>Log transaction</strong>.</li>
         </guide-steps>
         <guide-shot guide="ledger" name="repeat" [width]="1040" [height]="1800"
-          alt="The Log Transaction window for Rent of 1650 with the Repeat switch on, a note that Ledger adds a copy on each date it falls due and catches up on any it missed, and Repeat every set to Month." />
+          alt="The Log transaction window for Rent of 1650 with the Repeat switch on, a note that Ledger adds a copy on each date it falls due and catches up on any it missed, and Repeat every set to Month." />
         <p>
           Whenever you open Ledger, it adds a copy on each date that has come round, using your
           timezone, and catches up on any it missed while you were away. Each copy moves the
@@ -93,13 +93,13 @@ import { GUIDE } from '../shared';
           <li>Select <strong>Log transaction</strong>, then <strong>Transfer</strong>.</li>
           <li>Choose the <strong>From account</strong> and the <strong>To account</strong>.</li>
           <li>Enter the <strong>Amount</strong>, a <strong>Description</strong> and the <strong>Date</strong>.</li>
-          <li>Select <strong>Log Transaction</strong>. The first account goes down and the second goes up by the same amount.</li>
+          <li>Select <strong>Log transaction</strong>. The first account goes down and the second goes up by the same amount.</li>
         </guide-steps>
         <guide-shot guide="ledger" name="transfer" [width]="1040" [height]="1440"
-          alt="The Log Transaction window with Transfer selected, showing From account and To account lists in place of Account and Category, an Amount of 400 and the Description Monthly savings." />
+          alt="The Log transaction window with Transfer selected, showing From account and To account lists in place of Account and Category, an Amount of 400 and the Description Monthly savings." />
         <p>
           A transfer shows once in Transactions and on the Overview, with its direction, such as
-          Checking → Savings. To pay off a credit card, transfer from your checking account to
+          Checking to Savings. To pay off a credit card, transfer from your checking account to
           the card. A transfer can repeat too, for a standing order into savings.
         </p>
         <guide-tip>Everything about a transfer can be changed later, including both accounts, the amount and the date. Both balances follow.</guide-tip>
@@ -115,7 +115,7 @@ import { GUIDE } from '../shared';
           Lists show them expense first, then income, each in alphabetical order.
         </p>
         <guide-steps>
-          <li>In the <strong>Log Transaction</strong> or <strong>Add budget</strong> window, select <strong>+ New category</strong>.</li>
+          <li>In the <strong>Log transaction</strong> or <strong>Add budget</strong> window, select <strong>New category</strong>.</li>
           <li>Enter a <strong>Name</strong>, choose <strong>Expense</strong> or <strong>Income</strong>, and pick a <strong>Colour</strong>. If you skip the colour, Ledger picks one not yet in use.</li>
           <li>Select <strong>Create</strong>. If it matches the type you are logging, it is picked for you.</li>
         </guide-steps>
@@ -161,7 +161,7 @@ import { GUIDE } from '../shared';
         lead="Give a spending category a limit and watch how much of it you have used.">
         <guide-steps>
           <li>Open <a routerLink="/ledger/budgets">Budgets</a> and select <strong>Add budget</strong>.</li>
-          <li>Choose an expense <strong>Category</strong>, or select <strong>+ New category</strong> to add one.</li>
+          <li>Choose an expense <strong>Category</strong>, or select <strong>New category</strong> to add one.</li>
           <li>Enter the <strong>Limit</strong>.</li>
           <li>Choose a <strong>Period</strong>: <strong>Monthly</strong>, <strong>Weekly</strong> or <strong>Yearly</strong>, and select <strong>Create budget</strong>.</li>
         </guide-steps>
@@ -185,7 +185,7 @@ import { GUIDE } from '../shared';
       <guide-section id="read-the-overview" title="Read the Overview"
         lead="The Overview is Ledger's home page: this month at a glance.">
         <guide-shot guide="ledger" name="overview" [width]="1600" [height]="1163"
-          alt="The Ledger Overview for September 2026: Income 2,184.62 dollars, Expenses 1,017.19, Net 1,167.43 and a Savings rate of 53.4%, then four budget cards and a list of recent transactions." />
+          alt="The Ledger Overview for September 2026: Income 2,184.62 dollars, Expenses 2,667.19, Net minus 482.57 and a Savings rate of minus 22.1%, then four budget cards and a list of recent transactions." />
         <ul>
           <li><strong>Income</strong> and <strong>Expenses</strong> add up this calendar month's transactions, with the month cut in your timezone. Transfers are left out.</li>
           <li><strong>Net</strong> is income minus expenses, and <strong>Savings rate</strong> is net as a share of income.</li>
@@ -199,13 +199,13 @@ import { GUIDE } from '../shared';
         <guide-steps>
           <li>Open <a routerLink="/ledger/net-worth">Net worth</a> and select <strong>Take snapshot</strong>.</li>
           <li>Check the <strong>Snapshot date</strong>. <strong>Total assets</strong> and <strong>Total liabilities</strong> are filled in from your accounts by the same rule as the Accounts page: every account, inactive ones too, at its balance. Change them if you hold money Ledger does not track.</li>
-          <li>Check the <strong>Net worth</strong> and select <strong>Save Snapshot</strong>.</li>
+          <li>Check the <strong>Net worth</strong> and select <strong>Save snapshot</strong>.</li>
         </guide-steps>
         <guide-shot guide="ledger" name="net-worth" [width]="1600" [height]="1163"
-          alt="The Net worth page: a current net worth of 15,204.42 dollars as of 24 Sept 2026, with assets of 15,888.71 and liabilities of 684.29, above a line chart rising from about 12,000 dollars in April to 15,200 in September." />
+          alt="The Net worth page: a current net worth of 15,204.42 dollars as of 25 Sep, with assets of 15,888.71 and liabilities of 684.29, above a line chart rising from about 12,000 dollars in April to 15,200 in September." />
         <p>
           The top card shows your latest snapshot, the chart plots every snapshot over time, and
-          <strong>Snapshot History</strong> lists them newest first.
+          <strong>Snapshot history</strong> lists them newest first.
         </p>
         <guide-tip>Snapshots are not taken for you. Taking one on a date that already has a snapshot replaces it, so once a month works well.</guide-tip>
       </guide-section>
@@ -218,7 +218,7 @@ import { GUIDE } from '../shared';
           <li>For your own dates, select <strong>Custom</strong>, fill in <strong>From</strong> and <strong>To</strong> for <strong>Period A</strong> (the one to compare against) and <strong>Period B</strong>, then select <strong>Compare</strong>.</li>
         </guide-steps>
         <guide-shot guide="ledger" name="compare" [width]="1600" [height]="1163"
-          alt="The Compare periods page set to This month vs last: cards for Income, Spending and Net cash flow, each with last month's and this month's amounts and a line such as Down 3,900.74 dollars (-79.3%) on last month, above the Period overview bar chart." />
+          alt="The Compare periods page set to This month vs last: cards for Income, Spending and Net cash flow, each with last month's and this month's amounts and a line such as Down 5,057.95 dollars (-69.8%) on last month, above the Period overview bar chart." />
         <p>
           The cards show <strong>Income</strong>, <strong>Spending</strong> and
           <strong>Net cash flow</strong> for each period. The line under each reads the way you
@@ -241,11 +241,11 @@ import { GUIDE } from '../shared';
         <p>
           On a phone, the bottom bar has <strong>Overview</strong>, <strong>Activity</strong>
           (Transactions), <strong>Accounts</strong> and <strong>Budgets</strong>, plus
-          <strong>Jiro</strong> to go back to the dashboard. <strong>Net Worth</strong> and
+          <strong>Jiro</strong> to go back to the dashboard. <strong>Net worth</strong> and
           <strong>Compare</strong> are the two buttons at the top of every Ledger page.
         </p>
         <guide-shot guide="ledger" name="phone-nav" [width]="780" [height]="1688"
-          alt="Ledger's Budgets page on a phone, with Net Worth and Compare buttons at the top and a bottom bar of Jiro, Overview, Activity, Accounts and Budgets." />
+          alt="Ledger's Budgets page on a phone, with Net worth and Compare buttons at the top and a bottom bar of Jiro, Overview, Activity, Accounts and Budgets." />
       </guide-section>
 
       <guide-section id="ledger-on-the-dashboard-and-day-view" title="Ledger on the dashboard and day view"

@@ -15,14 +15,14 @@ import { GUIDE } from '../shared';
         <guide-steps>
           <li>Open <a routerLink="/journal">Journaly</a> and select <strong>New entry</strong>.</li>
           <li>Add a title if you like. It is optional.</li>
-          <li>Write in the box below it. If you are stuck, use <strong>Today's prompt</strong>: select the question to start writing, the arrow for another question, or the cross to hide prompts for the rest of the day.</li>
+          <li>Write in the box below it. If you are stuck, use <strong>Today's prompt</strong>: select the question to start writing, the arrow for another question, or the x to hide prompts for the rest of the day.</li>
           <li>Under <strong>Mood</strong>, pick the one that fits. Select it again to clear it.</li>
           <li>Under <strong>Tags</strong>, type a tag and press <kbd>Enter</kbd> or a comma. You can add up to 10.</li>
           <li>Under <strong>Photos</strong>, select <strong>Add</strong> to attach up to three photos. They show as thumbnails and upload when you publish.</li>
           <li>Under <strong>Collections</strong>, select any collection the entry belongs in.</li>
           <li>Select <strong>Publish</strong>. You go back to Journaly and the entry is on this week's calendar.</li>
         </guide-steps>
-        <guide-shot guide="journaly" name="new-entry" [width]="1440" [height]="1900"
+        <guide-shot guide="journaly" name="new-entry" [width]="1440" [height]="1944"
           alt="A new entry titled Long walk home, with today's writing prompt above the text, Calm picked as the mood, a walks tag, the Photos section with a note that photos upload when you publish, the Collections section, and a Publish button." />
       </guide-section>
 
@@ -31,7 +31,7 @@ import { GUIDE } from '../shared';
         <guide-steps>
           <li>On <a routerLink="/journal">Journaly</a>, use the arrows beside the dates to find the week.</li>
           <li>Select the <strong>+</strong> under the day.</li>
-          <li>Select <strong>Write now</strong>, or <strong>New Entry</strong> if the day already has entries.</li>
+          <li>Select <strong>Write now</strong>, or <strong>New entry</strong> if the day already has entries.</li>
           <li>The editor shows the date beside <strong>New entry</strong>, and the prompt is a general <strong>Writing prompt</strong> rather than today's. Write as usual and select <strong>Publish</strong>.</li>
         </guide-steps>
         <p>The entry counts for that day everywhere: the week view, the day view and your streak. Days still to come have nothing to write about yet, so their window offers no <strong>Write now</strong>.</p>
@@ -42,7 +42,7 @@ import { GUIDE } from '../shared';
         <guide-steps>
           <li>In the editor, under <strong>Photos</strong>, select <strong>Add</strong> and choose a JPEG, PNG or WebP file of up to 10 MB.</li>
           <li>On a new entry, the photo waits as a thumbnail and uploads when you select <strong>Publish</strong>. On an entry you are editing, it uploads straight away.</li>
-          <li>To take a photo off, select the cross on its thumbnail. Select an uploaded thumbnail to see it full size.</li>
+          <li>To take a photo off, select the x on its thumbnail. Select an uploaded thumbnail to see it full size.</li>
         </guide-steps>
         <p>If a photo cannot upload when you publish, the entry is still saved and stays open in the editor, so you can add the photo again.</p>
       </guide-section>
@@ -57,9 +57,9 @@ import { GUIDE } from '../shared';
           <li>Select <strong>See the whole day</strong> to open the day view for that date, or press <kbd>Esc</kbd> to close the window.</li>
         </guide-steps>
         <guide-shot guide="journaly" name="week-view" [width]="1600" [height]="540"
-          alt="The week of Sep 21 to Sep 27 with arrows either side and a Today link. Tuesday, Wednesday and Thursday each hold a note showing the start of the entry and its mood." />
+          alt="The week of 21 Sep to 27 Sep with arrows either side and a Today link. Wednesday, Thursday and Friday each hold a note showing the start of the entry and its mood." />
         <guide-shot guide="journaly" name="day-popup" [width]="1200" [height]="764"
-          alt="The window for Tuesday, Sep 22: a See the whole day link, one entry marked Grateful at 7:35 PM with family and cooking tags and a Delete button, and a New Entry button." />
+          alt="The window for Wed 23 Sep: a See the whole day link, one entry marked Grateful at 7:35 PM with family and cooking tags and a Delete button, and a New entry button." />
         <p>Below the calendar, <strong>Entries this week</strong> lists the same week's entries. Select one to open it.</p>
       </guide-section>
 
@@ -94,7 +94,7 @@ import { GUIDE } from '../shared';
         lead="Change anything you wrote, or remove an entry for good.">
         <h3>Edit</h3>
         <guide-steps>
-          <li>Open the entry: select it on <a routerLink="/journal/entries">Entries</a> or in the list on the Journaly tab, or select <strong>Edit Entry</strong> in the day window.</li>
+          <li>Open the entry: select it on <a routerLink="/journal/entries">Entries</a> or in the list on the Journaly tab, or select <strong>Edit entry</strong> in the day window.</li>
           <li>Change the title, text, mood, tags, photos or collections.</li>
           <li>Select <strong>Save</strong>.</li>
         </guide-steps>
@@ -109,28 +109,28 @@ import { GUIDE } from '../shared';
       <guide-section id="keep-entries-in-a-collection" title="Keep entries in a collection"
         lead="A collection gathers entries on one theme, such as a trip or a training block.">
         <guide-steps>
-          <li>Open <a routerLink="/journal/collections">Collections</a> and select <strong>+ New</strong>.</li>
+          <li>Open <a routerLink="/journal/collections">Collections</a> and select <strong>New</strong>.</li>
           <li>Enter a <strong>Name</strong> and, if you like, a <strong>Description</strong>, then select <strong>Create</strong>.</li>
           <li>When you write an entry, select the collection under <strong>Collections</strong> before you select <strong>Publish</strong>. From an empty collection, <strong>Write entry</strong> starts one with the collection already picked.</li>
           <li>To file an older entry, open it, select the collection under <strong>Collections</strong> and select <strong>Save</strong>. Select it again to take the entry out.</li>
           <li>Select a collection on the Collections tab to read its entries.</li>
         </guide-steps>
         <guide-shot guide="journaly" name="new-collection" [width]="1040" [height]="590"
-          alt="The New Collection window with the name Trips, the description Places I went and what I remember, and Cancel and Create buttons." />
-        <p>Inside a collection, select the cross on an entry and confirm to take it out of the collection; the entry stays in your journal. Select <strong>Edit</strong> to rename the collection, change its description or <strong>Delete</strong> it. Deleting a collection keeps its entries in your journal. To add a cover, select the folder picture beside the name and choose a JPEG, PNG or WebP image of up to 5 MB.</p>
+          alt="The New collection window with the name Trips, the description Places I went and what I remember, and Cancel and Create buttons." />
+        <p>Inside a collection, select the x on an entry and confirm to take it out of the collection; the entry stays in your journal. Select <strong>Edit</strong> to rename the collection, change its description or <strong>Delete</strong> it. Deleting a collection keeps its entries in your journal. To add a cover, select the folder picture beside the name and choose a JPEG, PNG or WebP image of up to 5 MB.</p>
       </guide-section>
 
       <guide-section id="journal-with-other-people" title="Journal with other people"
         lead="A group is a shared journal. Everyone in it can read every entry posted there.">
         <h3>Start a group</h3>
         <guide-steps>
-          <li>Open <a routerLink="/journal/groups">Groups</a> and select <strong>+ New Group</strong>, or <strong>Create Group</strong> if you have none yet.</li>
+          <li>Open <a routerLink="/journal/groups">Groups</a> and select <strong>New group</strong>, or <strong>Create group</strong> if you have none yet.</li>
           <li>Enter a <strong>Group name</strong> and select <strong>Create</strong>. The group opens.</li>
         </guide-steps>
         <guide-shot guide="journaly" name="groups-empty" [width]="1600" [height]="548"
-          alt="The Groups page with no groups yet, a + New Group button and a Create Group button." />
+          alt="The Groups page with no groups yet and a Create group button." />
         <guide-shot guide="journaly" name="new-group" [width]="1040" [height]="444"
-          alt="The New Group window with the group name Book club, and Cancel and Create buttons." />
+          alt="The New group window with the group name Book club, and Cancel and Create buttons." />
 
         <h3>Invite with a link</h3>
         <guide-steps>
@@ -156,7 +156,7 @@ import { GUIDE } from '../shared';
 
         <h3>Post to the group</h3>
         <guide-steps>
-          <li>In the group, select <strong>+ Write</strong>, or the <strong>+</strong> under a day to write for that day.</li>
+          <li>In the group, select <strong>Write</strong>, or the <strong>+</strong> under a day to write for that day.</li>
           <li>Write the entry and select <strong>Publish</strong>. It appears in the group with your name on it.</li>
         </guide-steps>
         <p>Group entries stay in the group. They do not appear in your own week view, Entries tab, day view or streak. You can edit or delete only your own entries there.</p>
