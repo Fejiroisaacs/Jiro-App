@@ -50,7 +50,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 <div class="preview-card">
           <div class="preview-header">
             <div>
-              <p class="preview-label">Shared Split</p>
+              <p class="preview-label">Shared split</p>
               <h1 class="preview-title">{{ preview()!.split_name }}</h1>
               <p class="preview-sub text-secondary">{{ preview()!.routines.length }} training {{ preview()!.routines.length === 1 ? 'day' : 'days' }}</p>
             </div>
@@ -88,7 +88,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 <div class="import-info">
               <p class="text-secondary">Sign in to import this split into your Jym library.</p>
               <jiro-button variant="primary" type="button" (click)="goToLogin()">
-                Sign in to Import
+                Sign in to import
               </jiro-button>
             </div>
 }
@@ -96,7 +96,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 <div class="import-info">
               <p class="text-secondary">This split will be copied into your account. Exercises will be matched by name or created for you.</p>
               <jiro-button variant="primary" type="button" [disabled]="importing()" (click)="importSplit()">
-                {{ importing() ? 'Importing...' : 'Import to My Account' }}
+                {{ importing() ? 'Importing...' : 'Import to my account' }}
               </jiro-button>
             </div>
 }

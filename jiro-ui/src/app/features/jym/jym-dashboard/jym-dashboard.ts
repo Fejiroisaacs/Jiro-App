@@ -97,7 +97,7 @@ const DELOAD_SNOOZE_DAYS = 7;
           @if (muscleGroupStats().length > 0) {
 <div class="stats-panel mg-panel">
             <div class="stats-header">
-              <span class="stats-title">Muscle Groups</span>
+              <span class="stats-title">Muscle groups</span>
               <span class="stats-sub text-secondary">Last 4 weeks</span>
             </div>
             <div class="mg-list">
@@ -127,11 +127,11 @@ const DELOAD_SNOOZE_DAYS = 7;
       <!-- In Progress Sessions -->
       @if (inProgressSessions().length > 0) {
 <div class="in-progress-section">
-        <h2 class="section-title">In Progress</h2>
+        <h2 class="section-title">In progress</h2>
         @for (s of inProgressSessions(); track s) {
 <div class="ipc" (click)="router.navigate(['/jym/session', s.id])">
           <div class="ipc-info">
-            <div class="ipc-name">{{ s.routine_name || 'Freestyle Session' }}</div>
+            <div class="ipc-name">{{ s.routine_name || 'Freestyle session' }}</div>
             <div class="ipc-meta">Started {{ formatSessionTime(s.started_at) }}
               @if (s.set_count > 0) {
 <span> · {{ s.set_count }} sets logged</span>
@@ -269,7 +269,7 @@ const DELOAD_SNOOZE_DAYS = 7;
 
       <!-- Start Session: choose routine modal -->
       @if (showRoutinePicker()) {
-<jiro-modal title="Choose Routine" maxWidth="420px" (close)="showRoutinePicker.set(false)">
+<jiro-modal title="Choose routine" maxWidth="420px" (close)="showRoutinePicker.set(false)">
         @if (loadingRoutines()) {
 <div class="list-skeletons" role="status" aria-label="Loading routines">
             @for (i of [1, 2, 3]; track i) { <jiro-skeleton height="48px" /> }

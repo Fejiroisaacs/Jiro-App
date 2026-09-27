@@ -664,8 +664,8 @@ export class RecipeListComponent implements OnInit {
 
   sortOptions: { key: SortKey; label: string }[] = [
     { key: 'newest', label: 'Newest' },
-    { key: 'trials', label: 'Most Trials' },
-    { key: 'rating', label: 'Highest Rated' },
+    { key: 'trials', label: 'Most trials' },
+    { key: 'rating', label: 'Highest rated' },
     { key: 'az', label: 'A-Z' },
   ];
 

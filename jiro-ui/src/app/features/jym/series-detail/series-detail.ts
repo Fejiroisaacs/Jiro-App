@@ -51,10 +51,10 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
           @if (!series()!.ended_at) {
 <div class="header-btns">
             <jiro-button variant="primary" type="button" (click)="openRoutinePicker()">
-              Start Session
+              Start session
             </jiro-button>
             <jiro-button variant="secondary" type="button" (click)="endSeries()">
-              End Series
+              End series
             </jiro-button>
           </div>
 }
@@ -93,7 +93,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
           <!-- Volume chart -->
           @if (activeTab() === 'volume') {
 <div class="chart-block">
-            <h2 class="section-title">Total Volume per Session</h2>
+            <h2 class="section-title">Total volume per session</h2>
             <p class="section-sub">Sum of weight × reps across all sets. Excludes deload sessions.</p>
             <div class="chart-wrapper">
               <canvas #volumeCanvas></canvas>
@@ -123,7 +123,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
           <!-- Compare tab -->
           @if (activeTab() === 'compare') {
 <div class="compare-block">
-            <h2 class="section-title">Series Comparison</h2>
+            <h2 class="section-title">Series comparison</h2>
             <p class="section-sub">Compare performance with another series of the same split.</p>
             @if (otherSeries().length === 0) {
 <div class="no-compare">
@@ -207,7 +207,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 
       <!-- Routine picker modal -->
       @if (showRoutinePicker()) {
-<jiro-modal title="Start Session" maxWidth="440px" (close)="showRoutinePicker.set(false)">
+<jiro-modal title="Start session" maxWidth="440px" (close)="showRoutinePicker.set(false)">
         <div class="routine-picker">
           <p class="picker-sub">Pick a routine for this session, or go freestyle.</p>
           @if (loadingRoutines()) {

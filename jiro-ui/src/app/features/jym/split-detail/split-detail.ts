@@ -42,7 +42,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
         <div class="header-left">
           <button class="back-btn" (click)="goBack()">
             <jiro-icon name="caret-left" [size]="16" />
-            All Splits
+            All splits
           </button>
           <div class="split-title-row">
             @if (!editingName()) {
@@ -94,14 +94,14 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
         <div class="header-btns">
           <jiro-button variant="secondary" type="button" (click)="openSeriesModal()">
             <jiro-icon name="play:fill" [size]="13" />
-            Start Series
+            Start series
           </jiro-button>
           <jiro-button variant="secondary" type="button" [disabled]="sharing()" (click)="shareSplit()">
             <jiro-icon name="share-network" [size]="13" />
             {{ sharing() ? 'Generating...' : 'Share' }}
           </jiro-button>
           <jiro-button variant="primary" type="button" (click)="showAddRoutine.set(true)">
-            Add Day
+            Add day
           </jiro-button>
         </div>
       </div>
@@ -200,7 +200,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
           </div>
 
           <button class="add-ex-btn" (click)="openExercisePicker(ri)">
-            + Add Exercise
+            + Add exercise
           </button>
         </div>
 }
@@ -208,7 +208,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
         @if (routines().length === 0) {
 <div class="board-empty">
           <p class="text-secondary">No training days yet. Add your first day to start building.</p>
-          <jiro-button variant="primary" type="button" (click)="showAddRoutine.set(true)">+ Add Day</jiro-button>
+          <jiro-button variant="primary" type="button" (click)="showAddRoutine.set(true)">+ Add day</jiro-button>
         </div>
 }
       </div>
@@ -218,20 +218,20 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
 
     <!-- Add Routine Modal -->
     @if (showAddRoutine()) {
-<jiro-modal title="Add Training Day" maxWidth="400px" (close)="showAddRoutine.set(false)">
+<jiro-modal title="Add training day" maxWidth="400px" (close)="showAddRoutine.set(false)">
       <form class="simple-form" (ngSubmit)="addRoutine()">
         <div class="form-group">
-          <label class="form-label" for="add-day-name">Day Name</label>
+          <label class="form-label" for="add-day-name">Day name</label>
           <input id="add-day-name" class="form-input" type="text" [(ngModel)]="newRoutineName" name="name" placeholder="e.g. Push Day" required />
         </div>
         <div class="form-group">
-          <label class="form-label" for="add-day-order">Day Order</label>
+          <label class="form-label" for="add-day-order">Day order</label>
           <input id="add-day-order" class="form-input" type="number" [(ngModel)]="newRoutineDay" name="day" min="1" />
         </div>
         <div class="form-actions">
           <jiro-button variant="secondary" type="button" (click)="showAddRoutine.set(false)">Cancel</jiro-button>
           <jiro-button variant="primary" type="submit" [disabled]="saving() || !newRoutineName.trim()">
-            {{ saving() ? 'Adding...' : 'Add Day' }}
+            {{ saving() ? 'Adding...' : 'Add day' }}
           </jiro-button>
         </div>
       </form>
@@ -240,7 +240,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
 
     <!-- Exercise Picker Modal -->
     @if (showExPicker()) {
-<jiro-modal title="Add Exercise" maxWidth="480px" (close)="showExPicker.set(false)">
+<jiro-modal title="Add exercise" maxWidth="480px" (close)="showExPicker.set(false)">
       <div class="ex-picker">
         @if (!creatingExercise()) {
 <label class="sr-only" for="picker-search">Search exercises</label>
@@ -270,18 +270,18 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
         <!-- Create new exercise inline -->
         @if (!creatingExercise() && !pickerSelectedEx()) {
 <button class="create-ex-inline-btn" (click)="startCreateExercise()">
-          + Create New Exercise{{ exSearch.trim() ? ' "' + exSearch.trim() + '"' : '' }}
+          + Create new exercise{{ exSearch.trim() ? ' "' + exSearch.trim() + '"' : '' }}
         </button>
 }
 
         @if (creatingExercise()) {
 <div class="inline-create-form">
           <div class="form-group">
-            <label class="form-label" for="picker-new-name">Exercise Name *</label>
+            <label class="form-label" for="picker-new-name">Exercise name *</label>
             <input id="picker-new-name" class="form-input" type="text" [(ngModel)]="newExName" placeholder="e.g. Bulgarian Split Squat" />
           </div>
           <div class="form-group">
-            <label class="form-label" for="picker-new-mg">Muscle Group</label>
+            <label class="form-label" for="picker-new-mg">Muscle group</label>
             <select id="picker-new-mg" class="form-input" [(ngModel)]="newExMuscleGroup">
               <option value="">None</option>
               @for (mg of muscleGroups; track mg) {

@@ -67,7 +67,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
             <jiro-icon name="basket" [size]="48" />
           </div>
           <h2>Your grocery list is empty</h2>
-          <p class="text-secondary">Open a recipe and select "Add to grocery list", add your planned week from the Meal Planner, or type an item above.</p>
+          <p class="text-secondary">Open a recipe and select "Add to grocery list", add your planned week from the meal planner, or type an item above.</p>
           <a class="browse-link" routerLink="/culinara">Browse recipes</a>
         </div>
       }

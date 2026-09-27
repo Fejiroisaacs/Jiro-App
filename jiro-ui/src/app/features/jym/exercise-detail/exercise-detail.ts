@@ -48,7 +48,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
           @if (exercise()!.history.length > 0) {
 <div class="pr-stats">
             <div class="stat">
-              <span class="stat-label">Best Weight</span>
+              <span class="stat-label">Best weight</span>
               <span class="stat-value">{{ settingsService.toDisplay(exercise()!.best_weight) | number:'1.1-1' }} {{ settingsService.unitLabel() }}</span>
             </div>
             <div class="stat">
@@ -91,7 +91,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
           <div class="chart-tabs">
             <button class="chart-tab" [class.active]="selectedChart() === '1rm'"         (click)="switchChart('1rm')">Est. 1RM</button>
             <button class="chart-tab" [class.active]="selectedChart() === 'volume'"      (click)="switchChart('volume')">Volume</button>
-            <button class="chart-tab" [class.active]="selectedChart() === 'maxweight'"   (click)="switchChart('maxweight')">Max Weight</button>
+            <button class="chart-tab" [class.active]="selectedChart() === 'maxweight'"   (click)="switchChart('maxweight')">Max weight</button>
             <button class="chart-tab" [class.active]="selectedChart() === 'repsatweight'" (click)="switchChart('repsatweight')">Reps @ Weight</button>
           </div>
 
@@ -125,11 +125,11 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
         <div class="section-panel">
         <div class="section-tabs-bar">
           <button class="section-tab" [class.active]="activeSection() === 'history'" (click)="setSection('history')">
-            Set History
+            Set history
             <span class="tab-count">{{ exercise()!.history.length }}</span>
           </button>
           <button class="section-tab" [class.active]="activeSection() === 'form'" (click)="setSection('form')">
-            Form Progression
+            Form progression
             @if (formChecks().length > 0) {
 <span class="tab-count">{{ formChecks().length }}</span>
 }
@@ -223,7 +223,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
 
           @if (!formChecksLoading() && groupedFormChecks().length === 0) {
 <div class="no-history">
-            <p class="text-secondary">No form check clips yet. Tap "+ Form Check" during a session to add one.</p>
+            <p class="text-secondary">No form check clips yet. Tap "+ Form check" during a session to add one.</p>
           </div>
 }
 
@@ -869,7 +869,7 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
     const values = data.map(d => Math.round(this.settingsService.toDisplay(d.volume) * 10) / 10);
     this.chart = new Chart(this.canvasRef.nativeElement,
       this.lineConfig(labels, values, `Volume (${unit}×reps)`, chartTones().warning,
-        'Total Session Volume', `Volume (${unit}×reps)`, `${unit}×reps`));
+        'Total session volume', `Volume (${unit}×reps)`, `${unit}×reps`));
   }
 
   private drawMaxWeightChart(unit: string) {
@@ -880,8 +880,8 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
     const labels = data.map(d => this.formatDate(d.date));
     const values = data.map(d => Math.round(this.settingsService.toDisplay(d.weight) * 10) / 10);
     this.chart = new Chart(this.canvasRef.nativeElement,
-      this.lineConfig(labels, values, `Max Weight (${unit})`, chartTones().accent,
-        'Heaviest Set Per Session', `Weight (${unit})`, unit));
+      this.lineConfig(labels, values, `Max weight (${unit})`, chartTones().accent,
+        'Heaviest set per session', `Weight (${unit})`, unit));
   }
 
   private drawRepsAtWeightChart() {

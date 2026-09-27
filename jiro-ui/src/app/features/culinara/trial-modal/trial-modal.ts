@@ -22,7 +22,7 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
     <form (ngSubmit)="onSubmit()" class="trial-form">
       <!-- Date cooked -->
       <div class="field">
-        <label class="field-label" for="trial-date">Date Cooked</label>
+        <label class="field-label" for="trial-date">Date cooked</label>
         <input
           id="trial-date"
           class="field-input"
@@ -92,7 +92,7 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
       <div class="form-actions">
         <button type="button" class="btn-ghost" (click)="cancelled.emit()">Cancel</button>
         <jiro-button variant="primary" type="submit" [loading]="saving()">
-          {{ trial ? 'Save Changes' : 'Log Trial' }}
+          {{ trial ? 'Save changes' : 'Log trial' }}
         </jiro-button>
       </div>
     </form>

@@ -138,14 +138,14 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 <div class="start-cta">
         <a (click)="goToSplits.emit()" class="start-link">
           <jiro-icon name="plus" [size]="13" />
-          Start a new series from your Splits
+          Start a new series from your splits
         </a>
       </div>
 }
 
       <!-- Routine Picker Modal -->
       @if (showRoutinePicker()) {
-<jiro-modal title="Choose Routine" maxWidth="420px" (close)="showRoutinePicker.set(false)">
+<jiro-modal title="Choose routine" maxWidth="420px" (close)="showRoutinePicker.set(false)">
         @if (loadingRoutines()) {
           <div class="sk-list" role="status" aria-label="Loading routines">@for (i of [1, 2, 3]; track i) { <jiro-skeleton height="48px" /> }</div>
         }

@@ -48,7 +48,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
             @if (imported()) {
 <jiro-icon name="check" [size]="14" />
 }
-            {{ importing() ? 'Saving...' : imported() ? 'Saved!' : 'Save to My Library' }}
+            {{ importing() ? 'Saving...' : imported() ? 'Saved!' : 'Save to my library' }}
           </button>
         </div>
 

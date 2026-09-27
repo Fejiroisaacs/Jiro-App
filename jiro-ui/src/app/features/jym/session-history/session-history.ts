@@ -172,7 +172,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
               @if (detail()!.attachments.length > 0) {
 <div class="attachments-panel" (click)="$event.stopPropagation()">
                 <div class="attachments-header">
-                  <span class="section-label">Form Check / Photos</span>
+                  <span class="section-label">Form check / photos</span>
                 </div>
 
                 <div class="attachments-grid">

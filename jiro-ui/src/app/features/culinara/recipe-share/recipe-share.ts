@@ -15,7 +15,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     <div class="share-page">
       <header class="share-header">
         <a routerLink="/" class="brand" aria-label="Jiro home"><jiro-logo [size]="28" /></a>
-        <a routerLink="/culinara" class="home-link">My Recipes</a>
+        <a routerLink="/culinara" class="home-link">My recipes</a>
       </header>
 
       <main class="share-main">
@@ -102,7 +102,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
             <p class="import-hint">Want to save this recipe to your collection?</p>
             <button class="btn-primary" (click)="importRecipe()" [disabled]="importing()">
               @if (!importing()) {
-<span>Import Recipe</span>
+<span>Import recipe</span>
 }
               @if (importing()) {
 <span class="btn-spinner"></span>

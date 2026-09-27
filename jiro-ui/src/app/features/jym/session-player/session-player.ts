@@ -56,7 +56,7 @@ interface ExerciseBlock {
     <div class="session-bar">
       <div class="session-bar-row">
         <div class="session-bar-left">
-          <span class="bar-label">Active Session</span>
+          <span class="bar-label">Active session</span>
           <span class="timer">{{ elapsedDisplay() }}</span>
         </div>
         <div class="session-bar-right">
@@ -320,7 +320,7 @@ interface ExerciseBlock {
 }
 
             <!-- Add set -->
-            <button class="add-set-btn" (click)="addSet(bi)">+ Add Set</button>
+            <button class="add-set-btn" (click)="addSet(bi)">+ Add set</button>
 
             <!-- Form check upload -->
             <div class="form-check-row">
@@ -330,7 +330,7 @@ interface ExerciseBlock {
                      [class.fc-disabled]="!canUploadFormCheck(bi, block.exerciseId)"
                      [title]="formCheckBtnTitle(bi, block.exerciseId)">
                 <jiro-icon name="camera" [size]="13" />
-                {{ isFormCheckUploading(block.exerciseId) ? 'Uploading...' : '+ Form Check' }}
+                {{ isFormCheckUploading(block.exerciseId) ? 'Uploading...' : '+ Form check' }}
               </label>
               <input type="file" [id]="'fc-input-' + block.exerciseId"
                 accept="video/mp4,video/webm,image/jpeg,image/png"
@@ -367,34 +367,34 @@ interface ExerciseBlock {
 }
 
         <!-- Add exercise -->
-        <button class="add-exercise-btn" (click)="addExercise()">+ Add Exercise</button>
+        <button class="add-exercise-btn" (click)="addExercise()">+ Add exercise</button>
       </div>
 }
     </div>
 
     <!-- Exit confirmation modal -->
     @if (showExitConfirm()) {
-<jiro-modal title="Exit Workout?" maxWidth="400px" (close)="showExitConfirm.set(false)">
+<jiro-modal title="Exit workout?" maxWidth="400px" (close)="showExitConfirm.set(false)">
       <p style="font-size:var(--font-size-sm);color:var(--text-secondary);line-height:1.6;margin-bottom:var(--space-lg)">
         Your sets are saved. You can resume this session any time from the Jym home page.
       </p>
       <div style="display:flex;flex-direction:column;gap:var(--space-sm)">
         <div style="display:flex;justify-content:flex-end;gap:var(--space-sm)">
-          <jiro-button variant="secondary" type="button" (click)="showExitConfirm.set(false)">Keep Training</jiro-button>
+          <jiro-button variant="secondary" type="button" (click)="showExitConfirm.set(false)">Keep training</jiro-button>
           <jiro-button variant="primary" type="button" (click)="exitSession()">Save & Exit</jiro-button>
         </div>
         <div style="border-top:1px solid var(--border-color);padding-top:var(--space-sm)">
           <jiro-button variant="danger" type="button" [disabled]="discarding()" (click)="discardSession()">
-            {{ discarding() ? 'Discarding...' : 'Discard Session' }}
+            {{ discarding() ? 'Discarding...' : 'Discard session' }}
           </jiro-button>
         </div>
       </div>
     </jiro-modal>
 }
 
-    <!-- Save as Template modal -->
+    <!-- Save as template modal -->
     @if (showTemplateSave()) {
-<jiro-modal title="Save as Template" maxWidth="420px" (close)="showTemplateSave.set(false)">
+<jiro-modal title="Save as template" maxWidth="420px" (close)="showTemplateSave.set(false)">
       <p style="font-size:var(--font-size-sm);color:var(--text-secondary);margin-bottom:var(--space-md);">
         Give this workout layout a name to reuse it in future sessions.
       </p>
@@ -414,7 +414,7 @@ interface ExerciseBlock {
       <div style="display:flex;justify-content:flex-end;gap:var(--space-sm);margin-top:var(--space-md)">
         <jiro-button variant="secondary" type="button" (click)="showTemplateSave.set(false)">Cancel</jiro-button>
         <jiro-button variant="primary" type="button" [disabled]="!templateName.trim() || templateSaving()" (click)="saveAsTemplate()">
-          {{ templateSaving() ? 'Saving...' : 'Save Template' }}
+          {{ templateSaving() ? 'Saving...' : 'Save template' }}
         </jiro-button>
       </div>
     </jiro-modal>

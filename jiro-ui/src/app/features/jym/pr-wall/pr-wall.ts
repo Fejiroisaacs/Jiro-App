@@ -15,7 +15,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
   template: `
     <div class="pr-wall">
       @if (!embedded()) {
-        <jiro-page-header heading="PR Wall" subtitle="Your best lifts, all in one place" />
+        <jiro-page-header heading="PR wall" subtitle="Your best lifts, all in one place" />
       }
 
       <!-- Loading -->
@@ -42,7 +42,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
           </div>
           <div class="summary-item">
             <span class="summary-num">{{ muscleGroupCount() }}</span>
-            <span class="summary-label">Muscle Groups</span>
+            <span class="summary-label">Muscle groups</span>
           </div>
           <div class="summary-item">
             <span class="summary-num">{{ topEst1RM() | number:'1.1-1' }}</span>
@@ -61,7 +61,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
           <div class="pr-table">
             <div class="pr-header-row">
               <span class="col-exercise">Exercise</span>
-              <span class="col-lift">Best Lift</span>
+              <span class="col-lift">Best lift</span>
               <span class="col-1rm">Est. 1RM</span>
               <span class="col-date">Date</span>
             </div>
