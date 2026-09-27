@@ -46,19 +46,19 @@ func NewLedgerService(db *pgxpool.Pool) *LedgerService {
 	return &LedgerService{db: db}
 }
 
-// categoryPalette is the colours a category can take, matching the defaults.
+// categoryPalette is the theme's data palette keys; the UI resolves each to var(--data-N).
 var categoryPalette = []string{
-	"#8D6E63", "#E57373", "#64B5F6", "#81C784", "#FFD54F", "#F48FB1", "#90A4AE",
-	"#CE93D8", "#BCAAA4", "#66BB6A", "#4DB6AC", "#FFA726", "#AB47BC", "#78909C",
+	"data-1", "data-2", "data-3", "data-4", "data-5", "data-6",
+	"data-7", "data-8", "data-9", "data-10", "data-11", "data-12",
 }
 
-var colorPattern = regexp.MustCompile(`^#[0-9A-Fa-f]{6}$`)
+var colorPattern = regexp.MustCompile(`^data-([1-9]|1[0-2])$`)
 
-// pickCategoryColor is the first unused palette colour, cycling once all are taken.
+// pickCategoryColor is the first unused palette key, cycling once all are taken.
 func pickCategoryColor(used []string) string {
 	taken := make(map[string]bool, len(used))
 	for _, c := range used {
-		taken[strings.ToUpper(c)] = true
+		taken[strings.ToLower(strings.TrimSpace(c))] = true
 	}
 	for _, c := range categoryPalette {
 		if !taken[c] {
@@ -68,13 +68,25 @@ func pickCategoryColor(used []string) string {
 	return categoryPalette[len(used)%len(categoryPalette)]
 }
 
-// normaliseColor validates a #RRGGBB colour and upper-cases it.
+// normaliseColor validates a palette key (data-1 to data-12) and lower-cases it.
 func normaliseColor(c string) (string, error) {
-	c = strings.TrimSpace(c)
+	c = strings.ToLower(strings.TrimSpace(c))
 	if !colorPattern.MatchString(c) {
-		return "", ledgerInvalid("color must be a hex colour like #64B5F6")
+		return "", ledgerInvalid("color must be a palette key from data-1 to data-12")
 	}
-	return strings.ToUpper(c), nil
+	return c, nil
+}
+
+// nextCategoryColor picks the first key the user's other categories don't use.
+func (s *LedgerService) nextCategoryColor(ctx context.Context, userID uuid.UUID, except *uuid.UUID) (string, error) {
+	var used []string
+	if err := s.db.QueryRow(ctx,
+		`SELECT COALESCE(array_agg(color) FILTER (WHERE color IS NOT NULL), '{}')
+		 FROM ledger_categories WHERE user_id = $1 AND ($2::uuid IS NULL OR id <> $2)`, userID, except,
+	).Scan(&used); err != nil {
+		return "", err
+	}
+	return pickCategoryColor(used), nil
 }
 
 // cleanCategoryName trims a name and checks it fits the column.
@@ -99,21 +111,21 @@ func (s *LedgerService) SeedDefaultCategories(ctx context.Context, userID uuid.U
 	}
 	defaults := []cat{
 		// Expense
-		{"Housing", "expense", "#8D6E63"},
-		{"Food & Drink", "expense", "#E57373"},
-		{"Transport", "expense", "#64B5F6"},
-		{"Health", "expense", "#81C784"},
-		{"Entertainment", "expense", "#FFD54F"},
-		{"Shopping", "expense", "#F48FB1"},
-		{"Utilities", "expense", "#90A4AE"},
-		{"Subscriptions", "expense", "#CE93D8"},
-		{"Other", "expense", "#BCAAA4"},
+		{"Housing", "expense", "data-12"},
+		{"Food & Drink", "expense", "data-1"},
+		{"Transport", "expense", "data-5"},
+		{"Health", "expense", "data-4"},
+		{"Entertainment", "expense", "data-3"},
+		{"Shopping", "expense", "data-6"},
+		{"Utilities", "expense", "data-10"},
+		{"Subscriptions", "expense", "data-9"},
+		{"Other", "expense", "data-7"},
 		// Income
-		{"Salary", "income", "#66BB6A"},
-		{"Freelance", "income", "#4DB6AC"},
-		{"Investment", "income", "#FFA726"},
-		{"Gift", "income", "#AB47BC"},
-		{"Other Income", "income", "#78909C"},
+		{"Salary", "income", "data-8"},
+		{"Freelance", "income", "data-4"},
+		{"Investment", "income", "data-11"},
+		{"Gift", "income", "data-6"},
+		{"Other Income", "income", "data-10"},
 	}
 
 	for _, c := range defaults {
@@ -287,15 +299,8 @@ func (s *LedgerService) CreateCategory(ctx context.Context, userID uuid.UUID, re
 		if color, err = normaliseColor(*req.Color); err != nil {
 			return nil, err
 		}
-	} else {
-		var used []string
-		if err := s.db.QueryRow(ctx,
-			`SELECT COALESCE(array_agg(upper(color)) FILTER (WHERE color IS NOT NULL), '{}')
-			 FROM ledger_categories WHERE user_id = $1`, userID,
-		).Scan(&used); err != nil {
-			return nil, err
-		}
-		color = pickCategoryColor(used)
+	} else if color, err = s.nextCategoryColor(ctx, userID, nil); err != nil {
+		return nil, err
 	}
 
 	if req.ParentID != nil {
@@ -382,7 +387,13 @@ func (s *LedgerService) UpdateCategory(ctx context.Context, userID, catID uuid.U
 		name = &n
 	}
 	if req.Color != nil {
-		c, err := normaliseColor(*req.Color)
+		var c string
+		var err error
+		if strings.TrimSpace(*req.Color) == "" {
+			c, err = s.nextCategoryColor(ctx, userID, &catID)
+		} else {
+			c, err = normaliseColor(*req.Color)
+		}
 		if err != nil {
 			return nil, err
 		}

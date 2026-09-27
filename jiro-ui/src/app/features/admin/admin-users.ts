@@ -1,8 +1,10 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AdminService, AdminUser } from '../../core/services/admin.service';
+import { SettingsService } from '../../core/services/settings.service';
+import { formatInstant } from '../../core/utils/format-date';
 
 @Component({
   selector: 'app-admin-users',
@@ -25,7 +27,7 @@ import { AdminService, AdminUser } from '../../core/services/admin.service';
 }
 
       @if (!loading() && users().length > 0) {
-<div class="table-wrap">
+<div class="table-wrap" tabindex="0" role="region" aria-label="Users table">
       <table class="users-table">
         <thead>
           <tr>
@@ -76,17 +78,18 @@ import { AdminService, AdminUser } from '../../core/services/admin.service';
     .page-title { font-size: 24px; font-weight: 700; margin-bottom: 20px; }
     .search-bar { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
     .search-input {
-      flex: 1; padding: 9px 12px; border: 1px solid var(--border-color); border-radius: 6px;
+      flex: 1; padding: 9px 12px; border: 1px solid var(--border-color); border-radius: var(--border-radius);
       background: var(--bg-surface); color: var(--text-primary); font-size: 14px;
     }
     .search-input:focus { border-color: var(--color-primary); }
     .search-btn {
       padding: 9px 18px; background: var(--color-primary); color: var(--text-on-primary);
-      border: none; border-radius: 6px; font-size: 14px; cursor: pointer;
+      border: none; border-radius: var(--border-radius); font-size: 14px; cursor: pointer;
     }
     .state-msg { color: var(--text-secondary); }
     .error-msg { color: var(--color-negative); }
-    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .table-wrap { position: relative; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .table-wrap:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
     .users-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 560px; }
     .users-table th {
       text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border-color);
@@ -95,11 +98,11 @@ import { AdminService, AdminUser } from '../../core/services/admin.service';
     .user-row { cursor: pointer; border-bottom: 1px solid var(--border-color); }
     .user-row td { padding: 10px 12px; }
     .user-row:hover td { background: rgba(var(--color-primary-rgb), 0.06); }
-    .badge { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; background: var(--border-color); color: var(--text-secondary); }
+    .badge { padding: 2px 8px; border-radius: var(--border-radius-pill); font-size: 11px; font-weight: 600; background: var(--border-color); color: var(--text-primary); }
     .badge.verified { background: color-mix(in srgb, var(--color-positive) 14%, transparent); color: var(--color-positive); }
     .pagination { display: flex; align-items: center; gap: 12px; margin-top: 20px; }
     .page-btn {
-      padding: 7px 16px; border: 1px solid var(--border-color); border-radius: 6px;
+      padding: 7px 16px; border: 1px solid var(--border-color); border-radius: var(--border-radius);
       background: var(--bg-surface); color: var(--text-primary); cursor: pointer; font-size: 13px;
     }
     .page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -112,6 +115,7 @@ import { AdminService, AdminUser } from '../../core/services/admin.service';
   `]
 })
 export class AdminUsersComponent implements OnInit {
+  private readonly settings = inject(SettingsService);
   users = signal<AdminUser[]>([]);
   loading = signal(true);
   error = signal('');
@@ -137,6 +141,6 @@ export class AdminUsersComponent implements OnInit {
   }
 
   formatDate(iso: string) {
-    return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    return formatInstant(iso, this.settings.timezone(), { year: 'always' });
   }
 }

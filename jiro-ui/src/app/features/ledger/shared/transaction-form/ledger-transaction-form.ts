@@ -197,7 +197,7 @@ let formSeq = 0;
       display: inline-flex; align-items: center; gap: 4px;
       background: none; border: none; padding: 8px 0; min-height: 32px;
       font-size: var(--font-size-sm); font-weight: 500;
-      color: var(--color-primary); cursor: pointer; line-height: 1;
+      color: var(--color-primary-text); cursor: pointer; line-height: 1;
     }
     .new-cat-btn:hover { opacity: 0.75; }
 
@@ -261,7 +261,7 @@ let formSeq = 0;
     /* Repeat switch */
     .toggle-row { display: flex; align-items: center; justify-content: space-between; }
     .toggle-btn {
-      width: 44px; height: 24px; border-radius: 12px;
+      width: 44px; height: 24px; border-radius: var(--border-radius-pill);
       border: none; background: var(--border-color);
       cursor: pointer; position: relative; transition: background 0.2s; padding: 0;
     }

@@ -22,6 +22,7 @@ import { MoodTrendComponent } from '../mood-trend/mood-trend';
 import { JournalDayModalComponent } from '../journal-day-modal/journal-day-modal';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { formatInstant } from '../../../core/utils/format-date';
 
 @Component({
   selector: 'app-journal-home',
@@ -130,7 +131,7 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
             <div class="entry-meta">
               <span class="entry-date">{{ formatDate(e.created_at) }}</span>
               @if (e.mood) {
-<span class="mood-chip" [style.border-left-color]="moodColor(e.mood)">{{ moodLabel(e.mood) }}</span>
+<span class="mood-chip" [style.--chip]="moodColor(e.mood)">{{ moodLabel(e.mood) }}</span>
 }
             </div>
             <div class="entry-card-actions" (click)="$event.stopPropagation()">
@@ -192,7 +193,7 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
       margin-bottom: var(--space-xl);
     }
     .streak-info { display: flex; align-items: baseline; gap: var(--space-xs); }
-    .streak-count { font-size: var(--font-size-xl); font-weight: 700; color: var(--color-primary); }
+    .streak-count { font-size: var(--font-size-xl); font-weight: 700; color: var(--color-primary-text); }
     .streak-label { font-size: var(--font-size-sm); color: var(--text-secondary); }
     .streak-divider { width: 1px; height: 28px; background: var(--border-color); margin: 0 var(--space-xs); }
     .streak-stat { display: flex; flex-direction: column; align-items: center; }
@@ -212,7 +213,7 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
     }
     .list-clear {
       background: none; border: none; padding: 0;
-      color: var(--color-primary); font: inherit; font-size: var(--font-size-sm);
+      color: var(--color-primary-text); font: inherit; font-size: var(--font-size-sm);
       cursor: pointer; text-decoration: underline; white-space: nowrap;
     }
     .filter-input, .filter-select {
@@ -237,11 +238,13 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
     .entry-meta { display: flex; align-items: center; gap: var(--space-sm); }
     .entry-date { font-size: var(--font-size-xs); color: var(--text-secondary); }
     .mood-chip {
-      font-size: var(--font-size-xs); padding: 2px 8px 2px 7px;
-      background: var(--bg-canvas); color: var(--text-secondary);
-      border: 1px solid var(--border-color);
-      border-left: 3px solid var(--border-color);
-      border-radius: var(--border-radius-sm);
+      font-size: var(--font-size-xs); padding: 2px 8px;
+      background: color-mix(in srgb, var(--chip) 18%, var(--bg-surface)); color: var(--text-primary);
+      border-radius: var(--border-radius-pill);
+    }
+    .mood-chip::before {
+      content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 5px;
+      border-radius: 50%; background: var(--chip);
     }
     .entry-card-actions { display: flex; gap: var(--space-xs); opacity: 0.45; transition: opacity 0.15s; }
     .entry-card:hover .entry-card-actions { opacity: 1; }
@@ -251,7 +254,7 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
     .entry-excerpt { font-size: var(--font-size-sm); color: var(--text-secondary); margin: 0 0 var(--space-sm); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
     .entry-footer { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); }
     .tag-list { display: flex; flex-wrap: wrap; gap: 4px; }
-    .tag-chip { font-size: 0.7rem; padding: 2px 8px; background: var(--bg-canvas); border-radius: 99px; color: var(--text-secondary); border: 1px solid var(--border-color); }
+    .tag-chip { font-size: 0.7rem; padding: 2px 8px; background: var(--bg-canvas); border-radius: var(--border-radius-pill); color: var(--text-secondary); border: 1px solid var(--border-color); }
     .img-badge { display: flex; align-items: center; gap: 3px; font-size: var(--font-size-xs); color: var(--text-secondary); flex-shrink: 0; }
 
     /* Modal */
@@ -429,7 +432,7 @@ export class JournalHomeComponent implements OnInit {
   }
 
   formatDate(s: string): string {
-    return new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return formatInstant(s, this.settings.timezone());
   }
 
   excerpt(body: string): string {

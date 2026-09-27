@@ -24,6 +24,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 import { IconName } from '../../../shared/icons/icons.generated';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { formatInstant } from '../../../core/utils/format-date';
 
 @Component({
   selector: 'app-journal-group',
@@ -119,7 +120,7 @@ import { ToastService } from '../../../core/services/toast.service';
 <div class="state-center">
           <h3>No entries this week</h3>
           <p class="text-secondary">Click any day above or use "Write" to add an entry.</p>
-          <jiro-button variant="primary" type="button" (click)="writeEntry()">Write Entry</jiro-button>
+          <jiro-button variant="primary" type="button" (click)="writeEntry()">Write entry</jiro-button>
         </div>
 }
 
@@ -346,12 +347,12 @@ import { ToastService } from '../../../core/services/toast.service';
       text-decoration: none;
       transition: color 0.15s;
     }
-    .back-link:hover { color: var(--color-primary); text-decoration: none; }
+    .back-link:hover { color: var(--color-primary-text); text-decoration: none; }
     .group-header-info { display: flex; align-items: center; gap: var(--space-md); }
     .group-avatar-lg {
       width: 48px; height: 48px; border-radius: 50%;
       background: color-mix(in srgb, var(--color-primary) 20%, transparent);
-      color: var(--color-primary); display: flex; align-items: center; justify-content: center;
+      color: var(--color-primary-text); display: flex; align-items: center; justify-content: center;
       font-weight: 700; font-size: var(--font-size-lg); flex-shrink: 0;
     }
     .group-header-info h1 { margin: 0 0 2px; }
@@ -374,7 +375,7 @@ import { ToastService } from '../../../core/services/toast.service';
     .author-avatar {
       width: 34px; height: 34px; border-radius: 50%;
       background: color-mix(in srgb, var(--color-primary) 15%, transparent);
-      color: var(--color-primary); display: flex; align-items: center; justify-content: center;
+      color: var(--color-primary-text); display: flex; align-items: center; justify-content: center;
       font-weight: 700; font-size: var(--font-size-sm); flex-shrink: 0;
     }
     .author-info { display: flex; flex-direction: column; gap: 1px; flex: 1; }
@@ -392,7 +393,7 @@ import { ToastService } from '../../../core/services/toast.service';
     .entry-images { display: flex; gap: var(--space-sm); flex-wrap: wrap; margin-bottom: var(--space-sm); }
     .entry-image { width: 100px; height: 80px; object-fit: cover; border-radius: var(--border-radius-sm); cursor: zoom-in; }
     .tag-list { display: flex; flex-wrap: wrap; gap: 4px; }
-    .tag-chip { font-size: 0.65rem; padding: 2px 6px; background: var(--bg-surface-hover); border-radius: 99px; color: var(--text-secondary); }
+    .tag-chip { font-size: 0.65rem; padding: 2px 6px; background: var(--bg-surface-hover); border-radius: var(--border-radius-pill); color: var(--text-secondary); }
 
     /* Members modal */
     .members-list { display: flex; flex-direction: column; gap: var(--space-xs); margin-bottom: var(--space-lg); }
@@ -410,7 +411,7 @@ import { ToastService } from '../../../core/services/toast.service';
     .member-name { font-size: var(--font-size-sm); font-weight: 500; }
     .member-status { font-size: var(--font-size-xs); }
     .member-status.pending { color: var(--color-warning); }
-    .owner-badge { font-size: var(--font-size-xs); padding: 2px 8px; background: color-mix(in srgb, var(--color-primary) 15%, transparent); color: var(--color-primary); border-radius: 99px; }
+    .owner-badge { font-size: var(--font-size-xs); padding: 2px 8px; background: color-mix(in srgb, var(--color-primary) 15%, transparent); color: var(--color-primary-text); border-radius: var(--border-radius-pill); }
 
     /* Invite */
     .invite-section, .rename-section { margin-top: var(--space-lg); padding-top: var(--space-lg); border-top: 1px solid var(--border-color); }
@@ -448,7 +449,7 @@ import { ToastService } from '../../../core/services/toast.service';
       color: var(--text-primary);
       transition: border-color 0.15s, color 0.15s; display: flex; align-items: center; justify-content: center;
     }
-    .mood-chip-sm.selected { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 12%, transparent); color: var(--color-primary); }
+    .mood-chip-sm.selected { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 12%, transparent); color: var(--color-primary-text); }
     .modal-actions { display: flex; justify-content: flex-end; gap: var(--space-sm); }
 
     /* Lightbox */
@@ -733,7 +734,8 @@ export class JournalGroupComponent implements OnInit {
   }
 
   formatExpiry(s: string): string {
-    return new Date(s).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: this.settings.timezone() });
+    const tz = this.settings.timezone();
+    return `${formatInstant(s, tz)}, ${new Date(s).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz })}`;
   }
 
   async removeMember(m: JournalGroupMember) {
@@ -832,7 +834,7 @@ export class JournalGroupComponent implements OnInit {
   }
 
   formatDate(s: string): string {
-    return new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return formatInstant(s, this.settings.timezone());
   }
 
   moodIcon(value: string): IconName {

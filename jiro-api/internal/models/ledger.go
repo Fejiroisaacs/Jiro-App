@@ -79,7 +79,7 @@ type CategoryTree struct {
 type CreateCategoryRequest struct {
 	Name string `json:"name" binding:"required"`
 	Type string `json:"type" binding:"required,oneof=income expense"`
-	// Color is #RRGGBB; left out, the next unused palette colour is picked.
+	// Color is a palette key, data-1 to data-12; left out or empty, the next unused key is picked.
 	Color    *string    `json:"color"`
 	ParentID *uuid.UUID `json:"parent_id"`
 }

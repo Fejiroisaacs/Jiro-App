@@ -18,7 +18,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { SettingsService } from '../../../core/services/settings.service';
-import { currencySymbol, formatCurrency, formatSignedCurrency, formatDate, hexWithAlpha, netWorthTotals } from '../shared/ledger-utils';
+import { currencySymbol, formatCurrency, formatSignedCurrency, formatDate, categoryColor, categoryTint, netWorthTotals } from '../shared/ledger-utils';
 
 type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
 
@@ -180,12 +180,10 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
                     @if (t.type === 'transfer') {
                       <span class="detail-txn-sub">{{ transferLabel(t) }}</span>
                     } @else if (t.category_name) {
-<span class="cat-chip"
-                      [style.background]="hexWithAlpha(t.category_color, 0.12)"
-                      [style.color]="t.category_color || 'var(--text-muted)'">
+                    <span class="cat-chip" [style.--chip]="categoryColor(t.category_color)" [style.background]="categoryTint(t.category_color)">
                       {{ t.category_name }}
                     </span>
-}
+                    }
                   </div>
                   <div class="detail-txn-right">
                     <!-- Signed for this account: a transfer out is minus, one in is plus. -->
@@ -235,7 +233,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
 
       <!-- ── Add Account Modal ── -->
       @if (showAddModal()) {
-<jiro-modal title="Add Account" maxWidth="480px" (close)="closeAddModal()">
+<jiro-modal title="Add account" maxWidth="480px" (close)="closeAddModal()">
         <form class="modal-form" (ngSubmit)="submitAddAccount()">
           <div class="form-group">
             <label class="form-label" for="acct-add-name">Account name</label>
@@ -253,7 +251,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
             <select id="acct-add-type" class="form-input" [(ngModel)]="addForm.type" name="type" required>
               <option value="checking">Checking</option>
               <option value="savings">Savings</option>
-              <option value="credit">Credit Card</option>
+              <option value="credit">Credit card</option>
               <option value="investment">Investment</option>
               <option value="cash">Cash</option>
             </select>
@@ -280,7 +278,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
           <div class="form-actions">
             <jiro-button variant="secondary" type="button" (click)="closeAddModal()">Cancel</jiro-button>
             <jiro-button variant="primary" type="submit" [disabled]="addSaving() || !addForm.name.trim()">
-              {{ addSaving() ? 'Saving...' : 'Add Account' }}
+              {{ addSaving() ? 'Saving...' : 'Add account' }}
             </jiro-button>
           </div>
         </form>
@@ -289,7 +287,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
 
       <!-- ── Edit Account Modal ── -->
       @if (showEditModal()) {
-<jiro-modal title="Edit Account" maxWidth="480px" (close)="closeEditModal()">
+<jiro-modal title="Edit account" maxWidth="480px" (close)="closeEditModal()">
         <form class="modal-form" (ngSubmit)="submitEditAccount()">
           <div class="form-group">
             <label class="form-label" for="acct-edit-name">Account name</label>
@@ -307,7 +305,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
             <select id="acct-edit-type" class="form-input" [(ngModel)]="editForm.type" name="type">
               <option value="checking">Checking</option>
               <option value="savings">Savings</option>
-              <option value="credit">Credit Card</option>
+              <option value="credit">Credit card</option>
               <option value="investment">Investment</option>
               <option value="cash">Cash</option>
             </select>
@@ -335,7 +333,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
           <div class="form-actions">
             <jiro-button variant="secondary" type="button" (click)="closeEditModal()">Cancel</jiro-button>
             <jiro-button variant="primary" type="submit" [disabled]="editSaving() || !editForm.name.trim()">
-              {{ editSaving() ? 'Saving...' : 'Save Changes' }}
+              {{ editSaving() ? 'Saving...' : 'Save changes' }}
             </jiro-button>
           </div>
         </form>
@@ -405,7 +403,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
     .acct-type-checking  { background: rgba(var(--color-accent-rgb), 0.12); color: var(--color-accent); }
     .acct-type-savings   { background: rgba(var(--color-accent-rgb), 0.20); color: var(--color-accent); }
     .acct-type-credit    { background: rgba(var(--color-danger-rgb), 0.12);  color: var(--color-danger); }
-    .acct-type-investment{ background: rgba(var(--color-primary-rgb), 0.12);  color: var(--color-primary); }
+    .acct-type-investment{ background: rgba(var(--color-primary-rgb), 0.12);  color: var(--color-primary-text); }
     .acct-type-cash      { background: rgba(var(--shadow-rgb), 0.12);  color: var(--text-secondary); }
 
     .acct-badges {
@@ -428,7 +426,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
       font-size: var(--font-size-xs);
       font-weight: 600;
       padding: 2px 8px;
-      border-radius: 10px;
+      border-radius: var(--border-radius-pill);
       background: rgba(var(--shadow-rgb), 0.15);
       color: var(--text-muted);
     }
@@ -500,7 +498,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
       cursor: pointer;
       border-radius: var(--border-radius-sm);
     }
-    .acct-disclosure:hover { color: var(--color-primary); }
+    .acct-disclosure:hover { color: var(--color-primary-text); }
 
     .acct-collapse {
       display: block;
@@ -515,7 +513,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
       font-size: var(--font-size-sm);
       cursor: pointer;
     }
-    .acct-collapse:hover { color: var(--color-primary); }
+    .acct-collapse:hover { color: var(--color-primary-text); }
 
 
     /* ── Detail panel ── */
@@ -577,12 +575,23 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
       text-overflow: ellipsis;
     }
 
+    .cat-chip::before {
+      content: '';
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      margin-right: 5px;
+      border-radius: 50%;
+      background: var(--chip);
+    }
+
     .cat-chip {
       display: inline-block;
       font-size: var(--font-size-xs);
       font-weight: 600;
+      color: var(--text-primary);
       padding: 2px 8px;
-      border-radius: 10px;
+      border-radius: var(--border-radius-pill);
       width: max-content;
       max-width: 100%;
       overflow: hidden;
@@ -692,7 +701,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
     .toggle-btn {
       width: 44px;
       height: 24px;
-      border-radius: 12px;
+      border-radius: var(--border-radius-pill);
       background: var(--border-color);
       border: none;
       cursor: pointer;
@@ -754,7 +763,8 @@ export class AccountsPageComponent implements OnInit {
   readonly currency = this.settings.currency;
   readonly symbol = computed(() => currencySymbol(this.settings.currency()));
   readonly formatDate = formatDate;
-  readonly hexWithAlpha = hexWithAlpha;
+  readonly categoryColor = categoryColor;
+  readonly categoryTint = categoryTint;
 
   accounts = signal<LedgerAccount[]>([]);
   loading = signal(true);
@@ -957,7 +967,7 @@ export class AccountsPageComponent implements OnInit {
     const labels: Record<AccountType, string> = {
       checking: 'Checking',
       savings: 'Savings',
-      credit: 'Credit Card',
+      credit: 'Credit card',
       investment: 'Investment',
       cash: 'Cash',
     };

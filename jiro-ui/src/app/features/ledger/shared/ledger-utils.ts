@@ -1,4 +1,5 @@
 /** Shared utilities for the Ledger module. Import instead of duplicating per component. */
+import { formatDay } from '../../../core/utils/format-date';
 
 /** Money in the user's currency, with its own decimals and a minus sign when negative. */
 export function formatCurrency(value: number, currency = 'USD'): string {
@@ -83,23 +84,36 @@ export function netWorthTotals(accounts: { balance: number }[]): { assets: numbe
   return { assets: round(assets), liabilities: round(liabilities), net: round(assets - liabilities) };
 }
 
-/** Category colours: the default categories' palette. */
-export const CATEGORY_PALETTE: { hex: string; name: string }[] = [
-  { hex: '#8D6E63', name: 'Clay' },
-  { hex: '#E57373', name: 'Coral' },
-  { hex: '#64B5F6', name: 'Sky' },
-  { hex: '#81C784', name: 'Sage' },
-  { hex: '#FFD54F', name: 'Mustard' },
-  { hex: '#F48FB1', name: 'Rose' },
-  { hex: '#90A4AE', name: 'Slate' },
-  { hex: '#CE93D8', name: 'Lilac' },
-  { hex: '#BCAAA4', name: 'Sand' },
-  { hex: '#66BB6A', name: 'Leaf' },
-  { hex: '#4DB6AC', name: 'Teal' },
-  { hex: '#FFA726', name: 'Amber' },
-  { hex: '#AB47BC', name: 'Plum' },
-  { hex: '#78909C', name: 'Steel' },
+/** Category colours: palette keys the API stores, drawn from the theme's data palette. */
+export const CATEGORY_PALETTE: { key: string; name: string }[] = [
+  { key: 'data-1', name: 'Terracotta' },
+  { key: 'data-2', name: 'Olive' },
+  { key: 'data-3', name: 'Ochre' },
+  { key: 'data-4', name: 'Sage' },
+  { key: 'data-5', name: 'Slate' },
+  { key: 'data-6', name: 'Rose' },
+  { key: 'data-7', name: 'Taupe' },
+  { key: 'data-8', name: 'Forest' },
+  { key: 'data-9', name: 'Copper' },
+  { key: 'data-10', name: 'Steel' },
+  { key: 'data-11', name: 'Mustard' },
+  { key: 'data-12', name: 'Walnut' },
 ];
+
+const PALETTE_KEY = /^data-([1-9]|1[0-2])$/;
+
+/** A category colour as CSS: data-3 becomes var(--data-3), a legacy hex passes through. */
+export function categoryColor(color: string | null | undefined): string {
+  const c = (color ?? '').trim().toLowerCase();
+  if (PALETTE_KEY.test(c)) return `var(--${c})`;
+  if (/^#[0-9a-f]{6}$/.test(c)) return c;
+  return 'var(--text-muted)';
+}
+
+/** The tint behind a category chip; chip text stays var(--text-primary). */
+export function categoryTint(color: string | null | undefined): string {
+  return `color-mix(in srgb, ${categoryColor(color)} 18%, var(--bg-surface))`;
+}
 
 /**
  * Parse a calendar date (no time component) as a LOCAL date.
@@ -112,8 +126,9 @@ export function parseDateOnly(value: string): Date {
   return new Date(y, m - 1, d);
 }
 
+/** A DATE value in the app's style: "25 Sep", with the year when it isn't this year. */
 export function formatDate(iso: string): string {
-  return parseDateOnly(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return formatDay(iso);
 }
 
 export function formatPct(value: number): string {
@@ -122,14 +137,6 @@ export function formatPct(value: number): string {
 
 export function clamp(val: number, min: number, max: number): number {
   return Math.min(Math.max(val, min), max);
-}
-
-export function hexWithAlpha(hex: string | null | undefined, alpha: number): string {
-  if (!hex) return `rgba(155,143,136,${alpha})`;
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r},${g},${b},${alpha})`;
 }
 
 export function periodLabel(period: string): string {

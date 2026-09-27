@@ -5,6 +5,7 @@ import { ToastService } from '../../../../core/services/toast.service';
 import { JiroButtonComponent } from '../../../../shared/components/jiro-button/jiro-button';
 import { JiroIconComponent } from '../../../../shared/components/jiro-icon/jiro-icon';
 import { JiroModalComponent } from '../../../../shared/components/jiro-modal/jiro-modal';
+import { categoryColor } from '../ledger-utils';
 import { LedgerCategoryDialogComponent } from '../category-dialog/ledger-category-dialog';
 
 /** Add, rename, recolour and delete categories; emits `changed` after any edit (budgets show them). */
@@ -33,7 +34,7 @@ import { LedgerCategoryDialogComponent } from '../category-dialog/ledger-categor
         <ul class="cm-list">
           @for (c of group.items; track c.id) {
             <li class="cm-row">
-              <span class="cm-dot" [style.background]="c.color || 'var(--text-muted)'" aria-hidden="true"></span>
+              <span class="cm-dot" [style.background]="categoryColor(c.color)" aria-hidden="true"></span>
               <span class="cm-name">{{ c.name }}</span>
               <button type="button" class="cm-btn" (click)="edit.set(c)" [attr.aria-label]="'Edit ' + c.name">
                 <jiro-icon name="pencil-simple" [size]="16" />
@@ -112,7 +113,7 @@ import { LedgerCategoryDialogComponent } from '../category-dialog/ledger-categor
       width: 40px; height: 40px; border: none; background: none; border-radius: var(--border-radius);
       color: var(--text-secondary); cursor: pointer;
     }
-    .cm-btn:hover { color: var(--color-primary); background: var(--bg-canvas); }
+    .cm-btn:hover { color: var(--color-primary-text); background: var(--bg-canvas); }
     .cm-danger:hover { color: var(--color-danger); }
     .del-form { display: flex; flex-direction: column; gap: var(--space-md); }
     .del-copy { font-size: var(--font-size-sm); color: var(--text-secondary); margin: 0; line-height: 1.5; }
@@ -130,6 +131,7 @@ export class LedgerCategoryManagerComponent implements OnInit {
   @Output() changed = new EventEmitter<void>();
 
   private readonly ledger = inject(LedgerService);
+  readonly categoryColor = categoryColor;
   private readonly toast = inject(ToastService);
 
   categories = signal<CategoryTree[]>([]);

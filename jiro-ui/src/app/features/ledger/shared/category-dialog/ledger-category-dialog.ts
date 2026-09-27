@@ -38,9 +38,9 @@ let dialogSeq = 0;
         <fieldset class="form-group">
           <legend class="form-label">Colour</legend>
           <div class="swatches">
-            @for (c of palette; track c.hex) {
-              <label class="swatch" [class.selected]="color === c.hex" [style.--swatch]="c.hex" [title]="c.name">
-                <input type="radio" name="cat_color" [value]="c.hex" [(ngModel)]="color" />
+            @for (c of palette; track c.key) {
+              <label class="swatch" [class.selected]="color === c.key" [style.--swatch]="'var(--' + c.key + ')'" [title]="c.name">
+                <input type="radio" name="cat_color" [value]="c.key" [(ngModel)]="color" />
                 <span class="sr-only">{{ c.name }}</span>
               </label>
             }
@@ -113,7 +113,8 @@ export class LedgerCategoryDialogComponent implements OnInit {
     if (this.category) {
       this.name = this.category.name;
       this.type = this.category.type;
-      this.color = (this.category.color ?? '').toUpperCase();
+      const key = (this.category.color ?? '').trim().toLowerCase();
+      this.color = this.palette.some(p => p.key === key) ? key : '';
     } else {
       this.type = this.defaultType;
     }

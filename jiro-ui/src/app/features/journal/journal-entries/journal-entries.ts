@@ -18,6 +18,9 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
+import { SettingsService } from '../../../core/services/settings.service';
+import { dayKey } from '../../../core/utils/day';
+import { formatInstant, formatMonth } from '../../../core/utils/format-date';
 
 export const ENTRIES_PAGE_SIZE = 20;
 
@@ -136,7 +139,7 @@ interface MonthGroup { key: string; label: string; entries: JournalEntry[]; }
                           <div class="entry-meta">
                             <span class="entry-date">{{ formatDate(e.created_at) }}</span>
                             @if (e.mood) {
-                              <span class="mood-chip" [style.border-left-color]="moodColor(e.mood)">{{ moodLabel(e.mood) }}</span>
+                              <span class="mood-chip" [style.--chip]="moodColor(e.mood)">{{ moodLabel(e.mood) }}</span>
                             }
                           </div>
                           <h3 class="entry-title" [class.entry-title--untitled]="!e.title">{{ e.title || 'Untitled' }}</h3>
@@ -219,7 +222,7 @@ interface MonthGroup { key: string; label: string; entries: JournalEntry[]; }
     .filter-tag { min-width: 120px; }
     .list-clear {
       background: none; border: none; padding: 0;
-      color: var(--color-primary); font: inherit; font-size: var(--font-size-sm);
+      color: var(--color-primary-text); font: inherit; font-size: var(--font-size-sm);
       cursor: pointer; text-decoration: underline; white-space: nowrap;
     }
 
@@ -250,11 +253,13 @@ interface MonthGroup { key: string; label: string; entries: JournalEntry[]; }
     .entry-meta { display: flex; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-xs); }
     .entry-date { font-size: var(--font-size-xs); color: var(--text-secondary); }
     .mood-chip {
-      font-size: var(--font-size-xs); padding: 2px 8px 2px 7px;
-      background: var(--bg-canvas); color: var(--text-secondary);
-      border: 1px solid var(--border-color);
-      border-left: 3px solid var(--border-color);
-      border-radius: var(--border-radius-sm);
+      font-size: var(--font-size-xs); padding: 2px 8px;
+      background: color-mix(in srgb, var(--chip) 18%, var(--bg-surface)); color: var(--text-primary);
+      border-radius: var(--border-radius-pill);
+    }
+    .mood-chip::before {
+      content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 5px;
+      border-radius: 50%; background: var(--chip);
     }
     .entry-title {
       font-size: var(--font-size-md); font-weight: 600; margin: 0 0 var(--space-xs);
@@ -268,7 +273,7 @@ interface MonthGroup { key: string; label: string; entries: JournalEntry[]; }
     }
     .entry-excerpt:last-child { margin-bottom: 0; }
     .tag-list { display: flex; flex-wrap: wrap; gap: 4px; }
-    .tag-chip { font-size: 0.7rem; padding: 2px 8px; background: var(--bg-canvas); border-radius: 99px; color: var(--text-secondary); border: 1px solid var(--border-color); }
+    .tag-chip { font-size: 0.7rem; padding: 2px 8px; background: var(--bg-canvas); border-radius: var(--border-radius-pill); color: var(--text-secondary); border: 1px solid var(--border-color); }
 
     /* Error */
     .error-box {
@@ -324,6 +329,7 @@ export class JournalEntriesComponent {
   protected readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly svc = inject(JournalService);
+  private readonly settings = inject(SettingsService);
   private readonly destroyRef = inject(DestroyRef);
 
   private readonly listTop = viewChild<ElementRef<HTMLElement>>('listTop');
@@ -358,11 +364,10 @@ export class JournalEntriesComponent {
     if (s.status !== 'ready') return [];
     const out: MonthGroup[] = [];
     for (const e of s.entries) {
-      const d = new Date(e.created_at);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const key = dayKey(e.created_at, this.settings.timezone()).slice(0, 7);
       let g = out[out.length - 1];
       if (!g || g.key !== key) {
-        g = { key, label: d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }), entries: [] };
+        g = { key, label: formatMonth(key), entries: [] };
         out.push(g);
       }
       g.entries.push(e);
@@ -512,7 +517,7 @@ export class JournalEntriesComponent {
 
   // ── Display helpers ──────────────────────────────────────────────────────
   formatDate(s: string): string {
-    return new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return formatInstant(s, this.settings.timezone());
   }
 
   /** Body as one line of plain text; CSS clamps it to two lines. */

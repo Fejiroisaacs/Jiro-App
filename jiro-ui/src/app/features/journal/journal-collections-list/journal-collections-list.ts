@@ -46,7 +46,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 <div class="state-box">
         <h3>No collections yet</h3>
         <p class="text-secondary">Group related entries into collections: travel, family moments, and more.</p>
-        <jiro-button variant="primary" type="button" (click)="showCreate.set(true)">Create Collection</jiro-button>
+        <jiro-button variant="primary" type="button" (click)="showCreate.set(true)">Create collection</jiro-button>
       </div>
 }
 
@@ -76,7 +76,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     </div>
 
     @if (showCreate()) {
-<jiro-modal title="New Collection" (close)="showCreate.set(false)">
+<jiro-modal title="New collection" (close)="showCreate.set(false)">
       <div class="modal-form">
         <label class="form-label" for="new-coll-name">Name</label>
         <input id="new-coll-name" type="text" class="form-control" [(ngModel)]="newName" placeholder="e.g. Europe Trip 2024" maxlength="100" />
