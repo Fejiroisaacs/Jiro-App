@@ -331,7 +331,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
     .mg-badge {
       background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary);
       font-size: var(--font-size-sm); font-weight: 500;
-      padding: 4px 12px; border-radius: 12px;
+      padding: 4px 12px; border-radius: var(--border-radius-pill);
     }
 
     .pr-stats { display: flex; gap: var(--space-xl); }
@@ -370,7 +370,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
     .chart-tab {
       padding: 6px 14px;
       border: 1px solid var(--border-color);
-      border-radius: 20px;
+      border-radius: var(--border-radius-pill);
       background: none;
       cursor: pointer;
       font-size: var(--font-size-sm);
@@ -447,7 +447,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
       background: var(--bg-canvas);
       border: 1px solid var(--border-color);
       color: var(--text-muted);
-      padding: 1px 7px; border-radius: 10px;
+      padding: 1px 7px; border-radius: var(--border-radius-pill);
       font-weight: 400;
     }
 

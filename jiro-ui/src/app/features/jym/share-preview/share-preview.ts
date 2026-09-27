@@ -170,7 +170,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .day-chip {
       font-size: var(--font-size-xs); font-weight: 600; padding: 2px 8px;
       background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary);
-      border-radius: 8px; white-space: nowrap;
+      border-radius: var(--border-radius-pill); white-space: nowrap;
     }
 
     .routine-name { font-size: var(--font-size-md); font-weight: 600; }
@@ -189,7 +189,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .ex-muscle {
       font-size: var(--font-size-xs); color: var(--text-muted);
       background: var(--bg-canvas); border: 1px solid var(--border-color);
-      border-radius: 4px; padding: 1px 6px;
+      border-radius: var(--border-radius-pill); padding: 1px 6px;
     }
 
     .ex-targets {

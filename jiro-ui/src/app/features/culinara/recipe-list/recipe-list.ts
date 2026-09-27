@@ -309,7 +309,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .sort-pill {
       padding: 6px 14px;
       border: 1px solid var(--border-color);
-      border-radius: 20px;
+      border-radius: var(--border-radius-pill);
       background: var(--bg-surface);
       color: var(--text-secondary);
       font-size: var(--font-size-xs);
@@ -341,7 +341,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .tag-chip {
       padding: 4px 12px;
       border: 1px solid var(--border-color);
-      border-radius: 20px;
+      border-radius: var(--border-radius-pill);
       background: var(--bg-surface);
       color: var(--text-secondary);
       font-size: var(--font-size-xs);
@@ -451,7 +451,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
       padding: 2px 8px;
       background: rgba(var(--color-primary-rgb), 0.08);
       color: var(--color-primary-text);
-      border-radius: 10px;
+      border-radius: var(--border-radius-pill);
       font-weight: 500;
     }
 
@@ -540,7 +540,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .collection-chip {
       padding: 4px 12px;
       border: 1px solid var(--border-color);
-      border-radius: 20px;
+      border-radius: var(--border-radius-pill);
       background: var(--bg-surface);
       color: var(--text-secondary);
       font-size: var(--font-size-xs);
@@ -596,7 +596,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .new-collection-input {
       padding: 4px 10px;
       border: 1px solid var(--color-primary);
-      border-radius: 20px;
+      border-radius: var(--border-radius-pill);
       background: var(--bg-surface);
       color: var(--text-primary);
       font-size: var(--font-size-xs);

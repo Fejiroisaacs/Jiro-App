@@ -262,7 +262,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
       padding: 4px;
       background: none;
       border: 1px dashed transparent;
-      border-radius: 4px;
+      border-radius: var(--border-radius-sm);
       color: var(--text-muted);
       cursor: pointer;
       font: inherit;
@@ -283,7 +283,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
       gap: 4px;
       background: var(--color-primary);
       color: var(--text-on-primary);
-      border-radius: 4px;
+      border-radius: var(--border-radius-sm);
       padding: 3px 6px 3px 8px;
       font-size: 0.72rem;
       line-height: 1.3;

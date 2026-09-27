@@ -168,7 +168,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .recipe-card {
       background: var(--bg-canvas);
       border: 1px solid var(--border-color);
-      border-radius: 12px;
+      border-radius: var(--border-radius-lg);
       padding: 32px;
     }
 
@@ -195,7 +195,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
       color: var(--text-secondary);
       font-size: 0.72rem;
       padding: 2px 9px;
-      border-radius: 20px;
+      border-radius: var(--border-radius-pill);
       font-weight: 500;
     }
 
@@ -203,7 +203,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .chip {
       background: var(--bg-surface);
       border: 1px solid var(--border-color);
-      border-radius: 6px;
+      border-radius: var(--border-radius-pill);
       padding: 4px 10px;
       font-size: 0.78rem;
       color: var(--text-secondary);

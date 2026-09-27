@@ -187,7 +187,7 @@ const ROW_ACTIONS: JiroMenuItem[] = [
     .mg-chip {
       min-height: 32px; padding: 4px 14px;
       border: 1px dashed var(--border-color);
-      border-radius: 2px;
+      border-radius: var(--border-radius-pill);
       background: var(--bg-surface);
       cursor: pointer;
       font-size: var(--font-size-sm); font-family: inherit;
@@ -254,7 +254,7 @@ const ROW_ACTIONS: JiroMenuItem[] = [
       font-size: var(--font-size-xs);
       font-weight: 600;
       padding: 3px 8px;
-      border-radius: 2px;
+      border-radius: var(--border-radius-pill);
       border: 1px solid var(--border-color);
       box-shadow: 1px 1px 0 var(--border-color);
       white-space: nowrap;

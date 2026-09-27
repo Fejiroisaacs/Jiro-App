@@ -163,7 +163,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .routine-badge {
       background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary-text);
       font-size: var(--font-size-xs); font-weight: 600;
-      padding: 3px 10px; border-radius: 12px; white-space: nowrap; flex-shrink: 0;
+      padding: 3px 10px; border-radius: var(--border-radius-pill); white-space: nowrap; flex-shrink: 0;
     }
 
     .split-desc { font-size: var(--font-size-sm); line-height: 1.4; }
@@ -172,7 +172,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 
     .tag-chip {
       font-size: 11px; font-weight: 500;
-      padding: 2px 8px; border-radius: 10px;
+      padding: 2px 8px; border-radius: var(--border-radius-pill);
       background: rgba(var(--color-primary-rgb), 0.08); color: var(--color-primary);
       border: 1px solid rgba(var(--color-primary-rgb), 0.18);
     }

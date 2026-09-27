@@ -536,7 +536,7 @@ interface ExerciseBlock {
     .rest-presets { display: flex; gap: 4px; margin-left: auto; }
 
     .rest-chip {
-      min-height: 28px; padding: 2px 8px; border-radius: 10px;
+      min-height: 28px; padding: 2px 8px; border-radius: var(--border-radius-pill);
       border: 1px solid color-mix(in srgb, currentColor 35%, transparent); background: none;
       color: color-mix(in srgb, currentColor 88%, transparent); font-size: var(--font-size-xs);
       cursor: pointer; transition: all 0.15s; font-family: inherit; white-space: nowrap;
@@ -574,7 +574,7 @@ interface ExerciseBlock {
 
     .rest-skip-btn {
       display: inline-flex; align-items: center; justify-content: center;
-      min-height: 28px; padding: 3px 8px; border-radius: 10px;
+      min-height: 28px; padding: 3px 8px; border-radius: var(--border-radius-pill);
       border: 1px solid color-mix(in srgb, currentColor 30%, transparent); background: none;
       color: color-mix(in srgb, currentColor 88%, transparent); cursor: pointer;
       font-size: var(--font-size-xs); transition: all 0.15s; font-family: inherit;
@@ -595,7 +595,7 @@ interface ExerciseBlock {
     .rest-row.rest-done .rest-progress-fill { background: var(--color-positive); }
 
     .type-toggle {
-      display: flex; border-radius: 6px; overflow: hidden;
+      display: flex; border-radius: var(--border-radius); overflow: hidden;
       border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
     }
 
@@ -744,7 +744,7 @@ interface ExerciseBlock {
     .block-title h2 { font-size: var(--font-size-md); font-weight: 600; }
 
     .sets-done-tag {
-      font-size: var(--font-size-xs); padding: 2px 8px; border-radius: 10px;
+      font-size: var(--font-size-xs); padding: 2px 8px; border-radius: var(--border-radius-pill);
       background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary); font-weight: 500;
     }
 
@@ -756,7 +756,7 @@ interface ExerciseBlock {
 
     .mg-tag {
       background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary-text);
-      font-size: var(--font-size-xs); padding: 2px 8px; border-radius: 10px;
+      font-size: var(--font-size-xs); padding: 2px 8px; border-radius: var(--border-radius-pill);
     }
 
     /* Exercise note */
@@ -1050,7 +1050,7 @@ interface ExerciseBlock {
 
     .fc-progress-bar {
       flex: 1; height: 4px; background: var(--border-color);
-      border-radius: 2px; overflow: hidden;
+      border-radius: var(--border-radius-sm); overflow: hidden;
     }
 
     .fc-progress-fill {
@@ -1073,10 +1073,10 @@ interface ExerciseBlock {
     }
 
     .fc-clip-link { display: inline-flex; align-items: center; text-decoration: none; }
-    .fc-thumb { width: 32px; height: 32px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border-color); }
+    .fc-thumb { width: 32px; height: 32px; object-fit: cover; border-radius: var(--border-radius-sm); border: 1px solid var(--border-color); }
     .fc-thumb-video {
       width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
-      background: var(--surface-secondary); border-radius: 4px; border: 1px solid var(--border-color);
+      background: var(--surface-secondary); border-radius: var(--border-radius-sm); border: 1px solid var(--border-color);
       color: var(--text-secondary);
     }
   `]

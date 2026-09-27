@@ -396,7 +396,7 @@ const DELOAD_SNOOZE_DAYS = 7;
     .asc-pills { display: flex; gap: var(--space-xs); flex-wrap: wrap; margin-top: 4px; }
 
     .asc-pill {
-      font-size: var(--font-size-xs); padding: 2px 8px; border-radius: 10px;
+      font-size: var(--font-size-xs); padding: 2px 8px; border-radius: var(--border-radius-pill);
       background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary-text); font-weight: 500;
     }
 
@@ -508,7 +508,7 @@ const DELOAD_SNOOZE_DAYS = 7;
       width: max-content;
     }
 
-    .heat-cell { width: 11px; height: 11px; border-radius: 2px; }
+    .heat-cell { width: 11px; height: 11px; border-radius: var(--border-radius-sm); }
 
     .heat-none { background: var(--bg-canvas); border: 1px solid var(--border-color); }
 
@@ -534,9 +534,9 @@ const DELOAD_SNOOZE_DAYS = 7;
 
     .mg-name { font-size: var(--font-size-xs); font-weight: 500; min-width: 72px; color: var(--text-secondary); }
 
-    .mg-bar { flex: 1; height: 6px; background: var(--bg-canvas); border-radius: 3px; overflow: hidden; }
+    .mg-bar { flex: 1; height: 6px; background: var(--bg-canvas); border-radius: var(--border-radius-sm); overflow: hidden; }
 
-    .mg-fill { height: 100%; border-radius: 3px; transition: width 0.3s; min-width: 3px; }
+    .mg-fill { height: 100%; border-radius: var(--border-radius-sm); transition: width 0.3s; min-width: 3px; }
 
     .mg-days { font-size: var(--font-size-xs); min-width: 54px; text-align: right; color: var(--text-muted); }
 

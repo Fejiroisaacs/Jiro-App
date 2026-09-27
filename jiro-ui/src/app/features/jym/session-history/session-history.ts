@@ -317,14 +317,14 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 
     .session-routine {
       font-size: var(--font-size-sm); color: var(--text-primary);
-      background: var(--color-secondary); padding: 2px 10px; border-radius: 10px;
+      background: var(--color-secondary); padding: 2px 10px; border-radius: var(--border-radius-pill);
     }
 
     .session-routine.freestyle { color: var(--text-muted); font-style: italic; background: none; }
 
     .type-badge {
       font-size: var(--font-size-xs); font-weight: 600;
-      padding: 2px 8px; border-radius: 10px;
+      padding: 2px 8px; border-radius: var(--border-radius-pill);
     }
 
     .type-badge.deload { background: rgba(var(--color-danger-rgb), 0.1); color: var(--color-danger); }
@@ -337,7 +337,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 
     .delete-session-btn {
       background: none; border: none; cursor: pointer;
-      color: var(--text-muted); padding: 6px; border-radius: 4px;
+      color: var(--text-muted); padding: 6px; border-radius: var(--border-radius-sm);
       display: flex; align-items: center; transition: all 0.15s;
       flex-shrink: 0;
     }
@@ -347,7 +347,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .stat-pill {
       font-size: var(--font-size-xs); padding: 3px 10px;
       background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary-text);
-      border-radius: 10px; font-weight: 500;
+      border-radius: var(--border-radius-pill); font-weight: 500;
     }
 
     .vol-pill { background: var(--bg-canvas); color: var(--text-secondary); border: 1px solid var(--border-color); }
@@ -475,7 +475,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .attachment-delete-btn {
       flex-shrink: 0; width: 20px; height: 20px;
       display: flex; align-items: center; justify-content: center;
-      background: none; border: none; border-radius: 4px;
+      background: none; border: none; border-radius: var(--border-radius-sm);
       color: var(--text-muted); cursor: pointer; padding: 0;
       transition: background 0.15s, color 0.15s;
     }

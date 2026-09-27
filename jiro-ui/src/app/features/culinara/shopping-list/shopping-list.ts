@@ -313,7 +313,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
       color: var(--text-muted);
       font-size: 18px;
       cursor: pointer;
-      border-radius: 4px;
+      border-radius: var(--border-radius-sm);
       transition: color 0.15s, background 0.15s;
     }
 

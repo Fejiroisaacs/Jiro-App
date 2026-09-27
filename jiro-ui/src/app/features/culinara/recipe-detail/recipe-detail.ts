@@ -631,7 +631,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
       flex: 1;
       height: 4px;
       background: var(--border-color);
-      border-radius: 2px;
+      border-radius: var(--border-radius-sm);
       overflow: hidden;
     }
 
@@ -720,7 +720,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
       padding: 3px 10px;
       background: rgba(var(--color-primary-rgb), 0.08);
       color: var(--color-primary);
-      border-radius: 12px;
+      border-radius: var(--border-radius-pill);
       font-weight: 500;
     }
 
@@ -770,7 +770,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
       font-size: var(--font-size-xs); padding: 3px 10px;
       background: rgba(var(--color-primary-rgb), 0.08); color: var(--color-primary);
       border: 1px solid rgba(var(--color-primary-rgb), 0.2);
-      border-radius: 12px; font-weight: 500;
+      border-radius: var(--border-radius-pill); font-weight: 500;
       display: inline-flex; align-items: center; gap: 4px;
     }
 
@@ -796,7 +796,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
       gap: 4px;
       padding: 4px 12px;
       border: 1px solid var(--border-color);
-      border-radius: 20px;
+      border-radius: var(--border-radius-pill);
       background: var(--bg-surface);
       color: var(--text-secondary);
       font-size: var(--font-size-xs);
@@ -1042,7 +1042,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
       cursor: pointer;
       color: var(--color-primary);
       padding: 4px 8px;
-      border-radius: 4px;
+      border-radius: var(--border-radius-sm);
       font-weight: 500;
       transition: background 0.15s;
     }
@@ -1155,7 +1155,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .toggle-switch {
       position: relative;
       width: 40px; height: 22px;
-      border: none; border-radius: 11px;
+      border: none; border-radius: var(--border-radius-pill);
       /* Off: a muted track (the border colour vanished in dark mode); the surface-coloured thumb contrasts. */
       background: var(--text-muted);
       cursor: pointer;

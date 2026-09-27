@@ -208,7 +208,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 
     .status-badge {
       font-size: var(--font-size-xs); font-weight: 600; padding: 3px 10px;
-      border-radius: 10px; white-space: nowrap; flex-shrink: 0;
+      border-radius: var(--border-radius-pill); white-space: nowrap; flex-shrink: 0;
     }
     .status-badge.active { background: rgba(var(--color-accent-rgb), 0.12); color: var(--color-positive); }
     .status-badge.ended { background: var(--bg-canvas); color: var(--text-muted); border: 1px solid var(--border-color); }
@@ -229,7 +229,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 
 
     .sessions-pill, .duration-pill {
-      font-size: var(--font-size-xs); padding: 3px 10px; border-radius: 10px;
+      font-size: var(--font-size-xs); padding: 3px 10px; border-radius: var(--border-radius-pill);
       background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary-text); font-weight: 500;
     }
 

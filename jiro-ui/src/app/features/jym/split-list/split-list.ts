@@ -210,7 +210,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
       font-size: var(--font-size-xs); 
       font-weight: 600;
       padding: 4px 8px; 
-      border-radius: 2px;
+      border-radius: var(--border-radius-pill);
       border: 1px dashed var(--border-color);
       box-shadow: 1px 1px 0 var(--border-color);
       white-space: nowrap;
@@ -241,7 +241,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
       font-size: var(--font-size-xs);
       font-weight: 600;
       padding: 4px 8px;
-      border-radius: 2px;
+      border-radius: var(--border-radius-pill);
       border: 1px solid var(--border-color);
       box-shadow: 1px 1px 0 rgba(var(--shadow-rgb), 0.1);
       white-space: nowrap;

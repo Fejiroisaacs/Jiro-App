@@ -387,7 +387,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
 
     .edit-btn {
       background: none; border: none; color: var(--text-muted);
-      cursor: pointer; padding: var(--space-xs); border-radius: 4px;
+      cursor: pointer; padding: var(--space-xs); border-radius: var(--border-radius-sm);
     }
 
     .edit-btn:hover { color: var(--color-primary); background: rgba(var(--color-primary-rgb), 0.1); }
@@ -418,7 +418,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
       font-size: var(--font-size-xs); 
       font-weight: 600;
       padding: 4px 8px; 
-      border-radius: 2px;
+      border-radius: var(--border-radius-pill);
       border: 1px dashed var(--border-color);
       box-shadow: 1px 1px 0 var(--border-color);
       white-space: nowrap;
@@ -427,7 +427,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
     .tag-edit-btn {
       display: flex; align-items: center; gap: 4px;
       background: none; border: 1px dashed var(--border-color);
-      border-radius: 10px; padding: 2px 8px;
+      border-radius: var(--border-radius-pill); padding: 2px 8px;
       color: var(--text-muted); font-size: 11px; cursor: pointer;
       transition: all 0.15s;
     }
@@ -492,7 +492,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
       font-size: var(--font-size-xs);
       font-weight: 600;
       padding: 4px 8px;
-      border-radius: 2px;
+      border-radius: var(--border-radius-pill);
       border: 1px solid var(--border-color);
       box-shadow: 1px 1px 0 rgba(var(--shadow-rgb), 0.1);
       white-space: nowrap;
@@ -505,7 +505,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
 
     .icon-btn {
       background: none; border: none; cursor: pointer;
-      color: var(--text-muted); padding: 4px; border-radius: 4px;
+      color: var(--text-muted); padding: 4px; border-radius: var(--border-radius-sm);
       display: flex; align-items: center; flex-shrink: 0;
     }
 
@@ -549,7 +549,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
       font-size: var(--font-size-xs);
       font-weight: 600;
       padding: 4px 8px;
-      border-radius: 2px;
+      border-radius: var(--border-radius-pill);
       border: 1px solid var(--border-color);
       box-shadow: 1px 1px 0 rgba(var(--shadow-rgb), 0.1);
       white-space: nowrap;
@@ -616,7 +616,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
     .ex-pick-btn {
       display: flex; align-items: center; justify-content: space-between;
       padding: var(--space-sm) var(--space-md); background: none;
-      border: none; border-radius: 4px; cursor: pointer;
+      border: none; border-radius: var(--border-radius-sm); cursor: pointer;
       text-align: left; width: 100%; transition: background 0.15s;
     }
 

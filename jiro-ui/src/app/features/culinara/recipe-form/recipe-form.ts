@@ -310,7 +310,7 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
     .tag-chip {
       padding: 6px 14px;
       border: 1px solid var(--border-color);
-      border-radius: 4px; /* Paper label look */
+      border-radius: var(--border-radius-pill);
       background: var(--bg-surface);
       color: var(--text-secondary);
       font-size: var(--font-size-xs);
@@ -349,7 +349,7 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
       padding: 3px 8px 3px 10px;
       background: rgba(var(--color-primary-rgb), 0.12);
       border: 1px solid var(--color-primary);
-      border-radius: 20px;
+      border-radius: var(--border-radius-pill);
       color: var(--color-primary);
       font-size: var(--font-size-xs);
       font-weight: 500;

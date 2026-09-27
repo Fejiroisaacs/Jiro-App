@@ -122,7 +122,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .mg-label { font-size: var(--font-size-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); }
 
     .mg-count {
-      font-size: var(--font-size-xs); padding: 1px 7px; border-radius: 10px;
+      font-size: var(--font-size-xs); padding: 1px 7px; border-radius: var(--border-radius-pill);
       background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary); font-weight: 500;
     }
 
