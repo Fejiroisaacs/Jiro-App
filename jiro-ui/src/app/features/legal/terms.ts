@@ -26,7 +26,7 @@ import { JiroPageHeaderComponent } from '../../shared/components/jiro-page-heade
       </header>
 
       <main class="legal-main">
-        <jiro-page-header heading="Terms of use" subtitle="Draft, last updated 23 September 2026" />
+        <jiro-page-header heading="Terms of use" subtitle="Draft, last updated 23 Sep 2026" />
 
         <p class="legal-draft" role="note">
           This is a draft. It has not been reviewed by a lawyer and it is not legal advice.
