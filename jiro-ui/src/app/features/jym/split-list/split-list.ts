@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal, input } from '@angular/core';
 
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { firstValueFrom } from 'rxjs';
 import { JymService, Split } from '../../../core/services/jym.service';
 import { WorkoutLauncher } from '../shared/workout-launcher';
 import { ConfirmService } from '../../../core/services/confirm.service';
@@ -418,9 +419,17 @@ export class SplitListComponent implements OnInit {
   }
 
   async deleteSplit(split: Split) {
+    // Series run on the split are deleted with it (FK cascade), so name them.
+    let series: string[] | null = null;
+    try {
+      series = (await firstValueFrom(this.jymService.listSeries())).filter(s => s.split_id === split.id).map(s => s.name);
+    } catch { /* fall back to the general wording */ }
+    const what = series === null ? 'the split, its routines and any series run on it'
+      : series.length ? `the split, its routines and ${series.length} series (${series.join(', ')})`
+      : 'the split and its routines';
     const ok = await this.confirmService.confirm({
       title: `Delete ${split.name}?`,
-      message: 'This deletes the split and all its routines. Sessions you already logged from them are not affected.',
+      message: `This deletes ${what}. Workouts you logged stay in your history.`,
       confirmLabel: 'Delete split',
       danger: true,
     });
