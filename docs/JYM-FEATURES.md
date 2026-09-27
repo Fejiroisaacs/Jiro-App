@@ -42,6 +42,8 @@ A **split** is a named training plan (e.g. "PPL", "Upper/Lower"). It contains on
 A **series** ties a split to a time window (weeks, sessions count, or open-ended). Sessions logged within a series are linked to it for progression tracking.
 
 - Start a series from the Jym hub or the split detail page.
+- A series knows its next day: the day after the last one logged, wrapping round. The Jym home offers it as **Up next**.
+- Starting a day from its split files the workout under the split's active series, whichever Start button was used.
 - End a series manually or let it run open-ended.
 - Series detail page shows a volume chart per session and per-exercise 1RM progression curves.
 
@@ -62,11 +64,12 @@ Switch between **Normal**, **Deload**, and **Test** at any time during the sessi
 ### Logging Sets
 Each exercise block shows a set table with columns: **Set #**, **Weight**, **Reps**, **RPE**, **W (Warm-up)**, and a log/delete action.
 
-- Enter weight and reps, then tap ✓ to save the set.
+- Tap ✓ to log the row. Typed values win; an untouched row logs its ghost values (today's aim), so repeating a set is one tap.
 - **RPE** (Rating of Perceived Exertion, 1–10) is optional.
-- Ghost text pre-fills from the previous session's values for that exercise.
-- A saved set turns green. A **🏆** badge appears if the set is a personal record.
-- Delete a saved set with the ✕ button.
+- Ghost values before the first set of the day are today's aim (see below); after it, a new row's ghosts are the set just lifted.
+- A saved set is tinted. A **PR** badge appears if the set is a personal record.
+- Tap a logged value to correct it: ✓ saves, × cancels (Escape on desktop). Delete a logged set with the trash icon.
+- In a routine, the block shows its plan ("Plan 3 × 8"), and a logged working set below the planned reps is marked.
 
 ### Warm-up Sets
 Each set row has a **W** toggle button. Tap it to mark the set as a warm-up.
@@ -80,14 +83,17 @@ Each exercise block has a subtle text area above the set table for a free-text n
 - On save, the note is written to every already-logged set in that block.
 - Notes are restored when returning to an in-progress session.
 
-### Progressive Overload Suggestions
-When you add an exercise to a freestyle session (or pick one from the exercise picker), the app fetches your history and shows a suggestion above the set table:
+### Last Time and Today's Aim
+Every exercise with history shows one line above its sets: what you did last time, and what to aim for today.
 
-> *Last: 80 kg × 5, try 82.5 kg*
+> *Last time 100 lbs × 8, 8, 6. Stay at 100 lbs until every set hits 8.*
 
-- The next weight is last time's top weight plus one plate step (**2.5 kg** or **5 lb**), rounded to that step. Warm-ups are ignored.
-- The suggestion is hidden once all sets are saved.
-- Deload session history is excluded from the calculation.
+- **Last time** is the latest normal workout before today's. Deload and test days are skipped, and warm-ups are not counted.
+- **With a plan** (a routine's sets × reps), it is double progression: once enough sets at the top weight hit the planned reps, try one plate more; until then, stay at the same weight.
+- **Freestyle**: one plate more, unless the top set was logged at RPE 9 or more; then stay and aim for one more rep.
+- **Bodyweight** lifts aim for one more rep.
+- One plate is **2.5 kg** or **5 lb**, counted from the plate grid (177.5 lb goes to 180). The rule lives in `weight-suggestion.ts` and is covered by `npm run test:unit`.
+- The line is hidden once all sets are saved.
 
 ### Rest Timer
 After every logged set, a rest timer starts automatically in the sticky header bar.
@@ -164,8 +170,10 @@ The home screen for the Jym module. Contains:
 ### Quick Navigation
 Links to the exercise library, session history, PR wall, body weight log, and series list.
 
-### In-Progress Session Banner
-If a session was started but not finished, a banner appears with a "Resume" button that takes you back to the live player.
+### In Progress and Up Next
+- A workout that was started but not finished is the first thing on the page, with **Resume** and discard.
+- Otherwise **Up next** names the next day of the most recently started active series: **Start** opens that day in the series, **Other day** picks another.
+- Active series cards show **Next: (day)**, and their Start opens that day directly.
 
 ### Workout Frequency Heatmap
 A GitHub-style contribution grid showing the last 16 weeks of workout activity.
