@@ -260,6 +260,11 @@ html.theme-slate {
   --bg-canvas: #F7F8FA;
   --bg-surface: #FDFDFE;
   --bg-surface-hover: #E0E6EE;
+  // A step deeper than Earth's so they keep 4.5:1 on this darker hover surface.
+  --color-danger: #A64B23;
+  --color-danger-rgb: 166, 75, 35;
+  --color-warning: #855E35;
+  --color-warning-rgb: 133, 94, 53;
   --border-color: #C8D0DC;
   --mark-bg: #D9E0E8;
   --shadow-rgb: 46, 63, 82;
