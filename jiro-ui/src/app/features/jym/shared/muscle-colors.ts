@@ -18,8 +18,13 @@ const MUSCLE_TOKENS: Record<string, number> = {
   calves: 12,
 };
 
+const DATA = [
+  'var(--data-1)', 'var(--data-2)', 'var(--data-3)', 'var(--data-4)', 'var(--data-5)', 'var(--data-6)',
+  'var(--data-7)', 'var(--data-8)', 'var(--data-9)', 'var(--data-10)', 'var(--data-11)', 'var(--data-12)',
+];
+
 /** The muscle group's data colour as a CSS value, e.g. `var(--data-5)`. */
 export function muscleColor(group: string | null | undefined): string {
   const n = MUSCLE_TOKENS[(group ?? 'other').trim().toLowerCase()] ?? MUSCLE_TOKENS['other'];
-  return `var(--data-${n})`;
+  return DATA[n - 1];
 }
