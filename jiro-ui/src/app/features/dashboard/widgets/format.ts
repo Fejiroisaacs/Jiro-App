@@ -1,18 +1,15 @@
-import { resolveTimeZone } from '../../../core/utils/day';
+import { dayKey, resolveTimeZone, todayKey } from '../../../core/utils/day';
 import { formatDay, formatInstant } from '../../../core/utils/format-date';
 
-/** "just now", "5m ago", "3h ago", "yesterday", "4 days ago", then a short date. */
-export function timeAgo(iso: string, now = Date.now()): string {
+/** "just now", "5m ago", "3h ago", then calendar days in `timeZone` ("yesterday", "4 days ago"). */
+export function timeAgo(iso: string, now = Date.now(), timeZone = resolveTimeZone(null)): string {
   const ms = now - new Date(iso).getTime();
   const minutes = Math.max(0, Math.round(ms / 60000));
   if (minutes < 1) return 'just now';
   if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.round(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
-  const days = Math.round(hours / 24);
-  if (days === 1) return 'yesterday';
-  if (days < 14) return `${days} days ago`;
-  return shortDate(iso);
+  return daysAgo(dayKey(iso, timeZone), todayKey(timeZone, new Date(now)));
 }
 
 /**
