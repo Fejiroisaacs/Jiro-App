@@ -68,3 +68,12 @@ Only `name` and `path` are required.
 
 Keep shots tight: a dialog or one card reads better than a whole page, and
 stays under the size budget.
+
+## Landing screenshots
+
+`landing-shots.mjs` re-shoots `public/images/landing/*-{light,dark}.webp` from
+the demo, with the demo bar hidden. Each shot's framing, final size and byte
+budget are in the `SHOTS` list at the top of the script.
+
+    node scripts/guide-shots/landing-shots.mjs            # all six
+    node scripts/guide-shots/landing-shots.mjs jym ledger # only these

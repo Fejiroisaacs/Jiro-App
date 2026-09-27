@@ -133,9 +133,9 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
               </div>
               <div class="l-card-shot">
                 <img class="shot-light" width="800" height="600" loading="lazy" decoding="async"
-                  alt="A Jym session in progress: logged sets with weights and reps." src="/images/landing/jym-light.webp" />
+                  alt="A logged Jym workout: sets with weights and reps, a warm-up set and PRs." src="/images/landing/jym-light.webp" />
                 <img class="shot-dark" width="800" height="600" loading="lazy" decoding="async"
-                  alt="A Jym session in progress: logged sets with weights and reps." src="/images/landing/jym-dark.webp" />
+                  alt="A logged Jym workout: sets with weights and reps, a warm-up set and PRs." src="/images/landing/jym-dark.webp" />
               </div>
             </div>
 
