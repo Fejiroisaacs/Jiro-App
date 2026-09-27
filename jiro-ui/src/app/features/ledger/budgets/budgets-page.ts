@@ -176,7 +176,7 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
               <label class="form-label" for="budget-add-category">Category</label>
               <button type="button" class="new-cat-btn" (click)="showCatDialog.set(true)"><jiro-icon name="plus" [size]="14" /> New category</button>
             </div>
-            <select id="budget-add-category" class="form-input" [(ngModel)]="newCategoryId" name="category" required>
+            <span class="select-wrap"><select id="budget-add-category" class="form-input" [(ngModel)]="newCategoryId" name="category" required>
               <option value="" disabled>Select a category...</option>
               @for (cat of expenseCategories(); track cat.id) {
                 <option [value]="cat.id">{{ cat.name }}</option>
@@ -184,7 +184,7 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
                   <option [value]="child.id">{{ cat.name }} / {{ child.name }}</option>
                 }
               }
-            </select>
+            </select></span>
           </div>
 
           <div class="form-group">
@@ -204,11 +204,11 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
 
           <div class="form-group">
             <label class="form-label" for="budget-add-period">Period</label>
-            <select id="budget-add-period" class="form-input" [(ngModel)]="newPeriod" name="period">
+            <span class="select-wrap"><select id="budget-add-period" class="form-input" [(ngModel)]="newPeriod" name="period">
               <option value="monthly">Monthly</option>
               <option value="weekly">Weekly</option>
               <option value="yearly">Yearly</option>
-            </select>
+            </select></span>
             <p class="field-hint">A budget always tracks the current {{ periodWord(newPeriod) }}, starting over at the next one.</p>
           </div>
 
@@ -245,11 +245,11 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
           </div>
           <div class="form-group">
             <label class="form-label" for="budget-edit-period">Period</label>
-            <select id="budget-edit-period" class="form-input" [(ngModel)]="editPeriod" name="period">
+            <span class="select-wrap"><select id="budget-edit-period" class="form-input" [(ngModel)]="editPeriod" name="period">
               <option value="monthly">Monthly</option>
               <option value="weekly">Weekly</option>
               <option value="yearly">Yearly</option>
-            </select>
+            </select></span>
           </div>
           @if (formError()) {
             <p class="form-error" role="alert">{{ formError() }}</p>
@@ -513,11 +513,24 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
     }
 
     select.form-input {
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239B8F88' stroke-width='2.5'%3E%3Cpolyline points='6,9 12,15 18,9'/%3E%3C/svg%3E");
-      background-repeat: no-repeat;
-      background-position: right 4px center;
       padding-right: 24px;
       cursor: pointer;
+    }
+
+    .select-wrap { position: relative; display: block; }
+
+    /* Chevron drawn as a mask so it takes the theme's muted text colour. */
+    .select-wrap::after {
+      content: '';
+      position: absolute;
+      right: 4px;
+      top: 50%;
+      width: 12px;
+      height: 12px;
+      transform: translateY(-50%);
+      background-color: var(--text-muted);
+      mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5'%3E%3Cpolyline points='6,9 12,15 18,9'/%3E%3C/svg%3E") center / contain no-repeat;
+      pointer-events: none;
     }
 
     .form-input:focus { border-bottom-color: var(--color-primary); }
