@@ -66,6 +66,13 @@ export class AuthService {
   isDemo = computed(() => this.currentUser()?.is_demo === true);
   isInitialized = this.initialized.asReadonly();
 
+  /** Bumped when the API refuses a write with EMAIL_NOT_VERIFIED; the shell re-shows its verify banner. */
+  private readonly verifyNudges = signal(0);
+  readonly verifyNudge = this.verifyNudges.asReadonly();
+  nudgeVerify() {
+    this.verifyNudges.update(n => n + 1);
+  }
+
   constructor(private http: HttpClient, private router: Router) {
     // The access token itself is never persisted (see handleAuth) — only
     // this non-sensitive profile object is, purely as the cheap signal

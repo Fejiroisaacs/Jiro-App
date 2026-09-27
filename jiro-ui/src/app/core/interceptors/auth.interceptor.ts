@@ -36,6 +36,12 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         toast.readOnlyNotice(error.error.error.message);
         return throwError(() => error);
       }
+      // Unverified write refused: same one-per-burst notice, and bring back a dismissed verify banner.
+      if (error.status === 403 && error.error?.error?.code === 'EMAIL_NOT_VERIFIED') {
+        toast.readOnlyNotice(error.error.error.message);
+        authService.nudgeVerify();
+        return throwError(() => error);
+      }
       if (error.status !== 401) return throwError(() => error);
 
       // Never signed in on this browser: nothing to refresh.
