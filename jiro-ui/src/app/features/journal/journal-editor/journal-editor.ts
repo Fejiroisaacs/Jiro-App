@@ -20,6 +20,7 @@ import { dayKey, isDayKey, todayKey, zonedNoonISO } from '../../../core/utils/da
 import { AuthService } from '../../../core/services/auth.service';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { formatDay } from '../../../core/utils/format-date';
 
 /** A photo picked for an entry that does not exist yet; it uploads on publish. */
 interface PendingPhoto { file: File; url: string; }
@@ -337,10 +338,10 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
     .for-date-badge {
       font-size: var(--font-size-xs);
       font-weight: 500;
-      color: var(--color-primary);
+      color: var(--color-primary-text);
       background: rgba(var(--color-primary-rgb), 0.1);
       padding: 2px 8px;
-      border-radius: 10px;
+      border-radius: var(--border-radius-pill);
     }
     .editor-topbar-actions { flex-shrink: 0; }
     .day-link {
@@ -351,7 +352,7 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
       margin: calc(var(--space-md) - var(--space-xl)) 0 var(--space-md);
       font-size: var(--font-size-sm);
       font-weight: 600;
-      color: var(--color-primary);
+      color: var(--color-primary-text);
     }
 
     /* Editor body */
@@ -405,7 +406,7 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
       cursor: pointer;
       transition: color 0.15s;
     }
-    .prompt-question:hover { color: var(--color-primary); }
+    .prompt-question:hover { color: var(--color-primary-text); }
     .prompt-actions { display: flex; gap: var(--space-xs); flex-shrink: 0; }
     .prompt-btn {
       display: inline-flex;
@@ -472,7 +473,7 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
       gap: 5px;
       padding: 7px 12px;
       border: 1.5px solid var(--border-color);
-      border-radius: 99px;
+      border-radius: var(--border-radius-pill);
       background: var(--bg-canvas);
       color: var(--text-secondary);
       font-size: var(--font-size-xs);
@@ -483,11 +484,11 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
       transition: border-color 0.15s, color 0.15s, background 0.15s;
       min-height: 44px;
     }
-    .mood-chip:hover { border-color: var(--color-primary); color: var(--color-primary); }
+    .mood-chip:hover { border-color: var(--color-primary); color: var(--color-primary-text); }
     .mood-chip.selected {
       border-color: var(--color-primary);
       background: color-mix(in srgb, var(--color-primary) 12%, transparent);
-      color: var(--color-primary);
+      color: var(--color-primary-text);
       font-weight: 500;
     }
     /* Tags */
@@ -500,8 +501,8 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
       font-size: var(--font-size-xs);
       padding: 4px 8px;
       background: color-mix(in srgb, var(--color-primary) 12%, transparent);
-      color: var(--color-primary);
-      border-radius: 99px;
+      color: var(--color-primary-text);
+      border-radius: var(--border-radius-pill);
     }
     .tag-remove {
       background: none;
@@ -534,7 +535,7 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
       gap: 5px;
       font-size: var(--font-size-xs);
       font-family: inherit;
-      color: var(--color-primary);
+      color: var(--color-primary-text);
       cursor: pointer;
       border: 1px solid var(--color-primary);
       border-radius: var(--border-radius-sm);
@@ -593,18 +594,18 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
       gap: 6px;
       padding: 6px 12px;
       border: 1.5px solid var(--border-color);
-      border-radius: 99px;
+      border-radius: var(--border-radius-pill);
       font-size: var(--font-size-xs);
       color: var(--text-secondary);
       cursor: pointer;
       transition: border-color 0.15s, color 0.15s, background 0.15s;
       min-height: 36px;
     }
-    .coll-option:hover { border-color: var(--color-primary); color: var(--color-primary); }
+    .coll-option:hover { border-color: var(--color-primary); color: var(--color-primary-text); }
     .coll-option.selected {
       border-color: var(--color-primary);
       background: color-mix(in srgb, var(--color-primary) 12%, transparent);
-      color: var(--color-primary);
+      color: var(--color-primary-text);
       font-weight: 500;
     }
 
@@ -989,8 +990,7 @@ export class JournalEditorComponent implements OnInit, OnDestroy {
 
   formatForDate(): string {
     if (!this.forDate) return '';
-    const d = new Date(this.forDate + 'T12:00:00');
-    return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+    return formatDay(this.forDate, { weekday: true });
   }
 }
 

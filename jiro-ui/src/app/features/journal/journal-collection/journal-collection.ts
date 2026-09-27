@@ -17,6 +17,8 @@ import { IconName } from '../../../shared/icons/icons.generated';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { UploadService } from '../../../core/services/upload.service';
+import { SettingsService } from '../../../core/services/settings.service';
+import { formatInstant } from '../../../core/utils/format-date';
 
 @Component({
   selector: 'app-journal-collection',
@@ -177,7 +179,7 @@ import { UploadService } from '../../../core/services/upload.service';
 
     <!-- Edit modal -->
     @if (showEdit()) {
-<jiro-modal title="Edit Collection" (close)="showEdit.set(false)">
+<jiro-modal title="Edit collection" (close)="showEdit.set(false)">
       <div class="modal-form">
         <label class="form-label" for="edit-coll-name">Name</label>
         <input id="edit-coll-name" type="text" class="form-control" [(ngModel)]="editName" maxlength="100" />
@@ -205,7 +207,7 @@ import { UploadService } from '../../../core/services/upload.service';
       display: flex; align-items: center; gap: 4px;
       font-size: var(--font-size-sm); color: var(--text-secondary); text-decoration: none; transition: color 0.15s;
     }
-    .back-link:hover { color: var(--color-primary); text-decoration: none; }
+    .back-link:hover { color: var(--color-primary-text); text-decoration: none; }
     .coll-header-info { display: flex; align-items: center; gap: var(--space-md); }
     .coll-cover {
       width: 60px;
@@ -294,7 +296,7 @@ import { UploadService } from '../../../core/services/upload.service';
     .entry-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-xs); }
     .entry-meta { display: flex; align-items: center; gap: var(--space-sm); }
     .entry-date { font-size: var(--font-size-xs); color: var(--text-secondary); }
-    .mood-chip { display: inline-flex; align-items: center; gap: 4px; font-size: var(--font-size-xs); padding: 2px 8px; background: color-mix(in srgb, var(--color-primary) 12%, transparent); color: var(--color-primary); border-radius: 99px; }
+    .mood-chip { display: inline-flex; align-items: center; gap: 4px; font-size: var(--font-size-xs); padding: 2px 8px; background: color-mix(in srgb, var(--color-primary) 12%, transparent); color: var(--color-primary-text); border-radius: var(--border-radius-pill); }
     .entry-card-actions { display: flex; gap: var(--space-xs); opacity: 0; transition: opacity 0.15s; }
     .entry-card:hover .entry-card-actions,
     .entry-card:focus-within .entry-card-actions { opacity: 1; }
@@ -307,7 +309,7 @@ import { UploadService } from '../../../core/services/upload.service';
     .entry-excerpt { font-size: var(--font-size-sm); color: var(--text-secondary); margin: 0 0 var(--space-sm); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
     .entry-footer { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); }
     .tag-list { display: flex; flex-wrap: wrap; gap: 4px; }
-    .tag-chip { font-size: 0.65rem; padding: 2px 6px; background: var(--bg-surface-hover); border-radius: 99px; color: var(--text-secondary); }
+    .tag-chip { font-size: 0.65rem; padding: 2px 6px; background: var(--bg-surface-hover); border-radius: var(--border-radius-pill); color: var(--text-secondary); }
     .img-badge { display: flex; align-items: center; gap: 3px; font-size: var(--font-size-xs); color: var(--text-secondary); flex-shrink: 0; }
 
     /* Modal */
@@ -344,6 +346,7 @@ export class JournalCollectionComponent implements OnInit {
   private readonly confirmService = inject(ConfirmService);
   private readonly toast = inject(ToastService);
   private readonly uploadService = inject(UploadService);
+  private readonly settings = inject(SettingsService);
 
   constructor(
     private svc: JournalService,
@@ -487,7 +490,7 @@ export class JournalCollectionComponent implements OnInit {
   }
 
   formatDate(s: string): string {
-    return new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return formatInstant(s, this.settings.timezone());
   }
 
   excerpt(body: string): string {

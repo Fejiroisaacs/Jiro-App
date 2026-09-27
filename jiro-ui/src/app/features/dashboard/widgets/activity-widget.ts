@@ -89,7 +89,7 @@ interface ActivityDay {
     .act-cell.on-w { background: var(--color-primary); }
     .act-cell.on-j { background: var(--color-accent); }
     .act-day { font-size: 10px; color: var(--text-muted); }
-    .act-col--today .act-day { color: var(--color-primary); font-weight: 700; }
+    .act-col--today .act-day { color: var(--color-primary-text); font-weight: 700; }
 
     /* Phones: two rows of 7 (last week over this week) instead of 14 tiny columns. */
     @media (max-width: 600px) {

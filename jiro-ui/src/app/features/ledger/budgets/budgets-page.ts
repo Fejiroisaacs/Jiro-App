@@ -16,7 +16,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { SettingsService } from '../../../core/services/settings.service';
-import { periodLabel, clamp, formatCurrency, currencySymbol } from '../shared/ledger-utils';
+import { periodLabel, clamp, formatCurrency, currencySymbol, categoryColor } from '../shared/ledger-utils';
 import { LedgerCategoryDialogComponent } from '../shared/category-dialog/ledger-category-dialog';
 import { LedgerCategoryManagerComponent } from '../shared/category-manager/ledger-category-manager';
 import { LedgerCategory } from '../../../core/services/ledger.service';
@@ -102,7 +102,7 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
               <span
                 class="color-dot"
                 aria-hidden="true"
-                [style.background]="budget.category_color || 'var(--text-muted)'">
+                [style.background]="categoryColor(budget.category_color)">
               </span>
               <h2 class="category-name">{{ budget.category_name }}</h2>
             </div>
@@ -355,7 +355,7 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
       width: 40px; height: 40px; border: none; background: none; cursor: pointer;
       border-radius: var(--border-radius); color: var(--text-secondary);
     }
-    .icon-btn:hover { background: var(--bg-canvas); color: var(--color-primary); }
+    .icon-btn:hover { background: var(--bg-canvas); color: var(--color-primary-text); }
     .icon-btn.delete-btn:hover { color: var(--color-danger); }
 
     .field-hint { font-size: var(--font-size-xs); color: var(--text-muted); margin: 0; line-height: 1.5; }
@@ -394,7 +394,7 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
       font-size: var(--font-size-xs);
       font-weight: 600;
       padding: 3px 8px;
-      border-radius: 2px;
+      border-radius: var(--border-radius-pill);
       border: 1px solid var(--border-color);
       white-space: nowrap;
       flex-shrink: 0;
@@ -406,7 +406,7 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
     .progress-track {
       height: 8px;
       background: var(--bg-canvas);
-      border-radius: 4px;
+      border-radius: var(--border-radius-pill);
       border: 1px solid var(--border-color);
       overflow: hidden;
     }
@@ -414,7 +414,7 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
     .progress-fill {
       height: 100%;
       background: var(--color-accent);
-      border-radius: 4px;
+      border-radius: var(--border-radius-pill);
       transition: width 0.4s ease;
     }
 
@@ -483,7 +483,7 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
       padding: 8px 0;
       font-size: var(--font-size-sm);
       font-weight: 500;
-      color: var(--color-primary);
+      color: var(--color-primary-text);
       cursor: pointer;
       line-height: 1;
     }
@@ -536,6 +536,7 @@ import { LedgerCategory } from '../../../core/services/ledger.service';
   `]
 })
 export class BudgetsPageComponent implements OnInit {
+  readonly categoryColor = categoryColor;
   readonly periodLabel = periodLabel;
   readonly clamp = clamp;
 

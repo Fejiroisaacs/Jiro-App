@@ -14,7 +14,7 @@ import { JiroButtonComponent } from '../../shared/components/jiro-button/jiro-bu
 import { JiroIconComponent } from '../../shared/components/jiro-icon/jiro-icon';
 import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
 import { JiroSkeletonComponent } from '../../shared/components/jiro-skeleton/jiro-skeleton';
-import { formatCurrency, formatSignedCurrency, transactionColor } from '../ledger/shared/ledger-utils';
+import { categoryColor, formatCurrency, formatSignedCurrency, transactionColor } from '../ledger/shared/ledger-utils';
 
 type LoadState =
   | { status: 'loading'; key: string }
@@ -213,7 +213,7 @@ const SLOT_LABELS: Record<string, string> = { breakfast: 'Breakfast', lunch: 'Lu
                             <span class="row-title">{{ t.description || 'Transaction' }}</span>
                             <span class="row-meta">
                               @if (t.category_name) {
-                                <span class="cat-dot" [style.background]="t.category_color || 'var(--text-muted)'" aria-hidden="true"></span>{{ t.category_name }} ·
+                                <span class="cat-dot" [style.background]="categoryColor(t.category_color)" aria-hidden="true"></span>{{ t.category_name }} ·
                               }
                               {{ t.type === 'transfer' && t.transfer_to_account_name ? t.account_name + ' to ' + t.transfer_to_account_name : t.account_name }}
                             </span>
@@ -263,7 +263,7 @@ const SLOT_LABELS: Record<string, string> = { breakfast: 'Breakfast', lunch: 'Lu
       font-weight: 600;
       letter-spacing: 0.06em;
       text-transform: uppercase;
-      color: var(--color-primary);
+      color: var(--color-primary-text);
     }
     .day-nav { display: flex; align-items: center; gap: var(--space-sm); }
     .day-arrow, .day-today {
@@ -364,7 +364,7 @@ const SLOT_LABELS: Record<string, string> = { breakfast: 'Breakfast', lunch: 'Lu
       background: var(--bg-surface-hover);
       color: var(--text-secondary);
     }
-    .pill--pr { background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary); }
+    .pill--pr { background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary-text); }
 
     .quiet {
       margin: 0;
@@ -380,7 +380,7 @@ const SLOT_LABELS: Record<string, string> = { breakfast: 'Breakfast', lunch: 'Lu
       align-items: center;
       min-height: 44px;
       font-weight: 600;
-      color: var(--color-primary);
+      color: var(--color-primary-text);
     }
 
     .sub-title {
@@ -417,6 +417,7 @@ const SLOT_LABELS: Record<string, string> = { breakfast: 'Breakfast', lunch: 'Lu
   `],
 })
 export class DayPageComponent {
+  readonly categoryColor = categoryColor;
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly days = inject(DayService);

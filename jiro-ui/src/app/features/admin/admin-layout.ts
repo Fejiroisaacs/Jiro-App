@@ -40,7 +40,7 @@ import { JiroConfirmComponent } from '../../shared/components/jiro-confirm/jiro-
     }
     .nav-links { display: flex; flex-direction: column; gap: 4px; flex: 1; }
     .nav-link {
-      display: block; padding: 8px 12px; border-radius: 6px;
+      display: block; padding: 8px 12px; border-radius: var(--border-radius);
       color: color-mix(in srgb, var(--text-on-dark) 75%, transparent); text-decoration: none; font-size: 14px;
       transition: background 0.15s, color 0.15s;
     }
@@ -49,7 +49,7 @@ import { JiroConfirmComponent } from '../../shared/components/jiro-confirm/jiro-
       background: color-mix(in srgb, var(--text-on-dark) 12%, transparent); color: var(--text-on-dark);
     }
     .logout-btn {
-      margin-top: auto; padding: 8px 12px; border-radius: 6px; border: none;
+      margin-top: auto; padding: 8px 12px; border-radius: var(--border-radius); border: none;
       background: none; color: color-mix(in srgb, var(--text-on-dark) 75%, transparent); font-size: 14px;
       cursor: pointer; text-align: left; transition: color 0.15s; white-space: nowrap;
     }

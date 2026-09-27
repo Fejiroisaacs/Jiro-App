@@ -23,7 +23,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
       <div class="section-row">
         <h2 class="section-title">Your groups</h2>
         @if (!loading() && groups().length > 0) {
-          <jiro-button variant="secondary" type="button" (click)="showCreate.set(true)"><jiro-icon name="plus" [size]="14" /> New Group</jiro-button>
+          <jiro-button variant="secondary" type="button" (click)="showCreate.set(true)"><jiro-icon name="plus" [size]="14" /> New group</jiro-button>
         }
       </div>
 
@@ -46,7 +46,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 <div class="state-box">
         <h3>No groups yet</h3>
         <p class="text-secondary">Create a group and invite friends to journal together.</p>
-        <jiro-button variant="primary" type="button" (click)="showCreate.set(true)">Create Group</jiro-button>
+        <jiro-button variant="primary" type="button" (click)="showCreate.set(true)">Create group</jiro-button>
       </div>
 }
 
@@ -70,7 +70,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     </div>
 
     @if (showCreate()) {
-<jiro-modal title="New Group" (close)="showCreate.set(false)">
+<jiro-modal title="New group" (close)="showCreate.set(false)">
       <div class="modal-form">
         <label class="form-label" for="new-group-name">Group name</label>
         <input id="new-group-name" type="text" class="form-control" [(ngModel)]="newName" placeholder="e.g. Weekend Adventures" maxlength="100" />
@@ -108,7 +108,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .group-avatar {
       width: 42px; height: 42px; border-radius: 50%;
       background: color-mix(in srgb, var(--color-primary) 20%, transparent);
-      color: var(--color-primary); display: flex; align-items: center; justify-content: center;
+      color: var(--color-primary-text); display: flex; align-items: center; justify-content: center;
       font-weight: 700; font-size: var(--font-size-md); flex-shrink: 0;
     }
     .group-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }

@@ -13,6 +13,7 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { SettingsService } from '../../../core/services/settings.service';
 import { todayKey } from '../../../core/utils/day';
+import { formatDay } from '../../../core/utils/format-date';
 
 @Component({
   selector: 'journal-day-modal',
@@ -122,7 +123,7 @@ import { todayKey } from '../../../core/utils/day';
 
           @if (!isFuture()) {
           <div class="list-footer">
-            <jiro-button variant="secondary" type="button" (click)="newEntry.emit()">New Entry</jiro-button>
+            <jiro-button variant="secondary" type="button" (click)="newEntry.emit()">New entry</jiro-button>
           </div>
           }
         </div>
@@ -180,7 +181,7 @@ import { todayKey } from '../../../core/utils/day';
               Delete
             </jiro-button>
             <jiro-button variant="primary" type="button" (click)="editEntry.emit(expanded()!.id)">
-              Edit Entry
+              Edit entry
             </jiro-button>
           </div>
 }
@@ -283,7 +284,7 @@ import { todayKey } from '../../../core/utils/day';
       margin-bottom: var(--space-sm);
       font-size: var(--font-size-sm);
       font-weight: 600;
-      color: var(--color-primary);
+      color: var(--color-primary-text);
     }
 
     /* ── Empty state ────────────────────────────────────── */
@@ -316,7 +317,7 @@ import { todayKey } from '../../../core/utils/day';
     .card-author {
       font-size: var(--font-size-xs);
       font-weight: 600;
-      color: var(--color-primary);
+      color: var(--color-primary-text);
       margin-bottom: 3px;
     }
     .card-meta {
@@ -402,7 +403,7 @@ import { todayKey } from '../../../core/utils/day';
     /* ── Expanded view ──────────────────────────────────── */
     .expanded-view { animation: expand-in 180ms ease-out forwards; }
     .exp-top { display: flex; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-sm); min-height: 22px; flex-wrap: wrap; }
-    .exp-author { font-size: var(--font-size-xs); font-weight: 600; color: var(--color-primary); }
+    .exp-author { font-size: var(--font-size-xs); font-weight: 600; color: var(--color-primary-text); }
     .exp-title { font-size: var(--font-size-lg); font-weight: 600; margin: 0 0 var(--space-md); }
     .exp-body {
       font-family: 'Georgia', serif;
@@ -441,8 +442,8 @@ import { todayKey } from '../../../core/utils/day';
       font-size: var(--font-size-xs);
       padding: 2px 10px;
       background: color-mix(in srgb, var(--color-primary) 12%, transparent);
-      color: var(--color-primary);
-      border-radius: 99px;
+      color: var(--color-primary-text);
+      border-radius: var(--border-radius-pill);
       flex-shrink: 0;
     }
     .tag-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: var(--space-sm); }
@@ -451,7 +452,7 @@ import { todayKey } from '../../../core/utils/day';
       padding: 2px 8px;
       background: var(--bg-canvas);
       border: 1px solid var(--border-color);
-      border-radius: 99px;
+      border-radius: var(--border-radius-pill);
       color: var(--text-secondary);
     }
 
@@ -501,7 +502,7 @@ import { todayKey } from '../../../core/utils/day';
         width: 36px;
         height: 4px;
         background: var(--border-color);
-        border-radius: 2px;
+        border-radius: var(--border-radius-pill);
         margin: var(--space-sm) auto 0;
         flex-shrink: 0;
       }
@@ -599,10 +600,7 @@ export class JournalDayModalComponent implements OnChanges {
 
   get formattedDate(): string {
     if (!this.date) return '';
-    const [y, m, d] = this.date.split('-').map(Number);
-    return new Date(y, m - 1, d).toLocaleDateString('en-US', {
-      weekday: 'long', month: 'short', day: 'numeric',
-    });
+    return formatDay(this.date, { weekday: true });
   }
 
   onSwipeEnd(e: TouchEvent) {
@@ -659,6 +657,6 @@ export class JournalDayModalComponent implements OnChanges {
   }
 
   formatTime(iso: string): string {
-    return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: this.settings.timezone() });
   }
 }

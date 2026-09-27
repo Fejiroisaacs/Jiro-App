@@ -8,6 +8,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JiroLogoComponent } from '../../../shared/components/jiro-logo/jiro-logo';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
+import { formatInstant } from '../../../core/utils/format-date';
 
 type State =
   | 'loading'      // waiting for auth, then the preview
@@ -211,10 +212,10 @@ type State =
       text-decoration: none;
       margin-top: var(--space-xs);
     }
-    .secondary-link:hover { color: var(--color-primary); text-decoration: underline; }
+    .secondary-link:hover { color: var(--color-primary-text); text-decoration: underline; }
 
     .create-account { font-size: var(--font-size-sm); margin-top: var(--space-xs); }
-    .link { color: var(--color-primary); text-decoration: underline; }
+    .link { color: var(--color-primary-text); text-decoration: underline; }
 
     @media (max-width: 480px) {
       .join-card { padding: var(--space-lg); }
@@ -301,9 +302,7 @@ export class JournalJoinComponent implements OnInit {
   }
 
   formatExpiry(s: string): string {
-    return new Date(s).toLocaleString('en-US', {
-      month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-      timeZone: this.settings.timezone(),
-    });
+    const tz = this.settings.timezone();
+    return `${formatInstant(s, tz)}, ${new Date(s).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz })}`;
   }
 }

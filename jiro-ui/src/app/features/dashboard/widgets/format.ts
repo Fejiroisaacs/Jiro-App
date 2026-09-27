@@ -1,3 +1,6 @@
+import { resolveTimeZone } from '../../../core/utils/day';
+import { formatDay, formatInstant } from '../../../core/utils/format-date';
+
 /** "just now", "5m ago", "3h ago", "yesterday", "4 days ago", then a short date. */
 export function timeAgo(iso: string, now = Date.now()): string {
   const ms = now - new Date(iso).getTime();
@@ -27,12 +30,12 @@ export function daysAgo(dateOnly: string, today: string): string {
   if (days <= 0) return 'today';
   if (days === 1) return 'yesterday';
   if (days < 14) return `${days} days ago`;
-  return new Date(day).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  return formatDay(dateOnly);
 }
 
-/** "12 Sep" (en-GB, like the rest of the dashboard). */
-export function shortDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+/** "12 Sep", the app's date style, on the day the instant falls in `timeZone`. */
+export function shortDate(iso: string, timeZone = resolveTimeZone(null)): string {
+  return formatInstant(iso, timeZone);
 }
 
 export function plural(n: number, one: string, many: string): string {

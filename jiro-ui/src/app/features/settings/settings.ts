@@ -78,7 +78,7 @@ import { ToastService } from '../../core/services/toast.service';
 
         <div class="profile-form">
           <label class="form-field">
-            <span class="setting-label">Display Name</span>
+            <span class="setting-label">Display name</span>
             <span class="text-secondary setting-desc">How your name appears across the app</span>
             <jiro-input
               [(ngModel)]="displayName"
@@ -111,7 +111,7 @@ import { ToastService } from '../../core/services/toast.service';
 
           <div class="profile-actions">
             <jiro-button variant="primary" (click)="saveProfile()" [disabled]="profileSaving()">
-              {{ profileSaving() ? 'Saving...' : 'Save Profile' }}
+              {{ profileSaving() ? 'Saving...' : 'Save profile' }}
             </jiro-button>
             @if (profileError()) {
 <span class="profile-error">{{ profileError() }}</span>
@@ -126,7 +126,7 @@ import { ToastService } from '../../core/services/toast.service';
 
         <div class="setting-row">
           <div>
-            <label class="setting-label" for="setting-weight-unit">Weight Unit</label>
+            <label class="setting-label" for="setting-weight-unit">Weight unit</label>
             <p class="text-secondary setting-desc">Used across all fitness tracking</p>
           </div>
           <select id="setting-weight-unit" [ngModel]="weightUnit" (ngModelChange)="pickWeightUnit($event)" class="jiro-select">
@@ -198,7 +198,7 @@ import { ToastService } from '../../core/services/toast.service';
         <!-- Dark mode toggle -->
         <div class="setting-row">
           <div>
-            <span class="setting-label" id="dark-mode-label">Dark Mode</span>
+            <span class="setting-label" id="dark-mode-label">Dark mode</span>
             <p class="text-secondary setting-desc">Switch between light and dark interface</p>
           </div>
           <button
@@ -361,7 +361,7 @@ import { ToastService } from '../../core/services/toast.service';
       color: var(--color-accent);
       background: rgba(var(--color-accent-rgb, 74, 103, 65), 0.1);
       padding: 4px 10px;
-      border-radius: 20px;
+      border-radius: var(--border-radius-pill);
     }
 
     .unverified-badge {
@@ -369,7 +369,7 @@ import { ToastService } from '../../core/services/toast.service';
       color: var(--text-secondary);
       background: var(--bg-surface-hover);
       padding: 4px 10px;
-      border-radius: 20px;
+      border-radius: var(--border-radius-pill);
     }
 
     .profile-form {
@@ -453,7 +453,7 @@ import { ToastService } from '../../core/services/toast.service';
       width: 40px;
       height: 22px;
       background: var(--border-color);
-      border-radius: 11px;
+      border-radius: var(--border-radius-pill);
       transition: background 0.2s;
       display: block;
     }

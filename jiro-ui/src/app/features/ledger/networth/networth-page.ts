@@ -28,6 +28,7 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
+import { formatDay } from '../../../core/utils/format-date';
 
 Chart.register(...registerables);
 
@@ -83,7 +84,7 @@ Chart.register(...registerables);
         <jiro-card class="summary-card">
           <div class="summary-grid">
             <div class="summary-main">
-              <span class="summary-label">Current Net Worth</span>
+              <span class="summary-label">Current net worth</span>
               <span
                 class="summary-networth"
                 [class.positive]="latestSnapshot()!.net_worth >= 0"
@@ -113,7 +114,7 @@ Chart.register(...registerables);
 
         <!-- Chart -->
         <jiro-card class="chart-card">
-          <div class="chart-title">Net Worth Over Time</div>
+          <div class="chart-title">Net worth over time</div>
           <div class="chart-wrapper">
             <canvas #networthChart></canvas>
           </div>
@@ -121,14 +122,14 @@ Chart.register(...registerables);
 
         <!-- Snapshot list -->
         <div class="snapshot-list-section">
-          <h2 class="section-heading" id="snapshot-history-heading">Snapshot History</h2>
+          <h2 class="section-heading" id="snapshot-history-heading">Snapshot history</h2>
           <div class="snapshot-list" tabindex="0" role="region" aria-labelledby="snapshot-history-heading">
             @for (snap of displayedSnapshots(); track snap.id) {
 <div class="snapshot-row">
               <div class="snap-date">{{ formatDate(snap.snapshot_date) }}</div>
               <div class="snap-values">
                 <div class="snap-stat">
-                  <span class="snap-label">Net Worth</span>
+                  <span class="snap-label">Net worth</span>
                   <span
                     class="snap-value networth"
                     [class.positive]="snap.net_worth >= 0"
@@ -155,7 +156,7 @@ Chart.register(...registerables);
 
       <!-- Take Snapshot Modal -->
       @if (showSnapshotModal()) {
-<jiro-modal title="Take Snapshot" maxWidth="480px" (close)="closeSnapshotModal()">
+<jiro-modal title="Take snapshot" maxWidth="480px" (close)="closeSnapshotModal()">
 
         @if (loadingAccounts()) {
 <div class="sk-stack" aria-hidden="true">
@@ -220,7 +221,7 @@ Chart.register(...registerables);
           <div class="form-actions">
             <jiro-button variant="secondary" type="button" (click)="closeSnapshotModal()">Cancel</jiro-button>
             <jiro-button variant="primary" type="submit" [disabled]="savingSnapshot()">
-              {{ savingSnapshot() ? 'Saving...' : 'Save Snapshot' }}
+              {{ savingSnapshot() ? 'Saving...' : 'Save snapshot' }}
             </jiro-button>
           </div>
 
@@ -593,11 +594,7 @@ export class NetWorthPageComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   formatDate(iso: string): string {
-    return parseDateOnly(iso).toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
+    return formatDay(iso);
   }
 
   formatNetWorth(value: number): string {
@@ -632,7 +629,7 @@ export class NetWorthPageComponent implements OnInit, AfterViewInit, OnDestroy {
         data: {
           labels,
           datasets: [{
-            label: 'Net Worth',
+            label: 'Net worth',
             data: values,
             borderColor: tone.accent,
             backgroundColor: `${tone.accent}1a`,

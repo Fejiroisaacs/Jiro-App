@@ -11,7 +11,8 @@ import {
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { SettingsService } from '../../../core/services/settings.service';
-import { addDays, dayKey, dayStartISO, mondayOfKey, shortDayLabel, todayKey } from '../../../core/utils/day';
+import { addDays, dayKey, dayStartISO, mondayOfKey, todayKey } from '../../../core/utils/day';
+import { formatDay } from '../../../core/utils/format-date';
 
 // ─── Exported helpers used by parent components ──────────────────────────────
 // Weeks are Monday-to-Sunday day keys in the user's zone, as in the day view.
@@ -154,7 +155,7 @@ export function weekRangeQuery(week: { from: string; to: string }, timeZone: str
     .wv-label { font-weight: 600; font-size: var(--font-size-sm); }
     .wv-today {
       font-size: var(--font-size-xs);
-      color: var(--color-primary);
+      color: var(--color-primary-text);
       background: none;
       border: none;
       cursor: pointer;
@@ -206,7 +207,7 @@ export function weekRangeQuery(week: { from: string; to: string }, timeZone: str
       line-height: 1.15;
       color: var(--text-primary);
     }
-    .wv-day--today .wv-day-num { color: var(--color-primary); }
+    .wv-day--today .wv-day-num { color: var(--color-primary-text); }
 
     /* Day body */
     .wv-day-body {
@@ -238,7 +239,7 @@ export function weekRangeQuery(week: { from: string; to: string }, timeZone: str
     .wv-note-author {
       font-size: 0.6rem;
       font-weight: 700;
-      color: var(--color-primary);
+      color: var(--color-primary-text);
       margin-bottom: 2px;
       white-space: nowrap;
       overflow: hidden;
@@ -284,7 +285,7 @@ export function weekRangeQuery(week: { from: string; to: string }, timeZone: str
     }
     .wv-add:hover {
       border-color: var(--color-primary);
-      color: var(--color-primary);
+      color: var(--color-primary-text);
       opacity: 1;
       background: color-mix(in srgb, var(--color-primary) 5%, transparent);
     }
@@ -322,7 +323,7 @@ export class JournalWeekViewComponent implements OnChanges, AfterViewInit {
 
   weekLabel = computed(() => {
     const days = this.weekDays();
-    return `${shortDayLabel(days[0])} to ${shortDayLabel(days[6])}, ${days[6].slice(0, 4)}`;
+    return `${formatDay(days[0], { year: 'never' })} to ${formatDay(days[6], { year: 'always' })}`;
   });
 
   entriesByDay = computed(() => {

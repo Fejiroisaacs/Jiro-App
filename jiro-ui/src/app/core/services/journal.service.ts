@@ -138,21 +138,20 @@ export interface ListEntriesParams {
  * energetic end first, through to the cool and heavy end. Anything that lists
  * or charts moods should follow this order rather than sorting alphabetically.
  *
- * `color` is a literal hex rather than a token on purpose. It is a categorical
- * scale: the eight values have to stay distinguishable from one another and
- * stable across themes, the way MUSCLE_COLORS does in the Jym summary, and the
- * chart needs a plain string. Every hue clears 3:1 as a non-text fill against
- * both surface colours, light (#FFFDF9) and dark (#261D18).
+ * `color` is a data palette colour, so it follows the theme: the eight moods
+ * stay distinguishable in light and dark, and each clears 3:1 as a non-text
+ * fill. It is a CSS value such as var(--data-3); use it for fills, bars and marks,
+ * never as text.
  */
 export const MOODS = [
-  { value: 'happy', label: 'Happy', color: '#AE7E22', icon: 'smiley' },
-  { value: 'grateful', label: 'Grateful', color: '#9C6EA8', icon: 'heart' },
-  { value: 'energised', label: 'Energised', color: '#BD5629', icon: 'lightning' },
-  { value: 'calm', label: 'Calm', color: '#5A8060', icon: 'cloud' },
-  { value: 'tired', label: 'Tired', color: '#8A7F76', icon: 'moon' },
-  { value: 'sad', label: 'Sad', color: '#5D7A99', icon: 'smiley-sad' },
-  { value: 'anxious', label: 'Anxious', color: '#3F8579', icon: 'warning-circle' },
-  { value: 'stressed', label: 'Stressed', color: '#B55048', icon: 'fire' },
+  { value: 'happy', label: 'Happy', color: 'var(--data-3)', icon: 'smiley' },
+  { value: 'grateful', label: 'Grateful', color: 'var(--data-6)', icon: 'heart' },
+  { value: 'energised', label: 'Energised', color: 'var(--data-9)', icon: 'lightning' },
+  { value: 'calm', label: 'Calm', color: 'var(--data-4)', icon: 'cloud' },
+  { value: 'tired', label: 'Tired', color: 'var(--data-7)', icon: 'moon' },
+  { value: 'sad', label: 'Sad', color: 'var(--data-5)', icon: 'smiley-sad' },
+  { value: 'anxious', label: 'Anxious', color: 'var(--data-2)', icon: 'warning-circle' },
+  { value: 'stressed', label: 'Stressed', color: 'var(--data-1)', icon: 'fire' },
 ] as const satisfies readonly { value: string; label: string; color: string; icon: IconName }[];
 
 export type Mood = (typeof MOODS)[number];

@@ -15,10 +15,11 @@ import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-he
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { LedgerTransactionFormComponent, TransactionPayload } from '../shared/transaction-form/ledger-transaction-form';
-import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, hexWithAlpha, parseDateOnly } from '../shared/ledger-utils';
+import { formatCurrency, formatSignedCurrency, formatDate, formatPct, clamp, categoryColor, categoryTint } from '../shared/ledger-utils';
 import { SettingsService } from '../../../core/services/settings.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { todayKey } from '../../../core/utils/day';
+import { formatMonth } from '../../../core/utils/format-date';
 
 @Component({
   selector: 'app-ledger-hub',
@@ -133,7 +134,7 @@ import { todayKey } from '../../../core/utils/day';
               @for (b of budgets(); track b.id) {
 <div class="budget-card">
                 <div class="budget-card-top">
-                  <span class="budget-cat-dot" aria-hidden="true" [style.background]="b.category_color || 'var(--text-muted)'"></span>
+                  <span class="budget-cat-dot" aria-hidden="true" [style.background]="categoryColor(b.category_color)"></span>
                   <span class="budget-cat-name">{{ b.category_name }}</span>
                   <span class="budget-pct" [class.pct-ok]="b.pct_used < 80" [class.pct-warn]="b.pct_used >= 80 && b.pct_used < 100" [class.pct-over]="b.pct_used >= 100">
                     {{ b.pct_used | number:'1.0-0' }}%
@@ -185,7 +186,7 @@ import { todayKey } from '../../../core/utils/day';
                       @if (t.type === 'transfer') {
                         <span class="txn-sub">{{ transferLabel(t) }}</span>
                       } @else if (t.category_name) {
-                        <span class="cat-chip" [style.background]="hexWithAlpha(t.category_color, 0.12)" [style.color]="t.category_color || 'var(--text-muted)'">
+                        <span class="cat-chip" [style.--chip]="categoryColor(t.category_color)" [style.background]="categoryTint(t.category_color)">
                           {{ t.category_name }}
                         </span>
                       }
@@ -209,12 +210,12 @@ import { todayKey } from '../../../core/utils/day';
 
       <!-- ── Add Transaction Modal ── -->
       @if (showTxnModal()) {
-<jiro-modal title="Log Transaction" maxWidth="520px" (close)="closeAddTransaction()">
+<jiro-modal title="Log transaction" maxWidth="520px" (close)="closeAddTransaction()">
         <ledger-transaction-form
           [accounts]="accounts()"
           [saving]="txnSaving()"
           [error]="txnError()"
-          submitLabel="Log Transaction"
+          submitLabel="Log transaction"
           (formSubmit)="onTxnSubmit($event)"
           (formCancel)="closeAddTransaction()">
         </ledger-transaction-form>
@@ -276,7 +277,7 @@ import { todayKey } from '../../../core/utils/day';
 
     .summary-value.expense { color: var(--color-danger); }
 
-    .summary-value.savings { color: var(--color-primary); }
+    .summary-value.savings { color: var(--color-primary-text); }
 
 
     /* ── Hub body ── */
@@ -305,7 +306,7 @@ import { todayKey } from '../../../core/utils/day';
 
     .section-link {
       font-size: var(--font-size-sm);
-      color: var(--color-primary);
+      color: var(--color-primary-text);
       text-decoration: none;
       font-weight: 500;
       transition: opacity 0.15s;
@@ -367,13 +368,13 @@ import { todayKey } from '../../../core/utils/day';
     .budget-bar-track {
       height: 6px;
       background: var(--bg-canvas);
-      border-radius: 3px;
+      border-radius: var(--border-radius-pill);
       overflow: hidden;
     }
 
     .budget-bar-fill {
       height: 100%;
-      border-radius: 3px;
+      border-radius: var(--border-radius-pill);
       transition: width 0.3s ease;
       min-width: 2px;
     }
@@ -442,12 +443,23 @@ import { todayKey } from '../../../core/utils/day';
       text-overflow: ellipsis;
     }
 
+    .cat-chip::before {
+      content: '';
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      margin-right: 5px;
+      border-radius: 50%;
+      background: var(--chip);
+    }
+
     .cat-chip {
       display: inline-block;
       font-size: var(--font-size-xs);
       font-weight: 600;
+      color: var(--text-primary);
       padding: 2px 8px;
-      border-radius: 10px;
+      border-radius: var(--border-radius-pill);
       max-width: 100%;
       width: max-content;
       overflow: hidden;
@@ -545,13 +557,13 @@ export class LedgerHubComponent implements OnInit {
 
   /** This month in the user's timezone (settings), as YYYY-MM: the API's summary month. */
   readonly currentMonth = computed(() => todayKey(this.settings.timezone()).slice(0, 7));
-  readonly currentMonthLabel = computed(() =>
-    parseDateOnly(this.currentMonth() + '-01').toLocaleString('en-US', { month: 'long', year: 'numeric' }));
+  readonly currentMonthLabel = computed(() => formatMonth(this.currentMonth()));
 
   readonly formatDate = formatDate;
   readonly formatPct = formatPct;
   readonly clamp = clamp;
-  readonly hexWithAlpha = hexWithAlpha;
+  readonly categoryColor = categoryColor;
+  readonly categoryTint = categoryTint;
 
   constructor(private ledgerService: LedgerService, public router: Router) {}
 

@@ -28,21 +28,21 @@ Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip, L
         <div class="stat-grid">
           <div class="stat-card">
             <div class="stat-value">{{ stats()!.total_users }}</div>
-            <div class="stat-label">Total Users</div>
+            <div class="stat-label">Total users</div>
           </div>
           <div class="stat-card">
             <div class="stat-value">{{ stats()!.total_sessions }}</div>
-            <div class="stat-label">Total Sessions</div>
+            <div class="stat-label">Total sessions</div>
           </div>
           <div class="stat-card">
             <div class="stat-value">{{ stats()!.total_recipes }}</div>
-            <div class="stat-label">Total Recipes</div>
+            <div class="stat-label">Total recipes</div>
           </div>
         </div>
 
         <!-- Events chart -->
         <div class="chart-card">
-          <h2 class="chart-title">Events: Last 30 Days</h2>
+          <h2 class="chart-title">Events: last 30 days</h2>
           <div class="chart-wrap">
             <canvas #chartCanvas></canvas>
           </div>
@@ -58,13 +58,13 @@ Chart.register(BarController, BarElement, CategoryScale, LinearScale, Tooltip, L
     .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; margin-bottom: 32px; }
     .stat-card {
       background: var(--bg-surface); border: 1px solid var(--border-color);
-      border-radius: 10px; padding: 20px; display: flex; flex-direction: column; gap: 6px;
+      border-radius: var(--border-radius-lg); padding: 20px; display: flex; flex-direction: column; gap: 6px;
     }
-    .stat-value { font-size: 32px; font-weight: 700; color: var(--color-primary); }
+    .stat-value { font-size: 32px; font-weight: 700; color: var(--color-primary-text); }
     .stat-label { font-size: 13px; color: var(--text-secondary); }
     .chart-card {
       background: var(--bg-surface); border: 1px solid var(--border-color);
-      border-radius: 10px; padding: 24px;
+      border-radius: var(--border-radius-lg); padding: 24px;
     }
     .chart-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
     .chart-wrap { position: relative; height: 280px; }

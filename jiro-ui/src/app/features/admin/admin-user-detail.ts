@@ -6,6 +6,8 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { AdminService, AdminUserDetail } from '../../core/services/admin.service';
 
 import { JiroIconComponent } from '../../shared/components/jiro-icon/jiro-icon';
+import { SettingsService } from '../../core/services/settings.service';
+import { formatInstant } from '../../core/utils/format-date';
 
 @Component({
   selector: 'app-admin-user-detail',
@@ -53,11 +55,11 @@ import { JiroIconComponent } from '../../shared/components/jiro-icon/jiro-icon';
           </div>
           <div class="stat-card">
             <div class="stat-val">{{ u.last_session_at ? formatDate(u.last_session_at) : 'Never' }}</div>
-            <div class="stat-lbl">Last Session</div>
+            <div class="stat-lbl">Last session</div>
           </div>
           <div class="stat-card">
             <div class="stat-val">{{ u.last_login_at ? formatDate(u.last_login_at) : 'Never' }}</div>
-            <div class="stat-lbl">Last Login</div>
+            <div class="stat-lbl">Last login</div>
           </div>
         </div>
 
@@ -67,23 +69,23 @@ import { JiroIconComponent } from '../../shared/components/jiro-icon/jiro-icon';
 
           <!-- Send password reset email -->
           <div class="action-block">
-            <div class="action-label">Send Password Reset Link</div>
+            <div class="action-label">Send password reset link</div>
             <p class="action-desc">Emails the user a reset link so they can set their own new password.</p>
-            <button class="action-btn" [disabled]="actionLoading()" (click)="sendPasswordReset()">Send Reset Email</button>
+            <button class="action-btn" [disabled]="actionLoading()" (click)="sendPasswordReset()">Send reset email</button>
           </div>
 
           <!-- Revoke sessions -->
           <div class="action-block">
-            <div class="action-label">Revoke All Sessions</div>
+            <div class="action-label">Revoke all sessions</div>
             <p class="action-desc">Forces the user to log in again on all devices.</p>
-            <button class="action-btn danger" [disabled]="actionLoading()" (click)="revokeSessions()">Revoke Sessions</button>
+            <button class="action-btn danger" [disabled]="actionLoading()" (click)="revokeSessions()">Revoke sessions</button>
           </div>
 
           <!-- Delete user -->
           <div class="action-block danger-zone">
-            <div class="action-label">Delete User</div>
+            <div class="action-label">Delete user</div>
             <p class="action-desc">Permanently deletes this account and all associated data. This cannot be undone.</p>
-            <button class="action-btn danger" [disabled]="actionLoading()" (click)="deleteUser()">Delete User</button>
+            <button class="action-btn danger" [disabled]="actionLoading()" (click)="deleteUser()">Delete user</button>
           </div>
         </div>
 
@@ -95,36 +97,36 @@ import { JiroIconComponent } from '../../shared/components/jiro-icon/jiro-icon';
     </div>
   `,
   styles: [`
-    .back-btn { background: none; border: 1px solid var(--border-color); border-radius: 6px;
+    .back-btn { background: none; border: 1px solid var(--border-color); border-radius: var(--border-radius);
       padding: 7px 14px; color: var(--text-secondary); font-size: 13px; cursor: pointer; margin-bottom: 20px;
       display: inline-flex; align-items: center; gap: 4px; }
-    .back-btn:hover { color: var(--color-primary); border-color: var(--color-primary); }
+    .back-btn:hover { color: var(--color-primary-text); border-color: var(--color-primary); }
     .state-msg { color: var(--text-secondary); }
     .error-msg { color: var(--color-danger); }
     .header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; gap: 12px; }
     .user-email { font-size: 20px; font-weight: 700; margin: 0 0 4px; }
     .user-sub { color: var(--text-secondary); font-size: 13px; margin: 0; }
-    .badge { padding: 4px 10px; border-radius: 10px; font-size: 12px; font-weight: 600;
+    .badge { padding: 4px 10px; border-radius: var(--border-radius-pill); font-size: 12px; font-weight: 600;
       background: var(--border-color); color: var(--text-secondary); flex-shrink: 0; }
     .badge.verified { background: color-mix(in srgb, var(--color-positive) 14%, transparent); color: var(--color-positive); }
     .stat-grid { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 32px; }
-    .stat-card { background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 8px;
+    .stat-card { background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--border-radius-lg);
       padding: 16px 20px; min-width: 100px; flex: 1 1 120px; }
-    .stat-val { font-size: 22px; font-weight: 700; color: var(--color-primary); }
+    .stat-val { font-size: 22px; font-weight: 700; color: var(--color-primary-text); }
     .stat-lbl { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
     .section-title { font-size: 16px; font-weight: 600; margin: 0 0 16px; }
     .actions-section { display: flex; flex-direction: column; gap: 16px; }
     .action-block { background: var(--bg-surface); border: 1px solid var(--border-color);
-      border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+      border-radius: var(--border-radius-lg); padding: 16px; display: flex; flex-direction: column; gap: 10px; }
     .action-block.danger-zone { border-color: color-mix(in srgb, var(--color-danger) 30%, transparent); }
     .action-label { font-size: 14px; font-weight: 600; }
     .action-desc { font-size: 13px; color: var(--text-secondary); margin: 0; }
     .action-btn { padding: 8px 16px; background: var(--color-primary); color: var(--text-on-primary);
-      border: none; border-radius: 6px; font-size: 14px; cursor: pointer; }
+      border: none; border-radius: var(--border-radius); font-size: 14px; cursor: pointer; }
     .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .action-btn.danger { background: var(--color-danger); }
     .action-btn.danger:hover:not(:disabled) { background: var(--color-danger-hover); }
-    .action-feedback { margin-top: 16px; padding: 10px 14px; border-radius: 6px; font-size: 13px;
+    .action-feedback { margin-top: 16px; padding: 10px 14px; border-radius: var(--border-radius); font-size: 13px;
       background: color-mix(in srgb, var(--color-positive) 14%, transparent); color: var(--color-positive); }
     @media (max-width: 600px) {
       .header { flex-direction: column; align-items: flex-start; gap: 8px; }
@@ -134,6 +136,7 @@ import { JiroIconComponent } from '../../shared/components/jiro-icon/jiro-icon';
   `]
 })
 export class AdminUserDetailComponent implements OnInit {
+  private readonly settings = inject(SettingsService);
   user = signal<AdminUserDetail | null>(null);
   loading = signal(true);
   error = signal('');
@@ -190,6 +193,6 @@ export class AdminUserDetailComponent implements OnInit {
   }
 
   formatDate(iso: string) {
-    return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    return formatInstant(iso, this.settings.timezone(), { year: 'always' });
   }
 }
