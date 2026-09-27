@@ -1101,8 +1101,14 @@ func (s *JymService) ListFormChecks(ctx context.Context, userID, exerciseID uuid
 
 // UpdateSession edits notes or type and finishes the session once; finishing again is ErrSessionEnded.
 func (s *JymService) UpdateSession(ctx context.Context, userID, sessionID uuid.UUID, req *models.UpdateSessionRequest) (*models.Session, error) {
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
 	sess := &models.Session{}
-	err := s.db.QueryRow(ctx,
+	err = tx.QueryRow(ctx,
 		`UPDATE sessions SET
 		   ended_at     = COALESCE($3, ended_at),
 		   notes        = COALESCE($4, notes),
@@ -1126,18 +1132,43 @@ func (s *JymService) UpdateSession(ctx context.Context, userID, sessionID uuid.U
 		}
 		return nil, err
 	}
+
+	// Deload sets never count, so a type change moves PRs in every exercise of the session.
+	if req.SessionType != nil {
+		if err := rerateSessionExercises(ctx, tx, userID, sessionID); err != nil {
+			return nil, err
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
 	return sess, nil
 }
 
 func (s *JymService) DeleteSession(ctx context.Context, userID, sessionID uuid.UUID) error {
-	res, err := s.db.Exec(ctx, `DELETE FROM sessions WHERE id = $1 AND user_id = $2`, sessionID, userID)
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	exerciseIDs, err := sessionExerciseIDs(ctx, tx, sessionID)
+	if err != nil {
+		return err
+	}
+	res, err := tx.Exec(ctx, `DELETE FROM sessions WHERE id = $1 AND user_id = $2`, sessionID, userID)
 	if err != nil {
 		return err
 	}
 	if res.RowsAffected() == 0 {
 		return ErrSessionNotFound
 	}
-	return nil
+	for _, exerciseID := range exerciseIDs {
+		if _, err := rerateExercisePRs(ctx, tx, userID, exerciseID); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
 }
 
 // DeleteSessionExercise removes every logged set for one exercise within a
@@ -1158,11 +1189,24 @@ func (s *JymService) DeleteSessionExercise(ctx context.Context, userID, sessionI
 		return ErrSessionNotFound
 	}
 
-	_, err = s.db.Exec(ctx,
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	res, err := tx.Exec(ctx,
 		`DELETE FROM session_sets WHERE session_id = $1 AND exercise_id = $2`,
 		sessionID, exerciseID,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	if res.RowsAffected() > 0 {
+		if _, err := rerateExercisePRs(ctx, tx, userID, exerciseID); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
 }
 
 // GetSessionAttachmentKeys returns the R2 object_key for every attachment
@@ -1190,12 +1234,18 @@ func (s *JymService) GetSessionAttachmentKeys(ctx context.Context, userID, sessi
 
 // ─── Sets ─────────────────────────────────────────────────────────────────────
 
-// isNewPR reports whether a working set beats the best weight, or ties it with more reps.
+// prTolerance treats weights this close as one lift: a kg best shown in lb and typed back lands within ~0.03 kg.
+const prTolerance = 0.05
+
+// isNewPR reports whether a working set beats the best weight, or ties it (within prTolerance) with more reps.
 func isNewPR(weight float64, reps int, isWarmup bool, bestWeight float64, bestReps int) bool {
 	if isWarmup {
 		return false
 	}
-	return weight > bestWeight || (weight == bestWeight && reps > bestReps)
+	if weight > bestWeight+prTolerance {
+		return true
+	}
+	return math.Abs(weight-bestWeight) <= prTolerance && reps > bestReps
 }
 
 // roundWeight rounds kg to the 2 decimals session_sets.weight keeps.
@@ -1203,27 +1253,155 @@ func roundWeight(kg float64) float64 {
 	return math.Round(kg*100) / 100
 }
 
-// bestWorkingSet returns the best non-warm-up weight and its reps; excludeSetID and before narrow it.
-func bestWorkingSet(ctx context.Context, q interface {
-	QueryRow(context.Context, string, ...any) pgx.Row
-}, userID, exerciseID, excludeSetID uuid.UUID, before *time.Time) (float64, int, error) {
+// rerateExercisePRs recomputes is_pr for every set of one exercise in logging order, so no edit or delete leaves
+// a stale flag. Warm-ups and deload sets are never PRs and don't raise the bar. Returns how many flags changed.
+func rerateExercisePRs(ctx context.Context, tx pgx.Tx, userID, exerciseID uuid.UUID) (int, error) {
+	// The row lock makes concurrent writes to one exercise re-rate in turn.
+	var locked int
+	if err := tx.QueryRow(ctx,
+		`SELECT 1 FROM exercises WHERE id = $1 AND user_id = $2 FOR UPDATE`, exerciseID, userID,
+	).Scan(&locked); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return 0, ErrExerciseNotFound
+		}
+		return 0, err
+	}
+
+	rows, err := tx.Query(ctx,
+		`SELECT ss.id, ss.weight, ss.reps_performed, ss.is_warmup, s.session_type = 'deload', ss.is_pr
+		 FROM session_sets ss
+		 JOIN sessions s ON s.id = ss.session_id
+		 WHERE ss.exercise_id = $1 AND s.user_id = $2
+		 ORDER BY ss.created_at, ss.id`,
+		exerciseID, userID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	var ids []string
+	var flags []bool
 	var bestWeight float64
 	var bestReps int
-	err := q.QueryRow(ctx,
-		`WITH hist AS (
-		   SELECT ss.weight, ss.reps_performed
-		   FROM session_sets ss
-		   JOIN sessions s ON ss.session_id = s.id
-		   WHERE ss.exercise_id = $1 AND s.user_id = $2 AND ss.is_warmup = false
-		     AND ss.id <> $3
-		     AND ($4::timestamptz IS NULL OR ss.created_at < $4)
-		 )
-		 SELECT COALESCE(MAX(weight), 0),
-		        COALESCE(MAX(reps_performed) FILTER (WHERE weight = (SELECT MAX(weight) FROM hist)), 0)
-		 FROM hist`,
-		exerciseID, userID, excludeSetID, before,
-	).Scan(&bestWeight, &bestReps)
-	return bestWeight, bestReps, err
+	for rows.Next() {
+		var id uuid.UUID
+		var weight float64
+		var reps int
+		var warmup, deload, current bool
+		if err := rows.Scan(&id, &weight, &reps, &warmup, &deload, &current); err != nil {
+			rows.Close()
+			return 0, err
+		}
+		pr := false
+		if !warmup && !deload {
+			pr = isNewPR(weight, reps, false, bestWeight, bestReps)
+			switch {
+			case weight > bestWeight+prTolerance:
+				bestWeight, bestReps = weight, reps
+			case math.Abs(weight-bestWeight) <= prTolerance:
+				bestWeight = math.Max(bestWeight, weight)
+				if reps > bestReps {
+					bestReps = reps
+				}
+			}
+		}
+		if pr != current {
+			ids = append(ids, id.String())
+			flags = append(flags, pr)
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	if _, err := tx.Exec(ctx,
+		`UPDATE session_sets SET is_pr = u.pr
+		 FROM unnest($1::text[], $2::bool[]) AS u(id, pr)
+		 WHERE session_sets.id = u.id::uuid`,
+		ids, flags,
+	); err != nil {
+		return 0, err
+	}
+	return len(ids), nil
+}
+
+// sessionExerciseIDs lists the exercises a session has sets for.
+func sessionExerciseIDs(ctx context.Context, tx pgx.Tx, sessionID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := tx.Query(ctx, `SELECT DISTINCT exercise_id FROM session_sets WHERE session_id = $1`, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+func rerateSessionExercises(ctx context.Context, tx pgx.Tx, userID, sessionID uuid.UUID) error {
+	exerciseIDs, err := sessionExerciseIDs(ctx, tx, sessionID)
+	if err != nil {
+		return err
+	}
+	for _, exerciseID := range exerciseIDs {
+		if _, err := rerateExercisePRs(ctx, tx, userID, exerciseID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// RerateAllPRs re-rates every exercise that has sets: a one-off backfill for flags written under older rules.
+func (s *JymService) RerateAllPRs(ctx context.Context) (exercises, changed int, err error) {
+	rows, err := s.db.Query(ctx,
+		`SELECT DISTINCT s.user_id, ss.exercise_id
+		 FROM session_sets ss JOIN sessions s ON s.id = ss.session_id`)
+	if err != nil {
+		return 0, 0, err
+	}
+	type pair struct{ userID, exerciseID uuid.UUID }
+	var pairs []pair
+	for rows.Next() {
+		var p pair
+		if err := rows.Scan(&p.userID, &p.exerciseID); err != nil {
+			rows.Close()
+			return 0, 0, err
+		}
+		pairs = append(pairs, p)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, 0, err
+	}
+
+	for _, p := range pairs {
+		tx, err := s.db.Begin(ctx)
+		if err != nil {
+			return exercises, changed, err
+		}
+		n, err := rerateExercisePRs(ctx, tx, p.userID, p.exerciseID)
+		if errors.Is(err, ErrExerciseNotFound) {
+			tx.Rollback(ctx)
+			continue
+		}
+		if err != nil {
+			tx.Rollback(ctx)
+			return exercises, changed, err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return exercises, changed, err
+		}
+		exercises++
+		changed += n
+	}
+	return exercises, changed, nil
 }
 
 func (s *JymService) LogSet(ctx context.Context, userID, sessionID uuid.UUID, req *models.CreateSetRequest) (*models.SessionSet, error) {
@@ -1252,27 +1430,37 @@ func (s *JymService) LogSet(ctx context.Context, userID, sessionID uuid.UUID, re
 	isWarmup := req.IsWarmup != nil && *req.IsWarmup
 	// Compare at the column's precision, or 175 lbs never ties the 79.38 kg saved.
 	weight := roundWeight(req.Weight)
-	bestWeight, bestReps, err := bestWorkingSet(ctx, s.db, userID, req.ExerciseID, uuid.Nil, nil)
+
+	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return nil, err
 	}
-	isPR := isNewPR(weight, req.RepsPerformed, isWarmup, bestWeight, bestReps)
+	defer tx.Rollback(ctx)
 
 	set := &models.SessionSet{}
-	err = s.db.QueryRow(ctx,
-		`INSERT INTO session_sets (session_id, exercise_id, set_number, weight, reps_performed, rpe, is_pr, is_warmup, exercise_note)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+	err = tx.QueryRow(ctx,
+		`INSERT INTO session_sets (session_id, exercise_id, set_number, weight, reps_performed, rpe, is_warmup, exercise_note)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		 RETURNING id, session_id, exercise_id, set_number, weight, reps_performed, rpe, is_pr, is_warmup, exercise_note, created_at`,
-		sessionID, req.ExerciseID, req.SetNumber, weight, req.RepsPerformed, req.RPE, isPR, isWarmup, req.ExerciseNote,
+		sessionID, req.ExerciseID, req.SetNumber, weight, req.RepsPerformed, req.RPE, isWarmup, req.ExerciseNote,
 	).Scan(&set.ID, &set.SessionID, &set.ExerciseID, &set.SetNumber, &set.Weight,
 		&set.RepsPerformed, &set.RPE, &set.IsPR, &set.IsWarmup, &set.ExerciseNote, &set.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
+	if _, err := rerateExercisePRs(ctx, tx, userID, req.ExerciseID); err != nil {
+		return nil, err
+	}
+	if err := tx.QueryRow(ctx, `SELECT is_pr FROM session_sets WHERE id = $1`, set.ID).Scan(&set.IsPR); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
 	return set, nil
 }
 
-// UpdateSet edits a logged set, recomputing its PR flag when weight, reps or warm-up change.
+// UpdateSet edits a logged set; a change to weight, reps or warm-up re-rates the whole exercise.
 func (s *JymService) UpdateSet(ctx context.Context, userID, setID uuid.UUID, req *models.UpdateSetRequest) (*models.SessionSet, error) {
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
@@ -1302,16 +1490,11 @@ func (s *JymService) UpdateSet(ctx context.Context, userID, setID uuid.UUID, req
 	}
 
 	if req.Weight != nil || req.RepsPerformed != nil || req.IsWarmup != nil {
-		bestWeight, bestReps, err := bestWorkingSet(ctx, tx, userID, set.ExerciseID, set.ID, &set.CreatedAt)
-		if err != nil {
+		if _, err := rerateExercisePRs(ctx, tx, userID, set.ExerciseID); err != nil {
 			return nil, err
 		}
-		isPR := isNewPR(set.Weight, set.RepsPerformed, set.IsWarmup, bestWeight, bestReps)
-		if isPR != set.IsPR {
-			if _, err := tx.Exec(ctx, `UPDATE session_sets SET is_pr = $2 WHERE id = $1`, set.ID, isPR); err != nil {
-				return nil, err
-			}
-			set.IsPR = isPR
+		if err := tx.QueryRow(ctx, `SELECT is_pr FROM session_sets WHERE id = $1`, set.ID).Scan(&set.IsPR); err != nil {
+			return nil, err
 		}
 	}
 
@@ -1321,19 +1504,40 @@ func (s *JymService) UpdateSet(ctx context.Context, userID, setID uuid.UUID, req
 	return set, nil
 }
 
+// DeleteSet removes a set, renumbers the rest of that exercise in the session, and re-rates its PRs.
 func (s *JymService) DeleteSet(ctx context.Context, userID, setID uuid.UUID) error {
-	res, err := s.db.Exec(ctx,
-		`DELETE FROM session_sets WHERE id = $1
-		 AND session_id IN (SELECT id FROM sessions WHERE user_id = $2)`,
-		setID, userID,
-	)
+	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return err
 	}
-	if res.RowsAffected() == 0 {
-		return ErrSetNotFound
+	defer tx.Rollback(ctx)
+
+	var sessionID, exerciseID uuid.UUID
+	err = tx.QueryRow(ctx,
+		`DELETE FROM session_sets WHERE id = $1
+		 AND session_id IN (SELECT id FROM sessions WHERE user_id = $2)
+		 RETURNING session_id, exercise_id`,
+		setID, userID,
+	).Scan(&sessionID, &exerciseID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrSetNotFound
+		}
+		return err
 	}
-	return nil
+	if _, err := tx.Exec(ctx,
+		`UPDATE session_sets ss SET set_number = n.rn
+		 FROM (SELECT id, ROW_NUMBER() OVER (ORDER BY set_number, created_at, id) AS rn
+		       FROM session_sets WHERE session_id = $1 AND exercise_id = $2) n
+		 WHERE ss.id = n.id AND ss.set_number <> n.rn`,
+		sessionID, exerciseID,
+	); err != nil {
+		return err
+	}
+	if _, err := rerateExercisePRs(ctx, tx, userID, exerciseID); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 // GetLastSessionSets returns the last logged sets for each exercise (for ghost text).
@@ -1442,7 +1646,7 @@ func (s *JymService) GetPRs(ctx context.Context, userID uuid.UUID) ([]models.Exe
 		 WHERE s.user_id = $1
 		   AND ss.is_pr  = true
 		   AND (s.session_type IS NULL OR s.session_type != 'deload')
-		 ORDER BY ss.exercise_id, ss.weight DESC`,
+		 ORDER BY ss.exercise_id, ROUND(ss.weight, 1) DESC, ss.reps_performed DESC, ss.weight DESC`,
 		userID,
 	)
 	if err != nil {
