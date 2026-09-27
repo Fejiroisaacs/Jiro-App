@@ -62,6 +62,8 @@ interface ExerciseBlock {
   exerciseNote: string;
   /** The routine's target for this exercise, when the workout follows one. */
   plan?: { sets: number; reps: number };
+  /** repeat when the advice is to hold the weight, trend-up otherwise. */
+  suggestionIcon?: 'trend-up' | 'repeat';
 }
 
 @Component({
@@ -236,7 +238,7 @@ interface ExerciseBlock {
             <!-- Last time, and what to aim for today -->
             @if (block.suggestion && !allSaved(bi)) {
 <div class="overload-hint">
-              <jiro-icon name="trend-up" [size]="12" />
+              <jiro-icon [name]="block.suggestionIcon ?? 'trend-up'" [size]="12" />
               {{ block.suggestion }}
             </div>
 }
@@ -2115,12 +2117,13 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     this.blocks.update(bs => bs.map(b => b.exerciseId === exerciseId ? {
       ...b,
       suggestion: next.text,
+      suggestionIcon: next.icon,
       sets: setGhosts ? b.sets.map(s => !s.saved ? { ...s, ghostWeight: next.ghostWeight, ghostReps: next.ghostReps } : s) : b.sets,
     } : b));
   }
 
   /** The hint line ("Last time ... Stay at ...") and the ghost values, from nextSets(). */
-  private suggestionFor(block: ExerciseBlock, history: SetHistory[]): { text: string; ghostWeight: string; ghostReps: string } | null {
+  private suggestionFor(block: ExerciseBlock, history: SetHistory[]): { text: string; ghostWeight: string; ghostReps: string; icon: 'trend-up' | 'repeat' } | null {
     const unit = this.settingsService.unitLabel();
     const next = nextSets(history, {
       excludeSessionId: this.sessionId,
@@ -2155,6 +2158,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
       text: `Last time ${last}. ${advice}`,
       ghostWeight: String(+next.weight.toFixed(2)),
       ghostReps: String(next.reps),
+      icon: next.move === 'hold' ? 'repeat' : 'trend-up',
     };
   }
 
