@@ -50,12 +50,13 @@ A **series** ties a split to a time window (weeks, sessions count, or open-ended
 ## Live Session Player
 
 ### Starting a Session
-- **Routine session**: tap "Start" next to a routine on the hub — the player pre-populates exercise blocks and set rows from the routine's targets.
-- **Freestyle session**: tap "+ Freestyle Session" — open canvas, add any exercises you want.
+- **Routine session**: tap "Start" next to a routine on the hub. The player pre-populates exercise blocks and set rows from the routine's targets. The plan comes from the server, so the workout can be resumed on any device.
+- **Freestyle session**: tap "Freestyle session" for an open canvas; add any exercises you want.
+- **A workout is already open**: every start button asks whether to resume it, start a new one anyway, or cancel. A double tap starts one workout.
 
 ### Session Type Toggle
 Switch between **Normal**, **Deload**, and **Test** at any time during the session using the toggle in the sticky header.
-- **Deload**: PR checks are skipped; the session is flagged so it doesn't count in plateau detection.
+- **Deload**: sets in a deload session are never PRs and don't count towards your best, so they can't raise the bar. Switching a session's type re-rates its PRs.
 - **Test**: use this to find new 1RMs.
 
 ### Logging Sets
@@ -82,9 +83,9 @@ Each exercise block has a subtle text area above the set table for a free-text n
 ### Progressive Overload Suggestions
 When you add an exercise to a freestyle session (or pick one from the exercise picker), the app fetches your history and shows a suggestion above the set table:
 
-> *Last: 80 kg × 5 — try 82.5 kg*
+> *Last: 80 kg × 5, try 82.5 kg*
 
-- Increment is **2.5 kg** for lifts ≥ 50 kg, **1.25 kg** for lighter lifts.
+- The next weight is last time's top weight plus one plate step (**2.5 kg** or **5 lb**), rounded to that step. Warm-ups are ignored.
 - The suggestion is hidden once all sets are saved.
 - Deload session history is excluded from the calculation.
 
@@ -96,6 +97,12 @@ After every logged set, a rest timer starts automatically in the sticky header b
 - Skip the timer early with the ✕ button.
 - The timer collapses automatically 3 seconds after finishing.
 
+### Units
+The kg/lbs toggle in the session bar converts the whole workout: logged sets are shown from their stored kg, typed sets and suggestions are converted.
+
+### Unlogged work
+Sets you typed but haven't ticked, exercises you added and plan exercises you removed are kept on this device until the workout is finished or discarded, so a reload or leaving the page loses nothing.
+
 ### Body Weight
 Log today's body weight directly from the session player without leaving the workout. The weight is saved with today's date and syncs to the body weight log.
 
@@ -103,7 +110,7 @@ Log today's body weight directly from the session player without leaving the wor
 A session-level notes field sits at the top of the player. Saves on blur.
 
 ### Finishing or Exiting
-- **Finish**: stamps `ended_at` and redirects to session history.
+- **Finish**: stamps `ended_at` and opens the workout summary. If a set has weight and reps typed but isn't ticked, Finish first asks: log it and finish, skip it, or go back.
 - **Save & Exit**: leaves the session open so you can return later. The in-progress session appears on the Jym hub.
 - **Discard**: permanently deletes the session and all its sets.
 
@@ -111,7 +118,7 @@ A session-level notes field sits at the top of the player. Saves on blur.
 
 ## Session History
 
-List of all sessions at `/jym/sessions`, showing:
+Sessions at `/jym/track?tab=sessions`, 50 at a time with "Show older sessions", showing:
 - Date and time
 - Routine name (or "Freestyle")
 - Duration
@@ -192,6 +199,6 @@ The app respects a global **unit preference** (kg / lbs). All weights entered an
 
 ## Personal Records — How They Work
 
-A set is flagged as a PR at log time if its weight is strictly greater than the maximum weight ever logged for that exercise (across all sessions for the user), excluding warm-up sets and deload sessions.
+A working set is a PR when it beats every earlier working set of that exercise: heavier than the best weight, or the same weight with more reps. Weights within 0.05 kg count as the same weight, so a kg best shown in lbs and typed back is neither a phantom PR nor a missed one. Warm-ups and deload sets are never PRs and never raise the bar.
 
-The PR flag is stored permanently on the set. Renaming or reorganising exercises does not affect existing PR flags.
+PR flags are stored on the sets and recomputed for the whole exercise whenever a set is logged, edited, deleted or marked a warm-up, and whenever a session's type changes. `go run ./cmd/rerate-prs` (from `jiro-api/`, with `DATABASE_URL` set) recomputes every stored flag once, for data written under older rules.
