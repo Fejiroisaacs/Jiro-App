@@ -626,7 +626,7 @@ export class JymDashboardComponent implements OnInit {
     }
     // 16 weeks, Monday to Sunday, ending with the current week.
     const today = todayKey(tz);
-    const start = addDays(mondayOfKey(today), -15 * 7);
+    const start = heatmapStartKey(tz);
     const days: { date: string; count: number; label: string; future: boolean }[] = [];
     for (let i = 0; i < 16 * 7; i++) {
       const key = addDays(start, i);
@@ -695,7 +695,7 @@ export class JymDashboardComponent implements OnInit {
     this.jymService.listSeries().subscribe({
       next: s => this.activeSeries.set(s.filter(sr => !sr.ended_at)),
     });
-    this.jymService.listSessions().subscribe({
+    this.jymService.listSessions({ from: heatmapStartKey(this.settingsService.timezone()) }).subscribe({
       next: s => {
         this.allSessions.set(s);
         this.inProgressSessions.set(s.filter(sess => !sess.ended_at));
@@ -817,6 +817,11 @@ function readDeloadSnoozed(): boolean {
     const stamp = Number(localStorage.getItem(DELOAD_SNOOZED_KEY));
     return stamp > 0 && Date.now() - stamp < DELOAD_SNOOZE_DAYS * 86400000;
   } catch { return false; }
+}
+
+/** First day of the 16-week heatmap: the Monday 15 weeks before this week's. */
+function heatmapStartKey(tz: string): string {
+  return addDays(mondayOfKey(todayKey(tz)), -15 * 7);
 }
 
 /** Whole calendar days from day key `from` to day key `to`. */

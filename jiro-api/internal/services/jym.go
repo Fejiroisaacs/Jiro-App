@@ -881,11 +881,55 @@ func (s *JymService) StartSession(ctx context.Context, userID uuid.UUID, req *mo
 	return sess, nil
 }
 
-// ListSessions returns the 50 most recent sessions, which is what every list
-// screen shows.
-func (s *JymService) ListSessions(ctx context.Context, userID uuid.UUID) ([]models.SessionSummary, error) {
-	limit := 50
-	return s.listSessions(ctx, userID, &limit)
+// sessionPageSelect aggregates only the sessions its page CTE picks, newest first.
+const sessionPageSelect = `WITH page AS (%s)
+		 SELECT s.id, s.user_id, s.routine_id, s.series_id, s.session_type, s.started_at, s.ended_at, s.notes,
+		        r.name as routine_name,
+		        COUNT(ss.id) as set_count,
+		        COUNT(ss.id) FILTER (WHERE ss.is_pr) AS pr_count,
+		        COALESCE(SUM(ss.weight * ss.reps_performed), 0) as total_volume,
+		        COALESCE(array_agg(DISTINCT e.muscle_group) FILTER (WHERE e.muscle_group IS NOT NULL), '{}'::text[]) as muscle_groups
+		 FROM page
+		 JOIN sessions s ON s.id = page.id
+		 LEFT JOIN routines r ON s.routine_id = r.id
+		 LEFT JOIN session_sets ss ON ss.session_id = s.id
+		 LEFT JOIN exercises e ON ss.exercise_id = e.id
+		 GROUP BY s.id, r.name
+		 ORDER BY s.started_at DESC, s.id DESC`
+
+// ListSessions returns one page of sessions, newest first; before and beforeID continue after a page's last row.
+func (s *JymService) ListSessions(ctx context.Context, userID uuid.UUID, before *time.Time, beforeID uuid.UUID, limit int) ([]models.SessionSummary, error) {
+	rows, err := s.db.Query(ctx, fmt.Sprintf(sessionPageSelect,
+		`SELECT id FROM sessions
+		 WHERE user_id = $1 AND ($2::timestamptz IS NULL OR (started_at, id) < ($2::timestamptz, $3::uuid))
+		 ORDER BY started_at DESC, id DESC
+		 LIMIT $4`),
+		userID, before, beforeID, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return scanSessionSummaries(rows)
+}
+
+// ListSessionsSince returns every session from the start of the user's calendar day, plus any still in progress.
+func (s *JymService) ListSessionsSince(ctx context.Context, userID uuid.UUID, day time.Time, tzHint string) ([]models.SessionSummary, error) {
+	loc, err := userLocation(ctx, s.db, userID, tzHint)
+	if err != nil {
+		return nil, err
+	}
+	start := time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, loc)
+	rows, err := s.db.Query(ctx, fmt.Sprintf(sessionPageSelect,
+		`SELECT id FROM sessions
+		 WHERE user_id = $1 AND (started_at >= $2 OR ended_at IS NULL)
+		 ORDER BY started_at DESC, id DESC
+		 LIMIT 1000`),
+		userID, start,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return scanSessionSummaries(rows)
 }
 
 // ListAllSessions returns every session the user has, for the account export.
@@ -909,7 +953,7 @@ const sessionSummarySelect = `SELECT s.id, s.user_id, s.routine_id, s.series_id,
 
 const sessionSummaryGroup = ` GROUP BY s.id, r.name `
 
-// listSessions is shared by both; a nil limit binds LIMIT NULL, which Postgres treats as no limit.
+// listSessions backs the export; a nil limit binds LIMIT NULL, which Postgres treats as no limit.
 func (s *JymService) listSessions(ctx context.Context, userID uuid.UUID, limit *int) ([]models.SessionSummary, error) {
 	rows, err := s.db.Query(ctx,
 		sessionSummarySelect+`WHERE s.user_id = $1`+sessionSummaryGroup+`ORDER BY s.started_at DESC LIMIT $2`,
