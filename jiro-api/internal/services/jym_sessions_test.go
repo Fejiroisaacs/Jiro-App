@@ -198,3 +198,31 @@ func TestStartSessionGuardsAnOpenWorkoutAndTheSeriesSplit(t *testing.T) {
 		t.Fatalf("day of split A in a series of split B: got %v, want ErrRoutineNotInSeries", err)
 	}
 }
+
+func TestGetSessionCarriesTheRoutinePlan(t *testing.T) {
+	svc, userID := testJymDB(t)
+	ctx := context.Background()
+	split, err := svc.CreateSplit(ctx, userID, &models.CreateSplitRequest{Name: "Plan"})
+	if err != nil {
+		t.Fatalf("create split: %v", err)
+	}
+	day, err := svc.CreateRoutine(ctx, userID, split.ID, &models.CreateRoutineRequest{Name: "Push", DayOrder: 1})
+	if err != nil {
+		t.Fatalf("create routine: %v", err)
+	}
+	ex := prTestSetup(t, svc, userID, "Test Bench")
+	if _, err := svc.ReplaceRoutineItems(ctx, userID, day.ID, []models.ReplaceItemEntry{{ExerciseID: ex, TargetSets: 3, TargetReps: 8}}); err != nil {
+		t.Fatalf("plan items: %v", err)
+	}
+	sess, err := svc.StartSession(ctx, userID, &models.CreateSessionRequest{RoutineID: &day.ID})
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	got, err := svc.GetSession(ctx, userID, sess.ID)
+	if err != nil {
+		t.Fatalf("get session: %v", err)
+	}
+	if len(got.Targets) != 1 || got.Targets[0].ExerciseID != ex || got.Targets[0].TargetSets != 3 {
+		t.Fatalf("targets = %+v; want the routine's 3 x 8", got.Targets)
+	}
+}

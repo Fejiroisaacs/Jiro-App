@@ -332,6 +332,8 @@ type SessionWithSets struct {
 	RoutineName *string                  `json:"routine_name"`
 	Sets        []SessionSetWithExercise `json:"sets"`
 	Attachments []SessionAttachment      `json:"attachments"`
+	// Targets is the routine's plan when the session has one, so any device can show what isn't logged yet.
+	Targets []RoutineItemWithExercise `json:"targets"`
 }
 
 // CreateSessionRequest optionally names the session type up front, so a

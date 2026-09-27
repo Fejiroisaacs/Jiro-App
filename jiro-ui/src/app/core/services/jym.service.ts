@@ -227,6 +227,8 @@ export interface SessionWithSets extends Session {
   routine_name: string | null;
   sets: SessionSet[];
   attachments: SessionAttachment[];
+  /** The routine's plan when the session has one. */
+  targets: RoutineItem[];
 }
 
 export interface StartSessionResponse extends Session {

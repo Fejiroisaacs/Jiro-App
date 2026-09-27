@@ -1109,6 +1109,16 @@ func (s *JymService) GetSession(ctx context.Context, userID, sessionID uuid.UUID
 		sess.Attachments = append(sess.Attachments, a)
 	}
 
+	sess.Targets = []models.RoutineItemWithExercise{}
+	if sess.RoutineID != nil {
+		items, err := s.listRoutineItems(ctx, *sess.RoutineID)
+		if err != nil {
+			return nil, err
+		}
+		if items != nil {
+			sess.Targets = items
+		}
+	}
 	return sess, nil
 }
 

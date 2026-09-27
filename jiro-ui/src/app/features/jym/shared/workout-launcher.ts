@@ -43,7 +43,7 @@ export class WorkoutLauncher {
   private async open(req: CreateSessionRequest): Promise<void> {
     try {
       const s = await firstValueFrom(this.jym.startSession(req));
-      await this.router.navigate(['/jym/session', s.id], { state: { targets: s.targets } });
+      await this.router.navigate(['/jym/session', s.id]);
     } catch (err) {
       const body = (err as HttpErrorResponse)?.error?.error as ({ code?: string } & Partial<OpenWorkout>) | undefined;
       if (body?.code === 'SESSION_IN_PROGRESS' && body.session_id && !req.force) {

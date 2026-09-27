@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, WritableSignal, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, WritableSignal, effect, inject, signal } from '@angular/core';
 
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -8,6 +8,7 @@ import {
   CreateSetRequest,
   SetHistory,
   SessionAttachment,
+  SessionSet,
 } from '../../../core/services/jym.service';
 import { UploadService } from '../../../core/services/upload.service';
 import { SettingsService } from '../../../core/services/settings.service';
@@ -35,6 +36,13 @@ interface SetRow {
   ghostWeight: string;
   ghostReps: string;
   isWarmup: boolean;
+}
+
+/** What only this device knows until it's logged: typed rows, added exercises, removed plan exercises. */
+interface SessionDraft {
+  added: { exerciseId: string; exerciseName: string; muscleGroup: string | null }[];
+  removed: string[];
+  rows: Record<string, { setNumber: number; weight: string; reps: string; rpe: string; isWarmup: boolean }[]>;
 }
 
 interface ExerciseBlock {
@@ -255,6 +263,7 @@ interface ExerciseBlock {
                   step="0.5"
                   min="0"
                   [(ngModel)]="row.weight"
+                  (ngModelChange)="saveDraftSoon()"
                   [placeholder]="row.ghostWeight || '0'"
                   [class.has-ghost]="row.ghostWeight && !row.weight"
                   [attr.aria-label]="'Set ' + row.setNumber + ' weight (' + settingsService.unitLabel() + ')'"
@@ -265,6 +274,7 @@ interface ExerciseBlock {
                   type="number"
                   min="1"
                   [(ngModel)]="row.reps"
+                  (ngModelChange)="saveDraftSoon()"
                   [placeholder]="row.ghostReps || '0'"
                   [class.has-ghost]="row.ghostReps && !row.reps"
                   [attr.aria-label]="'Set ' + row.setNumber + ' reps'"
@@ -278,6 +288,7 @@ interface ExerciseBlock {
                   min="1"
                   max="10"
                   [(ngModel)]="row.rpe"
+                  (ngModelChange)="saveDraftSoon()"
                   [disabled]="row.saved" />
 
                 <button
@@ -377,7 +388,7 @@ interface ExerciseBlock {
     @if (showExitConfirm()) {
 <jiro-modal title="Exit workout?" maxWidth="400px" (close)="showExitConfirm.set(false)">
       <p style="font-size:var(--font-size-sm);color:var(--text-secondary);line-height:1.6;margin-bottom:var(--space-lg)">
-        Your sets are saved. You can resume this session any time from the Jym home page.
+        Logged sets are saved. Sets you typed but haven't logged stay on this device until you come back.
       </p>
       <div style="display:flex;flex-direction:column;gap:var(--space-sm)">
         <div style="display:flex;justify-content:flex-end;gap:var(--space-sm)">
@@ -1138,11 +1149,25 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   private formCheckFiles = new Map<string, File>();
   blockAttachments = signal<Map<string, SessionAttachment[]>>(new Map());
 
-  // Re-sync both timers when the user returns from a locked screen
+  // Plan exercises (routine targets), and those removed from the plan on this device.
+  private targetIds = new Set<string>();
+  private removedTargets = new Set<string>();
+  private draftReady = false;
+  private closed = false;
+  private draftTimer: ReturnType<typeof setTimeout> | null = null;
+  // Structural changes (added, removed, logged) reach the draft; typing goes through saveDraftSoon().
+  private readonly draftOnChange = effect(() => {
+    this.blocks();
+    if (this.draftReady) this.saveDraft();
+  });
+
+  // Re-sync both timers when the user returns from a locked screen; save the draft when leaving.
   private readonly onVisibilityChange = () => {
     if (document.visibilityState === 'visible') {
       this.tickRestTimer();
       this.updateElapsed();
+    } else {
+      this.flushDraft();
     }
   };
 
@@ -1160,9 +1185,6 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     this.startTimer();
     document.addEventListener('visibilitychange', this.onVisibilityChange);
 
-    // Targets passed via router state when starting a routine-based session
-    const routerTargets: RoutineItem[] = (history.state?.targets) || [];
-
     // Load all exercises for the picker
     this.jymService.listExercises().subscribe(exs => {
       this.allExercises.set(exs);
@@ -1173,53 +1195,15 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     this.jymService.getSession(this.sessionId).subscribe({
       next: session => {
         if (session.ended_at) {
+          this.closeDraft();
           this.openInHistory();
           return;
         }
         this.startedAt = new Date(session.started_at);
         this.sessionType.set(session.session_type || 'normal');
         this.sessionNotes = session.notes || '';
-        const existingBlocks = this.buildBlocksFromSets(session.sets || []);
-        const targetsKey = `jiro_session_targets_${this.sessionId}`;
-
-        const buildRoutineBlocks = (targets: RoutineItem[]) => targets.map(t => ({
-          exerciseId: t.exercise_id,
-          exerciseName: t.exercise_name,
-          muscleGroup: t.muscle_group,
-          sets: Array.from({ length: t.target_sets }, (_, i) => ({
-            setNumber: i + 1, weight: '', reps: '', rpe: '',
-            saved: false, isPR: false, saving: false, id: null,
-            ghostWeight: '', ghostReps: String(t.target_reps),
-            isWarmup: false,
-          })),
-          ghostSets: [] as { weight: number; reps: number }[],
-          suggestion: null,
-          exerciseNote: '',
-        }));
-
-        if (existingBlocks.length === 0 && routerTargets.length > 0) {
-          // Fresh split session — save targets so we can restore on return
-          localStorage.setItem(targetsKey, JSON.stringify(routerTargets));
-          const newBlocks = buildRoutineBlocks(routerTargets);
-          this.blocks.set(newBlocks);
-          this.loadSuggestionsForBlocks(newBlocks);
-        } else {
-          // Returning: merge logged sets with any un-logged routine exercises
-          const savedStr = localStorage.getItem(targetsKey);
-          const savedTargets: RoutineItem[] = savedStr ? JSON.parse(savedStr) : [];
-          if (savedTargets.length > 0 && existingBlocks.length > 0) {
-            const existingIds = new Set(existingBlocks.map(b => b.exerciseId));
-            const missing = buildRoutineBlocks(savedTargets.filter(t => !existingIds.has(t.exercise_id)));
-            this.blocks.set([...existingBlocks, ...missing]);
-            this.loadSuggestionsForBlocks(missing);
-          } else if (savedTargets.length > 0 && existingBlocks.length === 0) {
-            const newBlocks = buildRoutineBlocks(savedTargets);
-            this.blocks.set(newBlocks);
-            this.loadSuggestionsForBlocks(newBlocks);
-          } else {
-            this.blocks.set(existingBlocks);
-          }
-        }
+        this.blocks.set(this.restoreBlocks(session.sets || [], session.targets ?? []));
+        this.draftReady = true;
 
         // Populate form check counts from existing attachments
         const amap = new Map<string, SessionAttachment[]>();
@@ -1239,6 +1223,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.flushDraft();
     if (this.timerInterval) clearInterval(this.timerInterval);
     this.clearRestTimer();
     document.removeEventListener('visibilitychange', this.onVisibilityChange);
@@ -1443,9 +1428,14 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   }
 
   logSet(blockIndex: number, setIndex: number) {
+    this.persistRow(blockIndex, setIndex, true);
+  }
+
+  /** Saves one typed row; resolves false when it didn't save. */
+  private persistRow(blockIndex: number, setIndex: number, startRest: boolean): Promise<boolean> {
     const block = this.blocks()[blockIndex];
-    const row = block.sets[setIndex];
-    if (!row.weight || !row.reps) return;
+    const row = block?.sets[setIndex];
+    if (!row || !row.weight || !row.reps) return Promise.resolve(false);
 
     // Warm up audio NOW, synchronously while the tap gesture is still active.
     // Safari blocks AudioContext creation/resume in async callbacks (e.g. HTTP responses).
@@ -1466,23 +1456,28 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
       exercise_note: block.exerciseNote || undefined,
     };
 
-    this.jymService.logSet(this.sessionId, req).subscribe({
-      next: saved => {
-        this.blocks.update(bs => bs.map((b, bi) => bi === blockIndex ? {
-          ...b,
-          sets: b.sets.map((s, si) => si === setIndex ? {
-            ...s, saving: false, saved: true, isPR: saved.is_pr, id: saved.id,
-          } : s),
-        } : b));
-        this.startRestTimer();
-      },
-      error: err => {
-        if (this.handleEnded(err)) return;
-        this.blocks.update(bs => bs.map((b, bi) => bi === blockIndex ? {
-          ...b,
-          sets: b.sets.map((s, si) => si === setIndex ? { ...s, saving: false } : s),
-        } : b));
-      },
+    return new Promise<boolean>(resolve => {
+      this.jymService.logSet(this.sessionId, req).subscribe({
+        next: saved => {
+          this.blocks.update(bs => bs.map((b, bi) => bi === blockIndex ? {
+            ...b,
+            sets: b.sets.map((s, si) => si === setIndex ? {
+              ...s, saving: false, saved: true, isPR: saved.is_pr, id: saved.id,
+            } : s),
+          } : b));
+          if (startRest) this.startRestTimer();
+          resolve(true);
+        },
+        error: err => {
+          if (this.handleEnded(err)) { resolve(false); return; }
+          this.blocks.update(bs => bs.map((b, bi) => bi === blockIndex ? {
+            ...b,
+            sets: b.sets.map((s, si) => si === setIndex ? { ...s, saving: false } : s),
+          } : b));
+          this.toast.error('Could not save that set. Check your connection and try again.');
+          resolve(false);
+        },
+      });
     });
   }
 
@@ -1522,6 +1517,8 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     this.jymService.deleteSessionExercise(this.sessionId, block.exerciseId).subscribe({
       next: () => {
         this.deleteStaleFormChecks(block.exerciseId);
+        if (this.targetIds.has(block.exerciseId)) this.removedTargets.add(block.exerciseId);
+        this.collapsedBlocks.update(set => new Set([...set].filter(i => i !== blockIndex).map(i => (i > blockIndex ? i - 1 : i))));
         this.blocks.update(bs => bs.filter((_, bi) => bi !== blockIndex));
         this.removingBlock.set(null);
         this.toast.success(`${block.exerciseName} removed`);
@@ -1550,7 +1547,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     this.discarding.set(true);
     this.jymService.deleteSession(this.sessionId).subscribe({
       next: () => {
-        localStorage.removeItem(`jiro_session_targets_${this.sessionId}`);
+        this.closeDraft();
         this.router.navigate(['/jym']);
       },
       error: () => this.discarding.set(false),
@@ -1580,7 +1577,29 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     });
   }
 
-  finishSession() {
+  async finishSession() {
+    const pending = this.unloggedRows();
+    if (pending.length > 0) {
+      const n = pending.length;
+      const choice = await this.confirmService.choose({
+        title: n === 1 ? 'Log the unlogged set?' : `Log ${n} unlogged sets?`,
+        message: n === 1
+          ? 'You typed a set but did not tick it. Log it before you finish?'
+          : `You typed ${n} sets but did not tick them. Log them before you finish?`,
+        confirmLabel: 'Log and finish',
+        altLabel: 'Skip them',
+        cancelLabel: 'Go back',
+        danger: false,
+      });
+      if (choice === 'cancel') return;
+      if (choice === 'confirm') {
+        for (const { bi, si } of pending) {
+          // A failed save keeps the user here, with the row still typed.
+          if (!(await this.persistRow(bi, si, false))) return;
+        }
+      }
+    }
+
     const hasSavedSets = this.blocks().some(b => b.sets.some(s => s.saved));
     if (!hasSavedSets && !this.sessionNotes.trim()) {
       this.emptySessionError.set('Nothing to save. Log at least one set or add session notes first.');
@@ -1593,7 +1612,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
       notes: this.sessionNotes,
     }).subscribe({
       next: () => {
-        localStorage.removeItem(`jiro_session_targets_${this.sessionId}`);
+        this.closeDraft();
         const durationSeconds = Math.floor((Date.now() - this.startedAt.getTime()) / 1000);
         this.router.navigate(['/jym/session-summary'], {
           state: {
@@ -1637,6 +1656,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   private handleEnded(err: unknown): boolean {
     const code = (err as { status?: number; error?: { error?: { code?: string } } })?.error?.error?.code;
     if (code !== 'SESSION_ENDED') return false;
+    this.closeDraft();
     this.toast.error('This workout was already finished.');
     this.openInHistory();
     return true;
@@ -1753,20 +1773,8 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     const existing = this.blocks().find(b => b.exerciseId === ex.id);
     if (existing) return;
 
-    const newBlock: ExerciseBlock = {
-      exerciseId: ex.id,
-      exerciseName: ex.name,
-      muscleGroup: ex.muscle_group,
-      sets: [{
-        setNumber: 1, weight: '', reps: '', rpe: '',
-        saved: false, isPR: false, saving: false, id: null,
-        ghostWeight: '', ghostReps: '', isWarmup: false,
-      }],
-      ghostSets: [],
-      suggestion: null,
-      exerciseNote: '',
-    };
-
+    this.removedTargets.delete(ex.id);
+    const newBlock = this.emptyBlock(ex.id, ex.name, ex.muscle_group, [this.newRow(1)]);
     this.blocks.update(bs => [...bs, newBlock]);
 
     // Fetch history to generate progressive overload suggestion
@@ -1784,6 +1792,135 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
         } : b));
       },
     });
+  }
+
+  // ── Plan and draft ──────────────────────────────────────────────
+
+  /** Logged exercises in the order done, then the plan's unlogged ones, then exercises added on this device. */
+  private restoreBlocks(sets: SessionSet[], targets: RoutineItem[]): ExerciseBlock[] {
+    const draft = this.readDraft();
+    this.targetIds = new Set(targets.map(t => t.exercise_id));
+    this.removedTargets = new Set(draft.removed.filter(id => this.targetIds.has(id)));
+
+    const logged = this.buildBlocksFromSets(sets);
+    const loggedIds = new Set(logged.map(b => b.exerciseId));
+    // A plan exercise logged part-way keeps its remaining planned rows.
+    const targetById = new Map(targets.map(t => [t.exercise_id, t]));
+    for (const b of logged) {
+      const t = targetById.get(b.exerciseId);
+      const last = b.sets[b.sets.length - 1];
+      for (let n = b.sets.length + 1; t && n <= t.target_sets; n++) {
+        b.sets.push(this.newRow(n, { ghostWeight: last?.weight ?? '', ghostReps: String(t.target_reps) }));
+      }
+    }
+    const planned = targets
+      .filter(t => !loggedIds.has(t.exercise_id) && !this.removedTargets.has(t.exercise_id))
+      .map(t => this.emptyBlock(t.exercise_id, t.exercise_name, t.muscle_group,
+        Array.from({ length: t.target_sets }, (_, i) => this.newRow(i + 1, { ghostReps: String(t.target_reps) }))));
+    const added = draft.added
+      .filter(a => !loggedIds.has(a.exerciseId) && !this.targetIds.has(a.exerciseId))
+      .map(a => this.emptyBlock(a.exerciseId, a.exerciseName, a.muscleGroup, [this.newRow(1)]));
+
+    const blocks = [...logged, ...planned, ...added];
+    for (const b of blocks) {
+      for (const d of draft.rows[b.exerciseId] ?? []) {
+        const row = b.sets.find(r => r.setNumber === d.setNumber);
+        if (row && !row.saved) Object.assign(row, { weight: d.weight, reps: d.reps, rpe: d.rpe, isWarmup: d.isWarmup });
+        else if (!row) b.sets.push(this.newRow(d.setNumber, { weight: d.weight, reps: d.reps, rpe: d.rpe, isWarmup: d.isWarmup }));
+      }
+      b.sets.sort((x, y) => x.setNumber - y.setNumber);
+    }
+    this.loadSuggestionsForBlocks([...planned, ...added]);
+    return blocks;
+  }
+
+  private newRow(setNumber: number, init: Partial<SetRow> = {}): SetRow {
+    return {
+      setNumber, weight: '', reps: '', rpe: '',
+      saved: false, isPR: false, saving: false, id: null,
+      ghostWeight: '', ghostReps: '', isWarmup: false,
+      ...init,
+    };
+  }
+
+  private emptyBlock(exerciseId: string, exerciseName: string, muscleGroup: string | null, sets: SetRow[]): ExerciseBlock {
+    return { exerciseId, exerciseName, muscleGroup, sets, ghostSets: [], suggestion: null, exerciseNote: '' };
+  }
+
+  /** Rows with weight and reps typed but not ticked. */
+  private unloggedRows(): { bi: number; si: number }[] {
+    const rows: { bi: number; si: number }[] = [];
+    this.blocks().forEach((b, bi) => b.sets.forEach((s, si) => {
+      if (!s.saved && !s.saving && s.weight && s.reps && !(s.rpe && this.rpeInvalid(s.rpe))) rows.push({ bi, si });
+    }));
+    return rows;
+  }
+
+  private draftKey(): string {
+    return `jiro_session_draft_${this.sessionId}`;
+  }
+
+  private readDraft(): SessionDraft {
+    const empty: SessionDraft = { added: [], removed: [], rows: {} };
+    try {
+      const raw = localStorage.getItem(this.draftKey());
+      return raw ? { ...empty, ...JSON.parse(raw) } : empty;
+    } catch {
+      return empty;
+    }
+  }
+
+  /** Keeps what the server doesn't have yet for this session, on this device. */
+  saveDraft() {
+    if (this.closed || !this.draftReady) return;
+    const blocks = this.blocks();
+    const rows: SessionDraft['rows'] = {};
+    for (const b of blocks) {
+      const typed = b.sets
+        .filter(s => !s.saved && (s.weight || s.reps || s.rpe || s.isWarmup))
+        .map(s => ({ setNumber: s.setNumber, weight: s.weight, reps: s.reps, rpe: s.rpe, isWarmup: s.isWarmup }));
+      if (typed.length) rows[b.exerciseId] = typed;
+    }
+    const draft: SessionDraft = {
+      added: blocks
+        .filter(b => !this.targetIds.has(b.exerciseId) && !b.sets.some(s => s.saved))
+        .map(b => ({ exerciseId: b.exerciseId, exerciseName: b.exerciseName, muscleGroup: b.muscleGroup })),
+      removed: [...this.removedTargets],
+      rows,
+    };
+    try {
+      if (draft.added.length || draft.removed.length || Object.keys(rows).length) {
+        localStorage.setItem(this.draftKey(), JSON.stringify(draft));
+      } else {
+        localStorage.removeItem(this.draftKey());
+      }
+    } catch { /* storage unavailable: the draft is a convenience */ }
+  }
+
+  /** Typing saves shortly after the last keystroke. */
+  saveDraftSoon() {
+    if (this.draftTimer) clearTimeout(this.draftTimer);
+    this.draftTimer = setTimeout(() => {
+      this.draftTimer = null;
+      this.saveDraft();
+    }, 300);
+  }
+
+  private flushDraft() {
+    if (!this.draftTimer) return;
+    clearTimeout(this.draftTimer);
+    this.draftTimer = null;
+    this.saveDraft();
+  }
+
+  /** The session is over (finished, discarded or ended elsewhere): drop its draft for good. */
+  private closeDraft() {
+    this.closed = true;
+    if (this.draftTimer) clearTimeout(this.draftTimer);
+    try {
+      localStorage.removeItem(this.draftKey());
+      localStorage.removeItem(`jiro_session_targets_${this.sessionId}`); // retired key, still on older devices
+    } catch { /* storage unavailable */ }
   }
 
   // ── Form check helpers ──────────────────────────────────────────
