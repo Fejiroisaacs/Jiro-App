@@ -846,6 +846,22 @@ func (s *JymService) StartSession(ctx context.Context, userID uuid.UUID, req *mo
 			return nil, ErrRoutineNotFound
 		}
 	}
+	seriesID := req.SeriesID
+	// A day of a split with an active series belongs to that series, whichever Start button was used.
+	if req.RoutineID != nil && seriesID == nil {
+		var active uuid.UUID
+		err := s.db.QueryRow(ctx,
+			`SELECT sr.id FROM split_series sr JOIN routines r ON r.split_id = sr.split_id
+			 WHERE r.id = $1 AND sr.user_id = $2 AND sr.ended_at IS NULL
+			 ORDER BY sr.started_at DESC LIMIT 1`,
+			*req.RoutineID, userID,
+		).Scan(&active)
+		if err == nil {
+			seriesID = &active
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			return nil, err
+		}
+	}
 	if req.SeriesID != nil {
 		if owned, err := s.ownsSeries(ctx, *req.SeriesID, userID); err != nil {
 			return nil, err
@@ -888,7 +904,7 @@ func (s *JymService) StartSession(ctx context.Context, userID uuid.UUID, req *mo
 		`INSERT INTO sessions (user_id, routine_id, series_id, session_type)
 		 VALUES ($1, $2, $3, $4)
 		 RETURNING id, user_id, routine_id, series_id, session_type, started_at, ended_at, notes`,
-		userID, req.RoutineID, req.SeriesID, sessionType,
+		userID, req.RoutineID, seriesID, sessionType,
 	).Scan(&sess.ID, &sess.UserID, &sess.RoutineID, &sess.SeriesID, &sess.SessionType, &sess.StartedAt, &sess.EndedAt, &sess.Notes)
 	if err != nil {
 		return nil, err
@@ -1893,10 +1909,69 @@ func (s *JymService) ListSeries(ctx context.Context, userID uuid.UUID) ([]models
 		}
 		result = append(result, sr)
 	}
+	rows.Close()
+	for i := range result {
+		if result[i].EndedAt != nil {
+			continue
+		}
+		if result[i].NextRoutine, err = s.NextRoutine(ctx, result[i].ID, result[i].SplitID); err != nil {
+			return nil, err
+		}
+	}
 	if result == nil {
 		result = []models.SplitSeriesSummary{}
 	}
 	return result, nil
+}
+
+// NextRoutine is the day after the series' latest logged day, wrapping round, or the first day before any.
+// Nil when the split has no days.
+func (s *JymService) NextRoutine(ctx context.Context, seriesID, splitID uuid.UUID) (*models.RoutineRef, error) {
+	rows, err := s.db.Query(ctx,
+		`SELECT id, name, day_order FROM routines WHERE split_id = $1 ORDER BY day_order, created_at, id`,
+		splitID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	var days []models.RoutineRef
+	for rows.Next() {
+		var d models.RoutineRef
+		if err := rows.Scan(&d.ID, &d.Name, &d.DayOrder); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		days = append(days, d)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(days) == 0 {
+		return nil, nil
+	}
+
+	var last uuid.UUID
+	err = s.db.QueryRow(ctx,
+		`SELECT routine_id FROM sessions
+		 WHERE series_id = $1 AND routine_id IS NOT NULL
+		 ORDER BY started_at DESC LIMIT 1`,
+		seriesID,
+	).Scan(&last)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return &days[0], nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	for i, d := range days {
+		if d.ID == last {
+			next := days[(i+1)%len(days)]
+			return &next, nil
+		}
+	}
+	// The last day logged has since been removed from the split.
+	return &days[0], nil
 }
 
 func (s *JymService) GetSeriesDetail(ctx context.Context, userID, seriesID uuid.UUID) (*models.SplitSeriesDetail, error) {
@@ -1922,6 +1997,12 @@ func (s *JymService) GetSeriesDetail(ctx context.Context, userID, seriesID uuid.
 			return nil, ErrSeriesNotFound
 		}
 		return nil, err
+	}
+
+	if detail.EndedAt == nil {
+		if detail.NextRoutine, err = s.NextRoutine(ctx, detail.ID, detail.SplitID); err != nil {
+			return nil, err
+		}
 	}
 
 	// Session points (for volume chart)

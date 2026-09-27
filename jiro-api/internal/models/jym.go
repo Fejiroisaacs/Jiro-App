@@ -218,6 +218,15 @@ type SplitSeriesSummary struct {
 	SplitSeries
 	SplitName    string `json:"split_name"`
 	SessionCount int    `json:"session_count"`
+	// NextRoutine is the day to train next in an active series; nil once it has ended or has no days.
+	NextRoutine *RoutineRef `json:"next_routine"`
+}
+
+// RoutineRef names one day of a split.
+type RoutineRef struct {
+	ID       uuid.UUID `json:"id"`
+	Name     string    `json:"name"`
+	DayOrder int       `json:"day_order"`
 }
 
 type SeriesSessionPoint struct {

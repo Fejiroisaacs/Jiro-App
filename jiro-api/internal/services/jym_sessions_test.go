@@ -226,3 +226,77 @@ func TestGetSessionCarriesTheRoutinePlan(t *testing.T) {
 		t.Fatalf("targets = %+v; want the routine's 3 x 8", got.Targets)
 	}
 }
+
+func TestSeriesNextDayAdvancesWrapsAndStartsLink(t *testing.T) {
+	svc, userID := testJymDB(t)
+	ctx := context.Background()
+	split, err := svc.CreateSplit(ctx, userID, &models.CreateSplitRequest{Name: "PPL"})
+	if err != nil {
+		t.Fatalf("create split: %v", err)
+	}
+	var days []*models.Routine
+	for i, name := range []string{"Push", "Pull", "Legs"} {
+		r, err := svc.CreateRoutine(ctx, userID, split.ID, &models.CreateRoutineRequest{Name: name, DayOrder: i + 1})
+		if err != nil {
+			t.Fatalf("create %s: %v", name, err)
+		}
+		days = append(days, r)
+	}
+	series, err := svc.CreateSeries(ctx, userID, &models.CreateSeriesRequest{SplitID: split.ID, Name: "Run", DurationType: "open"})
+	if err != nil {
+		t.Fatalf("create series: %v", err)
+	}
+	next := func() string {
+		n, err := svc.NextRoutine(ctx, series.ID, split.ID)
+		if err != nil {
+			t.Fatalf("next routine: %v", err)
+		}
+		if n == nil {
+			return ""
+		}
+		return n.Name
+	}
+	if got := next(); got != "Push" {
+		t.Fatalf("before any workout, next = %q, want Push", got)
+	}
+
+	// Starting Pull from the split, without naming the series, still files it under the active series.
+	pull, err := svc.StartSession(ctx, userID, &models.CreateSessionRequest{RoutineID: &days[1].ID})
+	if err != nil {
+		t.Fatalf("start pull: %v", err)
+	}
+	if pull.SeriesID == nil || *pull.SeriesID != series.ID {
+		t.Fatalf("a day started from its split was not linked to the active series")
+	}
+	finishSession(t, svc, userID, pull.ID)
+	if got := next(); got != "Legs" {
+		t.Fatalf("after Pull, next = %q, want Legs", got)
+	}
+	legs, err := svc.StartSession(ctx, userID, &models.CreateSessionRequest{RoutineID: &days[2].ID})
+	if err != nil {
+		t.Fatalf("start legs: %v", err)
+	}
+	finishSession(t, svc, userID, legs.ID)
+	if got := next(); got != "Push" {
+		t.Fatalf("after the last day, next = %q, want Push (wrap)", got)
+	}
+	list, err := svc.ListSeries(ctx, userID)
+	if err != nil {
+		t.Fatalf("list series: %v", err)
+	}
+	if len(list) != 1 || list[0].NextRoutine == nil || list[0].NextRoutine.Name != "Push" {
+		t.Fatalf("list series next = %+v, want Push", list)
+	}
+
+	ended := time.Now()
+	if _, err := svc.UpdateSeries(ctx, userID, series.ID, &models.UpdateSeriesRequest{EndedAt: &ended}); err != nil {
+		t.Fatalf("end series: %v", err)
+	}
+	after, err := svc.StartSession(ctx, userID, &models.CreateSessionRequest{RoutineID: &days[0].ID})
+	if err != nil {
+		t.Fatalf("start after end: %v", err)
+	}
+	if after.SeriesID != nil {
+		t.Fatalf("a workout was linked to an ended series")
+	}
+}
