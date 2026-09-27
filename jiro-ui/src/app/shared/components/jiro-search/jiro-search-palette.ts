@@ -327,7 +327,7 @@ interface TextPart { text: string; match: boolean; }
 
     mark {
       background: rgba(var(--color-primary-rgb), 0.18);
-      color: inherit;
+      color: var(--color-primary-text);
       font-weight: 700;
       border-radius: var(--border-radius-sm);
       padding: 0 1px;
