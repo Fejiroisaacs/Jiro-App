@@ -116,7 +116,7 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
             <jiro-user-menu direction="up" [compact]="collapsed()" />
           } @else {
             <a routerLink="/login" class="nav-item" [attr.aria-label]="collapsed() ? 'Sign in' : null">
-              <jiro-icon name="sign-out" [size]="22" />
+              <jiro-icon name="sign-in" [size]="22" />
               @if (!collapsed()) { <span class="nav-label">Sign in</span> }
             </a>
             @if (!collapsed()) {

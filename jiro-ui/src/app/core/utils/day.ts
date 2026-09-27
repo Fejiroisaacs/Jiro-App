@@ -96,10 +96,6 @@ export function mondayOfKey(key: string): string {
   return addDays(key, dow === 0 ? -6 : 1 - dow);
 }
 
-/** "Sep 21" for a day key; the key is already a calendar date, so no zone applies. */
-export function shortDayLabel(key: string): string {
-  return keyDate(key).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
-}
 
 const offsetFormatters = new Map<string, Intl.DateTimeFormat>();
 

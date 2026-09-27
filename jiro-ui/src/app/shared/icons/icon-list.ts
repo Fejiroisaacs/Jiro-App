@@ -13,6 +13,7 @@ export const ICON_LIST = [
   'moon',
   'list',
   'sign-out',
+  'sign-in',
   'user',
   'chat-circle',
   'bell',

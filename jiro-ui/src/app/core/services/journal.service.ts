@@ -150,7 +150,7 @@ export const MOODS = [
   { value: 'calm', label: 'Calm', color: 'var(--data-4)', icon: 'cloud' },
   { value: 'tired', label: 'Tired', color: 'var(--data-7)', icon: 'moon' },
   { value: 'sad', label: 'Sad', color: 'var(--data-5)', icon: 'smiley-sad' },
-  { value: 'anxious', label: 'Anxious', color: 'var(--data-2)', icon: 'warning-circle' },
+  { value: 'anxious', label: 'Anxious', color: 'var(--data-12)', icon: 'warning-circle' },
   { value: 'stressed', label: 'Stressed', color: 'var(--data-1)', icon: 'fire' },
 ] as const satisfies readonly { value: string; label: string; color: string; icon: IconName }[];
 
