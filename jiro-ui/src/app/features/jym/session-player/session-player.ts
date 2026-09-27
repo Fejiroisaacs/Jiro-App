@@ -1408,8 +1408,17 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   }
 
   setSessionType(type: string) {
+    const previous = this.sessionType();
     this.sessionType.set(type);
-    this.jymService.updateSession(this.sessionId, { session_type: type }).subscribe();
+    this.jymService.updateSession(this.sessionId, { session_type: type }).subscribe({
+      // Deload sets never count, so the type can move PR badges.
+      next: () => this.refreshPrBadges(),
+      error: err => {
+        if (this.handleEnded(err)) return;
+        this.sessionType.set(previous);
+        this.toast.error('Could not change the session type.');
+      },
+    });
   }
 
   toggleUnit(unit: string) {
@@ -1511,7 +1520,9 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
         if (this.savedCount(blockIndex) === 0) {
           this.deleteStaleFormChecks(exerciseId);
         }
+        this.refreshPrBadges();
       },
+      error: () => this.toast.error('Could not remove the set.'),
     });
   }
 
@@ -1569,7 +1580,9 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   }
 
   saveNotes() {
-    this.jymService.updateSession(this.sessionId, { notes: this.sessionNotes }).subscribe();
+    this.jymService.updateSession(this.sessionId, { notes: this.sessionNotes }).subscribe({
+      error: err => { if (!this.handleEnded(err)) this.toast.error('Could not save the session notes.'); },
+    });
   }
 
   saveAsTemplate() {
@@ -1601,7 +1614,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
           ? 'You typed a set but did not tick it. Log it before you finish?'
           : `You typed ${n} sets but did not tick them. Log them before you finish?`,
         confirmLabel: 'Log and finish',
-        altLabel: 'Skip them',
+        altLabel: n === 1 ? 'Skip it' : 'Skip them',
         cancelLabel: 'Go back',
         danger: false,
       });
@@ -1682,7 +1695,10 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     const today = todayKey(this.settingsService.timezone());
     this.jymService.logBodyWeight({ recorded_at: today, weight_kg: this.settingsService.toKg(this.bwValue) }).subscribe({
       next: () => { this.bwLogged.set(true); this.bwSaving.set(false); },
-      error: () => this.bwSaving.set(false),
+      error: () => {
+        this.bwSaving.set(false);
+        this.toast.error('Could not log your body weight.');
+      },
     });
   }
 
@@ -1718,10 +1734,14 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     if (row.id) {
       const id = row.id;
       this.jymService.updateSet(id, { is_warmup: newVal }).subscribe({
-        next: saved => this.blocks.update(bs => bs.map((b, i) => i !== bi ? b : {
-          ...b,
-          sets: b.sets.map(s => s.id !== id ? s : { ...s, isPR: saved.is_pr }),
-        })),
+        next: () => this.refreshPrBadges(),
+        error: () => {
+          this.blocks.update(bs => bs.map((b, i) => i !== bi ? b : {
+            ...b,
+            sets: b.sets.map(s => s.id !== id ? s : { ...s, isWarmup: !newVal }),
+          }));
+          this.toast.error('Could not change the warm-up.');
+        },
       });
     }
   }
@@ -1731,8 +1751,15 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     if (!block) return;
     const note = block.exerciseNote || undefined;
     const savedIds = block.sets.filter(s => s.saved && s.id).map(s => s.id!);
+    let warned = false;
     for (const id of savedIds) {
-      this.jymService.updateSet(id, { exercise_note: note }).subscribe();
+      this.jymService.updateSet(id, { exercise_note: note }).subscribe({
+        error: () => {
+          if (warned) return;
+          warned = true;
+          this.toast.error('Could not save the exercise note.');
+        },
+      });
     }
   }
 
@@ -1792,6 +1819,19 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     this.blocks.update(bs => [...bs, newBlock]);
 
     this.loadSuggestionsForBlocks([newBlock]);
+  }
+
+  /** Deleting a set, a warm-up or a type change can move a PR to another set: re-read the flags. */
+  private refreshPrBadges() {
+    this.jymService.getSession(this.sessionId).subscribe({
+      next: s => {
+        const pr = new Map(s.sets.map(x => [x.id, x.is_pr]));
+        this.blocks.update(bs => bs.map(b => ({
+          ...b,
+          sets: b.sets.map(r => (r.id && pr.has(r.id) ? { ...r, isPR: pr.get(r.id)! } : r)),
+        })));
+      },
+    });
   }
 
   // ── Plan and draft ──────────────────────────────────────────────

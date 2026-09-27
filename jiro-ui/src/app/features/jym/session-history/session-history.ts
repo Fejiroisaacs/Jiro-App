@@ -765,7 +765,10 @@ export class SessionHistoryComponent implements OnInit {
         URL.revokeObjectURL(url);
         this.exporting.set(false);
       },
-      error: () => this.exporting.set(false),
+      error: () => {
+        this.exporting.set(false);
+        this.toast.error('Could not export your sessions.');
+      },
     });
   }
 }

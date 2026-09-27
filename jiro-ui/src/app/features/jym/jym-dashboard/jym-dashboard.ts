@@ -37,6 +37,12 @@ const DELOAD_SNOOZE_DAYS = 7;
         </jiro-button>
       </jiro-page-header>
 
+      @if (loadError()) {
+        <jiro-empty-state compact icon="warning-circle" heading="Could not load everything" message="Check your connection and try again.">
+          <jiro-button size="sm" variant="secondary" type="button" (click)="load()">Try again</jiro-button>
+        </jiro-empty-state>
+      }
+
       <!-- Deload suggestion -->
       @if (deloadSuggestion(); as d) {
         <section class="deload-card" aria-labelledby="deload-heading">
@@ -208,7 +214,7 @@ const DELOAD_SNOOZE_DAYS = 7;
             @for (i of [1, 2, 3]; track i) { <jiro-skeleton height="50px" /> }
           </div>
         }
-        @if (!loading() && splits().length === 0) {
+        @if (!loading() && !loadError() && splits().length === 0) {
           <jiro-empty-state compact heading="No splits yet" message="A split organises your training week.">
             <jiro-button size="sm" variant="secondary" routerLink="/jym/plan">Create your first split</jiro-button>
           </jiro-empty-state>
@@ -242,18 +248,18 @@ const DELOAD_SNOOZE_DAYS = 7;
           <h2 class="section-title">Templates</h2>
           <a routerLink="/jym/templates" class="manage-link">Manage <jiro-icon name="arrow-right" [size]="14" /></a>
         </div>
-        @if (loading()) {
+        @if (templatesLoading()) {
 <div class="chip-skeletons" role="status" aria-label="Loading">
             @for (i of [1, 2, 3]; track i) { <jiro-skeleton height="50px" /> }
           </div>
         }
-        @if (!loading() && templates().length === 0) {
+        @if (!templatesLoading() && !loadError() && templates().length === 0) {
           <jiro-empty-state
             compact
             heading="No templates yet"
             message="During a session, use Save as template to keep its layout for next time." />
         }
-        @if (!loading() && templates().length > 0) {
+        @if (!templatesLoading() && templates().length > 0) {
 <div class="splits-row">
           @for (t of templates().slice(0, 4); track t) {
 <div class="split-chip" (click)="startFromTemplate(t)">
@@ -600,6 +606,8 @@ export class JymDashboardComponent implements OnInit {
   inProgressSessions = signal<SessionSummary[]>([]);
   templates = signal<Routine[]>([]);
   loading = signal(true);
+  templatesLoading = signal(true);
+  loadError = signal(false);
 
   hasCompletedSessions = computed(() => this.allSessions().some(s => !!s.ended_at));
 
@@ -690,21 +698,32 @@ export class JymDashboardComponent implements OnInit {
   constructor(private jymService: JymService, public router: Router) { }
 
   ngOnInit() {
+    this.load();
+  }
+
+  load() {
+    this.loadError.set(false);
+    this.loading.set(true);
+    this.templatesLoading.set(true);
+    const failed = () => this.loadError.set(true);
     this.jymService.listSplits().subscribe({
       next: s => { this.splits.set(s); this.loading.set(false); },
-      error: () => this.loading.set(false),
+      error: () => { this.loading.set(false); failed(); },
     });
     this.jymService.listSeries().subscribe({
       next: s => this.activeSeries.set(s.filter(sr => !sr.ended_at)),
+      error: failed,
     });
     this.jymService.listSessions({ from: heatmapStartKey(this.settingsService.timezone()) }).subscribe({
       next: s => {
         this.allSessions.set(s);
         this.inProgressSessions.set(s.filter(sess => !sess.ended_at));
       },
+      error: failed,
     });
     this.jymService.listTemplates().subscribe({
-      next: t => this.templates.set(t),
+      next: t => { this.templates.set(t); this.templatesLoading.set(false); },
+      error: () => { this.templatesLoading.set(false); failed(); },
     });
   }
 

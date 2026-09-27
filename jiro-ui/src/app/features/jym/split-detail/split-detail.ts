@@ -809,6 +809,7 @@ export class SplitDetailComponent implements OnInit {
     if (v === this.split()?.visibility) return;
     this.jymService.updateSplit(this.splitId, { visibility: v }).subscribe({
       next: s => this.split.update(cur => cur ? { ...cur, visibility: s.visibility } : cur),
+      error: () => this.toast.error('Could not change who can see this split.'),
     });
   }
 
@@ -1043,6 +1044,7 @@ export class SplitDetailComponent implements OnInit {
         this.shareUrl.set('');
         this.shareExpiresAt.set('');
       },
+      error: () => this.toast.error('Could not turn off the link.'),
     });
   }
 

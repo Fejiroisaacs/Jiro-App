@@ -4,6 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import { JymService, SplitSeriesDetail, ExerciseProgression, Routine } from '../../../core/services/jym.service';
+import { ConfirmService } from '../../../core/services/confirm.service';
+import { ToastService } from '../../../core/services/toast.service';
 import { WorkoutLauncher } from '../shared/workout-launcher';
 import { SettingsService } from '../../../core/services/settings.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
@@ -412,6 +414,8 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly settings = inject(SettingsService);
 
   private readonly launcher = inject(WorkoutLauncher);
+  private readonly confirmService = inject(ConfirmService);
+  private readonly toast = inject(ToastService);
 
   constructor(
     private jymService: JymService,
@@ -642,9 +646,17 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
     this.launcher.start({ series_id: this.seriesId });
   }
 
-  endSeries() {
+  async endSeries() {
+    const ok = await this.confirmService.confirm({
+      title: 'End this series?',
+      message: 'New workouts stop counting towards it, and it cannot be reopened. Its workouts and charts stay.',
+      confirmLabel: 'End series',
+      danger: false,
+    });
+    if (!ok) return;
     this.jymService.updateSeries(this.seriesId, { ended_at: new Date().toISOString() }).subscribe({
       next: updated => this.series.update(s => s ? { ...s, ended_at: updated.ended_at } : s),
+      error: () => this.toast.error('Could not end the series.'),
     });
   }
 
