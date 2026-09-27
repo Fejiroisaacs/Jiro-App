@@ -713,20 +713,20 @@ func buildDemoLedger(ds *demoDataset, at func(int, int, int) time.Time, date fun
 	// Same names and colours as LedgerService.SeedDefaultCategories.
 	cats := map[string]uuid.UUID{}
 	for _, c := range []struct{ name, typ, color string }{
-		{"Housing", "expense", "#8D6E63"},
-		{"Food & Drink", "expense", "#E57373"},
-		{"Transport", "expense", "#64B5F6"},
-		{"Health", "expense", "#81C784"},
-		{"Entertainment", "expense", "#FFD54F"},
-		{"Shopping", "expense", "#F48FB1"},
-		{"Utilities", "expense", "#90A4AE"},
-		{"Subscriptions", "expense", "#CE93D8"},
-		{"Other", "expense", "#BCAAA4"},
-		{"Salary", "income", "#66BB6A"},
-		{"Freelance", "income", "#4DB6AC"},
-		{"Investment", "income", "#FFA726"},
-		{"Gift", "income", "#AB47BC"},
-		{"Other Income", "income", "#78909C"},
+		{"Housing", "expense", "data-12"},
+		{"Food & Drink", "expense", "data-1"},
+		{"Transport", "expense", "data-5"},
+		{"Health", "expense", "data-4"},
+		{"Entertainment", "expense", "data-3"},
+		{"Shopping", "expense", "data-6"},
+		{"Utilities", "expense", "data-10"},
+		{"Subscriptions", "expense", "data-9"},
+		{"Other", "expense", "data-7"},
+		{"Salary", "income", "data-8"},
+		{"Freelance", "income", "data-4"},
+		{"Investment", "income", "data-11"},
+		{"Gift", "income", "data-6"},
+		{"Other Income", "income", "data-10"},
 	} {
 		id := uuid.New()
 		cats[c.name] = id
