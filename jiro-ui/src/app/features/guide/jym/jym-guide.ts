@@ -89,8 +89,8 @@ import { GUIDE } from '../shared';
           <li>The rest timer starts in the bar at the top. Choose <strong>1m</strong>, <strong>1:30</strong>, <strong>2m</strong>, <strong>3m</strong> or <strong>5m</strong>, add <strong>+30s</strong>, or select the x to skip it. It beeps when your rest is over.</li>
           <li>Use <strong>+ Add set</strong> for another set and <strong>+ Add exercise</strong> for another exercise. The x on a logged set removes it.</li>
         </guide-steps>
-        <guide-shot guide="jym" name="session-sets" [width]="1400" [height]="1098"
-          alt="Bench Press during a workout: a warm-up set of 95 lbs, four logged sets of 175 lbs with the 6-rep set marked PR, and a sixth row suggesting 175 lbs and 5 reps." />
+        <guide-shot guide="jym" name="session-sets" [width]="1400" [height]="1204"
+          alt="Bench Press during a workout: a note from last time, a warm-up set of 95 lbs, four logged sets of 175 lbs with the 6-rep set marked PR, and a sixth row suggesting 180.8 lbs and 5 reps." />
         <guide-tip>A set is a PR when it is the heaviest weight you have logged for that exercise, or the same top weight for more reps. Warm-ups are left out on both sides: they never count as a PR and never raise the bar for one. Marking a PR set as a warm-up takes its badge away.</guide-tip>
       </guide-section>
 
@@ -123,8 +123,8 @@ import { GUIDE } from '../shared';
           <li>Enter a name and select <strong>Save template</strong>.</li>
           <li>To use it, select the template under <strong>Templates</strong> on the <a routerLink="/jym">Jym</a> home page, or select <strong>Start</strong> on it in <a routerLink="/jym/plan" [queryParams]="{ tab: 'templates' }">Plan, Templates</a>.</li>
         </guide-steps>
-        <guide-shot guide="jym" name="save-template" [width]="840" [height]="504"
-          alt="The Save as Template window with the name Push day A, and Cancel and Save Template buttons." />
+        <guide-shot guide="jym" name="save-template" [width]="840" [height]="554"
+          alt="The Save as template window with the name Push day A, and Cancel and Save template buttons." />
       </guide-section>
 
       <guide-section id="run-a-series" title="Run a series"
