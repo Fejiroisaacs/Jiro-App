@@ -715,12 +715,13 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
       overflow: hidden;
     }
 
-    /* Data colours lifted toward the card text so they read on the dark card. */
     .sc-mg-fill {
       height: 100%;
       border-radius: var(--border-radius-sm);
-      filter: brightness(1.35);
     }
+
+    /* Light-theme data colours are lifted to read on the dark card; dark-theme ones already are. */
+    :host-context(html:not(.dark)) .sc-mg-fill { filter: brightness(1.35); }
 
     .sc-mg-pct {
       width: 28px;
