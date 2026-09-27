@@ -57,6 +57,13 @@ export class SettingsService {
     return this.weightUnit() === 'lbs' ? value / KG_TO_LBS : value;
   }
 
+  /** Re-expresses a weight typed in one unit in another: lbs to 0.1, kg to the 0.01 it is stored at. */
+  convertWeight(value: number, from: string, to: string): number {
+    if (from === to) return value;
+    const kg = from === 'lbs' ? value / KG_TO_LBS : value;
+    return to === 'lbs' ? Math.round(kg * KG_TO_LBS * 10) / 10 : Math.round(kg * 100) / 100;
+  }
+
   unitLabel(): string {
     return this.weightUnit();
   }

@@ -27,6 +27,8 @@ import { ConfirmService } from '../../../core/services/confirm.service';
 interface SetRow {
   setNumber: number;
   weight: string;
+  /** Stored kg of a logged set, so a unit switch re-derives it instead of reinterpreting the text. */
+  weightKg?: number;
   reps: string;
   rpe: string;
   saved: boolean;
@@ -40,6 +42,7 @@ interface SetRow {
 
 /** What only this device knows until it's logged: typed rows, added exercises, removed plan exercises. */
 interface SessionDraft {
+  unit?: string;
   added: { exerciseId: string; exerciseName: string; muscleGroup: string | null }[];
   removed: string[];
   rows: Record<string, { setNumber: number; weight: string; reps: string; rpe: string; isWarmup: boolean }[]>;
@@ -1149,6 +1152,16 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   private formCheckFiles = new Map<string, File>();
   blockAttachments = signal<Map<string, SessionAttachment[]>>(new Map());
 
+  // History behind each exercise's suggestion, kept to rebuild it in another unit.
+  private readonly historyByExercise = new Map<string, SetHistory[]>();
+  private lastUnit: string | null = null;
+  // The bar's kg/lbs toggle changes the unit mid-workout: convert the rows, never reread their numbers.
+  private readonly convertOnUnitChange = effect(() => {
+    const unit = this.settingsService.weightUnit();
+    if (this.lastUnit && unit !== this.lastUnit) this.convertWorkout(this.lastUnit, unit);
+    this.lastUnit = unit;
+  });
+
   // Plan exercises (routine targets), and those removed from the plan on this device.
   private targetIds = new Set<string>();
   private removedTargets = new Set<string>();
@@ -1379,6 +1392,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
       blockMap.get(s.exercise_id)!.sets.push({
         setNumber: s.set_number,
         weight: String(this.settingsService.toDisplay(s.weight)),
+        weightKg: s.weight,
         reps: String(s.reps_performed),
         rpe: s.rpe != null ? String(s.rpe) : '',
         saved: true,
@@ -1462,7 +1476,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
           this.blocks.update(bs => bs.map((b, bi) => bi === blockIndex ? {
             ...b,
             sets: b.sets.map((s, si) => si === setIndex ? {
-              ...s, saving: false, saved: true, isPR: saved.is_pr, id: saved.id,
+              ...s, saving: false, saved: true, isPR: saved.is_pr, id: saved.id, weightKg: saved.weight,
             } : s),
           } : b));
           if (startRest) this.startRestTimer();
@@ -1777,21 +1791,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     const newBlock = this.emptyBlock(ex.id, ex.name, ex.muscle_group, [this.newRow(1)]);
     this.blocks.update(bs => [...bs, newBlock]);
 
-    // Fetch history to generate progressive overload suggestion
-    this.jymService.getExercise(ex.id, { limit: SUGGESTION_SETS }).subscribe({
-      next: exWithHistory => {
-        const { suggestion, ghostWeight, ghostReps } = this.computeSuggestion(exWithHistory.history);
-        this.blocks.update(bs => bs.map(b => b.exerciseId === ex.id ? {
-          ...b,
-          suggestion,
-          sets: b.sets.map((s, i) => i === 0 && !s.saved ? {
-            ...s,
-            ghostWeight: ghostWeight ?? s.ghostWeight,
-            ghostReps: ghostReps ?? s.ghostReps,
-          } : s),
-        } : b));
-      },
-    });
+    this.loadSuggestionsForBlocks([newBlock]);
   }
 
   // ── Plan and draft ──────────────────────────────────────────────
@@ -1822,8 +1822,10 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
       .map(a => this.emptyBlock(a.exerciseId, a.exerciseName, a.muscleGroup, [this.newRow(1)]));
 
     const blocks = [...logged, ...planned, ...added];
+    const unit = this.settingsService.weightUnit();
     for (const b of blocks) {
-      for (const d of draft.rows[b.exerciseId] ?? []) {
+      for (const saved of draft.rows[b.exerciseId] ?? []) {
+        const d = draft.unit && draft.unit !== unit ? { ...saved, weight: this.convertText(saved.weight, draft.unit, unit) } : saved;
         const row = b.sets.find(r => r.setNumber === d.setNumber);
         if (row && !row.saved) Object.assign(row, { weight: d.weight, reps: d.reps, rpe: d.rpe, isWarmup: d.isWarmup });
         else if (!row) b.sets.push(this.newRow(d.setNumber, { weight: d.weight, reps: d.reps, rpe: d.rpe, isWarmup: d.isWarmup }));
@@ -1882,6 +1884,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
       if (typed.length) rows[b.exerciseId] = typed;
     }
     const draft: SessionDraft = {
+      unit: this.settingsService.weightUnit(),
       added: blocks
         .filter(b => !this.targetIds.has(b.exerciseId) && !b.sets.some(s => s.saved))
         .map(b => ({ exerciseId: b.exerciseId, exerciseName: b.exerciseName, muscleGroup: b.muscleGroup })),
@@ -1996,20 +1999,47 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     for (const block of blocks) {
       this.jymService.getExercise(block.exerciseId, { limit: SUGGESTION_SETS }).subscribe({
         next: ex => {
-          const { suggestion, ghostWeight, ghostReps } = this.computeSuggestion(ex.history);
-          if (!suggestion) return;
-          this.blocks.update(bs => bs.map(b => b.exerciseId === block.exerciseId ? {
-            ...b,
-            suggestion,
-            sets: b.sets.map(s => !s.saved ? {
-              ...s,
-              ghostWeight: ghostWeight ?? s.ghostWeight,
-              ghostReps: ghostReps ?? s.ghostReps,
-            } : s),
-          } : b));
+          this.historyByExercise.set(block.exerciseId, ex.history);
+          this.applySuggestion(block.exerciseId);
         },
       });
     }
+  }
+
+  /** Last time's top set and the next weight to try, as ghosts on the exercise's unlogged rows. */
+  private applySuggestion(exerciseId: string) {
+    const history = this.historyByExercise.get(exerciseId);
+    if (!history) return;
+    const { suggestion, ghostWeight, ghostReps } = this.computeSuggestion(history);
+    if (!suggestion) return;
+    this.blocks.update(bs => bs.map(b => b.exerciseId === exerciseId ? {
+      ...b,
+      suggestion,
+      sets: b.sets.map(s => !s.saved ? {
+        ...s,
+        ghostWeight: ghostWeight ?? s.ghostWeight,
+        ghostReps: ghostReps ?? s.ghostReps,
+      } : s),
+    } : b));
+  }
+
+  private convertText(value: string, from: string, to: string): string {
+    const n = parseFloat(value);
+    return value && !isNaN(n) ? String(this.settingsService.convertWeight(n, from, to)) : value;
+  }
+
+  /** Logged rows come back from their stored kg; typed rows and ghosts are converted; suggestions are rebuilt. */
+  private convertWorkout(from: string, to: string) {
+    this.blocks.update(bs => bs.map(b => ({
+      ...b,
+      sets: b.sets.map(s => ({
+        ...s,
+        weight: s.saved && s.weightKg != null ? String(this.settingsService.toDisplay(s.weightKg)) : this.convertText(s.weight, from, to),
+        ghostWeight: this.convertText(s.ghostWeight, from, to),
+      })),
+    })));
+    if (this.bwValue) this.bwValue = this.settingsService.convertWeight(this.bwValue, from, to);
+    for (const b of this.blocks()) this.applySuggestion(b.exerciseId);
   }
 
   private computeSuggestion(history: SetHistory[]): { suggestion: string | null; ghostWeight: string | null; ghostReps: string | null } {
