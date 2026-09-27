@@ -22,7 +22,7 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
             <jiro-logo [size]="30" />
           </a>
           <div class="l-nav-links">
-            <a routerLink="/login" class="l-nav-login">Log in</a>
+            <a routerLink="/login" class="l-nav-login">Sign in</a>
             <a routerLink="/register" class="l-nav-cta">Get started</a>
           </div>
         </div>
@@ -83,8 +83,7 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
         <div #reveal data-reveal="modules" class="l-section-inner l-reveal" [class.is-visible]="revealed().has('modules')">
           <h2 class="l-section-title l-section-title--with-lead">Every corner of your life, covered.</h2>
           <p class="l-section-lead">
-            All modules share the same design language, data layer, and account. No juggling five separate apps.
-            Use only what you need. Each module is independent but lives in the same elegant workspace.
+            Four modules, one account. Use only the ones you need, and see your workouts, meals, journal and money together on one dashboard.
           </p>
 
           <div class="l-bento">
@@ -130,7 +129,7 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
                   <jiro-mark name="jym" [size]="24" />
                 </div>
                 <h3 class="l-card-name">Jym</h3>
-                <p class="l-card-desc">Log sets, track volume, and visualise your strength journey with PR detection and progress charts.</p>
+                <p class="l-card-desc">Log sets as you train. Jym spots your personal records and charts every lift over time.</p>
               </div>
               <div class="l-card-shot">
                 <img class="shot-light" width="800" height="600" loading="lazy" decoding="async"
@@ -164,7 +163,7 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
                   <jiro-mark name="echo" [size]="24" />
                 </div>
                 <h3 class="l-card-name">Echo</h3>
-                <p class="l-card-desc">Smart reminders that fit your rhythm. Recurring schedules, multi-channel delivery.</p>
+                <p class="l-card-desc">Reminders for anything, once or on a repeat schedule, sent by push or email.</p>
               </div>
               <div class="l-card-badge">Coming soon</div>
             </div>
@@ -214,7 +213,7 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
               <li><span>Ledger</span></li>
             </ul>
             <ul class="l-footer-list" aria-label="Jiro">
-              <li><a routerLink="/login">Log in</a></li>
+              <li><a routerLink="/login">Sign in</a></li>
               <li><a routerLink="/register">Get started</a></li>
               <li><a routerLink="/privacy">Privacy</a></li>
               <li><a routerLink="/terms">Terms</a></li>
@@ -279,7 +278,7 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
       min-height: 44px;
       padding: 0 14px;
       font-size: var(--font-size-sm);
-      border-radius: var(--border-radius-sm);
+      border-radius: var(--border-radius);
     }
     .l-nav-login {
       color: var(--text-secondary);
@@ -305,7 +304,7 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
       min-height: 44px;
       font-family: inherit;
       font-weight: 600;
-      border-radius: var(--border-radius-sm);
+      border-radius: var(--border-radius);
       transition: transform 0.12s, box-shadow 0.12s, opacity 0.12s;
       cursor: pointer;
       border: none;
@@ -538,7 +537,7 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
     .l-card {
       background: var(--bg-canvas);
       border: 1px solid var(--border-color);
-      border-radius: calc(var(--border-radius) * 1.5);
+      border-radius: var(--border-radius-lg);
       box-shadow: var(--shadow-sm);
       padding: var(--space-lg);
       display: flex;
@@ -635,7 +634,7 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
       color: var(--text-primary);
     }
     .l-privacy-list jiro-icon {
-      color: var(--color-accent);
+      color: var(--color-primary);
       margin-top: 2px;
     }
     @media (min-width: 601px) {
