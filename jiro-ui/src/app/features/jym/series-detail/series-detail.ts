@@ -86,9 +86,9 @@ import { formatInstant } from '../../../core/utils/format-date';
 <div>
           <!-- Tab bar -->
           <div class="tab-bar">
-            <button class="tab-btn" [class.active]="activeTab() === 'volume'" (click)="activeTab.set('volume')">Volume</button>
-            <button class="tab-btn" [class.active]="activeTab() === 'orm'" (click)="activeTab.set('orm')">Est. 1RM</button>
-            <button class="tab-btn" [class.active]="activeTab() === 'compare'" (click)="activeTab.set('compare')">Compare</button>
+            <button class="tab-btn" [class.active]="activeTab() === 'volume'" (click)="selectTab('volume')">Volume</button>
+            <button class="tab-btn" [class.active]="activeTab() === 'orm'" (click)="selectTab('orm')">Est. 1RM</button>
+            <button class="tab-btn" [class.active]="activeTab() === 'compare'" (click)="selectTab('compare')">Compare</button>
           </div>
 
           <!-- Volume chart -->
@@ -146,7 +146,7 @@ import { formatInstant } from '../../../core/utils/format-date';
                 @if (compareSeriesId) {
 <div class="form-group">
                   <label class="form-label">Exercise</label>
-                  <select class="ex-select" [(ngModel)]="compareExId" (ngModelChange)="drawCompareChart()">
+                  <select class="ex-select" [(ngModel)]="compareExId" (ngModelChange)="redrawCompare()">
                     <option value="">Select exercise...</option>
                     @for (ex of compareExercises(); track ex) {
 <option [value]="ex.exercise_id">{{ ex.exercise_name }}</option>
@@ -534,6 +534,21 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
       },
     };
     this.ormChart = new Chart(this.ormCanvasRef.nativeElement, config);
+  }
+
+  /** A tab's canvas only exists after the next render, so draw once it does. */
+  selectTab(tab: 'volume' | 'orm' | 'compare') {
+    this.activeTab.set(tab);
+    setTimeout(() => {
+      if (tab === 'volume') this.drawVolumeChart();
+      else if (tab === 'orm') this.drawOrmChart();
+      else this.drawCompareChart();
+    });
+  }
+
+  /** The compare canvas appears once both pickers are set. */
+  redrawCompare() {
+    setTimeout(() => this.drawCompareChart());
   }
 
   loadCompare() {

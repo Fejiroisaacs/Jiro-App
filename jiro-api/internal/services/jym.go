@@ -1892,84 +1892,66 @@ func (s *JymService) GetSeriesDetail(ctx context.Context, userID, seriesID uuid.
 	defer sessRows.Close()
 
 	detail.Sessions = []models.SeriesSessionPoint{}
-	var sessionIDs []uuid.UUID
 	for sessRows.Next() {
 		var pt models.SeriesSessionPoint
 		if err := sessRows.Scan(&pt.SessionID, &pt.Date, &pt.SessionType, &pt.TotalVolume, &pt.SetCount); err != nil {
 			return nil, err
 		}
 		detail.Sessions = append(detail.Sessions, pt)
-		sessionIDs = append(sessionIDs, pt.SessionID)
 	}
 	sessRows.Close()
 
-	// Build session date lookup
-	sessDateMap := make(map[uuid.UUID]time.Time)
-	for _, sp := range detail.Sessions {
-		sessDateMap[sp.SessionID] = sp.Date
+	// Best working-set e1RM per exercise per session, oldest session first (1 rep is the weight itself).
+	exRows, err := s.db.Query(ctx,
+		`SELECT ss.session_id, s.started_at, ss.exercise_id, e.name, e.muscle_group,
+		        MAX(CASE WHEN ss.reps_performed = 1 THEN ss.weight
+		                 ELSE ss.weight * (1 + ss.reps_performed / 30.0) END) AS best_est_1rm
+		 FROM session_sets ss
+		 JOIN sessions s ON s.id = ss.session_id
+		 JOIN exercises e ON ss.exercise_id = e.id
+		 WHERE s.series_id = $1 AND NOT ss.is_warmup
+		 GROUP BY ss.session_id, s.started_at, ss.exercise_id, e.name, e.muscle_group
+		 ORDER BY ss.exercise_id, s.started_at`,
+		seriesID,
+	)
+	if err != nil {
+		return nil, err
 	}
+	defer exRows.Close()
 
-	// Exercise progressions (best est 1RM per exercise per session)
-	if len(sessionIDs) > 0 {
-		placeholders := ""
-		args := []interface{}{}
-		for i, id := range sessionIDs {
-			args = append(args, id)
-			if i > 0 {
-				placeholders += ","
-			}
-			placeholders += "$" + intStr(i+1)
-		}
-
-		exRows, err := s.db.Query(ctx,
-			`SELECT ss.session_id, ss.exercise_id, e.name, e.muscle_group,
-			        MAX(ss.weight * (1 + ss.reps_performed::float / 30.0)) as best_est_1rm
-			 FROM session_sets ss
-			 JOIN exercises e ON ss.exercise_id = e.id
-			 WHERE ss.session_id IN (`+placeholders+`)
-			 GROUP BY ss.session_id, ss.exercise_id, e.name, e.muscle_group
-			 ORDER BY ss.exercise_id, ss.session_id ASC`,
-			args...,
-		)
-		if err != nil {
+	exMap := make(map[uuid.UUID]*models.ExerciseProgression)
+	exOrder := []uuid.UUID{}
+	for exRows.Next() {
+		var sessID, exID uuid.UUID
+		var date time.Time
+		var exName string
+		var mg *string
+		var best1RM float64
+		if err := exRows.Scan(&sessID, &date, &exID, &exName, &mg, &best1RM); err != nil {
 			return nil, err
 		}
-		defer exRows.Close()
-
-		exMap := make(map[uuid.UUID]*models.ExerciseProgression)
-		exOrder := []uuid.UUID{}
-		for exRows.Next() {
-			var sessID, exID uuid.UUID
-			var exName string
-			var mg *string
-			var best1RM float64
-			if err := exRows.Scan(&sessID, &exID, &exName, &mg, &best1RM); err != nil {
-				return nil, err
+		if _, ok := exMap[exID]; !ok {
+			exMap[exID] = &models.ExerciseProgression{
+				ExerciseID:   exID,
+				ExerciseName: exName,
+				MuscleGroup:  mg,
+				Points:       []models.ProgressionPoint{},
 			}
-			if _, ok := exMap[exID]; !ok {
-				exMap[exID] = &models.ExerciseProgression{
-					ExerciseID:   exID,
-					ExerciseName: exName,
-					MuscleGroup:  mg,
-					Points:       []models.ProgressionPoint{},
-				}
-				exOrder = append(exOrder, exID)
-			}
-			exMap[exID].Points = append(exMap[exID].Points, models.ProgressionPoint{
-				SessionID:  sessID,
-				Date:       sessDateMap[sessID],
-				BestEst1RM: math.Round(best1RM*10) / 10,
-			})
+			exOrder = append(exOrder, exID)
 		}
+		exMap[exID].Points = append(exMap[exID].Points, models.ProgressionPoint{
+			SessionID:  sessID,
+			Date:       date,
+			BestEst1RM: math.Round(best1RM*10) / 10,
+		})
+	}
+	if err := exRows.Err(); err != nil {
+		return nil, err
+	}
 
-		for _, exID := range exOrder {
-			detail.ExerciseProgressions = append(detail.ExerciseProgressions, *exMap[exID])
-		}
-		if detail.ExerciseProgressions == nil {
-			detail.ExerciseProgressions = []models.ExerciseProgression{}
-		}
-	} else {
-		detail.ExerciseProgressions = []models.ExerciseProgression{}
+	detail.ExerciseProgressions = []models.ExerciseProgression{}
+	for _, exID := range exOrder {
+		detail.ExerciseProgressions = append(detail.ExerciseProgressions, *exMap[exID])
 	}
 
 	return detail, nil

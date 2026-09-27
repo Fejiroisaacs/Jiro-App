@@ -104,3 +104,40 @@ func TestExerciseHistoryHeaderCoversAllWorkingSets(t *testing.T) {
 		t.Fatalf("full history = %+v; want 3 sets in set order, the warm-up flagged", all.History)
 	}
 }
+
+func TestSeriesProgressionIsInDateOrder(t *testing.T) {
+	svc, userID := testJymDB(t)
+	ctx := context.Background()
+	split, err := svc.CreateSplit(ctx, userID, &models.CreateSplitRequest{Name: "Test Split"})
+	if err != nil {
+		t.Fatalf("create split: %v", err)
+	}
+	series, err := svc.CreateSeries(ctx, userID, &models.CreateSeriesRequest{SplitID: split.ID, Name: "Block", DurationType: "open"})
+	if err != nil {
+		t.Fatalf("create series: %v", err)
+	}
+	ex := prTestSetup(t, svc, userID, "Test Squat")
+	for i, w := range []float64{100, 105, 110, 115} {
+		sess, err := svc.StartSession(ctx, userID, &models.CreateSessionRequest{SeriesID: &series.ID})
+		if err != nil {
+			t.Fatalf("start %d: %v", i, err)
+		}
+		logSet(t, svc, userID, sess.ID, ex, 1, w, 1)
+		finishSession(t, svc, userID, sess.ID)
+	}
+
+	detail, err := svc.GetSeriesDetail(ctx, userID, series.ID)
+	if err != nil {
+		t.Fatalf("series detail: %v", err)
+	}
+	pts := detail.ExerciseProgressions[0].Points
+	want := []float64{100, 105, 110, 115}
+	if len(pts) != len(want) {
+		t.Fatalf("got %d points, want %d", len(pts), len(want))
+	}
+	for i, p := range pts {
+		if p.BestEst1RM != want[i] {
+			t.Fatalf("points = %+v; want singles 100..115 in date order, a single's e1RM being its weight", pts)
+		}
+	}
+}
