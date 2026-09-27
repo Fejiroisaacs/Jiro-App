@@ -19,7 +19,7 @@ const USERNAME_PATTERN = /^[a-z0-9_]{3,30}$/;
       <div class="auth-container">
         <div class="auth-header">
           <jiro-logo class="auth-logo" [size]="40" />
-          <h1 class="auth-subtitle">Create an account</h1>
+          <h1 class="auth-subtitle">Create account</h1>
         </div>
 
         <!-- ngSkipHydration: NgForm (ngModel inside <form>) has a documented
@@ -29,7 +29,7 @@ const USERNAME_PATTERN = /^[a-z0-9_]{3,30}$/;
         <jiro-card ngSkipHydration>
           <form (ngSubmit)="onSubmit()" class="auth-form">
             <jiro-input
-              label="Display Name"
+              label="Display name"
               type="text"
               placeholder="What should we call you?"
               [(ngModel)]="displayName"
@@ -63,7 +63,7 @@ const USERNAME_PATTERN = /^[a-z0-9_]{3,30}$/;
             </jiro-input>
 
             <jiro-input
-              label="Confirm Password"
+              label="Confirm password"
               type="password"
               placeholder="Re-enter your password"
               [(ngModel)]="confirmPassword"
@@ -72,7 +72,7 @@ const USERNAME_PATTERN = /^[a-z0-9_]{3,30}$/;
             </jiro-input>
 
             <jiro-button class="outline-when-disabled" block type="submit" [loading]="loading()" [disabled]="!canSubmit()">
-              Create Account
+              Create account
             </jiro-button>
           </form>
 

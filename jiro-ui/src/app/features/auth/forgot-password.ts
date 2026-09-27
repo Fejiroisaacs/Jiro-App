@@ -25,7 +25,7 @@ import { JiroIconComponent } from '../../shared/components/jiro-icon/jiro-icon';
             <jiro-icon name="check-circle" [size]="40" />
             <p>Check your inbox! If that email is registered you'll receive a reset link shortly.</p>
           </div>
-          <a routerLink="/login" class="back-link"><jiro-icon name="arrow-left" [size]="16" /> Back to login</a>
+          <a routerLink="/login" class="back-link"><jiro-icon name="arrow-left" [size]="16" /> Back to sign in</a>
         </div>
 } @else {
 
@@ -47,7 +47,7 @@ import { JiroIconComponent } from '../../shared/components/jiro-icon/jiro-icon';
             {{ loading() ? 'Sending...' : 'Send reset link' }}
           </jiro-button>
 
-          <a routerLink="/login" class="back-link"><jiro-icon name="arrow-left" [size]="16" /> Back to login</a>
+          <a routerLink="/login" class="back-link"><jiro-icon name="arrow-left" [size]="16" /> Back to sign in</a>
         
 }
 

@@ -47,12 +47,12 @@ import { JiroLogoComponent } from '../../shared/components/jiro-logo/jiro-logo';
             <a routerLink="/forgot-password" class="forgot-link">Forgot password?</a>
 
             <jiro-button class="outline-when-disabled" block type="submit" [loading]="loading()" [disabled]="!email || !password">
-              Sign In
+              Sign in
             </jiro-button>
           </form>
 
           <p class="auth-footer">
-            Don't have an account? <a routerLink="/register" [queryParams]="returnQuery">Create one</a>
+            Don't have an account? <a routerLink="/register" [queryParams]="returnQuery">Create account</a>
           </p>
           <p class="auth-demo">
             Just looking?

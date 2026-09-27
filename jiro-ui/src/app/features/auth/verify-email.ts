@@ -52,7 +52,7 @@ import { JiroSkeletonComponent } from '../../shared/components/jiro-skeleton/jir
 <p class="resent-msg">Sent! Check your inbox.</p>
 }
           @if (!authService.isAuthenticated()) {
-<a routerLink="/login" class="action-link"><jiro-icon name="arrow-left" [size]="16" /> Back to login</a>
+<a routerLink="/login" class="action-link"><jiro-icon name="arrow-left" [size]="16" /> Back to sign in</a>
 }
         </div>
 }
