@@ -56,10 +56,7 @@
     "waitFor": ".wv-grid",
     "actions": [
       {
-        "click": {
-          "role": "button",
-          "name": "Open Wed 23"
-        }
+        "click": ".wv-day:has(.wv-note) .wv-add"
       },
       {
         "wait": 600

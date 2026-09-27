@@ -56,7 +56,10 @@ Only `name` and `path` are required.
 - `path`: the app URL to open.
 - `waitFor`: a CSS selector to wait for before anything else.
 - `actions`: run in order. `click` takes a CSS selector or `{ "role", "name" }`
-  (add `"exact": true` for an exact name match). `fill` takes a selector and a
+  (add `"exact": true` for an exact name match). A selector clicks its first
+  match and can use `:has()`, so pick by content, not by date: the demo's dates
+  move daily (`".wv-day:has(.wv-note) .wv-add"` opens the first day with an
+  entry). `fill` takes a selector and a
   `value`. `press` takes a key such as `Control+k` or `Escape`. `wait` takes
   milliseconds. `scroll` scrolls a selector into view.
 - `clip`: a CSS selector for the element to capture. It is scrolled into view
