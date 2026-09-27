@@ -4,6 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
 import { JymService } from '../../../core/services/jym.service';
 import { SettingsService } from '../../../core/services/settings.service';
+import { ToastService } from '../../../core/services/toast.service';
 import { dayKey } from '../../../core/utils/day';
 import { muscleColor } from '../shared/muscle-colors';
 
@@ -759,6 +760,7 @@ export class SessionSummaryComponent implements OnInit {
 
   private readonly jymService = inject(JymService);
   private readonly settings = inject(SettingsService);
+  private readonly toast = inject(ToastService);
 
   constructor(private router: Router) {}
 
@@ -885,7 +887,7 @@ export class SessionSummaryComponent implements OnInit {
     this.sharing.set(true);
     const el = this.shareCardEl.nativeElement;
     try {
-      const { toPng } = await import('html-to-image');
+      const { toBlob } = await import('html-to-image');
 
       // Temporarily move the card into the visible viewport.
       // html-to-image uses getComputedStyle() which may skip painting
@@ -898,25 +900,31 @@ export class SessionSummaryComponent implements OnInit {
       // skipFonts: true prevents html-to-image from trying to read
       // cross-origin Google Fonts CSS, which throws a CORS SecurityError.
       // The image falls back to the system sans, which is fine for the card.
-      const dataUrl = await toPng(el, { pixelRatio: 2, width: 375, height: 667, skipFonts: true });
-
-      // Restore the card to off-screen.
+      // A Blob directly: the production CSP refuses fetch() on data: URLs.
+      const blob = await toBlob(el, { pixelRatio: 2, width: 375, height: 667, skipFonts: true });
       el.style.left = '-9999px';
+      if (!blob) throw new Error('empty image');
 
-      const blob = await (await fetch(dataUrl)).blob();
       const file = new File([blob], 'workout.png', { type: 'image/png' });
-
-      if (navigator.share && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'My Jym workout' });
-      } else {
-        const a = document.createElement('a');
-        a.href = dataUrl;
-        a.download = 'workout.png';
-        a.click();
+      if (navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: 'My Jym workout' });
+          return;
+        } catch (e) {
+          // Closing the share sheet is not a failure; anything else falls back to a download.
+          if ((e as DOMException)?.name === 'AbortError') return;
+        }
       }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'workout.png';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (e) {
       console.error('Share failed', e);
       el.style.left = '-9999px';
+      this.toast.error('Could not create the workout image.');
     } finally {
       this.sharing.set(false);
     }
