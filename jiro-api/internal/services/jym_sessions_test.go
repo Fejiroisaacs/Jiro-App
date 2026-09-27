@@ -141,3 +141,28 @@ func TestSeriesProgressionIsInDateOrder(t *testing.T) {
 		}
 	}
 }
+
+func TestGetSessionListsExercisesInTheOrderDone(t *testing.T) {
+	svc, userID := testJymDB(t)
+	ctx := context.Background()
+	a := prTestSetup(t, svc, userID, "Test A")
+	b := prTestSetup(t, svc, userID, "Test B")
+	// Do the exercise with the larger id first, so id order would put it second.
+	first, second := a, b
+	if a.String() < b.String() {
+		first, second = b, a
+	}
+	sess := startSession(t, svc, userID, "")
+	logSet(t, svc, userID, sess, first, 1, 50, 5)
+	logSet(t, svc, userID, sess, second, 1, 60, 5)
+	logSet(t, svc, userID, sess, first, 2, 50, 5)
+
+	got, err := svc.GetSession(ctx, userID, sess)
+	if err != nil {
+		t.Fatalf("get session: %v", err)
+	}
+	order := []uuid.UUID{got.Sets[0].ExerciseID, got.Sets[1].ExerciseID, got.Sets[2].ExerciseID}
+	if order[0] != first || order[1] != first || order[2] != second {
+		t.Fatalf("set order by exercise = %v; want the first-done exercise's two sets, then the other", order)
+	}
+}

@@ -1019,6 +1019,7 @@ func (s *JymService) GetSession(ctx context.Context, userID, sessionID uuid.UUID
 		return nil, err
 	}
 
+	// Exercises in the order they were first done, not by id.
 	rows, err := s.db.Query(ctx,
 		`SELECT ss.id, ss.session_id, ss.exercise_id, ss.set_number, ss.weight,
 		        ss.reps_performed, ss.rpe, ss.is_pr, ss.is_warmup, ss.exercise_note, ss.created_at,
@@ -1026,7 +1027,7 @@ func (s *JymService) GetSession(ctx context.Context, userID, sessionID uuid.UUID
 		 FROM session_sets ss
 		 JOIN exercises e ON ss.exercise_id = e.id
 		 WHERE ss.session_id = $1
-		 ORDER BY ss.exercise_id, ss.set_number ASC`,
+		 ORDER BY MIN(ss.created_at) OVER (PARTITION BY ss.exercise_id), ss.exercise_id, ss.set_number, ss.created_at`,
 		sessionID,
 	)
 	if err != nil {
