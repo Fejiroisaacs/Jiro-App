@@ -325,7 +325,10 @@ export class BodyWeightComponent implements OnInit, AfterViewInit, OnDestroy {
         this.saving.set(false);
         setTimeout(() => this.maybeDrawChart(), 0);
       },
-      error: () => this.saving.set(false),
+      error: () => {
+        this.saving.set(false);
+        this.toast.error('Could not log your body weight.');
+      },
     });
   }
 

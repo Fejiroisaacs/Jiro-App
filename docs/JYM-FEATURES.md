@@ -42,6 +42,8 @@ A **split** is a named training plan (e.g. "PPL", "Upper/Lower"). It contains on
 A **series** ties a split to a time window (weeks, sessions count, or open-ended). Sessions logged within a series are linked to it for progression tracking.
 
 - Start a series from the Jym hub or the split detail page.
+- A series knows its next day: the day after the last one logged, wrapping round. The Jym home offers it as **Up next**.
+- Starting a day from its split files the workout under the split's active series, whichever Start button was used.
 - End a series manually or let it run open-ended.
 - Series detail page shows a volume chart per session and per-exercise 1RM progression curves.
 
@@ -50,22 +52,24 @@ A **series** ties a split to a time window (weeks, sessions count, or open-ended
 ## Live Session Player
 
 ### Starting a Session
-- **Routine session**: tap "Start" next to a routine on the hub — the player pre-populates exercise blocks and set rows from the routine's targets.
-- **Freestyle session**: tap "+ Freestyle Session" — open canvas, add any exercises you want.
+- **Routine session**: tap "Start" next to a routine on the hub. The player pre-populates exercise blocks and set rows from the routine's targets. The plan comes from the server, so the workout can be resumed on any device.
+- **Freestyle session**: tap "Freestyle session" for an open canvas; add any exercises you want.
+- **A workout is already open**: every start button asks whether to resume it, start a new one anyway, or cancel. A double tap starts one workout.
 
 ### Session Type Toggle
 Switch between **Normal**, **Deload**, and **Test** at any time during the session using the toggle in the sticky header.
-- **Deload**: PR checks are skipped; the session is flagged so it doesn't count in plateau detection.
+- **Deload**: sets in a deload session are never PRs and don't count towards your best, so they can't raise the bar. Switching a session's type re-rates its PRs.
 - **Test**: use this to find new 1RMs.
 
 ### Logging Sets
 Each exercise block shows a set table with columns: **Set #**, **Weight**, **Reps**, **RPE**, **W (Warm-up)**, and a log/delete action.
 
-- Enter weight and reps, then tap ✓ to save the set.
+- Tap ✓ to log the row. Typed values win; an untouched row logs its ghost values (today's aim), so repeating a set is one tap.
 - **RPE** (Rating of Perceived Exertion, 1–10) is optional.
-- Ghost text pre-fills from the previous session's values for that exercise.
-- A saved set turns green. A **🏆** badge appears if the set is a personal record.
-- Delete a saved set with the ✕ button.
+- Ghost values before the first set of the day are today's aim (see below); after it, a new row's ghosts are the set just lifted.
+- A saved set is tinted. A **PR** badge appears if the set is a personal record.
+- Tap a logged value to correct it: ✓ saves, × cancels (Escape on desktop). Delete a logged set with the trash icon.
+- In a routine, the block shows its plan ("Plan 3 × 8"), and a logged working set below the planned reps is marked.
 
 ### Warm-up Sets
 Each set row has a **W** toggle button. Tap it to mark the set as a warm-up.
@@ -79,14 +83,17 @@ Each exercise block has a subtle text area above the set table for a free-text n
 - On save, the note is written to every already-logged set in that block.
 - Notes are restored when returning to an in-progress session.
 
-### Progressive Overload Suggestions
-When you add an exercise to a freestyle session (or pick one from the exercise picker), the app fetches your history and shows a suggestion above the set table:
+### Last Time and Today's Aim
+Every exercise with history shows one line above its sets: what you did last time, and what to aim for today.
 
-> *Last: 80 kg × 5 — try 82.5 kg*
+> *Last time 100 lbs × 8, 8, 6. Stay at 100 lbs until every set hits 8.*
 
-- Increment is **2.5 kg** for lifts ≥ 50 kg, **1.25 kg** for lighter lifts.
-- The suggestion is hidden once all sets are saved.
-- Deload session history is excluded from the calculation.
+- **Last time** is the latest normal workout before today's. Deload and test days are skipped, and warm-ups are not counted.
+- **With a plan** (a routine's sets × reps), it is double progression: once enough sets at the top weight hit the planned reps, try one plate more; until then, stay at the same weight.
+- **Freestyle**: one plate more, unless the top set was logged at RPE 9 or more; then stay and aim for one more rep.
+- **Bodyweight** lifts aim for one more rep.
+- One plate is **2.5 kg** or **5 lb**, counted from the plate grid (177.5 lb goes to 180). The rule lives in `weight-suggestion.ts` and is covered by `npm run test:unit`.
+- The line is hidden once all sets are saved.
 
 ### Rest Timer
 After every logged set, a rest timer starts automatically in the sticky header bar.
@@ -96,6 +103,12 @@ After every logged set, a rest timer starts automatically in the sticky header b
 - Skip the timer early with the ✕ button.
 - The timer collapses automatically 3 seconds after finishing.
 
+### Units
+The kg/lbs toggle in the session bar converts the whole workout: logged sets are shown from their stored kg, typed sets and suggestions are converted.
+
+### Unlogged work
+Sets you typed but haven't ticked, exercises you added and plan exercises you removed are kept on this device until the workout is finished or discarded, so a reload or leaving the page loses nothing.
+
 ### Body Weight
 Log today's body weight directly from the session player without leaving the workout. The weight is saved with today's date and syncs to the body weight log.
 
@@ -103,7 +116,7 @@ Log today's body weight directly from the session player without leaving the wor
 A session-level notes field sits at the top of the player. Saves on blur.
 
 ### Finishing or Exiting
-- **Finish**: stamps `ended_at` and redirects to session history.
+- **Finish**: stamps `ended_at` and opens the workout summary. If a set has weight and reps typed but isn't ticked, Finish first asks: log it and finish, skip it, or go back.
 - **Save & Exit**: leaves the session open so you can return later. The in-progress session appears on the Jym hub.
 - **Discard**: permanently deletes the session and all its sets.
 
@@ -111,7 +124,7 @@ A session-level notes field sits at the top of the player. Saves on blur.
 
 ## Session History
 
-List of all sessions at `/jym/sessions`, showing:
+Sessions at `/jym/track?tab=sessions`, 50 at a time with "Show older sessions", showing:
 - Date and time
 - Routine name (or "Freestyle")
 - Duration
@@ -157,8 +170,10 @@ The home screen for the Jym module. Contains:
 ### Quick Navigation
 Links to the exercise library, session history, PR wall, body weight log, and series list.
 
-### In-Progress Session Banner
-If a session was started but not finished, a banner appears with a "Resume" button that takes you back to the live player.
+### In Progress and Up Next
+- A workout that was started but not finished is the first thing on the page, with **Resume** and discard.
+- Otherwise **Up next** names the next day of the most recently started active series: **Start** opens that day in the series, **Other day** picks another.
+- Active series cards show **Next: (day)**, and their Start opens that day directly.
 
 ### Workout Frequency Heatmap
 A GitHub-style contribution grid showing the last 16 weeks of workout activity.
@@ -192,6 +207,6 @@ The app respects a global **unit preference** (kg / lbs). All weights entered an
 
 ## Personal Records — How They Work
 
-A set is flagged as a PR at log time if its weight is strictly greater than the maximum weight ever logged for that exercise (across all sessions for the user), excluding warm-up sets and deload sessions.
+A working set is a PR when it beats every earlier working set of that exercise: heavier than the best weight, or the same weight with more reps. Weights within 0.05 kg count as the same weight, so a kg best shown in lbs and typed back is neither a phantom PR nor a missed one. Warm-ups and deload sets are never PRs and never raise the bar.
 
-The PR flag is stored permanently on the set. Renaming or reorganising exercises does not affect existing PR flags.
+PR flags are stored on the sets and recomputed for the whole exercise whenever a set is logged, edited, deleted or marked a warm-up, and whenever a session's type changes. `go run ./cmd/rerate-prs` (from `jiro-api/`, with `DATABASE_URL` set) recomputes every stored flag once, for data written under older rules.

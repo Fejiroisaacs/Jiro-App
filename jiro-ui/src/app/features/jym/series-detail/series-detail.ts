@@ -4,6 +4,9 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import { JymService, SplitSeriesDetail, ExerciseProgression, Routine } from '../../../core/services/jym.service';
+import { ConfirmService } from '../../../core/services/confirm.service';
+import { ToastService } from '../../../core/services/toast.service';
+import { WorkoutLauncher } from '../shared/workout-launcher';
 import { SettingsService } from '../../../core/services/settings.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
@@ -86,9 +89,9 @@ import { formatInstant } from '../../../core/utils/format-date';
 <div>
           <!-- Tab bar -->
           <div class="tab-bar">
-            <button class="tab-btn" [class.active]="activeTab() === 'volume'" (click)="activeTab.set('volume')">Volume</button>
-            <button class="tab-btn" [class.active]="activeTab() === 'orm'" (click)="activeTab.set('orm')">Est. 1RM</button>
-            <button class="tab-btn" [class.active]="activeTab() === 'compare'" (click)="activeTab.set('compare')">Compare</button>
+            <button class="tab-btn" [class.active]="activeTab() === 'volume'" (click)="selectTab('volume')">Volume</button>
+            <button class="tab-btn" [class.active]="activeTab() === 'orm'" (click)="selectTab('orm')">Est. 1RM</button>
+            <button class="tab-btn" [class.active]="activeTab() === 'compare'" (click)="selectTab('compare')">Compare</button>
           </div>
 
           <!-- Volume chart -->
@@ -146,7 +149,7 @@ import { formatInstant } from '../../../core/utils/format-date';
                 @if (compareSeriesId) {
 <div class="form-group">
                   <label class="form-label">Exercise</label>
-                  <select class="ex-select" [(ngModel)]="compareExId" (ngModelChange)="drawCompareChart()">
+                  <select class="ex-select" [(ngModel)]="compareExId" (ngModelChange)="redrawCompare()">
                     <option value="">Select exercise...</option>
                     @for (ex of compareExercises(); track ex) {
 <option [value]="ex.exercise_id">{{ ex.exercise_name }}</option>
@@ -410,6 +413,10 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
 
   readonly settings = inject(SettingsService);
 
+  private readonly launcher = inject(WorkoutLauncher);
+  private readonly confirmService = inject(ConfirmService);
+  private readonly toast = inject(ToastService);
+
   constructor(
     private jymService: JymService,
     private route: ActivatedRoute,
@@ -536,6 +543,21 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
     this.ormChart = new Chart(this.ormCanvasRef.nativeElement, config);
   }
 
+  /** A tab's canvas only exists after the next render, so draw once it does. */
+  selectTab(tab: 'volume' | 'orm' | 'compare') {
+    this.activeTab.set(tab);
+    setTimeout(() => {
+      if (tab === 'volume') this.drawVolumeChart();
+      else if (tab === 'orm') this.drawOrmChart();
+      else this.drawCompareChart();
+    });
+  }
+
+  /** The compare canvas appears once both pickers are set. */
+  redrawCompare() {
+    setTimeout(() => this.drawCompareChart());
+  }
+
   loadCompare() {
     if (!this.compareSeriesId) return;
     this.jymService.getSeries(this.compareSeriesId).subscribe(s => {
@@ -616,21 +638,25 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
 
   startWithRoutine(routineId: string) {
     this.showRoutinePicker.set(false);
-    this.jymService.startSession({ routine_id: routineId, series_id: this.seriesId }).subscribe({
-      next: s => this.router.navigate(['/jym/session', s.id], { state: { targets: s.targets } }),
-    });
+    this.launcher.start({ routine_id: routineId, series_id: this.seriesId });
   }
 
   startFreestyle() {
     this.showRoutinePicker.set(false);
-    this.jymService.startSession({ series_id: this.seriesId }).subscribe({
-      next: s => this.router.navigate(['/jym/session', s.id]),
-    });
+    this.launcher.start({ series_id: this.seriesId });
   }
 
-  endSeries() {
+  async endSeries() {
+    const ok = await this.confirmService.confirm({
+      title: 'End this series?',
+      message: 'New workouts stop counting towards it, and it cannot be reopened. Its workouts and charts stay.',
+      confirmLabel: 'End series',
+      danger: false,
+    });
+    if (!ok) return;
     this.jymService.updateSeries(this.seriesId, { ended_at: new Date().toISOString() }).subscribe({
       next: updated => this.series.update(s => s ? { ...s, ended_at: updated.ended_at } : s),
+      error: () => this.toast.error('Could not end the series.'),
     });
   }
 

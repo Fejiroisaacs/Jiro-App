@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -84,7 +85,17 @@ func (h *JymHandler) GetExercise(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid exercise ID"}})
 		return
 	}
-	ex, err := h.jymService.GetExerciseWithHistory(c.Request.Context(), userID, exerciseID)
+	// ?limit= trims the set list for callers that only need recent sets (the workout's suggestions).
+	var limit *int
+	if l := c.Query("limit"); l != "" {
+		n, perr := strconv.Atoi(l)
+		if perr != nil || n < 1 || n > 500 {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_LIMIT", Message: "limit must be 1 to 500"}})
+			return
+		}
+		limit = &n
+	}
+	ex, err := h.jymService.GetExerciseWithHistory(c.Request.Context(), userID, exerciseID, limit)
 	if err != nil {
 		if err == services.ErrExerciseNotFound {
 			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Exercise not found"}})
@@ -504,6 +515,21 @@ func (h *JymHandler) StartSession(c *gin.Context) {
 	}
 	sess, err := h.jymService.StartSession(c.Request.Context(), userID, &req)
 	if err != nil {
+		var open *services.SessionInProgressError
+		if errors.As(err, &open) {
+			c.JSON(http.StatusConflict, gin.H{"error": gin.H{
+				"code":         "SESSION_IN_PROGRESS",
+				"message":      "Another workout is still in progress",
+				"session_id":   open.SessionID,
+				"routine_name": open.RoutineName,
+				"started_at":   open.StartedAt,
+			}})
+			return
+		}
+		if err == services.ErrRoutineNotInSeries {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "ROUTINE_NOT_IN_SERIES", Message: "That day is not part of the series' split"}})
+			return
+		}
 		if err == services.ErrRoutineNotFound {
 			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Routine not found"}})
 			return
@@ -523,9 +549,51 @@ func (h *JymHandler) StartSession(c *gin.Context) {
 	c.JSON(http.StatusCreated, sess)
 }
 
+// ListSessions serves ?from=YYYY-MM-DD (every session from that day, plus unfinished ones) or a cursor page
+// (?before=<started_at>&before_id=<id>&limit=), newest first.
 func (h *JymHandler) ListSessions(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
-	sessions, err := h.jymService.ListSessions(c.Request.Context(), userID)
+	ctx := c.Request.Context()
+	var sessions []models.SessionSummary
+	var err error
+	if from := c.Query("from"); from != "" {
+		day, perr := time.Parse("2006-01-02", from)
+		if perr != nil {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_DATE", Message: "from must be YYYY-MM-DD"}})
+			return
+		}
+		// tz is only a fallback for a user with no timezone setting, as on GET /day.
+		sessions, err = h.jymService.ListSessionsSince(ctx, userID, day, c.Query("tz"))
+	} else {
+		limit := 50
+		if l := c.Query("limit"); l != "" {
+			n, perr := strconv.Atoi(l)
+			if perr != nil || n < 1 || n > 100 {
+				c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_LIMIT", Message: "limit must be 1 to 100"}})
+				return
+			}
+			limit = n
+		}
+		var before *time.Time
+		beforeID := uuid.Nil
+		if b := c.Query("before"); b != "" {
+			t, perr := time.Parse(time.RFC3339Nano, b)
+			if perr != nil {
+				c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_CURSOR", Message: "before must be an RFC 3339 time"}})
+				return
+			}
+			before = &t
+		}
+		if b := c.Query("before_id"); b != "" {
+			id, perr := uuid.Parse(b)
+			if perr != nil {
+				c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_CURSOR", Message: "before_id must be a session id"}})
+				return
+			}
+			beforeID = id
+		}
+		sessions, err = h.jymService.ListSessions(ctx, userID, before, beforeID, limit)
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to list sessions"}})
 		return

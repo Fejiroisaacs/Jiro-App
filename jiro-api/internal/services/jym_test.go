@@ -40,6 +40,9 @@ func TestIsNewPR(t *testing.T) {
 		{"heavier warm-up", 140, 1, true, 100, 5, false},
 		{"first ever set is a warm-up", 20, 10, true, 0, 0, false},
 		{"warm-up same weight more reps", 100, 8, true, 100, 5, false},
+		{"lb round trip just above the best is the same lift", 100.02, 5, false, 100, 5, false},
+		{"lb round trip just below the best with more reps", 99.99, 6, false, 100, 5, true},
+		{"just past the tolerance", 100.06, 5, false, 100, 5, true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

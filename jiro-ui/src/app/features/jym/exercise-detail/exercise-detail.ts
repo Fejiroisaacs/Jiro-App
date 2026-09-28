@@ -181,7 +181,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
 <tr [class.is-pr]="entry.is_pr">
                 <td class="date-cell">{{ formatDate(entry.date) }}</td>
                 <td class="weight-cell">{{ settingsService.toDisplay(entry.weight) | number:'1.1-1' }} {{ settingsService.unitLabel() }}</td>
-                <td>{{ entry.reps }} reps</td>
+                <td>{{ entry.reps }} reps @if (entry.is_warmup) {<span class="warmup-note">Warm-up</span>}</td>
                 <td class="orm-cell">{{ settingsService.toDisplay(entry.est_1rm) | number:'1.1-1' }} {{ settingsService.unitLabel() }}</td>
                 <td class="pr-cell">
                   @if (entry.is_pr) {
@@ -519,6 +519,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
     .date-cell { color: var(--text-secondary); }
 
     .weight-cell { font-weight: 600; }
+    .warmup-note { margin-left: var(--space-xs); font-size: var(--font-size-xs); color: var(--text-muted); }
 
     .orm-cell { color: var(--color-primary); font-weight: 500; }
 
@@ -727,7 +728,7 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
     if (!ex || ex.history.length === 0) return null;
     const bySession = new Map<string, { date: string; weight: number }>();
     for (const h of ex.history) {
-      if (h.session_type === 'deload') continue;
+      if (h.session_type === 'deload' || h.is_warmup) continue;
       const cur = bySession.get(h.session_id);
       if (!cur || h.weight > cur.weight) bySession.set(h.session_id, { date: h.date, weight: h.weight });
     }
@@ -1000,7 +1001,7 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
   private get1rmData(): SetHistory[] {
     const bySession = new Map<string, SetHistory>();
     for (const h of this.exercise()!.history) {
-      if (h.session_type === 'deload') continue;
+      if (h.session_type === 'deload' || h.is_warmup) continue;
       if (!bySession.has(h.session_id) || h.est_1rm > bySession.get(h.session_id)!.est_1rm) {
         bySession.set(h.session_id, h);
       }
@@ -1012,7 +1013,7 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
   private getVolumeData(): { date: string; volume: number }[] {
     const bySession = new Map<string, { date: string; volume: number }>();
     for (const h of this.exercise()!.history) {
-      if (h.session_type === 'deload') continue;
+      if (h.session_type === 'deload' || h.is_warmup) continue;
       if (!bySession.has(h.session_id)) bySession.set(h.session_id, { date: h.date, volume: 0 });
       bySession.get(h.session_id)!.volume += h.weight * h.reps;
     }
@@ -1023,7 +1024,7 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
   private getMaxWeightData(): SetHistory[] {
     const bySession = new Map<string, SetHistory>();
     for (const h of this.exercise()!.history) {
-      if (h.session_type === 'deload') continue;
+      if (h.session_type === 'deload' || h.is_warmup) continue;
       if (!bySession.has(h.session_id) || h.weight > bySession.get(h.session_id)!.weight) {
         bySession.set(h.session_id, h);
       }
@@ -1035,7 +1036,7 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
   private getRepsAtWeightData(weight: number): { date: string; repsArr: number[] }[] {
     const bySession = new Map<string, { date: string; repsArr: number[] }>();
     for (const h of this.exercise()!.history) {
-      if (h.session_type === 'deload') continue;
+      if (h.session_type === 'deload' || h.is_warmup) continue;
       if (Math.abs(h.weight - weight) > 0.01) continue;
       if (!bySession.has(h.session_id)) bySession.set(h.session_id, { date: h.date, repsArr: [] });
       bySession.get(h.session_id)!.repsArr.push(h.reps);
@@ -1047,7 +1048,7 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
   private getUniqueWeights(): number[] {
     const weights = new Set<number>();
     for (const h of (this.exercise()?.history ?? [])) {
-      if (h.session_type !== 'deload') weights.add(h.weight);
+      if (h.session_type !== 'deload' && !h.is_warmup) weights.add(h.weight);
     }
     return Array.from(weights).sort((a, b) => b - a);
   }

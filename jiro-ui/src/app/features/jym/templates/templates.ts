@@ -2,6 +2,7 @@ import { Component, OnInit, inject, input, signal } from '@angular/core';
 
 import { Router } from '@angular/router';
 import { JymService, Routine } from '../../../core/services/jym.service';
+import { WorkoutLauncher } from '../shared/workout-launcher';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
@@ -117,6 +118,8 @@ export class JymTemplatesComponent implements OnInit {
   private readonly confirmService = inject(ConfirmService);
   private readonly toast = inject(ToastService);
 
+  private readonly launcher = inject(WorkoutLauncher);
+
   constructor(private jymService: JymService, private router: Router) {}
 
   ngOnInit() {
@@ -127,9 +130,7 @@ export class JymTemplatesComponent implements OnInit {
   }
 
   startFromTemplate(t: Routine) {
-    this.jymService.startSession({ routine_id: t.id }).subscribe({
-      next: s => this.router.navigate(['/jym/session', s.id], { state: { targets: s.targets } }),
-    });
+    this.launcher.start({ routine_id: t.id });
   }
 
   async deleteTemplate(t: Routine) {

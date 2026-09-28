@@ -25,8 +25,11 @@ type Exercise struct {
 type SetHistory struct {
 	SessionID    uuid.UUID `json:"session_id"`
 	Date         time.Time `json:"date"`
+	SetNumber    int       `json:"set_number"`
 	Weight       float64   `json:"weight"`
 	Reps         int       `json:"reps"`
+	RPE          *int      `json:"rpe"`
+	IsWarmup     bool      `json:"is_warmup"`
 	Est1RM       float64   `json:"est_1rm"`
 	IsPR         bool      `json:"is_pr"`
 	SessionType  string    `json:"session_type"`
@@ -215,6 +218,15 @@ type SplitSeriesSummary struct {
 	SplitSeries
 	SplitName    string `json:"split_name"`
 	SessionCount int    `json:"session_count"`
+	// NextRoutine is the day to train next in an active series; nil once it has ended or has no days.
+	NextRoutine *RoutineRef `json:"next_routine"`
+}
+
+// RoutineRef names one day of a split.
+type RoutineRef struct {
+	ID       uuid.UUID `json:"id"`
+	Name     string    `json:"name"`
+	DayOrder int       `json:"day_order"`
 }
 
 type SeriesSessionPoint struct {
@@ -329,6 +341,8 @@ type SessionWithSets struct {
 	RoutineName *string                  `json:"routine_name"`
 	Sets        []SessionSetWithExercise `json:"sets"`
 	Attachments []SessionAttachment      `json:"attachments"`
+	// Targets is the routine's plan when the session has one, so any device can show what isn't logged yet.
+	Targets []RoutineItemWithExercise `json:"targets"`
 }
 
 // CreateSessionRequest optionally names the session type up front, so a
@@ -338,6 +352,8 @@ type CreateSessionRequest struct {
 	RoutineID   *uuid.UUID `json:"routine_id"`
 	SeriesID    *uuid.UUID `json:"series_id"`
 	SessionType *string    `json:"session_type" binding:"omitempty,oneof=normal deload test"`
+	// Force starts even while another session is unfinished; without it that is a SessionInProgressError.
+	Force bool `json:"force"`
 }
 
 type UpdateSessionRequest struct {

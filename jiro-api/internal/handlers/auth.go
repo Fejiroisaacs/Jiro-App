@@ -110,7 +110,11 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	h.setRefreshCookie(c, user.ID)
+	refreshToken, err := h.issueRefreshToken(c, user.ID)
+	if err != nil {
+		// The account exists, so answer anyway: signed in until the access token expires.
+		log.Error().Err(err).Msg("Failed to issue refresh token at registration")
+	}
 	analytics.TrackEvent(h.db, user.ID, "user.register", nil)
 
 	// Seed default ledger categories asynchronously
@@ -137,8 +141,9 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}()
 
 	c.JSON(http.StatusCreated, models.AuthResponse{
-		AccessToken: accessToken,
-		User:        *user,
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		User:         *user,
 	})
 }
 
@@ -189,13 +194,18 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	h.setRefreshCookie(c, user.ID)
+	refreshToken, err := h.issueRefreshToken(c, user.ID)
+	if err != nil {
+		respondInternal(c, err, "failed to issue refresh token")
+		return
+	}
 	analytics.TrackEvent(h.db, user.ID, "user.login", nil)
 
 	user.PasswordHash = ""
 	c.JSON(http.StatusOK, models.AuthResponse{
-		AccessToken: accessToken,
-		User:        *user,
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		User:         *user,
 	})
 }
 
@@ -224,18 +234,23 @@ func (h *AuthHandler) Demo(c *gin.Context) {
 		return
 	}
 
-	h.setRefreshCookie(c, userID)
+	refreshToken, err := h.issueRefreshToken(c, userID)
+	if err != nil {
+		respondInternal(c, err, "failed to issue refresh token")
+		return
+	}
 	analytics.TrackEvent(h.db, userID, "demo.start", nil)
 
 	c.JSON(http.StatusOK, models.AuthResponse{
-		AccessToken: accessToken,
-		User:        *user,
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		User:         *user,
 	})
 }
 
 func (h *AuthHandler) Refresh(c *gin.Context) {
-	rawToken, err := c.Cookie("refresh_token")
-	if err != nil {
+	rawToken := presentedRefreshToken(c)
+	if rawToken == "" {
 		c.JSON(http.StatusUnauthorized, models.ErrorResponse{
 			Error: models.ErrorDetail{Code: "NO_REFRESH_TOKEN", Message: "No refresh token provided"},
 		})
@@ -253,8 +268,6 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		return
 	}
 
-	h.authService.RevokeRefreshToken(c.Request.Context(), oldHash)
-
 	accessToken, err := h.authService.GenerateAccessToken(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
@@ -262,8 +275,6 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		})
 		return
 	}
-
-	h.setRefreshCookie(c, userID)
 
 	user, err := h.userService.GetByID(c.Request.Context(), userID)
 	if err != nil {
@@ -273,23 +284,31 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		return
 	}
 
+	// The old token is retired only once its successor is stored, so any failure leaves it usable.
+	refreshToken, err := h.issueRefreshToken(c, userID)
+	if err != nil {
+		respondInternal(c, err, "failed to issue refresh token")
+		return
+	}
+	h.authService.RevokeRefreshToken(c.Request.Context(), oldHash)
+
 	c.JSON(http.StatusOK, models.AuthResponse{
-		AccessToken: accessToken,
-		User:        *user,
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		User:         *user,
 	})
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
-	rawToken, err := c.Cookie("refresh_token")
-	if err == nil {
+	if rawToken := presentedRefreshToken(c); rawToken != "" {
 		if _, hash, err := h.authService.ValidateRefreshToken(c.Request.Context(), rawToken); err == nil {
-			h.authService.RevokeRefreshToken(c.Request.Context(), hash)
+			h.authService.DeleteRefreshToken(c.Request.Context(), hash)
 		}
 	}
 
 	sameSite, secure := h.refreshCookiePolicy()
 	c.SetSameSite(sameSite)
-	c.SetCookie("refresh_token", "", -1, "/api/v1/auth", "", secure, true)
+	c.SetCookie(refreshCookie, "", -1, "/api/v1/auth", "", secure, true)
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
 }
 
@@ -302,18 +321,33 @@ func (h *AuthHandler) refreshCookiePolicy() (http.SameSite, bool) {
 	return http.SameSiteStrictMode, false
 }
 
-func (h *AuthHandler) setRefreshCookie(c *gin.Context, userID uuid.UUID) {
+const refreshCookie = "refresh_token"
+
+// issueRefreshToken stores a new refresh token, sets it as the cookie and returns it for the body.
+func (h *AuthHandler) issueRefreshToken(c *gin.Context, userID uuid.UUID) (string, error) {
 	rawToken, tokenHash, err := h.authService.GenerateRefreshToken()
 	if err != nil {
-		return
+		return "", err
 	}
-
-	h.authService.StoreRefreshToken(c.Request.Context(), userID, tokenHash)
+	if err := h.authService.StoreRefreshToken(c.Request.Context(), userID, tokenHash); err != nil {
+		return "", err
+	}
 
 	maxAge := int(h.cfg.RefreshTokenTTL.Seconds())
 	sameSite, secure := h.refreshCookiePolicy()
 	c.SetSameSite(sameSite)
-	c.SetCookie("refresh_token", rawToken, maxAge, "/api/v1/auth", "", secure, true)
+	c.SetCookie(refreshCookie, rawToken, maxAge, "/api/v1/auth", "", secure, true)
+	return rawToken, nil
+}
+
+// presentedRefreshToken reads the app's copy from the body, else the cookie (older clients).
+func presentedRefreshToken(c *gin.Context) string {
+	var req models.RefreshRequest
+	if err := c.ShouldBindJSON(&req); err == nil && req.RefreshToken != "" {
+		return req.RefreshToken
+	}
+	rawToken, _ := c.Cookie(refreshCookie)
+	return rawToken
 }
 
 func (h *AuthHandler) VerifyEmail(c *gin.Context) {

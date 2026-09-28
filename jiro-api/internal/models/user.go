@@ -89,7 +89,14 @@ type PublicUser struct {
 
 type AuthResponse struct {
 	AccessToken string `json:"access_token"`
-	User        User   `json:"user"`
+	// Also set as a cookie; the app keeps this copy because Safari drops the API's cross-site cookie.
+	RefreshToken string `json:"refresh_token,omitempty"`
+	User         User   `json:"user"`
+}
+
+// RefreshRequest carries the app's copy of the refresh token; without one the cookie is used.
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token"`
 }
 
 type VerifyEmailRequest struct {

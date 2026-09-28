@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, HostListener, PLATFORM_ID, computed, inject, signal } from '@angular/core';
+import { ChangeDetectorRef, Component, HostListener, PLATFORM_ID, computed, effect, inject, signal } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { RouterOutlet, RouterLink, RouterLinkActive, Router, NavigationEnd } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -621,6 +621,12 @@ export class MainLayoutComponent {
   readonly isDemo = this.auth.isDemo;
 
   private readonly verifyDismissed = signal(readDismissed());
+  // A refused write means the nudge matters now, so a dismissed banner comes back.
+  private readonly reshowVerifyOnRefusal = effect(() => {
+    if (this.auth.verifyNudge() === 0) return;
+    try { sessionStorage.removeItem(VERIFY_DISMISSED_KEY); } catch { /* storage unavailable */ }
+    this.verifyDismissed.set(false);
+  });
   readonly showVerifyBanner = computed(() => {
     const user = this.auth.user();
     if (!user || user.is_demo || user.email_verified || this.verifyDismissed()) return false;

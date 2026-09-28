@@ -1,4 +1,5 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
+import { ToastService } from '../../../core/services/toast.service';
 
 import { ActivatedRoute, Router } from '@angular/router';
 import { JymService, PublicSplitDetail } from '../../../core/services/jym.service';
@@ -191,6 +192,8 @@ export class DiscoverDetailComponent implements OnInit {
 
   private splitId = '';
 
+  private readonly toast = inject(ToastService);
+
   constructor(
     private jymService: JymService,
     private route: ActivatedRoute,
@@ -210,7 +213,10 @@ export class DiscoverDetailComponent implements OnInit {
     this.importing.set(true);
     this.jymService.importPublicSplit(this.splitId).subscribe({
       next: () => { this.importing.set(false); this.imported.set(true); },
-      error: () => this.importing.set(false),
+      error: () => {
+        this.importing.set(false);
+        this.toast.error('Could not add this split. Try again.');
+      },
     });
   }
 }

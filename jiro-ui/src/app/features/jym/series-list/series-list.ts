@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal, input, output } from '@angular/core'
 
 import { Router } from '@angular/router';
 import { JymService, SplitSeriesSummary } from '../../../core/services/jym.service';
+import { WorkoutLauncher } from '../shared/workout-launcher';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
@@ -332,6 +333,8 @@ export class SeriesListComponent implements OnInit {
   private readonly toast = inject(ToastService);
   private readonly settings = inject(SettingsService);
 
+  private readonly launcher = inject(WorkoutLauncher);
+
   constructor(private jymService: JymService, public router: Router) { }
 
   ngOnInit() {
@@ -363,21 +366,12 @@ export class SeriesListComponent implements OnInit {
 
   startWithRoutine(routineId: string) {
     this.showRoutinePicker.set(false);
-    this.jymService.startSession({
-      routine_id: routineId,
-      series_id: this.selectedSeriesId,
-    }).subscribe({
-      next: s => this.router.navigate(['/jym/session', s.id], { state: { targets: s.targets } }),
-    });
+    this.launcher.start({ routine_id: routineId, series_id: this.selectedSeriesId });
   }
 
   startFreeWithSplit() {
     this.showRoutinePicker.set(false);
-    this.jymService.startSession({
-      series_id: this.selectedSeriesId,
-    }).subscribe({
-      next: s => this.router.navigate(['/jym/session', s.id]),
-    });
+    this.launcher.start({ series_id: this.selectedSeriesId });
   }
 
   async deleteSeries(event: Event, sr: SplitSeriesSummary) {

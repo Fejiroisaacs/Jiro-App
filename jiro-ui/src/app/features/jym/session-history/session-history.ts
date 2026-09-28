@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { NavigationEnd, Router, RouterLink } from '@angular/router';
 import { filter } from 'rxjs';
 import { JymService, SessionSummary, SessionWithSets } from '../../../core/services/jym.service';
+import { WorkoutLauncher } from '../shared/workout-launcher';
 import { SettingsService } from '../../../core/services/settings.service';
 import { UploadService } from '../../../core/services/upload.service';
 import { ConfirmService } from '../../../core/services/confirm.service';
@@ -70,8 +71,18 @@ import { formatInstant } from '../../../core/utils/format-date';
         <div class="sessions-list" role="status" aria-label="Loading sessions">@for (i of [1, 2, 3, 4]; track i) { <jiro-skeleton height="88px" /> }</div>
       }
 
+      <!-- Load error -->
+      @if (!loading() && loadError()) {
+        <jiro-empty-state
+          icon="warning-circle"
+          heading="Could not load your sessions"
+          message="Check your connection and try again.">
+          <jiro-button variant="secondary" type="button" (click)="load()">Try again</jiro-button>
+        </jiro-empty-state>
+      }
+
       <!-- Empty -->
-      @if (!loading() && sessions().length === 0) {
+      @if (!loading() && !loadError() && sessions().length === 0) {
         <jiro-empty-state
           icon="barbell"
           heading="No sessions yet"
@@ -219,6 +230,11 @@ import { formatInstant } from '../../../core/utils/format-date';
           </div>
 }
         </div>
+        @if (hasMore()) {
+          <div class="load-more">
+            <jiro-button variant="secondary" type="button" [loading]="loadingMore()" (click)="loadMore()">Show older sessions</jiro-button>
+          </div>
+        }
 }
       </div>
 }
@@ -229,6 +245,7 @@ import { formatInstant } from '../../../core/utils/format-date';
     :host { display: block; }
 
     .session-history { max-width: 800px; width: 100%; }
+    .load-more { display: flex; justify-content: center; margin-top: var(--space-lg); }
 
 
     .page-header h1 { font-size: var(--font-size-2xl); font-weight: 700; }
@@ -530,6 +547,9 @@ export class SessionHistoryComponent implements OnInit {
   private readonly injector = inject(Injector);
   sessions = signal<SessionSummary[]>([]);
   loading = signal(true);
+  loadError = signal(false);
+  hasMore = signal(false);
+  loadingMore = signal(false);
   selectedId = signal<string | null>(null);
   detail = signal<SessionWithSets | null>(null);
   detailLoading = signal(false);
@@ -537,6 +557,8 @@ export class SessionHistoryComponent implements OnInit {
   exporting = signal(false);
   exportFrom = '';
   exportTo = '';
+
+  private readonly launcher = inject(WorkoutLauncher);
 
   constructor(
     private jymService: JymService,
@@ -553,9 +575,40 @@ export class SessionHistoryComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.jymService.listSessions().subscribe({
-      next: s => { this.sessions.set(s); this.loading.set(false); this.focusSessionFromUrl(); },
-      error: () => { this.loading.set(false); this.focusSessionFromUrl(); },
+    this.load();
+  }
+
+  load() {
+    this.loading.set(true);
+    this.loadError.set(false);
+    this.jymService.listSessions({ limit: HISTORY_PAGE }).subscribe({
+      next: s => {
+        this.sessions.set(s);
+        this.hasMore.set(s.length === HISTORY_PAGE);
+        this.loading.set(false);
+        this.focusSessionFromUrl();
+      },
+      error: () => { this.loadError.set(true); this.loading.set(false); this.focusSessionFromUrl(); },
+    });
+  }
+
+  /** The next page, continuing after the oldest row loaded. */
+  loadMore() {
+    const last = this.sessions().at(-1);
+    if (!last || this.loadingMore()) return;
+    this.loadingMore.set(true);
+    this.jymService.listSessions({ before: last.started_at, beforeId: last.id, limit: HISTORY_PAGE }).subscribe({
+      next: page => {
+        // A session opened on its own from ?session= may already be in the list.
+        const seen = new Set(this.sessions().map(x => x.id));
+        this.sessions.update(list => [...list, ...page.filter(x => !seen.has(x.id))]);
+        this.hasMore.set(page.length === HISTORY_PAGE);
+        this.loadingMore.set(false);
+      },
+      error: () => {
+        this.loadingMore.set(false);
+        this.toast.error('Could not load older sessions.');
+      },
     });
   }
 
@@ -696,9 +749,7 @@ export class SessionHistoryComponent implements OnInit {
   }
 
   startNew() {
-    this.jymService.startSession({}).subscribe({
-      next: s => this.router.navigate(['/jym/session', s.id]),
-    });
+    this.launcher.start({});
   }
 
   downloadCSV() {
@@ -714,10 +765,15 @@ export class SessionHistoryComponent implements OnInit {
         URL.revokeObjectURL(url);
         this.exporting.set(false);
       },
-      error: () => this.exporting.set(false),
+      error: () => {
+        this.exporting.set(false);
+        this.toast.error('Could not export your sessions.');
+      },
     });
   }
 }
+
+const HISTORY_PAGE = 50;
 
 /**
  * A list row for a session fetched on its own (outside the capped list).

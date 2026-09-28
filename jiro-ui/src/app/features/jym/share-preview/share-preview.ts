@@ -1,4 +1,5 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
+import { ToastService } from '../../../core/services/toast.service';
 
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { JymService, SharePreview } from '../../../core/services/jym.service';
@@ -235,6 +236,8 @@ export class SharePreviewComponent implements OnInit {
 
   isLoggedIn = signal(false);
 
+  private readonly toast = inject(ToastService);
+
   constructor(
     private route: ActivatedRoute,
     private router: Router,
@@ -276,7 +279,10 @@ export class SharePreviewComponent implements OnInit {
         this.importing.set(false);
         this.imported.set(true);
       },
-      error: () => this.importing.set(false),
+      error: () => {
+        this.importing.set(false);
+        this.toast.error('Could not add this split. Try again.');
+      },
     });
   }
 

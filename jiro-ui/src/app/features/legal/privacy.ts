@@ -27,7 +27,7 @@ import { JiroPageHeaderComponent } from '../../shared/components/jiro-page-heade
       </header>
 
       <main class="legal-main">
-        <jiro-page-header heading="Privacy policy" subtitle="Draft, last updated 23 Sep 2026" />
+        <jiro-page-header heading="Privacy policy" subtitle="Draft, last updated 27 Sep 2026" />
 
         <p class="legal-draft" role="note">
           This is a draft. It has not been reviewed by a lawyer and it is not legal advice.
@@ -227,7 +227,10 @@ import { JiroPageHeaderComponent } from '../../shared/components/jiro-page-heade
             <dd>
               Keeps you signed in for up to 7 days. It can only be read by the Jiro server, not by
               scripts on the page, and it is only sent to the sign-in part of the server. The server
-              stores a hash of it, not the token itself. It is removed when you sign out.
+              stores a hash of it, not the token itself. It is removed when you sign out. Some
+              browsers, including Safari and every browser on iPhone, block this cookie because the
+              server is on a different domain from the app, so the app also keeps a copy
+              (<code>jiro_refresh_token</code>, below).
             </dd>
           </dl>
           <p>
@@ -242,6 +245,12 @@ import { JiroPageHeaderComponent } from '../../shared/components/jiro-page-heade
               A copy of your profile (such as your email, names, profile photo link and settings) so
               the app can show it straight away. Removed when you sign out.
             </dd>
+            <dt><code>jiro_refresh_token</code></dt>
+            <dd>
+              The same sign-in token as the cookie above, so you stay signed in on browsers that
+              block the cookie. Unlike the cookie, the app itself can read this copy. It is replaced
+              each time the app renews your session, and removed when you sign out.
+            </dd>
             <dt><code>jiro_dark</code></dt>
             <dd>Whether you turned dark mode on.</dd>
             <dt><code>culinara_shopping_list</code></dt>
@@ -251,10 +260,10 @@ import { JiroPageHeaderComponent } from '../../shared/components/jiro-page-heade
             </dd>
             <dt><code>jiro_cook_checklist_</code> followed by a recipe ID</dt>
             <dd>Which ingredients and steps you ticked off in cook mode.</dd>
-            <dt><code>jiro_session_targets_</code> followed by a session ID</dt>
+            <dt><code>jiro_session_draft_</code> followed by a session ID</dt>
             <dd>
-              The planned sets and reps for a workout in progress. Removed when you finish or discard
-              the workout.
+              Sets you have typed but not logged yet in a workout in progress, and exercises you added
+              or removed. Removed when you finish or discard the workout.
             </dd>
             <dt><code>jiro_journal_prompt_dismissed</code></dt>
             <dd>The date you last closed the daily journal prompt.</dd>
