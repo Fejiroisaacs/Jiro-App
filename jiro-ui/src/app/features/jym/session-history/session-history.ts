@@ -775,18 +775,15 @@ export class SessionHistoryComponent implements OnInit {
 
 const HISTORY_PAGE = 50;
 
-/**
- * A list row for a session fetched on its own (outside the capped list).
- * Totals mirror the list query: every set counts towards set_count and
- * total_volume, warm-ups included.
- */
+/** A list row for a session fetched on its own, counted like the list: working sets, and lifts with a record. */
 function summaryFromDetail(d: SessionWithSets): SessionSummary {
-  const { sets, attachments: _attachments, ...session } = d;
+  const { sets, attachments: _attachments, targets: _targets, ...session } = d;
+  const working = sets.filter(x => !x.is_warmup);
   return {
     ...session,
-    set_count: sets.length,
-    pr_count: sets.filter(x => x.is_pr).length,
-    total_volume: sets.reduce((sum, x) => sum + x.weight * x.reps_performed, 0),
+    set_count: working.length,
+    pr_count: new Set(sets.filter(x => x.is_pr).map(x => x.exercise_id)).size,
+    total_volume: working.reduce((sum, x) => sum + x.weight * x.reps_performed, 0),
     muscle_groups: [],
   };
 }

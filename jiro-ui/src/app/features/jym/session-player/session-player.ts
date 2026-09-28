@@ -1686,28 +1686,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     }).subscribe({
       next: () => {
         this.closeDraft();
-        const durationSeconds = Math.floor((Date.now() - this.startedAt.getTime()) / 1000);
-        this.router.navigate(['/jym/session-summary'], {
-          state: {
-            sessionId: this.sessionId,
-            durationSeconds,
-            sessionType: this.sessionType(),
-            weightUnit: this.settingsService.weightUnit(),
-            routineName: null,
-            blocks: this.blocks().map(b => ({
-              exerciseId: b.exerciseId,
-              exerciseName: b.exerciseName,
-              muscleGroup: b.muscleGroup,
-              sets: b.sets.map(s => ({
-                weight: parseFloat(s.weight) || 0,
-                reps: parseInt(s.reps, 10) || 0,
-                saved: s.saved,
-                isPR: s.isPR,
-                isWarmup: s.isWarmup,
-              })),
-            })),
-          },
-        });
+        this.router.navigate(['/jym/sessions', this.sessionId, 'summary']);
       },
       error: err => {
         this.finishing.set(false);

@@ -1,61 +1,41 @@
 import { Component, OnInit, ViewChild, ElementRef, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
-import { JymService } from '../../../core/services/jym.service';
+import { JymService, SessionReport } from '../../../core/services/jym.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { dayKey } from '../../../core/utils/day';
 import { muscleColor } from '../shared/muscle-colors';
 
-interface SummaryState {
-  sessionId: string;
-  durationSeconds: number;
-  sessionType: string;
-  weightUnit: string;
-  routineName: string | null;
-  blocks: {
-    exerciseId: string;
-    exerciseName: string;
-    muscleGroup: string | null;
-    sets: {
-      weight: number;
-      reps: number;
-      saved: boolean;
-      isPR: boolean;
-      isWarmup: boolean;
-    }[];
-  }[];
-}
-
 interface LiftHighlight {
   exerciseId: string;
   exerciseName: string;
   muscleGroup: string | null;
+  /** In the display unit. */
   weight: number;
   reps: number;
+  /** In kg, from the API. */
   est1RM: number;
   isPR: boolean;
-  previousBest?: { weight: number; reps: number; est1RM: number };
-}
-
-/** Mirrors the backend's epley1RM exactly (services/jym.go) — this side only
- *  ever has to rate the just-finished session's own sets locally; the
- *  previous session's number always comes pre-computed from the API. */
-function epley1RM(weight: number, reps: number): number {
-  if (reps === 1) return weight;
-  return Math.round(weight * (1 + reps / 30) * 10) / 10;
+  previous?: { weight: number; reps: number; est1RM: number };
 }
 
 interface MuscleGroupData {
   group: string;
-  volume: number;
+  sets: number;
   percentage: number;
   color: string;
 }
 
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function formatDuration(secs: number): string {
+  if (secs >= 3600) return `${Math.floor(secs / 3600)}h ${Math.floor((secs % 3600) / 60)}m`;
+  if (secs >= 60) return `${Math.floor(secs / 60)}m ${secs % 60}s`;
+  return `${secs}s`;
 }
 
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
@@ -71,104 +51,119 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
         <div class="hero-content">
           <span class="trophy-ring"><jiro-icon name="trophy" [size]="48" /></span>
           <h1 class="hero-title">Workout complete</h1>
+          @if (routineName(); as name) {
+            <p class="hero-sub">{{ name }}</p>
+          }
           @if (sessionType() !== 'normal') {
             <span class="type-pill">{{ sessionType() === 'deload' ? 'Deload' : 'Test' }} session</span>
           }
         </div>
       </div>
 
-      @if (prCount() > 0) {
-        <p class="pr-line">
-          <jym-pr-badge size="md" />
-          {{ prCount() }} new personal record{{ prCount() === 1 ? '' : 's' }}
-        </p>
-      }
-
-      <div class="stats-row">
-        <div class="stat-card">
-          <div class="stat-value">{{ durationStr() }}</div>
-          <div class="stat-label">Duration</div>
+      @if (loading()) {
+        <p class="state-note" role="status">Loading your summary…</p>
+      } @else if (loadError()) {
+        <div class="state-note" role="alert">
+          <p>Could not load this summary.</p>
+          <div class="action-row">
+            <button class="btn-share" (click)="load()">Try again</button>
+            <button class="btn-done" (click)="done()">Back to Jym</button>
+          </div>
         </div>
-        <div class="stat-card">
-          <div class="stat-value">{{ totalVolume() }}</div>
-          <div class="stat-label">Volume</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value">{{ totalSets() }}</div>
-          <div class="stat-label">Work sets</div>
-        </div>
-      </div>
+      } @else {
+        @if (prCount() > 0) {
+          <p class="pr-line">
+            <jym-pr-badge size="md" />
+            {{ prCount() }} new personal record{{ prCount() === 1 ? '' : 's' }}
+          </p>
+        }
 
-      @if (muscleGroups().length > 0) {
-        <section class="section">
-          <h2 class="section-label">Muscle groups</h2>
-          @for (mg of muscleGroups(); track mg.group) {
-            <div class="mg-row">
-              <span class="mg-name">{{ mg.group }}</span>
-              <div class="mg-track">
-                <div class="mg-fill" [style.width.%]="mg.percentage" [style.background]="mg.color"></div>
-              </div>
-              <span class="mg-pct">{{ mg.percentage | number:'1.0-0' }}%</span>
-            </div>
-          }
-        </section>
-      }
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-value">{{ durationStr() }}</div>
+            <div class="stat-label">Duration</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">{{ totalVolume() }}</div>
+            <div class="stat-label">Volume</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">{{ totalSets() }}</div>
+            <div class="stat-label">Work sets</div>
+          </div>
+        </div>
 
-      @if (liftHighlights().length > 0) {
-        <section class="section">
-          <h2 class="section-label">Session highlights</h2>
-          @for (lift of liftHighlights(); track lift.exerciseId) {
-            <div class="lift-card">
-              <div class="lift-meta">
-                <span class="lift-name">{{ lift.exerciseName }}</span>
-                @if (lift.muscleGroup) {
-                  <span class="lift-muscle">{{ lift.muscleGroup }}</span>
-                }
-              </div>
-              <div class="lift-aside">
-                <div class="lift-current">
-                  @if (lift.isPR) {
-                    <jym-pr-badge />
-                  } @else {
-                    <span class="best-tag">Best</span>
-                  }
-                  <span class="lift-weight">{{ lift.weight | number:'1.0-1' }} × {{ lift.reps }}</span>
+        @if (muscleGroups().length > 0) {
+          <section class="section">
+            <h2 class="section-label">Muscle groups</h2>
+            @for (mg of muscleGroups(); track mg.group) {
+              <div class="mg-row">
+                <span class="mg-name">{{ mg.group }}</span>
+                <div class="mg-track">
+                  <div class="mg-fill" [style.width.%]="mg.percentage" [style.background]="mg.color"></div>
                 </div>
-                @if (lift.previousBest; as prev) {
-                  <div class="lift-previous">
-                    Last time {{ prev.weight | number:'1.0-1' }} × {{ prev.reps }}
-                    @if (est1RMDelta(lift); as d) {
-                      <span class="delta" [class.delta-up]="d.direction === 'up'" [class.delta-down]="d.direction === 'down'">
-                        {{ d.direction === 'up' ? '↑' : d.direction === 'down' ? '↓' : '' }}{{ d.pct > 0 ? d.pct + '%' : '' }}
-                      </span>
-                    }
-                  </div>
-                }
+                <span class="mg-pct">{{ mg.percentage | number:'1.0-0' }}%</span>
               </div>
-            </div>
-          }
-        </section>
-      }
+            }
+          </section>
+        }
 
-      @if (liftHighlights().length === 0) {
-        <section class="section">
-          <p class="empty-note">No sets were logged this session.</p>
-        </section>
-      }
+        @if (liftHighlights().length > 0) {
+          <section class="section">
+            <h2 class="section-label">Session highlights</h2>
+            @for (lift of liftHighlights(); track lift.exerciseId) {
+              <div class="lift-card">
+                <div class="lift-meta">
+                  <span class="lift-name">{{ lift.exerciseName }}</span>
+                  @if (lift.muscleGroup) {
+                    <span class="lift-muscle">{{ lift.muscleGroup }}</span>
+                  }
+                </div>
+                <div class="lift-aside">
+                  <div class="lift-current">
+                    @if (lift.isPR) {
+                      <jym-pr-badge />
+                    } @else {
+                      <span class="best-tag">Best</span>
+                    }
+                    <span class="lift-weight">{{ lift.weight | number:'1.0-1' }} × {{ lift.reps }}</span>
+                  </div>
+                  @if (lift.previous; as prev) {
+                    <div class="lift-previous">
+                      Last time {{ prev.weight | number:'1.0-1' }} × {{ prev.reps }}
+                      @if (est1RMDelta(lift); as d) {
+                        <span class="delta" [class.delta-up]="d.direction === 'up'" [class.delta-down]="d.direction === 'down'">
+                          {{ d.direction === 'up' ? '↑' : d.direction === 'down' ? '↓' : '' }}{{ d.pct > 0 ? d.pct + '%' : '' }}
+                        </span>
+                      }
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+          </section>
+        }
 
-      <div class="action-row">
-        <button class="btn-share" (click)="shareWorkout()" [disabled]="sharing()">
-          @if (sharing()) {
-            <span class="spinner" aria-hidden="true"></span>
-          } @else {
-            <jiro-icon name="share-network" [size]="16" />
-          }
-          {{ sharing() ? 'Sharing...' : 'Share workout' }}
-        </button>
-        <button class="btn-done" (click)="done()">Done</button>
-      </div>
-      @if (sessionDay()) {
-        <p class="day-link-row"><a class="day-link" [routerLink]="['/day', sessionDay()]">See this day</a></p>
+        @if (liftHighlights().length === 0) {
+          <section class="section">
+            <p class="empty-note">No work sets were logged this session.</p>
+          </section>
+        }
+
+        <div class="action-row">
+          <button class="btn-share" (click)="shareWorkout()" [disabled]="sharing()">
+            @if (sharing()) {
+              <span class="spinner" aria-hidden="true"></span>
+            } @else {
+              <jiro-icon name="share-network" [size]="16" />
+            }
+            {{ sharing() ? 'Sharing...' : 'Share workout' }}
+          </button>
+          <button class="btn-done" (click)="done()">Done</button>
+        </div>
+        @if (sessionDay()) {
+          <p class="day-link-row"><a class="day-link" [routerLink]="['/day', sessionDay()]">See this day</a></p>
+        }
       }
 
     </div>
@@ -179,6 +174,9 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
         <span class="sc-logo">Jym</span>
         <jiro-icon class="sc-trophy" name="trophy" [size]="48" />
         <p class="sc-title">Workout complete</p>
+        @if (routineName(); as name) {
+          <p class="sc-sub">{{ name }}</p>
+        }
       </div>
 
       <div class="sc-stats">
@@ -284,6 +282,13 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
       line-height: 1.15;
     }
 
+    .hero-sub {
+      margin: 0 0 var(--space-sm);
+      font-size: var(--font-size-md);
+      font-weight: 600;
+      color: var(--text-on-dark);
+    }
+
     .type-pill {
       display: inline-block;
       background: color-mix(in srgb, var(--text-on-dark) 12%, transparent);
@@ -346,6 +351,15 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
 
     .section { margin-bottom: var(--space-xl); }
     .section-label { margin: 0 0 var(--space-md); }
+
+    .state-note {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+      text-align: center;
+      padding: var(--space-lg) 0;
+      margin: 0;
+    }
+    .state-note p { margin: 0 0 var(--space-md); }
 
     .empty-note {
       font-size: var(--font-size-sm);
@@ -595,6 +609,14 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
       white-space: nowrap;
     }
 
+    .sc-sub {
+      margin: -8px 0 0;
+      color: color-mix(in srgb, var(--text-on-dark) 80%, transparent);
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
     .sc-stats {
       display: flex;
       flex-shrink: 0;
@@ -749,11 +771,14 @@ export class SessionSummaryComponent implements OnInit {
   totalSets      = signal(0);
   prCount        = signal(0);
   sessionType    = signal('normal');
+  routineName    = signal<string | null>(null);
   muscleGroups   = signal<MuscleGroupData[]>([]);
   liftHighlights = signal<LiftHighlight[]>([]);
   topLifts       = signal<LiftHighlight[]>([]);
   sharing        = signal(false);
-  /** The user's day the workout started on (now minus its duration). */
+  loading        = signal(true);
+  loadError      = signal(false);
+  /** The user's day the workout started on. */
   sessionDay     = signal('');
 
   @ViewChild('shareCard') shareCardEl!: ElementRef<HTMLDivElement>;
@@ -761,126 +786,81 @@ export class SessionSummaryComponent implements OnInit {
   private readonly jymService = inject(JymService);
   private readonly settings = inject(SettingsService);
   private readonly toast = inject(ToastService);
+  private readonly route = inject(ActivatedRoute);
 
   constructor(private router: Router) {}
 
   ngOnInit(): void {
-    const state = history.state as SummaryState | undefined;
-    if (!state?.blocks) {
+    this.load();
+  }
+
+  /** The server builds the summary, so it survives a reload and matches history. */
+  load(): void {
+    const id = this.route.snapshot.paramMap.get('id');
+    if (!id) {
       this.router.navigate(['/jym']);
       return;
     }
-    this.computeStats(state);
-    this.loadPreviousBests(state);
-    const started = Date.now() - (state.durationSeconds ?? 0) * 1000;
-    this.sessionDay.set(dayKey(started, this.settings.timezone()));
-  }
-
-  /** Fills in each highlight's previousBest once the API responds; the page
-   *  renders immediately without it and updates in place, rather than
-   *  blocking "Workout complete" on a network round trip. */
-  private loadPreviousBests(state: SummaryState): void {
-    if (!state.sessionId) return;
-    const exerciseIds = state.blocks.map(b => b.exerciseId).filter(Boolean);
-    this.jymService.getPreviousBests(state.sessionId, exerciseIds).subscribe({
-      next: bests => {
-        const byExercise = new Map(bests.map(b => [b.exercise_id, b]));
-        this.liftHighlights.update(highlights => highlights.map(h => {
-          const prev = byExercise.get(h.exerciseId);
-          if (!prev) return h;
-          // The API returns kg; lift.weight is already in the user's display
-          // unit (session-player converts before it ever reaches this page),
-          // so both sides must be compared in the same unit or the delta
-          // below is meaningless — recomputed from the converted weight
-          // rather than trusting the API's kg-based est_1rm.
-          const weight = this.settings.toDisplay(prev.weight);
-          return { ...h, previousBest: { weight, reps: prev.reps_performed, est1RM: epley1RM(weight, prev.reps_performed) } };
-        }));
+    this.loading.set(true);
+    this.loadError.set(false);
+    this.jymService.getSessionReport(id).subscribe({
+      next: report => {
+        this.show(report);
+        this.loading.set(false);
       },
-      // No previous-workout comparison is a normal outcome (first time doing
-      // an exercise, or the lookup failing) — the rest of the summary already
-      // rendered, so this fails silently rather than showing an error toast.
-      error: () => {},
+      error: () => {
+        this.loading.set(false);
+        this.loadError.set(true);
+      },
     });
   }
 
-  /** Under half a kilo of estimated 1RM is noise, not progress either way. */
-  est1RMDelta(lift: LiftHighlight): { pct: number; direction: 'up' | 'down' | 'same' } | null {
-    const prev = lift.previousBest;
-    if (!prev || prev.est1RM <= 0) return null;
-    const diff = lift.est1RM - prev.est1RM;
-    if (Math.abs(diff) < 0.5) return { pct: 0, direction: 'same' };
-    return { pct: Math.abs(Math.round((diff / prev.est1RM) * 100)), direction: diff > 0 ? 'up' : 'down' };
+  private show(r: SessionReport): void {
+    this.sessionType.set(r.session_type || 'normal');
+    this.routineName.set(r.routine_name);
+    const started = new Date(r.started_at).getTime();
+    const ended = r.ended_at ? new Date(r.ended_at).getTime() : Date.now();
+    this.durationStr.set(formatDuration(Math.max(0, Math.floor((ended - started) / 1000))));
+    this.sessionDay.set(dayKey(started, this.settings.timezone()));
+
+    this.totalSets.set(r.set_count);
+    const volume = Math.round(this.settings.toDisplay(r.total_volume));
+    this.totalVolume.set(`${volume.toLocaleString('en-US')} ${this.settings.unitLabel()}`);
+    this.prCount.set(r.pr_count);
+
+    const allSets = r.muscles.reduce((sum, m) => sum + m.sets, 0) || 1;
+    this.muscleGroups.set(r.muscles.map(m => ({
+      group: capitalize(m.muscle_group),
+      sets: m.sets,
+      percentage: Math.round((m.sets / allSets) * 100),
+      color: muscleColor(m.muscle_group),
+    })));
+
+    const highlights: LiftHighlight[] = r.exercises.flatMap(e => e.best ? [{
+      exerciseId: e.exercise_id,
+      exerciseName: e.name,
+      muscleGroup: e.muscle_group,
+      weight: this.settings.toDisplay(e.best.weight),
+      reps: e.best.reps,
+      est1RM: e.best.est_1rm,
+      isPR: e.is_pr,
+      previous: e.previous
+        ? { weight: this.settings.toDisplay(e.previous.weight), reps: e.previous.reps, est1RM: e.previous.est_1rm }
+        : undefined,
+    }] : []);
+    this.liftHighlights.set(highlights);
+    // Weighted lifts by estimated 1RM, then bodyweight lifts by reps.
+    this.topLifts.set([...highlights].sort((a, b) => b.est1RM - a.est1RM || b.reps - a.reps).slice(0, 3));
   }
 
-  private computeStats(state: SummaryState): void {
-    this.sessionType.set(state.sessionType ?? 'normal');
-
-    // Duration string
-    const secs = state.durationSeconds ?? 0;
-    if (secs >= 3600) {
-      this.durationStr.set(`${Math.floor(secs / 3600)}h ${Math.floor((secs % 3600) / 60)}m`);
-    } else if (secs >= 60) {
-      this.durationStr.set(`${Math.floor(secs / 60)}m ${secs % 60}s`);
-    } else {
-      this.durationStr.set(`${secs}s`);
-    }
-
-    // Collect work sets (saved & not warmup)
-    const work: { weight: number; reps: number; isPR: boolean; mg: string | null }[] = [];
-    for (const block of state.blocks) {
-      for (const s of block.sets) {
-        if (s.saved && !s.isWarmup) {
-          work.push({ weight: s.weight, reps: s.reps, isPR: s.isPR, mg: block.muscleGroup });
-        }
-      }
-    }
-
-    this.totalSets.set(work.length);
-
-    const vol = work.reduce((acc, s) => acc + s.weight * s.reps, 0);
-    this.totalVolume.set(`${Math.round(vol).toLocaleString()} ${state.weightUnit || 'lbs'}`);
-
-    // Muscle group breakdown
-    const groupMap = new Map<string, number>();
-    for (const s of work) {
-      const key = s.mg?.toLowerCase() ?? 'other';
-      groupMap.set(key, (groupMap.get(key) ?? 0) + s.weight * s.reps);
-    }
-    const totalVol = vol || 1;
-    this.muscleGroups.set(
-      Array.from(groupMap.entries())
-        .map(([key, volume]) => ({
-          group: capitalize(key),
-          volume,
-          percentage: Math.round((volume / totalVol) * 100),
-          color: muscleColor(key),
-        }))
-        .sort((a, b) => b.volume - a.volume),
-    );
-
-    // Lift highlights — one entry per exercise block
-    const highlights: LiftHighlight[] = [];
-    for (const block of state.blocks) {
-      const ws = block.sets.filter(s => s.saved && !s.isWarmup);
-      if (!ws.length) continue;
-      const prSets = ws.filter(s => s.isPR);
-      const pool   = prSets.length ? prSets : ws;
-      const best   = pool.reduce((top, s) => (s.weight > top.weight ? s : top), pool[0]);
-      highlights.push({
-        exerciseId: block.exerciseId,
-        exerciseName: block.exerciseName,
-        muscleGroup: block.muscleGroup,
-        weight: best.weight,
-        reps: best.reps,
-        est1RM: epley1RM(best.weight, best.reps),
-        isPR: prSets.length > 0,
-      });
-    }
-
-    this.liftHighlights.set(highlights);
-    this.prCount.set(highlights.filter(h => h.isPR).length);
-    this.topLifts.set([...highlights].sort((a, b) => b.weight - a.weight).slice(0, 3));
+  /** Change in estimated 1RM on last time; none for a record or a deload, and under 0.25 kg is noise. */
+  est1RMDelta(lift: LiftHighlight): { pct: number; direction: 'up' | 'down' | 'same' } | null {
+    const prev = lift.previous;
+    if (!prev || prev.est1RM <= 0 || lift.isPR || this.sessionType() === 'deload') return null;
+    const diff = lift.est1RM - prev.est1RM;
+    const pct = Math.round(Math.abs(diff / prev.est1RM) * 100);
+    if (Math.abs(diff) < 0.25 || pct === 0) return { pct: 0, direction: 'same' };
+    return { pct, direction: diff > 0 ? 'up' : 'down' };
   }
 
   async shareWorkout(): Promise<void> {

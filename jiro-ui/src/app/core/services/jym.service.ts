@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, of } from 'rxjs';
+import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { SettingsService } from './settings.service';
 
@@ -23,6 +23,8 @@ export interface Exercise {
 export interface SetHistory {
   session_id: string;
   date: string;
+  /** The session's end; null while it is still in progress. */
+  ended_at: string | null;
   set_number: number;
   weight: number;
   reps: number;
@@ -50,12 +52,32 @@ export interface ExercisePR {
   date: string;
 }
 
-export interface PreviousBest {
-  exercise_id: string;
+/** One set with its estimated 1RM, in kg; `date` is its workout's start, given for last time. */
+export interface SetRef {
   weight: number;
-  reps_performed: number;
+  reps: number;
   est_1rm: number;
-  date: string;
+  date?: string;
+}
+
+export interface ExerciseReport {
+  exercise_id: string;
+  name: string;
+  muscle_group: string | null;
+  /** Working sets. */
+  sets: number;
+  volume: number;
+  is_pr: boolean;
+  /** The best record set if the lift set a record, otherwise the best working set. */
+  best: SetRef | null;
+  /** The best set of the latest finished normal workout before this one. */
+  previous: SetRef | null;
+}
+
+/** A workout's summary, by the same rules as every session list. */
+export interface SessionReport extends SessionSummary {
+  exercises: ExerciseReport[];
+  muscles: { muscle_group: string; sets: number }[];
 }
 
 // ─── Splits ───────────────────────────────────────────────────────────────────
@@ -186,9 +208,11 @@ export interface Session {
 
 export interface SessionSummary extends Session {
   routine_name: string | null;
+  /** Working sets; warm-ups are left out. */
   set_count: number;
-  /** Sets flagged as a personal record in this session. */
+  /** Lifts with a new record in this session. */
   pr_count: number;
+  /** Weight × reps over working sets, in kg. */
   total_volume: number;
   muscle_groups: string[];
 }
@@ -403,11 +427,9 @@ export class JymService {
     return this.http.delete<void>(`${API_URL}/sessions/${sessionId}/exercises/${exerciseId}`);
   }
 
-  /** Best set for each exercise from the most recent session before this one — for "last time" on the summary. */
-  getPreviousBests(sessionId: string, exerciseIds: string[]): Observable<PreviousBest[]> {
-    if (!exerciseIds.length) return of([]);
-    const params = new HttpParams().set('exercise_ids', exerciseIds.join(','));
-    return this.http.get<PreviousBest[]>(`${API_URL}/sessions/${sessionId}/previous-bests`, { params });
+  /** A workout's summary: totals, each lift's best set against last time, and sets per muscle. */
+  getSessionReport(sessionId: string): Observable<SessionReport> {
+    return this.http.get<SessionReport>(`${API_URL}/sessions/${sessionId}/summary`);
   }
 
   // Body weights

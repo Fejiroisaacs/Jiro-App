@@ -98,7 +98,7 @@ import { formatInstant } from '../../../core/utils/format-date';
           @if (activeTab() === 'volume') {
 <div class="chart-block">
             <h2 class="section-title">Total volume per session</h2>
-            <p class="section-sub">Sum of weight × reps across all sets. Excludes deload sessions.</p>
+            <p class="section-sub">Sum of weight × reps across working sets. Excludes deload sessions.</p>
             <div class="chart-wrapper">
               <canvas #volumeCanvas></canvas>
             </div>
