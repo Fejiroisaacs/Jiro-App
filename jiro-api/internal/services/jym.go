@@ -62,13 +62,6 @@ func NewJymService(db *pgxpool.Pool) *JymService {
 	return &JymService{db: db}
 }
 
-func epley1RM(weight float64, reps int) float64 {
-	if reps == 1 {
-		return weight
-	}
-	return math.Round((weight*(1+float64(reps)/30.0))*10) / 10
-}
-
 // ─── Exercises ───────────────────────────────────────────────────────────────
 
 // 23505 is unique_violation; exercises are UNIQUE (user_id, name).
@@ -149,23 +142,22 @@ func (s *JymService) GetExerciseWithHistory(ctx context.Context, userID, exercis
 		return nil, err
 	}
 
-	// Header stats cover every working set, however many sets the list returns.
+	// Header stats cover every working set outside deloads, however many sets the list returns.
 	var best1RM float64
 	if err := s.db.QueryRow(ctx,
 		`SELECT COALESCE(MAX(ss.weight), 0),
-		        COALESCE(MAX(CASE WHEN ss.reps_performed = 1 THEN ss.weight
-		                          ELSE ss.weight * (1 + ss.reps_performed / 30.0) END), 0)
+		        COALESCE(MAX(`+e1rmSQL("ss.weight", "ss.reps_performed")+`), 0)
 		 FROM session_sets ss
 		 JOIN sessions s ON ss.session_id = s.id
-		 WHERE ss.exercise_id = $1 AND s.user_id = $2 AND NOT ss.is_warmup`,
+		 WHERE ss.exercise_id = $1 AND s.user_id = $2 AND NOT ss.is_warmup AND s.session_type <> 'deload'`,
 		exerciseID, userID,
 	).Scan(&ex.BestWeight, &best1RM); err != nil {
 		return nil, err
 	}
-	ex.Est1RM = math.Round(best1RM*10) / 10
+	ex.Est1RM = roundTenth(best1RM)
 
 	rows, err := s.db.Query(ctx,
-		`SELECT ss.session_id, s.started_at, ss.set_number, ss.weight, ss.reps_performed, ss.rpe, ss.is_warmup,
+		`SELECT ss.session_id, s.started_at, s.ended_at, ss.set_number, ss.weight, ss.reps_performed, ss.rpe, ss.is_warmup,
 		        ss.is_pr, s.session_type, ss.exercise_note
 		 FROM session_sets ss
 		 JOIN sessions s ON ss.session_id = s.id
@@ -182,7 +174,7 @@ func (s *JymService) GetExerciseWithHistory(ctx context.Context, userID, exercis
 	ex.History = []models.SetHistory{}
 	for rows.Next() {
 		var h models.SetHistory
-		if err := rows.Scan(&h.SessionID, &h.Date, &h.SetNumber, &h.Weight, &h.Reps, &h.RPE, &h.IsWarmup,
+		if err := rows.Scan(&h.SessionID, &h.Date, &h.EndedAt, &h.SetNumber, &h.Weight, &h.Reps, &h.RPE, &h.IsWarmup,
 			&h.IsPR, &h.SessionType, &h.ExerciseNote); err != nil {
 			return nil, err
 		}
@@ -945,11 +937,7 @@ func (s *JymService) StartSession(ctx context.Context, userID uuid.UUID, req *mo
 // sessionPageSelect aggregates only the sessions its page CTE picks, newest first.
 const sessionPageSelect = `WITH page AS (%s)
 		 SELECT s.id, s.user_id, s.routine_id, s.series_id, s.session_type, s.started_at, s.ended_at, s.notes,
-		        r.name as routine_name,
-		        COUNT(ss.id) as set_count,
-		        COUNT(ss.id) FILTER (WHERE ss.is_pr) AS pr_count,
-		        COALESCE(SUM(ss.weight * ss.reps_performed), 0) as total_volume,
-		        COALESCE(array_agg(DISTINCT e.muscle_group) FILTER (WHERE e.muscle_group IS NOT NULL), '{}'::text[]) as muscle_groups
+		        r.name as routine_name, ` + sessionAggregatesSQL + `
 		 FROM page
 		 JOIN sessions s ON s.id = page.id
 		 LEFT JOIN routines r ON s.routine_id = r.id
@@ -1001,11 +989,7 @@ func (s *JymService) ListAllSessions(ctx context.Context, userID uuid.UUID) ([]m
 
 // sessionSummarySelect is a session list row; callers append a WHERE on s.* then sessionSummaryGroup.
 const sessionSummarySelect = `SELECT s.id, s.user_id, s.routine_id, s.series_id, s.session_type, s.started_at, s.ended_at, s.notes,
-		        r.name as routine_name,
-		        COUNT(ss.id) as set_count,
-		        COUNT(ss.id) FILTER (WHERE ss.is_pr) AS pr_count,
-		        COALESCE(SUM(ss.weight * ss.reps_performed), 0) as total_volume,
-		        COALESCE(array_agg(DISTINCT e.muscle_group) FILTER (WHERE e.muscle_group IS NOT NULL), '{}'::text[]) as muscle_groups
+		        r.name as routine_name, ` + sessionAggregatesSQL + `
 		 FROM sessions s
 		 LEFT JOIN routines r ON s.routine_id = r.id
 		 LEFT JOIN session_sets ss ON ss.session_id = s.id
@@ -2008,8 +1992,8 @@ func (s *JymService) GetSeriesDetail(ctx context.Context, userID, seriesID uuid.
 	// Session points (for volume chart)
 	sessRows, err := s.db.Query(ctx,
 		`SELECT s.id, s.started_at, s.session_type,
-		        COALESCE(SUM(ss.weight * ss.reps_performed), 0) as total_volume,
-		        COUNT(ss.id) as set_count
+		        `+workingVolumeSQL+` as total_volume,
+		        `+workingSetCountSQL+` as set_count
 		 FROM sessions s
 		 LEFT JOIN session_sets ss ON ss.session_id = s.id
 		 WHERE s.series_id = $1
@@ -2032,15 +2016,14 @@ func (s *JymService) GetSeriesDetail(ctx context.Context, userID, seriesID uuid.
 	}
 	sessRows.Close()
 
-	// Best working-set e1RM per exercise per session, oldest session first (1 rep is the weight itself).
+	// Best working-set e1RM per exercise per finished, non-deload session, oldest session first.
 	exRows, err := s.db.Query(ctx,
 		`SELECT ss.session_id, s.started_at, ss.exercise_id, e.name, e.muscle_group,
-		        MAX(CASE WHEN ss.reps_performed = 1 THEN ss.weight
-		                 ELSE ss.weight * (1 + ss.reps_performed / 30.0) END) AS best_est_1rm
+		        MAX(`+e1rmSQL("ss.weight", "ss.reps_performed")+`) AS best_est_1rm
 		 FROM session_sets ss
 		 JOIN sessions s ON s.id = ss.session_id
 		 JOIN exercises e ON ss.exercise_id = e.id
-		 WHERE s.series_id = $1 AND NOT ss.is_warmup
+		 WHERE s.series_id = $1 AND NOT ss.is_warmup AND s.ended_at IS NOT NULL AND s.session_type <> 'deload'
 		 GROUP BY ss.session_id, s.started_at, ss.exercise_id, e.name, e.muscle_group
 		 ORDER BY ss.exercise_id, s.started_at`,
 		seriesID,
@@ -2073,7 +2056,7 @@ func (s *JymService) GetSeriesDetail(ctx context.Context, userID, seriesID uuid.
 		exMap[exID].Points = append(exMap[exID].Points, models.ProgressionPoint{
 			SessionID:  sessID,
 			Date:       date,
-			BestEst1RM: math.Round(best1RM*10) / 10,
+			BestEst1RM: roundTenth(best1RM),
 		})
 	}
 	if err := exRows.Err(); err != nil {
@@ -2179,8 +2162,7 @@ func (s *JymService) StreamSessionsCSV(ctx context.Context, userID uuid.UUID, fr
 			ss.reps_performed,
 			COALESCE(ss.rpe::text, ''),
 			ss.is_warmup,
-			ss.is_pr,
-			ROUND((ss.weight * (1 + ss.reps_performed::float / 30.0))::numeric, 1)
+			ss.is_pr
 		FROM sessions s
 		LEFT JOIN routines r ON s.routine_id = r.id
 		JOIN session_sets ss ON ss.session_id = s.id
@@ -2205,15 +2187,16 @@ func (s *JymService) StreamSessionsCSV(ctx context.Context, userID uuid.UUID, fr
 		var sessionID uuid.UUID
 		var routine, exercise, muscleGroup, rpe string
 		var setNum, reps int
-		var weight, est1rm float64
+		var weight float64
 		var isWarmup, isPR bool
 
 		if err := rows.Scan(
 			&date, &sessionID, &routine, &exercise, &muscleGroup,
-			&setNum, &weight, &reps, &rpe, &isWarmup, &isPR, &est1rm,
+			&setNum, &weight, &reps, &rpe, &isWarmup, &isPR,
 		); err != nil {
 			return err
 		}
+		est1rm := epley1RM(weight, reps)
 
 		_ = cw.Write([]string{
 			date.Format("2006-01-02"),

@@ -23,17 +23,19 @@ type Exercise struct {
 
 // SetHistory is one logged set from history, enriched with computed 1RM.
 type SetHistory struct {
-	SessionID    uuid.UUID `json:"session_id"`
-	Date         time.Time `json:"date"`
-	SetNumber    int       `json:"set_number"`
-	Weight       float64   `json:"weight"`
-	Reps         int       `json:"reps"`
-	RPE          *int      `json:"rpe"`
-	IsWarmup     bool      `json:"is_warmup"`
-	Est1RM       float64   `json:"est_1rm"`
-	IsPR         bool      `json:"is_pr"`
-	SessionType  string    `json:"session_type"`
-	ExerciseNote *string   `json:"exercise_note"`
+	SessionID uuid.UUID `json:"session_id"`
+	Date      time.Time `json:"date"`
+	// The session's end; null while it is still in progress.
+	EndedAt      *time.Time `json:"ended_at"`
+	SetNumber    int        `json:"set_number"`
+	Weight       float64    `json:"weight"`
+	Reps         int        `json:"reps"`
+	RPE          *int       `json:"rpe"`
+	IsWarmup     bool       `json:"is_warmup"`
+	Est1RM       float64    `json:"est_1rm"`
+	IsPR         bool       `json:"is_pr"`
+	SessionType  string     `json:"session_type"`
+	ExerciseNote *string    `json:"exercise_note"`
 }
 
 type ExerciseWithHistory struct {
