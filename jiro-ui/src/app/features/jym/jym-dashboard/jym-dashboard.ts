@@ -96,7 +96,8 @@ const DELOAD_SNOOZE_DAYS = 7;
           <div class="deload-info">
             <h2 class="deload-heading" id="deload-heading">Time for a lighter week?</h2>
             <p class="deload-note">
-              Volume is down {{ d.dropPercent | number:'1.0-1' }}% across your last {{ d.sessionCount }} sessions,
+              Your last {{ d.sessionCount }} sessions averaged {{ d.dropPercent | number:'1.0-1' }}% less volume than
+              the last time you trained each day,
               {{ settingsService.toDisplay(d.olderMeanVolume) | number:'1.0-0' }} to
               {{ settingsService.toDisplay(d.newerMeanVolume) | number:'1.0-0' }} {{ settingsService.unitLabel() }} a session,
               and none of them set a PR.
@@ -659,8 +660,9 @@ export class JymDashboardComponent implements OnInit {
    * said "Not now" inside the last week. The rule itself lives in
    * ../deload-rule.ts; this only decides whether to show what it found.
    */
+  /** Hidden while a workout is open: the answer is for the next one. */
   readonly deloadSuggestion = computed(() =>
-    this.deloadSnoozed() ? null : suggestDeload(this.allSessions())
+    this.deloadSnoozed() || this.inProgressSessions().length > 0 ? null : suggestDeload(this.allSessions())
   );
 
   /** The most recently started active series that knows its next day. */
@@ -779,8 +781,12 @@ export class JymDashboardComponent implements OnInit {
    * Opens the next session already marked as a deload, so the player shows
    * Deload selected without a second call.
    */
+  /** Up next's day in its series, as a deload; freestyle when no series is active. */
   startDeloadSession() {
-    this.launcher.start({ session_type: 'deload' });
+    const sr = this.upNext();
+    this.launcher.start(sr?.next_routine
+      ? { routine_id: sr.next_routine.id, series_id: sr.id, session_type: 'deload' }
+      : { session_type: 'deload' });
   }
 
   /** Quiets the suggestion for a week. A suggestion you cannot quiet is nagging. */
