@@ -108,6 +108,46 @@ func TestHeaderAndSeriesE1RMUseTheCappedFormula(t *testing.T) {
 	}
 }
 
+func TestTemplateTakesRepsFromWorkingSets(t *testing.T) {
+	svc, userID := testJymDB(t)
+	ctx := context.Background()
+	squat := prTestSetup(t, svc, userID, "Test Squat")
+	mobility := prTestSetup(t, svc, userID, "Test Mobility")
+	sess := startSession(t, svc, userID, "")
+	warm := true
+	for i, reps := range []int{10, 10} {
+		if _, err := svc.LogSet(ctx, userID, sess, &models.CreateSetRequest{
+			ExerciseID: squat, SetNumber: i + 1, Weight: 60, RepsPerformed: reps, IsWarmup: &warm,
+		}); err != nil {
+			t.Fatalf("log warm-up: %v", err)
+		}
+	}
+	for i := range 3 {
+		logSet(t, svc, userID, sess, squat, i+3, 100, 5)
+	}
+	if _, err := svc.LogSet(ctx, userID, sess, &models.CreateSetRequest{
+		ExerciseID: mobility, SetNumber: 1, Weight: 0, RepsPerformed: 12, IsWarmup: &warm,
+	}); err != nil {
+		t.Fatalf("log warm-up only lift: %v", err)
+	}
+	finishSession(t, svc, userID, sess)
+
+	tmpl, err := svc.CreateTemplateFromSession(ctx, userID, sess, "Test Template")
+	if err != nil {
+		t.Fatalf("template: %v", err)
+	}
+	got := map[uuid.UUID][2]int{}
+	for _, it := range tmpl.Items {
+		got[it.ExerciseID] = [2]int{it.TargetSets, it.TargetReps}
+	}
+	if got[squat] != [2]int{3, 5} {
+		t.Fatalf("squat target %v, want 3 x 5 from the working sets alone", got[squat])
+	}
+	if got[mobility] != [2]int{1, 12} {
+		t.Fatalf("warm-up-only lift %v, want 1 x 12", got[mobility])
+	}
+}
+
 func TestExerciseHeaderLeavesOutDeloadsAndHistoryKnowsUnfinished(t *testing.T) {
 	svc, userID := testJymDB(t)
 	ctx := context.Background()

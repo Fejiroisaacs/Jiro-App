@@ -2532,7 +2532,7 @@ func (s *JymService) CreateTemplateFromSession(ctx context.Context, userID, sess
 	rows, err := s.db.Query(ctx,
 		`SELECT exercise_id,
 		        COUNT(*) FILTER (WHERE NOT is_warmup)::int AS target_sets,
-		        ROUND(AVG(reps_performed))::int            AS target_reps
+		        COALESCE(ROUND(AVG(reps_performed) FILTER (WHERE NOT is_warmup)), ROUND(AVG(reps_performed)))::int AS target_reps
 		 FROM session_sets
 		 WHERE session_id = $1
 		 GROUP BY exercise_id
