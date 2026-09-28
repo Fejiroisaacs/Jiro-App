@@ -22,7 +22,7 @@ import { GUIDE } from '../shared';
         </ul>
         <guide-shot guide="jym" name="home" [width]="1600" [height]="1163"
           alt="The Jym home page: an Activity grid for the past 16 weeks, Muscle groups with bars and days since last trained, an active series called Spring strength block at 5 of 6 weeks, and the Push Pull Legs split." />
-        <guide-tip>If your volume has dropped across your last four sessions and none of them set a PR, the home page asks <strong>Time for a lighter week?</strong> Select <strong>Start next session as a deload</strong>, or <strong>Not now</strong> to hide it for a week.</guide-tip>
+        <guide-tip>If your last three workouts averaged at least 5% less volume than the last time you trained each of those days, and none of them set a PR, the home page asks <strong>Time for a lighter week?</strong> Select <strong>Start next session as a deload</strong> to start your series' next day as a deload, or <strong>Not now</strong> to hide it for a week.</guide-tip>
       </guide-section>
 
       <guide-section id="find-or-add-an-exercise" title="Find or add an exercise"
@@ -163,7 +163,7 @@ import { GUIDE } from '../shared';
           <li>Select a record to open that exercise.</li>
         </guide-steps>
         <guide-shot guide="jym" name="prs" [width]="1600" [height]="1163"
-          alt="The PRs tab: 8 exercises, 5 muscle groups and a top est. 1RM of 476 lbs, then tables for Back, Biceps and Chest listing lifts such as Deadlift 295 lbs × 5." />
+          alt="The PRs tab: 12 exercises, 6 muscle groups and a top est. 1RM of 453.3 lbs, then tables for Back, Biceps and Chest listing lifts such as Deadlift 295 lbs × 5." />
       </guide-section>
 
       <guide-section id="track-your-body-weight" title="Track your body weight"

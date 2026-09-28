@@ -45,7 +45,9 @@ A **series** ties a split to a time window (weeks, sessions count, or open-ended
 - A series knows its next day: the day after the last one logged, wrapping round. The Jym home offers it as **Up next**.
 - Starting a day from its split files the workout under the split's active series, whichever Start button was used.
 - End a series manually or let it run open-ended.
-- Series detail page shows a volume chart per session and per-exercise 1RM progression curves.
+- A length is 1–52 weeks or 1–200 sessions; the start form won't take anything else.
+- Progress counts finished workouts with at least one working set. Weeks are counted to the end date once a series has ended, so an old block reads "8 / 8 weeks", not the weeks since.
+- Series detail page shows a volume chart per session (working sets; deloads left out) and per-exercise estimated 1RM curves (finished, non-deload workouts).
 
 ---
 
@@ -88,7 +90,7 @@ Every exercise with history shows one line above its sets: what you did last tim
 
 > *Last time 100 lbs × 8, 8, 6. Stay at 100 lbs until every set hits 8.*
 
-- **Last time** is the latest normal workout before today's. Deload and test days are skipped, and warm-ups are not counted.
+- **Last time** is the latest finished normal workout that started before this one. Deload and test days and unfinished workouts are skipped, and warm-ups are not counted.
 - **With a plan** (a routine's sets × reps), it is double progression: once enough sets at the top weight hit the planned reps, try one plate more; until then, stay at the same weight.
 - **Freestyle**: one plate more, unless the top set was logged at RPE 9 or more; then stay and aim for one more rep.
 - **Bodyweight** lifts aim for one more rep.
@@ -120,6 +122,14 @@ A session-level notes field sits at the top of the player. Saves on blur.
 - **Save & Exit**: leaves the session open so you can return later. The in-progress session appears on the Jym hub.
 - **Discard**: permanently deletes the session and all its sets.
 
+### Workout Summary
+At `/jym/sessions/:id/summary`, built by the server (`GET /jym/sessions/:id/summary`), so a reload keeps it and its numbers match history.
+- The routine name under "Workout complete", then duration, volume and work sets (warm-ups left out) and the number of lifts that set a record.
+- **Muscle groups**: each group's share of the working sets, so bodyweight work counts.
+- **Session highlights**: each lift's best set, which is its best record set if it set one, otherwise its highest estimated 1RM (bodyweight lifts: most reps).
+- **Last time**: the lift's best set from its latest finished normal workout before this one, with the change in estimated 1RM. A record needs no change shown, and a deload isn't compared.
+- The share card ranks its top lifts by estimated 1RM, bodyweight lifts after them by reps.
+
 ---
 
 ## Session History
@@ -128,8 +138,8 @@ Sessions at `/jym/track?tab=sessions`, 50 at a time with "Show older sessions", 
 - Date and time
 - Routine name (or "Freestyle")
 - Duration
-- Set count
-- Total volume (weight × reps, displayed in your preferred unit)
+- Working sets (warm-ups left out)
+- Total volume (weight × reps over working sets, displayed in your preferred unit)
 - Muscle groups trained
 
 Click a session to see the full read-only detail — same layout as the player with inputs replaced by static values.
@@ -140,14 +150,17 @@ Click a session to see the full read-only detail — same layout as the player w
 
 At `/jym/exercises/:id`:
 
-- **Header**: exercise name, muscle group, best weight ever, current estimated 1RM.
-- **1RM Line Chart**: estimated 1RM (Epley formula: `weight × (1 + reps/30)`) plotted per session over time. Uses the best set from each session.
+- **Header**: exercise name, muscle group, best weight ever and the best estimated 1RM, from working sets outside deloads.
+- **1RM Line Chart**: estimated 1RM (see How Jym counts) plotted per session over time. Uses the best set from each session.
 - **History Table**: every logged set — date, weight × reps, estimated 1RM, and a 🏆 if it was a PR at the time.
 
 ### Plateau & Decline Detection
-Computed from the last 3 non-deload sessions for this exercise:
-- **Plateau banner**: if your peak weight has been the same across 3 consecutive sessions, a yellow banner appears suggesting it may be time to progress.
-- **Decline banner**: if your peak weight has dropped three sessions in a row, a red banner appears.
+Computed from finished normal workouts, never warm-ups (`plateau-rule.ts`, covered by `npm run test:unit`):
+- Each workout is measured by its best set's estimated 1RM, or by reps when the sets compared are all bodyweight.
+- The best of the last 3 workouts is set against the best of the up to 3 before them (so it needs 4 or more).
+- **No banner** when the recent best is higher: 100×5 → 100×6 → 100×7 is progress.
+- **Decline banner** when it is more than 5% lower.
+- **Plateau banner** otherwise. Comparing bests over a window keeps heavy, medium and light days from reading as a decline.
 
 ---
 
@@ -174,6 +187,13 @@ Links to the exercise library, session history, PR wall, body weight log, and se
 - A workout that was started but not finished is the first thing on the page, with **Resume** and discard.
 - Otherwise **Up next** names the next day of the most recently started active series: **Start** opens that day in the series, **Other day** picks another.
 - Active series cards show **Next: (day)**, and their Start opens that day directly.
+
+### Time for a Lighter Week?
+A card that suggests a deload (`deload-rule.ts`, covered by `npm run test:unit`):
+- It compares each of your newest 3 finished normal workouts with working sets against the last time you trained that same split day. It suggests a deload when they average at least 5% less volume and none of them set a record.
+- A freestyle workout has no like-for-like, so it gives no answer.
+- Only workouts after your latest deload count, so the card stays quiet during a deload and until new evidence builds up after it. It also hides while a workout is open.
+- **Start next session as a deload** opens Up next's day, in its series, as a deload (freestyle when no series is active). **Not now** hides it for a week.
 
 ### Workout Frequency Heatmap
 A GitHub-style contribution grid showing the last 16 weeks of workout activity.
@@ -204,6 +224,14 @@ At `/jym/bodyweight`: a chart and table of body weight entries over time.
 The app respects a global **unit preference** (kg / lbs). All weights entered and displayed throughout Jym respect this setting. Storage is always in kg.
 
 ---
+
+## How Jym Counts
+
+One set of rules, in `jiro-api/internal/services/jym_metrics.go`, behind every list, summary and chart:
+- A **working set** is any set that isn't a warm-up. Sets, volume and best sets count working sets.
+- **Estimated 1RM** is Epley, `weight × (1 + reps/30)`, with a single meaning the weight itself and reps capped at 10, since Epley overshoots beyond that (340 × 12 counts as 340 × 10). It is rounded to 0.1 kg.
+- **PRs** in a session count lifts with a new record, not record sets: three sets that each beat the last on one lift are one record.
+- **Templates** saved from a workout take their sets and reps from its working sets.
 
 ## Personal Records — How They Work
 
