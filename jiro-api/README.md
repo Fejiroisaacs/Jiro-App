@@ -229,7 +229,7 @@ Base URL: `http://localhost:8080/api/v1`
 
 ## Auth Flow
 
-1. `POST /auth/login` → returns `access_token` (JWT, 15 min) in body + sets `refresh_token` httpOnly cookie (7 days, SHA-256 hashed in DB)
+1. `POST /auth/login` → returns `access_token` (JWT, 15 min) and `refresh_token` (7 days, SHA-256 hashed in DB) in the body, and sets the same refresh token as an httpOnly `refresh_token` cookie
 2. All protected routes require `Authorization: Bearer <access_token>`
-3. When the access token expires, `POST /auth/refresh` exchanges the cookie for a new access token (rotating refresh)
-4. `POST /auth/logout` deletes the refresh token from the DB and clears the cookie
+3. When the access token expires, `POST /auth/refresh` takes `{"refresh_token": "..."}` in the body, or the cookie when the body has none, and returns a new pair (rotating refresh). The app sends the body copy because Safari drops the cross-site cookie; see [docs/AUTH-SESSIONS.md](../docs/AUTH-SESSIONS.md)
+4. `POST /auth/logout` (token in the body or the cookie) deletes the refresh token from the DB and clears the cookie

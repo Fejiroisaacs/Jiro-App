@@ -18,7 +18,7 @@
 | ----- | ---------- |
 | Backend | Go 1.25, Gin |
 | Frontend | Angular 21, Signals, CSS custom properties |
-| Auth | JWT (15 min) + httpOnly refresh cookie (7 days) |
+| Auth | JWT (15 min) + rotating refresh token (7 days) |
 | Database | PostgreSQL via Docker (local) / Neon (production) |
 | Email | Resend (password reset, email verification) |
 | Object Storage | Cloudflare R2 (avatars, recipe covers, journal images, session attachments) |
@@ -44,7 +44,7 @@ The presign limit is additive — a user must satisfy **both** the 300/min gener
 ### Authentication
 
 - JWT access tokens expire after **15 minutes**
-- Refresh tokens are httpOnly cookies, valid for **7 days**, SHA-256 hashed in the database
+- Refresh tokens last **7 days**, rotate on every use and are SHA-256 hashed in the database. The API sets them as an httpOnly cookie and also returns them, and the app keeps that copy because Safari drops the cross-site cookie (see [docs/AUTH-SESSIONS.md](docs/AUTH-SESSIONS.md), which also has the plans for a cookie-only session)
 - Passwords hashed with **Argon2id**
 - Email verification required on registration; password reset via Resend
 
