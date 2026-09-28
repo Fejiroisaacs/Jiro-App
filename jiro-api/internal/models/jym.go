@@ -403,12 +403,37 @@ type SessionSet struct {
 
 // PreviousBest is the best set for one exercise from the most recent session
 // before a given one — used on the post-workout summary to show "last time".
-type PreviousBest struct {
-	ExerciseID uuid.UUID `json:"exercise_id"`
-	Weight     float64   `json:"weight"`
-	Reps       int       `json:"reps_performed"`
-	Est1RM     float64   `json:"est_1rm"`
-	Date       time.Time `json:"date"`
+// SessionReport is a workout's summary, by the same rules as every session list.
+type SessionReport struct {
+	SessionSummary
+	Exercises []ExerciseReport `json:"exercises"`
+	Muscles   []MuscleShare    `json:"muscles"`
+}
+
+// ExerciseReport is one lift in a workout: its working sets, its best set, and last time's best.
+type ExerciseReport struct {
+	ExerciseID  uuid.UUID `json:"exercise_id"`
+	Name        string    `json:"name"`
+	MuscleGroup *string   `json:"muscle_group"`
+	Sets        int       `json:"sets"`
+	Volume      float64   `json:"volume"`
+	IsPR        bool      `json:"is_pr"`
+	Best        *SetRef   `json:"best"`
+	Previous    *SetRef   `json:"previous"`
+}
+
+// SetRef is one set with its estimated 1RM; Date is its workout's start, given for last time.
+type SetRef struct {
+	Weight float64    `json:"weight"`
+	Reps   int        `json:"reps"`
+	Est1RM float64    `json:"est_1rm"`
+	Date   *time.Time `json:"date,omitempty"`
+}
+
+// MuscleShare is a muscle group's working sets in a workout; ungrouped lifts are "other".
+type MuscleShare struct {
+	MuscleGroup string `json:"muscle_group"`
+	Sets        int    `json:"sets"`
 }
 
 type SessionSetWithExercise struct {

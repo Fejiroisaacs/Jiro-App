@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/analytics"
@@ -917,34 +916,25 @@ func (h *JymHandler) DeleteSessionExercise(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Exercise removed"})
 }
 
-// GetPreviousBests returns, for each exercise_id in the query string, the
-// best set from the most recent session before :id — the "last time" line
-// on the post-workout summary.
-// GET /jym/sessions/:id/previous-bests?exercise_ids=uuid1,uuid2
-func (h *JymHandler) GetPreviousBests(c *gin.Context) {
+// GetSessionReport is a workout's summary, built by the same rules as every session list.
+// GET /jym/sessions/:id/summary
+func (h *JymHandler) GetSessionReport(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 	sessionID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid session ID"}})
 		return
 	}
-
-	raw := strings.Split(c.Query("exercise_ids"), ",")
-	exerciseIDs := make([]uuid.UUID, 0, len(raw))
-	for _, r := range raw {
-		id, err := uuid.Parse(strings.TrimSpace(r))
-		if err != nil {
-			continue
-		}
-		exerciseIDs = append(exerciseIDs, id)
-	}
-
-	bests, err := h.jymService.GetPreviousBests(c.Request.Context(), userID, sessionID, exerciseIDs)
+	report, err := h.jymService.GetSessionReport(c.Request.Context(), userID, sessionID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to fetch previous bests"}})
+		if errors.Is(err, services.ErrSessionNotFound) {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Session not found"}})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to build the session summary"}})
 		return
 	}
-	c.JSON(http.StatusOK, bests)
+	c.JSON(http.StatusOK, report)
 }
 
 // ─── CSV Export ───────────────────────────────────────────────────────────────

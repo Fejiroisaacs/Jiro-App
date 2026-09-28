@@ -3,6 +3,9 @@ package services
 import (
 	"fmt"
 	"math"
+	"strings"
+
+	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/models"
 )
 
 // Jym's numbers, defined once. A working set is any set that isn't a warm-up.
@@ -26,6 +29,29 @@ func roundTenth(v float64) float64 {
 func e1rmSQL(weight, reps string) string {
 	return fmt.Sprintf("CASE WHEN %[2]s <= 1 THEN %[1]s ELSE %[1]s * (1 + LEAST(%[2]s, %[3]d) / 30.0) END",
 		weight, reps, e1rmRepCap)
+}
+
+// bestSet is the set with the highest estimated 1RM, then the most reps, so bodyweight sets compare by reps.
+func bestSet(sets []models.SetRef) *models.SetRef {
+	if len(sets) == 0 {
+		return nil
+	}
+	best := sets[0]
+	for _, s := range sets[1:] {
+		if s.Est1RM > best.Est1RM ||
+			s.Est1RM == best.Est1RM && (s.Reps > best.Reps || s.Reps == best.Reps && s.Weight > best.Weight) {
+			best = s
+		}
+	}
+	return &best
+}
+
+// muscleKey groups free-text muscle groups case-insensitively; a lift without one is "other".
+func muscleKey(group *string) string {
+	if group == nil || strings.TrimSpace(*group) == "" {
+		return "other"
+	}
+	return strings.ToLower(strings.TrimSpace(*group))
 }
 
 // Session aggregates over session_sets ss (and exercises e): working sets only, and PRs counted as lifts with a new record.
