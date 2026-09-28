@@ -9,7 +9,7 @@ Backend for the Jiro Life OS platform. Built with Go, Gin, and PostgreSQL.
 | Language | Go 1.26 |
 | Framework | Gin |
 | Database | PostgreSQL 16 (pgx/v5 pool) |
-| Auth | JWT (access) + httpOnly cookie (refresh) |
+| Auth | JWT (access) + rotating refresh token (httpOnly cookie, also returned in the body) |
 | Password hashing | Argon2id |
 | Logging | zerolog |
 
