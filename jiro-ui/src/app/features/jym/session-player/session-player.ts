@@ -2106,6 +2106,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     const unit = this.settingsService.unitLabel();
     const next = nextSets(history, {
       excludeSessionId: this.sessionId,
+      before: this.startedAt.toISOString(),
       plan: block.plan ?? null,
       unit,
       toDisplay: kg => this.settingsService.toDisplay(kg),

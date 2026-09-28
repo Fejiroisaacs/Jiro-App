@@ -13,6 +13,7 @@ import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
 import { formatInstant } from '../../../core/utils/format-date';
+import { detectPlateau, type PlateauStatus } from '../plateau-rule';
 
 Chart.register(...registerables);
 
@@ -69,7 +70,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
 <div class="plateau-banner plateau">
           <jiro-icon name="warning-circle" [size]="16" />
           <div>
-            <strong>Plateau detected.</strong> Your max weight has been the same for the last 3 sessions.
+            <strong>Plateau detected.</strong> Your best set hasn't improved in your last 3 sessions.
             Consider a small weight increase, extra reps, or a deload week to break through.
           </div>
         </div>
@@ -78,7 +79,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
 <div class="plateau-banner decline">
           <jiro-icon name="trend-down" [size]="16" />
           <div>
-            <strong>Declining trend.</strong> Your peak lift has dropped across the last 3 sessions.
+            <strong>Declining trend.</strong> Your best set in your last 3 sessions is down more than 5% on the sessions before.
             Consider a deload, technique check, or extra recovery before pushing again.
           </div>
         </div>
@@ -723,24 +724,7 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
     });
   });
 
-  plateauStatus = computed<'plateau' | 'decline' | null>(() => {
-    const ex = this.exercise();
-    if (!ex || ex.history.length === 0) return null;
-    const bySession = new Map<string, { date: string; weight: number }>();
-    for (const h of ex.history) {
-      if (h.session_type === 'deload' || h.is_warmup) continue;
-      const cur = bySession.get(h.session_id);
-      if (!cur || h.weight > cur.weight) bySession.set(h.session_id, { date: h.date, weight: h.weight });
-    }
-    const sessions = Array.from(bySession.values())
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    if (sessions.length < 3) return null;
-    const last3 = sessions.slice(-3).map(s => s.weight);
-    const [a, b, c] = last3;
-    if (Math.abs(a - b) < 0.01 && Math.abs(b - c) < 0.01) return 'plateau';
-    if (b < a - 0.01 && c < b - 0.01) return 'decline';
-    return null;
-  });
+  plateauStatus = computed<PlateauStatus>(() => detectPlateau(this.exercise()?.history ?? []));
 
   private chart: Chart | null = null;
   private dataLoaded = false;

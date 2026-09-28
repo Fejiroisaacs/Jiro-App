@@ -11,6 +11,8 @@ export function nextPlateWeight(top: number, unit: string): number {
 export interface PastSet {
   session_id: string;
   date: string;
+  /** Null while the workout is still in progress. */
+  ended_at: string | null;
   set_number: number;
   /** kg, as stored. */
   weight: number;
@@ -41,8 +43,8 @@ export interface NextSets {
 /**
  * Today's aim for one exercise, from its history.
  *
- * Last time is the latest normal workout other than today's; deload and test days
- * would mislead. With a plan it is double progression: once enough sets at the top
+ * Last time is the latest finished normal workout that started before this one; deload
+ * and test days would mislead. With a plan it is double progression: once enough sets at the top
  * weight reach the planned reps, add a plate, otherwise stay. Without a plan, add a
  * plate unless the top set was logged at RPE 9 or more. Bodyweight lifts add a rep.
  * Warm-ups never count.
@@ -51,15 +53,19 @@ export function nextSets(
   history: readonly PastSet[],
   opts: {
     excludeSessionId: string;
+    /** This workout's start, ISO; later workouts are never last time. */
+    before?: string;
     plan: { sets: number; reps: number } | null;
     unit: string;
     toDisplay: (kg: number) => number;
   },
 ): NextSets | null {
+  const before = opts.before ? new Date(opts.before).getTime() : Infinity;
   let latest: { id: string; time: number } | null = null;
   for (const h of history) {
-    if (h.session_id === opts.excludeSessionId || h.session_type !== 'normal') continue;
+    if (h.session_id === opts.excludeSessionId || h.session_type !== 'normal' || h.ended_at === null) continue;
     const time = new Date(h.date).getTime();
+    if (time >= before) continue;
     if (!latest || time > latest.time) latest = { id: h.session_id, time };
   }
   if (!latest) return null;

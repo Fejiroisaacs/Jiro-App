@@ -4,10 +4,12 @@ import assert from 'node:assert/strict';
 import { nextPlateWeight, nextSets, type PastSet } from './weight-suggestion.ts';
 
 /** One workout's sets: [weight kg, reps, rpe?, warm-up?]. */
-function workout(id: string, day: number, sets: [number, number, (number | null)?, boolean?][], type = 'normal'): PastSet[] {
+function workout(id: string, day: number, sets: [number, number, (number | null)?, boolean?][], type = 'normal', finished = true): PastSet[] {
+  const dd = String(day).padStart(2, '0');
   return sets.map(([weight, reps, rpe = null, warmup = false], i) => ({
     session_id: id,
-    date: `2026-09-${String(day).padStart(2, '0')}T10:00:00Z`,
+    date: `2026-09-${dd}T10:00:00Z`,
+    ended_at: finished ? `2026-09-${dd}T11:00:00Z` : null,
     set_number: i + 1,
     weight,
     reps,
@@ -78,4 +80,15 @@ test('no normal workout before today means no suggestion', () => {
 test('the latest normal workout wins', () => {
   const history = [...workout('old', 1, [[90, 5]]), ...workout('new', 2, [[95, 5]])];
   assert.equal(nextSets(history, opts())?.weight, 97.5);
+});
+
+test('an unfinished workout is never last time', () => {
+  const history = [...workout('done', 1, [[90, 5]]), ...workout('open', 2, [[60, 5]], 'normal', false)];
+  assert.deepEqual(nextSets(history, opts())?.last, [{ weight: 90, reps: 5, warmup: false }]);
+});
+
+test('a workout that started after this one is never last time', () => {
+  const history = [...workout('before', 1, [[90, 5]]), ...workout('after', 5, [[120, 5]])];
+  const got = nextSets(history, { ...opts(), before: '2026-09-03T10:00:00Z' });
+  assert.deepEqual(got?.last, [{ weight: 90, reps: 5, warmup: false }]);
 });
