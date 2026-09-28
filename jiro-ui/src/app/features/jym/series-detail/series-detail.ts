@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -17,6 +17,7 @@ Chart.register(...registerables);
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { formatInstant } from '../../../core/utils/format-date';
+import { seriesProgress } from '../series-progress';
 
 @Component({
   selector: 'app-series-detail',
@@ -65,14 +66,14 @@ import { formatInstant } from '../../../core/utils/format-date';
         </div>
 
         <!-- Progress bar (for fixed-length series) -->
-        @if (series()!.duration_type !== 'open') {
+        @if (progress(); as p) {
 <div class="progress-section">
           <div class="progress-label">
             <span>Progress</span>
-            <span class="progress-value">{{ progressText() }}</span>
+            <span class="progress-value">{{ p.label }}</span>
           </div>
           <div class="progress-bar">
-            <div class="progress-fill" [style.width.%]="progressPct()"></div>
+            <div class="progress-fill" [style.width.%]="p.percent"></div>
           </div>
         </div>
 }
@@ -660,29 +661,11 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  progressPct(): number {
+  /** Measured to the end date once the series has ended; none without a target. */
+  readonly progress = computed(() => {
     const s = this.series();
-    if (!s) return 0;
-    if (s.duration_type === 'sessions' && s.target_sessions) {
-      return Math.min(100, (s.session_count / s.target_sessions) * 100);
-    }
-    if (s.duration_type === 'weeks' && s.target_weeks) {
-      const elapsed = (Date.now() - new Date(s.started_at).getTime()) / 86400000 / 7;
-      return Math.min(100, (elapsed / s.target_weeks) * 100);
-    }
-    return 0;
-  }
-
-  progressText(): string {
-    const s = this.series();
-    if (!s) return '';
-    if (s.duration_type === 'sessions' && s.target_sessions) return `${s.session_count} / ${s.target_sessions} sessions`;
-    if (s.duration_type === 'weeks' && s.target_weeks) {
-      const wks = Math.floor((Date.now() - new Date(s.started_at).getTime()) / 86400000 / 7);
-      return `${wks} / ${s.target_weeks} weeks`;
-    }
-    return '';
-  }
+    return s ? seriesProgress(s) : null;
+  });
 
   formatDate(instant: string): string {
     return formatInstant(instant, this.settings.timezone());

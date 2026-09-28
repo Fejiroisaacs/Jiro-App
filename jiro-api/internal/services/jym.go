@@ -30,10 +30,11 @@ var (
 	ErrShareExpired       = errors.New("share link has expired")
 	ErrShareForbidden     = errors.New("not your share link")
 
-	ErrInvalidSessionType = errors.New("session type must be normal, deload or test")
-	ErrSessionEnded       = errors.New("session has already ended")
-	ErrDuplicateRoutine   = errors.New("routine listed more than once")
-	ErrRoutineNotInSeries = errors.New("routine is not a day of the series' split")
+	ErrInvalidSessionType  = errors.New("session type must be normal, deload or test")
+	ErrSessionEnded        = errors.New("session has already ended")
+	ErrDuplicateRoutine    = errors.New("routine listed more than once")
+	ErrRoutineNotInSeries  = errors.New("routine is not a day of the series' split")
+	ErrInvalidSeriesLength = errors.New("a series runs 1 to 52 weeks or 1 to 200 sessions")
 )
 
 // SessionInProgressError is StartSession's answer while another session is unfinished and Force is off.
@@ -1742,6 +1743,22 @@ func (s *JymService) DeleteBodyWeight(ctx context.Context, userID, id uuid.UUID)
 // ─── Split Series ─────────────────────────────────────────────────────────────
 
 func (s *JymService) CreateSeries(ctx context.Context, userID uuid.UUID, req *models.CreateSeriesRequest) (*models.SplitSeriesSummary, error) {
+	// A length in weeks or sessions needs its number; open-ended keeps none.
+	switch req.DurationType {
+	case "weeks":
+		if req.TargetWeeks == nil || *req.TargetWeeks < 1 || *req.TargetWeeks > 52 {
+			return nil, ErrInvalidSeriesLength
+		}
+		req.TargetSessions = nil
+	case "sessions":
+		if req.TargetSessions == nil || *req.TargetSessions < 1 || *req.TargetSessions > 200 {
+			return nil, ErrInvalidSeriesLength
+		}
+		req.TargetWeeks = nil
+	default:
+		req.TargetWeeks, req.TargetSessions = nil, nil
+	}
+
 	// Verify split ownership
 	var ownerID uuid.UUID
 	if err := s.db.QueryRow(ctx, `SELECT user_id FROM splits WHERE id = $1`, req.SplitID).Scan(&ownerID); err != nil {
@@ -1773,12 +1790,10 @@ func (s *JymService) ListSeries(ctx context.Context, userID uuid.UUID) ([]models
 		`SELECT sr.id, sr.user_id, sr.split_id, sr.name, sr.duration_type,
 		        sr.target_weeks, sr.target_sessions, sr.started_at, sr.ended_at, sr.created_at,
 		        sp.name as split_name,
-		        COUNT(sess.id) as session_count
+		        `+seriesSessionCountSQL("sr.id")+` as session_count
 		 FROM split_series sr
 		 JOIN splits sp ON sr.split_id = sp.id
-		 LEFT JOIN sessions sess ON sess.series_id = sr.id
 		 WHERE sr.user_id = $1
-		 GROUP BY sr.id, sp.name
 		 ORDER BY sr.started_at DESC`,
 		userID,
 	)
@@ -1870,12 +1885,10 @@ func (s *JymService) GetSeriesDetail(ctx context.Context, userID, seriesID uuid.
 		`SELECT sr.id, sr.user_id, sr.split_id, sr.name, sr.duration_type,
 		        sr.target_weeks, sr.target_sessions, sr.started_at, sr.ended_at, sr.created_at,
 		        sp.name,
-		        COUNT(sess.id)
+		        `+seriesSessionCountSQL("sr.id")+`
 		 FROM split_series sr
 		 JOIN splits sp ON sr.split_id = sp.id
-		 LEFT JOIN sessions sess ON sess.series_id = sr.id
-		 WHERE sr.id = $1 AND sr.user_id = $2
-		 GROUP BY sr.id, sp.name`,
+		 WHERE sr.id = $1 AND sr.user_id = $2`,
 		seriesID, userID,
 	).Scan(
 		&detail.ID, &detail.UserID, &detail.SplitID, &detail.Name, &detail.DurationType,
@@ -1902,7 +1915,7 @@ func (s *JymService) GetSeriesDetail(ctx context.Context, userID, seriesID uuid.
 		        `+workingSetCountSQL+` as set_count
 		 FROM sessions s
 		 LEFT JOIN session_sets ss ON ss.session_id = s.id
-		 WHERE s.series_id = $1
+		 WHERE s.series_id = $1 AND `+countedSessionSQL("s")+`
 		 GROUP BY s.id
 		 ORDER BY s.started_at ASC`,
 		seriesID,
@@ -1995,7 +2008,7 @@ func (s *JymService) UpdateSeries(ctx context.Context, userID, seriesID uuid.UUI
 		return nil, err
 	}
 	s.db.QueryRow(ctx, `SELECT name FROM splits WHERE id = $1`, sr.SplitID).Scan(&sr.SplitName)
-	s.db.QueryRow(ctx, `SELECT COUNT(*) FROM sessions WHERE series_id = $1`, seriesID).Scan(&sr.SessionCount)
+	s.db.QueryRow(ctx, `SELECT `+seriesSessionCountSQL("$1"), seriesID).Scan(&sr.SessionCount)
 	return sr, nil
 }
 

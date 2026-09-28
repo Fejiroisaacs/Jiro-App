@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -105,6 +106,90 @@ func TestHeaderAndSeriesE1RMUseTheCappedFormula(t *testing.T) {
 	}
 	if pts := detail.ExerciseProgressions[0].Points; len(pts) != 1 || pts[0].BestEst1RM != want {
 		t.Fatalf("series points %+v, want one at %v", pts, want)
+	}
+}
+
+func TestSeriesCountsFinishedWorkoutsWithWorkingSets(t *testing.T) {
+	svc, userID := testJymDB(t)
+	ctx := context.Background()
+	split, err := svc.CreateSplit(ctx, userID, &models.CreateSplitRequest{Name: "Test Split"})
+	if err != nil {
+		t.Fatalf("create split: %v", err)
+	}
+	weeks := 8
+	series, err := svc.CreateSeries(ctx, userID, &models.CreateSeriesRequest{
+		SplitID: split.ID, Name: "Block", DurationType: "weeks", TargetWeeks: &weeks,
+	})
+	if err != nil {
+		t.Fatalf("create series: %v", err)
+	}
+	ex := prTestSetup(t, svc, userID, "Test Squat")
+	start := func() uuid.UUID {
+		sess, err := svc.StartSession(ctx, userID, &models.CreateSessionRequest{SeriesID: &series.ID, Force: true})
+		if err != nil {
+			t.Fatalf("start: %v", err)
+		}
+		return sess.ID
+	}
+	counted := start()
+	logSet(t, svc, userID, counted, ex, 1, 100, 5)
+	finishSession(t, svc, userID, counted)
+	open := start()
+	logSet(t, svc, userID, open, ex, 1, 100, 5)
+	warmOnly := start()
+	warm := true
+	if _, err := svc.LogSet(ctx, userID, warmOnly, &models.CreateSetRequest{
+		ExerciseID: ex, SetNumber: 1, Weight: 60, RepsPerformed: 5, IsWarmup: &warm,
+	}); err != nil {
+		t.Fatalf("log warm-up: %v", err)
+	}
+	finishSession(t, svc, userID, warmOnly)
+
+	list, err := svc.ListSeries(ctx, userID)
+	if err != nil || len(list) != 1 || list[0].SessionCount != 1 {
+		t.Fatalf("list %+v, err %v; want 1 counted session", list, err)
+	}
+	detail, err := svc.GetSeriesDetail(ctx, userID, series.ID)
+	if err != nil {
+		t.Fatalf("detail: %v", err)
+	}
+	if detail.SessionCount != 1 || len(detail.Sessions) != 1 || detail.Sessions[0].SessionID != counted {
+		t.Fatalf("detail count %d, sessions %+v; want only the finished workout with a working set", detail.SessionCount, detail.Sessions)
+	}
+	name := "Renamed"
+	updated, err := svc.UpdateSeries(ctx, userID, series.ID, &models.UpdateSeriesRequest{Name: &name})
+	if err != nil || updated.SessionCount != 1 {
+		t.Fatalf("update %+v, err %v; want 1 counted session", updated, err)
+	}
+}
+
+func TestCreateSeriesValidatesItsLength(t *testing.T) {
+	svc, userID := testJymDB(t)
+	ctx := context.Background()
+	split, err := svc.CreateSplit(ctx, userID, &models.CreateSplitRequest{Name: "Test Split"})
+	if err != nil {
+		t.Fatalf("create split: %v", err)
+	}
+	n := func(v int) *int { return &v }
+	for _, tc := range []struct {
+		kind            string
+		weeks, sessions *int
+	}{
+		{"weeks", nil, nil}, {"weeks", n(0), nil}, {"weeks", n(53), nil},
+		{"sessions", nil, nil}, {"sessions", nil, n(201)},
+	} {
+		_, err := svc.CreateSeries(ctx, userID, &models.CreateSeriesRequest{
+			SplitID: split.ID, Name: "Bad", DurationType: tc.kind, TargetWeeks: tc.weeks, TargetSessions: tc.sessions,
+		})
+		if !errors.Is(err, ErrInvalidSeriesLength) {
+			t.Fatalf("%s weeks %v sessions %v: err %v, want ErrInvalidSeriesLength", tc.kind, tc.weeks, tc.sessions, err)
+		}
+	}
+	open, err := svc.CreateSeries(ctx, userID, &models.CreateSeriesRequest{
+		SplitID: split.ID, Name: "Open", DurationType: "open", TargetWeeks: n(5),
+	})
+	if err != nil || open.TargetWeeks != nil || open.TargetSessions != nil {
+		t.Fatalf("open series %+v, err %v; want no targets", open, err)
 	}
 }
 

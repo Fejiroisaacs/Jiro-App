@@ -54,6 +54,16 @@ func muscleKey(group *string) string {
 	return strings.ToLower(strings.TrimSpace(*group))
 }
 
+// countedSessionSQL is true for a session that counts towards a series: finished, with a working set.
+func countedSessionSQL(alias string) string {
+	return fmt.Sprintf(`%[1]s.ended_at IS NOT NULL AND EXISTS (SELECT 1 FROM session_sets w WHERE w.session_id = %[1]s.id AND NOT w.is_warmup)`, alias)
+}
+
+// seriesSessionCountSQL counts a series' counted sessions; seriesID is an SQL expression such as sr.id or $1.
+func seriesSessionCountSQL(seriesID string) string {
+	return `(SELECT COUNT(*) FROM sessions c WHERE c.series_id = ` + seriesID + ` AND ` + countedSessionSQL("c") + `)`
+}
+
 // Session aggregates over session_sets ss (and exercises e): working sets only, and PRs counted as lifts with a new record.
 const (
 	workingSetCountSQL = `COUNT(ss.id) FILTER (WHERE NOT ss.is_warmup)`

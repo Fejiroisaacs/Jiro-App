@@ -38,13 +38,21 @@ let seq = 0;
         @if (duration === 'weeks') {
           <div class="form-group">
             <label class="form-label" [for]="uid + '-weeks'">Number of weeks</label>
-            <input [id]="uid + '-weeks'" class="form-input" type="number" [(ngModel)]="targetWeeks" name="targetWeeks" min="1" max="52" />
+            <input [id]="uid + '-weeks'" class="form-input" type="number" [(ngModel)]="targetWeeks" name="targetWeeks" min="1" max="52"
+              [attr.aria-invalid]="!!lengthError()" [attr.aria-describedby]="lengthError() ? uid + '-length' : null" />
+            @if (lengthError()) {
+              <p class="form-hint" [id]="uid + '-length'">{{ lengthError() }}</p>
+            }
           </div>
         }
         @if (duration === 'sessions') {
           <div class="form-group">
             <label class="form-label" [for]="uid + '-sessions'">Number of sessions</label>
-            <input [id]="uid + '-sessions'" class="form-input" type="number" [(ngModel)]="targetSessions" name="targetSessions" min="1" max="200" />
+            <input [id]="uid + '-sessions'" class="form-input" type="number" [(ngModel)]="targetSessions" name="targetSessions" min="1" max="200"
+              [attr.aria-invalid]="!!lengthError()" [attr.aria-describedby]="lengthError() ? uid + '-length' : null" />
+            @if (lengthError()) {
+              <p class="form-hint" [id]="uid + '-length'">{{ lengthError() }}</p>
+            }
           </div>
         }
 
@@ -54,7 +62,7 @@ let seq = 0;
 
         <div class="form-actions">
           <jiro-button variant="secondary" type="button" (click)="closed.emit()">Cancel</jiro-button>
-          <jiro-button variant="primary" type="submit" [disabled]="saving() || !name.trim()">
+          <jiro-button variant="primary" type="submit" [disabled]="saving() || !name.trim() || !!lengthError()">
             {{ saving() ? 'Starting...' : 'Start series' }}
           </jiro-button>
         </div>
@@ -91,7 +99,7 @@ let seq = 0;
       background: rgba(var(--color-primary-rgb), 0.1); border-color: var(--color-primary);
       color: var(--color-primary); font-weight: 600;
     }
-    .form-error { margin: 0; font-size: var(--font-size-sm); color: var(--color-danger); }
+    .form-error, .form-hint { margin: 0; font-size: var(--font-size-sm); color: var(--color-danger); }
     .form-actions { display: flex; justify-content: flex-end; gap: var(--space-sm); margin-top: var(--space-xs); }
   `],
 })
@@ -112,8 +120,8 @@ export class JymNewSeriesModalComponent implements OnInit {
 
   name = '';
   duration: Duration = 'open';
-  targetWeeks = 8;
-  targetSessions = 20;
+  targetWeeks: number | null = 8;
+  targetSessions: number | null = 20;
   saving = signal(false);
   error = signal('');
 
@@ -121,17 +129,24 @@ export class JymNewSeriesModalComponent implements OnInit {
     this.name = this.defaultName();
   }
 
+  /** Why the length can't be used, or '' when it can. */
+  lengthError(): string {
+    if (this.duration === 'weeks' && !wholeUpTo(this.targetWeeks, 52)) return 'Enter a whole number of weeks, from 1 to 52.';
+    if (this.duration === 'sessions' && !wholeUpTo(this.targetSessions, 200)) return 'Enter a whole number of sessions, from 1 to 200.';
+    return '';
+  }
+
   create() {
     const name = this.name.trim();
-    if (!name) return;
+    if (!name || this.lengthError()) return;
     this.saving.set(true);
     this.error.set('');
     const req: CreateSeriesRequest = {
       split_id: this.splitId(),
       name,
       duration_type: this.duration,
-      ...(this.duration === 'weeks' ? { target_weeks: this.targetWeeks } : {}),
-      ...(this.duration === 'sessions' ? { target_sessions: this.targetSessions } : {}),
+      ...(this.duration === 'weeks' ? { target_weeks: this.targetWeeks ?? undefined } : {}),
+      ...(this.duration === 'sessions' ? { target_sessions: this.targetSessions ?? undefined } : {}),
     };
     this.jymService.createSeries(req).subscribe({
       next: sr => {
@@ -145,4 +160,8 @@ export class JymNewSeriesModalComponent implements OnInit {
       },
     });
   }
+}
+
+function wholeUpTo(value: number | null, max: number): boolean {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= max;
 }

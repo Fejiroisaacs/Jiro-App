@@ -734,6 +734,10 @@ func (h *JymHandler) CreateSeries(c *gin.Context) {
 	}
 	sr, err := h.jymService.CreateSeries(c.Request.Context(), userID, &req)
 	if err != nil {
+		if errors.Is(err, services.ErrInvalidSeriesLength) {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()}})
+			return
+		}
 		if err == services.ErrSplitNotFound || err == services.ErrNotOwner {
 			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Split not found"}})
 			return

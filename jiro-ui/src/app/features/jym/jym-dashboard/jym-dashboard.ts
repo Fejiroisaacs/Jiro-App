@@ -16,6 +16,7 @@ import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-he
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { suggestDeload } from '../deload-rule';
 import { formatDay } from '../../../core/utils/format-date';
+import { weeksElapsed } from '../series-progress';
 
 /** Snooze stamp for the deload suggestion: the epoch ms of the last "Not now". */
 const DELOAD_SNOOZED_KEY = 'jiro_jym_deload_snoozed';
@@ -864,8 +865,7 @@ export class JymDashboardComponent implements OnInit {
   }
 
   progressWeeks(sr: SplitSeriesSummary): number {
-    const days = Math.floor((Date.now() - new Date(sr.started_at).getTime()) / 86400000);
-    return Math.floor(days / 7);
+    return weeksElapsed(sr);
   }
 }
 

@@ -13,6 +13,7 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { SettingsService } from '../../../core/services/settings.service';
 import { formatInstant } from '../../../core/utils/format-date';
+import { weeksElapsed } from '../series-progress';
 
 @Component({
   selector: 'app-series-list',
@@ -395,8 +396,7 @@ export class SeriesListComponent implements OnInit {
   }
 
   progressWeeks(sr: SplitSeriesSummary): number {
-    const days = Math.floor((Date.now() - new Date(sr.started_at).getTime()) / 86400000);
-    return Math.floor(days / 7);
+    return weeksElapsed(sr);
   }
 
   formatDate(instant: string): string {

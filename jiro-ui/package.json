@@ -10,7 +10,7 @@
     "build:sitemap": "node scripts/build-sitemap.mjs",
     "check:css": "node scripts/check-css-vars.mjs",
     "icons": "node scripts/build-icons.mjs",
-    "test:unit": "node --experimental-strip-types --disable-warning=ExperimentalWarning --test src/app/features/jym/weight-suggestion.spec.ts src/app/features/jym/plateau-rule.spec.ts src/app/features/jym/deload-rule.spec.ts",
+    "test:unit": "node --experimental-strip-types --disable-warning=ExperimentalWarning --test src/app/features/jym/weight-suggestion.spec.ts src/app/features/jym/plateau-rule.spec.ts src/app/features/jym/deload-rule.spec.ts src/app/features/jym/series-progress.spec.ts",
     "serve:ssr:jiro-ui": "node dist/jiro-ui/server/server.mjs"
   },
   "prettier": {
