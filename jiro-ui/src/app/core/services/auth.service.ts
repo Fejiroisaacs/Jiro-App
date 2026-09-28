@@ -38,10 +38,15 @@ export interface StoredDashboardLayout {
 
 export interface AuthResponse {
   access_token: string;
+  /** Also sent as a cookie, which Safari drops because the API is on another site. */
+  refresh_token?: string;
   user: User;
 }
 
 const API_URL = environment.apiUrl;
+
+/** The app's copy of the refresh token (see docs/AUTH-SESSIONS.md). */
+const REFRESH_KEY = 'jiro_refresh_token';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -74,10 +79,10 @@ export class AuthService {
   }
 
   constructor(private http: HttpClient, private router: Router) {
-    // The access token itself is never persisted (see handleAuth) — only
-    // this non-sensitive profile object is, purely as the cheap signal
-    // "this browser was logged in" that init() uses to decide whether a
-    // reload is worth a refresh call at all. Guarded: there is no
+    // The access token itself is never persisted (see handleAuth). This
+    // profile object is, as the cheap signal "this browser was logged in"
+    // that init() uses to decide whether a reload is worth a refresh call
+    // at all. Guarded: there is no
     // localStorage under `platform-server`, and it throws outright in some
     // private windows.
     const stored = readLocal('jiro_user');
@@ -118,10 +123,10 @@ export class AuthService {
    *
    *  The access token is never persisted (see handleAuth), so on every fresh
    *  boot there is no in-memory token regardless of whether the session is
-   *  actually still live — only the httpOnly refresh cookie knows that. Three
+   *  actually still live — only the refresh token knows that. Three
    *  cases:
    *   1. No browser storage at all (prerender/SSR): there is no cached user
-   *      and no refresh cookie to present, so this is a pure no-op. Firing
+   *      and no refresh token to present, so this is a pure no-op. Firing
    *      HTTP here would also stall server-side rendering waiting on it.
    *   2. No cached `jiro_user`: this browser was never logged in (or logged
    *      out). Settle synchronously with no network call — the landing page
@@ -156,7 +161,7 @@ export class AuthService {
     // Fire-and-forget: deliberately neither awaited nor returned. Routed
     // through the shared `refreshing$` slot so that a request from a public
     // page which 401s while this is in flight latches onto this same request
-    // instead of firing a second POST /auth/refresh — the refresh cookie
+    // instead of firing a second POST /auth/refresh — the refresh token
     // rotates on use, so two concurrent refreshes race and one loses, which
     // would sign out a user who has a perfectly live session.
     this.startRefresh()
@@ -198,7 +203,7 @@ export class AuthService {
    *  which causes token-rotation failures and silent API hangs. */
   private startRefresh(): Observable<AuthResponse | null> {
     if (this.refreshing$) return this.refreshing$;
-    this.refreshing$ = this.http.post<AuthResponse>(`${API_URL}/auth/refresh`, {}, { withCredentials: true })
+    this.refreshing$ = this.http.post<AuthResponse>(`${API_URL}/auth/refresh`, this.refreshBody(), { withCredentials: true })
       .pipe(
         tap(res => this.handleAuth(res)),
         catchError((err) => {
@@ -214,7 +219,7 @@ export class AuthService {
 
   logout(redirectTo = '/login') {
     if (!this.currentUser()) return; // already logged out — prevent duplicate navigation
-    this.http.post(`${API_URL}/auth/logout`, {}, { withCredentials: true }).subscribe();
+    this.http.post(`${API_URL}/auth/logout`, this.refreshBody(), { withCredentials: true }).subscribe();
     this.clearAuth();
     this.router.navigateByUrl(redirectTo);
   }
@@ -287,19 +292,30 @@ export class AuthService {
   }
 
   private handleAuth(res: AuthResponse) {
-    // The access token lives in this signal only — never persisted, so an
-    // attacker with script execution can't read it out of localStorage; it
-    // dies with the tab/reload and init() re-derives a fresh one from the
-    // httpOnly refresh cookie, which JS can never read at all.
+    // The access token lives in this signal only — never persisted; it dies
+    // with the tab/reload and init() re-derives a fresh one from the refresh
+    // token, which the app keeps because Safari drops the API's cookie.
     this.accessToken.set(res.access_token);
     this.currentUser.set(res.user);
     writeLocal('jiro_user', JSON.stringify(res.user));
+    if (res.refresh_token) {
+      // Removed first: if the write fails, the rotated-away token must not be sent later, which revokes every session.
+      removeLocal(REFRESH_KEY);
+      writeLocal(REFRESH_KEY, res.refresh_token);
+    }
+  }
+
+  /** The stored refresh token, if any; without one the API falls back to its cookie. */
+  private refreshBody(): { refresh_token?: string } {
+    const token = readLocal(REFRESH_KEY);
+    return token ? { refresh_token: token } : {};
   }
 
   private clearAuth() {
     this.accessToken.set(null);
     this.currentUser.set(null);
     removeLocal('jiro_user');
+    removeLocal(REFRESH_KEY);
   }
 }
 
