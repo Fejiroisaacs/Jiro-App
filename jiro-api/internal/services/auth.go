@@ -246,6 +246,12 @@ func (s *AuthService) RevokeRefreshToken(ctx context.Context, tokenHash string) 
 	return err
 }
 
+// DeleteRefreshToken ends a session at sign-out, with no grace window for a copy of the token.
+func (s *AuthService) DeleteRefreshToken(ctx context.Context, tokenHash string) error {
+	_, err := s.db.Exec(ctx, "DELETE FROM refresh_tokens WHERE token_hash = $1", tokenHash)
+	return err
+}
+
 func (s *AuthService) RevokeAllUserTokens(ctx context.Context, userID uuid.UUID) error {
 	_, err := s.db.Exec(ctx, "DELETE FROM refresh_tokens WHERE user_id = $1", userID)
 	return err
