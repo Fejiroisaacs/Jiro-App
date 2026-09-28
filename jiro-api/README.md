@@ -6,7 +6,7 @@ Backend for the Jiro Life OS platform. Built with Go, Gin, and PostgreSQL.
 
 | Component | Choice |
 |-----------|--------|
-| Language | Go 1.25 |
+| Language | Go 1.26 |
 | Framework | Gin |
 | Database | PostgreSQL 16 (pgx/v5 pool) |
 | Auth | JWT (access) + httpOnly cookie (refresh) |
@@ -17,7 +17,7 @@ Backend for the Jiro Life OS platform. Built with Go, Gin, and PostgreSQL.
 
 ## Prerequisites
 
-- Go 1.25+
+- Go 1.26+
 - PostgreSQL 16 (via Docker — see below)
 - `.env` file in `jiro-api/` (see Environment Variables)
 

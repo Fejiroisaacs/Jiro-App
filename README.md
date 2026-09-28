@@ -16,7 +16,7 @@
 
 | Layer | Technology |
 | ----- | ---------- |
-| Backend | Go 1.25, Gin |
+| Backend | Go 1.26, Gin |
 | Frontend | Angular 21, Signals, CSS custom properties |
 | Auth | JWT (15 min) + rotating refresh token (7 days) |
 | Database | PostgreSQL via Docker (local) / Neon (production) |
