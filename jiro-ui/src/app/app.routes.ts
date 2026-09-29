@@ -259,12 +259,13 @@ export const routes: Routes = [
       },
       {
         path: 'jym/session/:id',
-        title: 'Session',
-        data: { ...PRIVATE_PAGE, moduleNav: false },
+        title: 'Workout',
+        // A focus screen, like cook mode: the workout gets the phone's whole height.
+        data: { ...PRIVATE_PAGE, moduleNav: false, mobileNav: false },
         loadComponent: () => import('./features/jym/session-player/session-player').then(m => m.SessionPlayerComponent),
       },
       {
-        path: 'jym/session-summary',
+        path: 'jym/sessions/:id/summary',
         title: 'Session summary',
         data: { ...PRIVATE_PAGE, moduleNav: false },
         loadComponent: () => import('./features/jym/session-summary/session-summary').then(m => m.SessionSummaryComponent),

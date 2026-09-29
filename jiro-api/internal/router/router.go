@@ -248,6 +248,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 				jym.GET("/sessions", jymHandler.ListSessions)
 				jym.GET("/sessions/:id", jymHandler.GetSession)
 				jym.PATCH("/sessions/:id", jymHandler.UpdateSession)
+				jym.PATCH("/sessions/:id/times", jymHandler.UpdateSessionTimes)
 				jym.DELETE("/sessions/:id", jymHandler.DeleteSession)
 				jym.GET("/export/sessions.csv", jymHandler.ExportSessions)
 				jym.POST("/sessions/:id/template", jymHandler.CreateTemplateFromSession)
@@ -257,7 +258,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 				jym.PUT("/sets/:id", jymHandler.UpdateSet)
 				jym.DELETE("/sets/:id", jymHandler.DeleteSet)
 				jym.DELETE("/sessions/:id/exercises/:exercise_id", jymHandler.DeleteSessionExercise)
-				jym.GET("/sessions/:id/previous-bests", jymHandler.GetPreviousBests)
+				jym.GET("/sessions/:id/summary", jymHandler.GetSessionReport)
 
 				// Body weights
 				jym.POST("/bodyweights", jymHandler.LogBodyWeight)

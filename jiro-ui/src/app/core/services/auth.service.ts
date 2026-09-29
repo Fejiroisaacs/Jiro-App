@@ -29,6 +29,15 @@ export interface UserSettings {
   currency?: string;
   /** Dashboard widget order and visibility. Absent means the default layout; send null to reset. */
   dashboard?: StoredDashboardLayout | null;
+  /** Seconds Jym's rest timer runs after each logged set (15 to 600; default 90). */
+  rest_seconds?: number;
+  /** The bar and plate sizes on hand, per unit; sent whole. null resets to the defaults. */
+  plates?: StoredPlates | null;
+}
+
+export interface StoredPlates {
+  kg?: { bar: number; sizes: number[] };
+  lbs?: { bar: number; sizes: number[] };
 }
 
 export interface StoredDashboardLayout {

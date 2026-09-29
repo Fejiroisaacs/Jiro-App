@@ -133,3 +133,21 @@ export function zonedNoonISO(key: string, timeZone: string): string {
 export function dayStartISO(key: string, timeZone: string): string {
   return zonedHourISO(key, 0, timeZone);
 }
+
+/** "2026-09-28T19:30": `instant` on `timeZone`'s wall clock, for a date-time field. */
+export function toZonedInput(instant: string | Date, timeZone: string): string {
+  const ms = new Date(instant).getTime();
+  return new Date(ms + zoneOffsetMs(ms, timeZone)).toISOString().slice(0, 16);
+}
+
+const ZONED_INPUT = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/;
+
+/** The UTC instant (ISO) a date-time field's value means in `timeZone`; null when empty or malformed. */
+export function fromZonedInput(value: string, timeZone: string): string | null {
+  const m = ZONED_INPUT.exec(value ?? '');
+  if (!m) return null;
+  const wall = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] ?? 0));
+  let instant = wall - zoneOffsetMs(wall, timeZone);
+  instant = wall - zoneOffsetMs(instant, timeZone);
+  return new Date(instant).toISOString();
+}

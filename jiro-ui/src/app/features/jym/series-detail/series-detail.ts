@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -17,6 +17,7 @@ Chart.register(...registerables);
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { formatInstant } from '../../../core/utils/format-date';
+import { seriesProgress } from '../series-progress';
 
 @Component({
   selector: 'app-series-detail',
@@ -45,10 +46,7 @@ import { formatInstant } from '../../../core/utils/format-date';
               <span class="status-badge" [class.active]="!series()!.ended_at">
                 {{ series()!.ended_at ? 'Ended' : 'Active' }}
               </span>
-              <span class="meta-text">Started {{ formatDate(series()!.started_at) }}</span>
-              @if (series()!.ended_at) {
-<span class="meta-text">· Ended {{ formatDate(series()!.ended_at!) }}</span>
-}
+              <span class="meta-text">Started {{ formatDate(series()!.started_at) }}{{ series()!.ended_at ? ', ended ' + formatDate(series()!.ended_at!) : '' }}</span>
               <span class="meta-text">· {{ series()!.session_count }} sessions</span>
             </div>
           </div>
@@ -65,14 +63,14 @@ import { formatInstant } from '../../../core/utils/format-date';
         </div>
 
         <!-- Progress bar (for fixed-length series) -->
-        @if (series()!.duration_type !== 'open') {
+        @if (progress(); as p) {
 <div class="progress-section">
           <div class="progress-label">
             <span>Progress</span>
-            <span class="progress-value">{{ progressText() }}</span>
+            <span class="progress-value">{{ p.label }}</span>
           </div>
           <div class="progress-bar">
-            <div class="progress-fill" [style.width.%]="progressPct()"></div>
+            <div class="progress-fill" [style.width.%]="p.percent"></div>
           </div>
         </div>
 }
@@ -98,7 +96,7 @@ import { formatInstant } from '../../../core/utils/format-date';
           @if (activeTab() === 'volume') {
 <div class="chart-block">
             <h2 class="section-title">Total volume per session</h2>
-            <p class="section-sub">Sum of weight × reps across all sets. Excludes deload sessions.</p>
+            <p class="section-sub">Sum of weight × reps across working sets. Excludes deload sessions.</p>
             <div class="chart-wrapper">
               <canvas #volumeCanvas></canvas>
             </div>
@@ -264,6 +262,13 @@ import { formatInstant } from '../../../core/utils/format-date';
     }
 
     .header-btns { display: flex; gap: var(--space-sm); flex-shrink: 0; }
+
+    /* On a phone the buttons take their own row; side by side, End series ran off the screen. */
+    @media (max-width: 600px) {
+      .detail-header { flex-direction: column; gap: var(--space-md); }
+      .header-btns { width: 100%; }
+      .header-btns > * { flex: 1; --jiro-btn-width: 100%; }
+    }
 
     .split-label { font-size: var(--font-size-xs); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
 
@@ -660,29 +665,11 @@ export class SeriesDetailComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  progressPct(): number {
+  /** Measured to the end date once the series has ended; none without a target. */
+  readonly progress = computed(() => {
     const s = this.series();
-    if (!s) return 0;
-    if (s.duration_type === 'sessions' && s.target_sessions) {
-      return Math.min(100, (s.session_count / s.target_sessions) * 100);
-    }
-    if (s.duration_type === 'weeks' && s.target_weeks) {
-      const elapsed = (Date.now() - new Date(s.started_at).getTime()) / 86400000 / 7;
-      return Math.min(100, (elapsed / s.target_weeks) * 100);
-    }
-    return 0;
-  }
-
-  progressText(): string {
-    const s = this.series();
-    if (!s) return '';
-    if (s.duration_type === 'sessions' && s.target_sessions) return `${s.session_count} / ${s.target_sessions} sessions`;
-    if (s.duration_type === 'weeks' && s.target_weeks) {
-      const wks = Math.floor((Date.now() - new Date(s.started_at).getTime()) / 86400000 / 7);
-      return `${wks} / ${s.target_weeks} weeks`;
-    }
-    return '';
-  }
+    return s ? seriesProgress(s) : null;
+  });
 
   formatDate(instant: string): string {
     return formatInstant(instant, this.settings.timezone());

@@ -1,4 +1,5 @@
-import { Component, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef, inject, signal, computed } from '@angular/core';
+import { Component, DestroyRef, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef, inject, signal, computed } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
@@ -13,6 +14,7 @@ import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
 import { formatInstant } from '../../../core/utils/format-date';
+import { detectPlateau, type PlateauStatus } from '../plateau-rule';
 
 Chart.register(...registerables);
 
@@ -69,7 +71,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
 <div class="plateau-banner plateau">
           <jiro-icon name="warning-circle" [size]="16" />
           <div>
-            <strong>Plateau detected.</strong> Your max weight has been the same for the last 3 sessions.
+            <strong>Plateau detected.</strong> Your best set hasn't improved in your last 3 sessions.
             Consider a small weight increase, extra reps, or a deload week to break through.
           </div>
         </div>
@@ -78,7 +80,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
 <div class="plateau-banner decline">
           <jiro-icon name="trend-down" [size]="16" />
           <div>
-            <strong>Declining trend.</strong> Your peak lift has dropped across the last 3 sessions.
+            <strong>Declining trend.</strong> Your best set in your last 3 sessions is down more than 5% on the sessions before.
             Consider a deload, technique check, or extra recovery before pushing again.
           </div>
         </div>
@@ -723,26 +725,11 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
     });
   });
 
-  plateauStatus = computed<'plateau' | 'decline' | null>(() => {
-    const ex = this.exercise();
-    if (!ex || ex.history.length === 0) return null;
-    const bySession = new Map<string, { date: string; weight: number }>();
-    for (const h of ex.history) {
-      if (h.session_type === 'deload' || h.is_warmup) continue;
-      const cur = bySession.get(h.session_id);
-      if (!cur || h.weight > cur.weight) bySession.set(h.session_id, { date: h.date, weight: h.weight });
-    }
-    const sessions = Array.from(bySession.values())
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    if (sessions.length < 3) return null;
-    const last3 = sessions.slice(-3).map(s => s.weight);
-    const [a, b, c] = last3;
-    if (Math.abs(a - b) < 0.01 && Math.abs(b - c) < 0.01) return 'plateau';
-    if (b < a - 0.01 && c < b - 0.01) return 'decline';
-    return null;
-  });
+  plateauStatus = computed<PlateauStatus>(() => detectPlateau(this.exercise()?.history ?? []));
 
   private chart: Chart | null = null;
+  private currentId = '';
+  private readonly destroyRef = inject(DestroyRef);
   private dataLoaded = false;
   private viewReady = false;
 
@@ -755,20 +742,40 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
   ) {}
 
   ngOnInit() {
-    const id = this.route.snapshot.paramMap.get('id') || '';
+    // The page is reused when Ctrl K opens another exercise from this one, so follow the id.
+    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(p => this.load(p.get('id') || ''));
+  }
+
+  private load(id: string) {
+    this.currentId = id;
+    this.exercise.set(null);
+    this.loading.set(true);
+    this.formChecks.set([]);
+    this.formChecksLoading.set(true);
+    this.selectedWeight.set(null);
+    this.historyPage.set(0);
+    this.formPage.set(0);
+    this.dataLoaded = false;
+    this.chart?.destroy();
+    this.chart = null;
     this.jymService.getExercise(id).subscribe({
       next: ex => {
+        if (id !== this.currentId) return;
         this.exercise.set(ex);
         this.loading.set(false);
         this.uniqueWeights.set(this.getUniqueWeights());
         this.dataLoaded = true;
         setTimeout(() => this.maybeDrawChart(), 0);
       },
-      error: () => this.loading.set(false),
+      error: () => { if (id === this.currentId) this.loading.set(false); },
     });
     this.jymService.listExerciseFormChecks(id).subscribe({
-      next: checks => { this.formChecks.set(checks); this.formChecksLoading.set(false); },
-      error: () => this.formChecksLoading.set(false),
+      next: checks => {
+        if (id !== this.currentId) return;
+        this.formChecks.set(checks);
+        this.formChecksLoading.set(false);
+      },
+      error: () => { if (id === this.currentId) this.formChecksLoading.set(false); },
     });
   }
 

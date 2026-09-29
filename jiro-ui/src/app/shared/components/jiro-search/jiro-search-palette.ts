@@ -573,13 +573,8 @@ export class JiroSearchPaletteComponent implements AfterViewInit, OnDestroy {
         if (item.in_progress) {
           this.router.navigate(['/jym/session', item.id]);
         } else {
-          // Completed sessions open read-only in history. The player would
-          // restart its timer, and Finish would overwrite ended_at.
-          // 'reload' so picking the same session twice still re-focuses it.
-          this.router.navigate(['/jym/track'], {
-            queryParams: { tab: 'sessions', session: item.id },
-            onSameUrlNavigation: 'reload',
-          });
+          // A finished workout opens its summary; Done there comes back to this page.
+          this.router.navigate(['/jym/sessions', item.id, 'summary'], { state: { back: this.router.url } });
         }
         break;
       case 'journal':

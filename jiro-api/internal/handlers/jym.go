@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/analytics"
@@ -523,6 +522,8 @@ func (h *JymHandler) StartSession(c *gin.Context) {
 				"session_id":   open.SessionID,
 				"routine_name": open.RoutineName,
 				"started_at":   open.StartedAt,
+				"set_count":    open.SetCount,
+				"last_set_at":  open.LastSetAt,
 			}})
 			return
 		}
@@ -654,6 +655,35 @@ func (h *JymHandler) UpdateSession(c *gin.Context) {
 	c.JSON(http.StatusOK, sess)
 }
 
+// UpdateSessionTimes handles PATCH /jym/sessions/:id/times for a finished workout.
+func (h *JymHandler) UpdateSessionTimes(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	sessionID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid session ID"}})
+		return
+	}
+	var req models.UpdateSessionTimesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()}})
+		return
+	}
+	sess, err := h.jymService.UpdateSessionTimes(c.Request.Context(), userID, sessionID, &req)
+	var timesErr *services.SessionTimesError
+	switch {
+	case err == nil:
+		c.JSON(http.StatusOK, sess)
+	case errors.As(err, &timesErr):
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: timesErr.Reason}})
+	case errors.Is(err, services.ErrSessionNotFound):
+		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Session not found"}})
+	case errors.Is(err, services.ErrSessionNotFinished):
+		c.JSON(http.StatusConflict, models.ErrorResponse{Error: models.ErrorDetail{Code: "SESSION_NOT_FINISHED", Message: "Finish the workout before changing its times"}})
+	default:
+		respondInternal(c, err, "failed to update session times")
+	}
+}
+
 func (h *JymHandler) DeleteSession(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 	sessionID, err := uuid.Parse(c.Param("id"))
@@ -735,6 +765,10 @@ func (h *JymHandler) CreateSeries(c *gin.Context) {
 	}
 	sr, err := h.jymService.CreateSeries(c.Request.Context(), userID, &req)
 	if err != nil {
+		if errors.Is(err, services.ErrInvalidSeriesLength) {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()}})
+			return
+		}
 		if err == services.ErrSplitNotFound || err == services.ErrNotOwner {
 			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Split not found"}})
 			return
@@ -917,34 +951,25 @@ func (h *JymHandler) DeleteSessionExercise(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Exercise removed"})
 }
 
-// GetPreviousBests returns, for each exercise_id in the query string, the
-// best set from the most recent session before :id — the "last time" line
-// on the post-workout summary.
-// GET /jym/sessions/:id/previous-bests?exercise_ids=uuid1,uuid2
-func (h *JymHandler) GetPreviousBests(c *gin.Context) {
+// GetSessionReport is a workout's summary, built by the same rules as every session list.
+// GET /jym/sessions/:id/summary
+func (h *JymHandler) GetSessionReport(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 	sessionID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid session ID"}})
 		return
 	}
-
-	raw := strings.Split(c.Query("exercise_ids"), ",")
-	exerciseIDs := make([]uuid.UUID, 0, len(raw))
-	for _, r := range raw {
-		id, err := uuid.Parse(strings.TrimSpace(r))
-		if err != nil {
-			continue
-		}
-		exerciseIDs = append(exerciseIDs, id)
-	}
-
-	bests, err := h.jymService.GetPreviousBests(c.Request.Context(), userID, sessionID, exerciseIDs)
+	report, err := h.jymService.GetSessionReport(c.Request.Context(), userID, sessionID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to fetch previous bests"}})
+		if errors.Is(err, services.ErrSessionNotFound) {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Session not found"}})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to build the session summary"}})
 		return
 	}
-	c.JSON(http.StatusOK, bests)
+	c.JSON(http.StatusOK, report)
 }
 
 // ─── CSV Export ───────────────────────────────────────────────────────────────

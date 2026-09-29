@@ -60,6 +60,22 @@ type UpdateSettingsRequest struct {
 	// Dashboard is tri-state: empty means "leave alone", the literal `null`
 	// removes the key (back to the default layout), anything else is a layout.
 	Dashboard json.RawMessage `json:"dashboard,omitempty"`
+	// RestSeconds is how long Jym's rest timer runs after each logged set.
+	RestSeconds *int `json:"rest_seconds,omitempty"`
+	// Plates is tri-state like Dashboard: a Plates object, or `null` for the defaults.
+	Plates json.RawMessage `json:"plates,omitempty"`
+}
+
+// PlateSet is a bar and the plate sizes on hand, in one weight unit.
+type PlateSet struct {
+	Bar   float64   `json:"bar"`
+	Sizes []float64 `json:"sizes"`
+}
+
+// Plates is a PlateSet per unit; a unit left out uses the app's defaults.
+type Plates struct {
+	Kg  *PlateSet `json:"kg,omitempty"`
+	Lbs *PlateSet `json:"lbs,omitempty"`
 }
 
 // DashboardLayout is the stored order and visibility of dashboard widgets.

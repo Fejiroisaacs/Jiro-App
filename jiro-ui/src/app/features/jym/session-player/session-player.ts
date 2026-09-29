@@ -1,6 +1,6 @@
-import { Component, OnInit, OnDestroy, WritableSignal, effect, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, WritableSignal, computed, effect, inject, signal } from '@angular/core';
 
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import {
   JymService,
@@ -13,8 +13,13 @@ import {
 } from '../../../core/services/jym.service';
 import { UploadService } from '../../../core/services/upload.service';
 import { SettingsService } from '../../../core/services/settings.service';
-import { todayKey } from '../../../core/utils/day';
+import { dayKey, timeInZone, todayKey } from '../../../core/utils/day';
+import { formatInstant } from '../../../core/utils/format-date';
+import { isStale } from '../stale-workout';
 import { nextSets } from '../weight-suggestion';
+import { filled, parseDecimal, parseWhole } from '../number-input';
+import { nearestLoadable, platesFor, platesPerSide, warmupRamp } from '../plates';
+import { DRAFT_VERSION, SessionDraft, clearDraft, readDraft, writeDraft } from '../shared/session-draft';
 import { AuthService } from '../../../core/services/auth.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
@@ -22,9 +27,11 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
+import { SaveTemplateDialogComponent } from '../shared/save-template-dialog';
 import { ToastService } from '../../../core/services/toast.service';
 import { ConfirmService } from '../../../core/services/confirm.service';
 
+/** One row of an exercise; weight, reps and RPE are the text typed (a comma may be the decimal point). */
 interface SetRow {
   setNumber: number;
   weight: string;
@@ -44,14 +51,6 @@ interface SetRow {
   before?: { weight: string; reps: string; rpe: string };
 }
 
-/** What only this device knows until it's logged: typed rows, added exercises, removed plan exercises. */
-interface SessionDraft {
-  unit?: string;
-  added: { exerciseId: string; exerciseName: string; muscleGroup: string | null }[];
-  removed: string[];
-  rows: Record<string, { setNumber: number; weight: string; reps: string; rpe: string; isWarmup: boolean }[]>;
-}
-
 interface ExerciseBlock {
   exerciseId: string;
   exerciseName: string;
@@ -69,10 +68,10 @@ interface ExerciseBlock {
 @Component({
   selector: 'app-session-player',
   standalone: true,
-  imports: [FormsModule, JiroButtonComponent, JiroModalComponent, JiroIconComponent, JiroSkeletonComponent, JiroEmptyStateComponent, JymPrBadgeComponent],
+  imports: [FormsModule, RouterLink, JiroButtonComponent, JiroModalComponent, JiroIconComponent, JiroSkeletonComponent, JiroEmptyStateComponent, JymPrBadgeComponent, SaveTemplateDialogComponent],
   template: `
     <h1 class="sr-only">Active session</h1>
-    <!-- Sticky header bar -->
+    <!-- Sticky bar: the clock, the options, and Finish; everything else waits in the options sheet. -->
     <div class="session-bar">
       <div class="session-bar-row">
         <div class="session-bar-left">
@@ -80,48 +79,49 @@ interface ExerciseBlock {
           <span class="timer">{{ elapsedDisplay() }}</span>
         </div>
         <div class="session-bar-right">
-          <div class="type-toggle">
-            <button class="type-btn" [class.active]="sessionType() === 'normal'" (click)="setSessionType('normal')">Normal</button>
-            <button class="type-btn" [class.active]="sessionType() === 'deload'" (click)="setSessionType('deload')">Deload</button>
-            <button class="type-btn" [class.active]="sessionType() === 'test'" (click)="setSessionType('test')">Test</button>
-          </div>
-          <div class="type-toggle unit-toggle">
-            <button class="type-btn" [class.active]="settingsService.weightUnit() === 'lbs'" (click)="toggleUnit('lbs')">lbs</button>
-            <button class="type-btn" [class.active]="settingsService.weightUnit() === 'kg'" (click)="toggleUnit('kg')">kg</button>
-          </div>
-          <button class="save-template-btn" type="button" title="Save as template" aria-label="Save as template" (click)="showTemplateSave.set(true)">
-            <jiro-icon name="floppy-disk" [size]="15" />
+          <button class="bar-icon-btn" type="button" aria-label="Workout options" title="Workout options" aria-haspopup="dialog" (click)="showOptions.set(true)">
+            <jiro-icon name="dots-three" [size]="22" />
           </button>
-          <jiro-button size="sm" variant="ghost" type="button" (click)="showExitConfirm.set(true)">Exit</jiro-button>
-          <jiro-button size="sm" variant="inverse" type="button" (click)="finishSession()" [disabled]="finishing()">
+          <jiro-button size="lg" variant="inverse" type="button" (click)="finishSession()" [disabled]="finishing()">
             {{ finishing() ? 'Finishing...' : 'Finish' }}
           </jiro-button>
         </div>
-        @if (emptySessionError()) {
-<p class="empty-session-error">{{ emptySessionError() }}</p>
-}
       </div>
-      <!-- Rest timer row — expands the bar after logging a set -->
+      <!-- Rest timer row: opens after a logged set -->
       @if (restTimerActive()) {
-<div class="rest-row" [class.rest-done]="restTimerDone()">
-        <span class="rest-label">Rest</span>
-        <span class="rest-countdown">{{ restTimerDisplay() }}</span>
-        <div class="rest-presets">
-          @for (d of restPresets; track d) {
-<button class="rest-chip"
-            [class.active]="restTimerDuration() === d"
-            (click)="setRestDuration(d)">{{ restPresetLabel(d) }}</button>
-}
-          <button class="rest-chip rest-add-btn" type="button" (click)="addRestTime(30)" title="Add 30 seconds" aria-label="Add 30 seconds">+30s</button>
+        <div class="rest-row" [class.rest-done]="restTimerDone()">
+          <span class="rest-label">Rest</span>
+          <span class="rest-countdown" role="timer" aria-live="off">{{ restTimerDisplay() }}</span>
+          <button class="rest-btn" type="button" (click)="addRestTime(30)" aria-label="Add 30 seconds to this rest">+30s</button>
+          <button class="rest-btn" type="button" (click)="skipRestTimer()">Skip</button>
+          <div class="rest-progress" aria-hidden="true">
+            <div class="rest-progress-fill" [style.width.%]="(restTimerRemaining() / restLength()) * 100"></div>
+          </div>
         </div>
-        <button class="rest-skip-btn" type="button" (click)="skipRestTimer()" aria-label="Skip rest" title="Skip rest"><jiro-icon name="x" [size]="12" /></button>
-        <div class="rest-progress">
-          <div class="rest-progress-fill"
-            [style.width.%]="(restTimerRemaining() / restTimerDuration()) * 100"></div>
+      }
+    </div>
+
+    <!-- A workout left open for hours: finish it where it really ended, or throw away an empty one. -->
+    @if (stale(); as st) {
+      <div class="stale-banner" role="status">
+        <p class="stale-text">
+          This workout started {{ st.started }} and wasn't finished.
+          {{ st.lastSet ? 'Your last set was at ' + st.lastSet + '.' : 'Nothing was logged.' }}
+        </p>
+        <div class="stale-actions">
+          @if (st.lastSetAt) {
+            <jiro-button size="lg" type="button" [loading]="finishing()" (click)="finishAtLastSet(st.lastSetAt)">Finish at {{ st.lastSetTime }}</jiro-button>
+          } @else {
+            <jiro-button size="lg" variant="danger" type="button" [loading]="discarding()" (click)="discardSession()">Discard it</jiro-button>
+          }
+          <jiro-button size="lg" variant="secondary" type="button" (click)="stale.set(null)">Keep going</jiro-button>
         </div>
       </div>
-}
-    </div>
+    }
+
+    @if (emptySessionError()) {
+      <p class="empty-session-error" role="alert">{{ emptySessionError() }}</p>
+    }
 
     <!-- Deload / Test notice -->
     @if (sessionType() === 'deload') {
@@ -169,14 +169,17 @@ interface ExerciseBlock {
           <input
             id="session-bw"
             class="bw-input"
-            type="number"
-            step="0.1"
-            min="0"
+            type="text"
+            inputmode="decimal"
+            enterkeyhint="done"
+            autocomplete="off"
             [(ngModel)]="bwValue"
-            [placeholder]="settingsService.unitLabel()" />
+            [placeholder]="settingsService.unitLabel()"
+            (keydown.enter)="saveBodyWeight()" />
           <button
             class="bw-save-btn"
-            [disabled]="bwSaving() || !bwValue"
+            type="button"
+            [disabled]="bwSaving() || !bwValid()"
             (click)="saveBodyWeight()">
             {{ bwSaving() ? '...' : 'Log' }}
           </button>
@@ -255,123 +258,134 @@ interface ExerciseBlock {
                 (blur)="saveExerciseNote(bi)"></textarea>
             </div>
 
+            <!-- Warm-ups before the first working set: the bar, then about 50, 70 and 85 percent. -->
+            @if (warmupRampFor(block); as ramp) {
+              <button type="button" class="warmup-prompt" (click)="addWarmups(bi, ramp)">
+                <jiro-icon name="fire" [size]="16" />
+                <span class="warmup-prompt-text">
+                  Add warm-up sets
+                  <small>{{ rampSummary(ramp) }}</small>
+                </span>
+              </button>
+            }
+
             <!-- Set header -->
-            <div class="set-header-row">
+            <div class="set-header-row" aria-hidden="true">
               <span class="sh set-num">Set</span>
-              <span class="sh weight">Weight ({{ settingsService.unitLabel() }})</span>
-              <span class="sh reps">Reps</span>
-              <span class="sh rpe">RPE</span>
-              <span class="sh warmup-col" title="Warm-up"><jiro-icon name="fire" [size]="14" label="Warm-up" /></span>
-              <span class="sh action"></span>
+              <span class="sh">Weight ({{ settingsService.unitLabel() }})</span>
+              <span class="sh">Reps</span>
+              <span class="sh">RPE</span>
+              <span class="sh"></span>
             </div>
 
-            <!-- Set rows -->
+            <!-- Set rows: the number opens warm-up and remove; the check logs what the row shows. -->
             @for (row of block.sets; track row.id ?? 'new-' + row.setNumber; let si = $index) {
-
               <div class="set-row" [class.set-done]="row.saved" [class.set-warmup]="row.isWarmup" [class.set-short]="isShort(block, row)" [class.set-editing]="row.editing">
-                <span class="set-num-cell">{{ row.setNumber }}</span>
+                <button
+                  type="button"
+                  class="set-num-btn"
+                  [class.is-warmup]="row.isWarmup"
+                  aria-haspopup="dialog"
+                  [attr.aria-label]="'Set ' + row.setNumber + (row.isWarmup ? ', warm-up' : '') + ', options'"
+                  [disabled]="row.saving"
+                  (click)="openSetSheet(block, row)">
+                  @if (row.isWarmup) {
+                    <jiro-icon name="fire" [size]="12" />
+                  }
+                  {{ row.setNumber }}
+                </button>
 
                 <input
                   class="set-input"
-                  type="number"
-                  step="0.5"
-                  min="0"
+                  type="text"
+                  inputmode="decimal"
+                  enterkeyhint="next"
+                  autocomplete="off"
                   [(ngModel)]="row.weight"
                   (ngModelChange)="saveDraftSoon()"
                   [placeholder]="row.ghostWeight || '0'"
-                  [class.has-ghost]="row.ghostWeight && !row.weight"
+                  [class.has-ghost]="row.ghostWeight && !filled(row.weight)"
                   [attr.aria-label]="'Set ' + row.setNumber + ' weight (' + settingsService.unitLabel() + ')'"
                   [readonly]="row.saved && !row.editing"
                   [class.logged]="row.saved && !row.editing"
                   [attr.title]="row.saved && !row.editing ? 'Tap to edit' : null"
                   (click)="editRow($event, bi, si)"
-                  (keydown.enter)="editRow($event, bi, si)"
+                  (keydown.enter)="onEnter($event, bi, si, 'weight')"
                   (keydown.escape)="cancelEdit(bi, si)" />
 
                 <input
                   class="set-input reps-input"
-                  type="number"
-                  min="1"
+                  type="text"
+                  inputmode="numeric"
+                  enterkeyhint="done"
+                  autocomplete="off"
                   [(ngModel)]="row.reps"
                   (ngModelChange)="saveDraftSoon()"
                   [placeholder]="row.ghostReps || '0'"
-                  [class.has-ghost]="row.ghostReps && !row.reps"
+                  [class.has-ghost]="row.ghostReps && !filled(row.reps)"
                   [attr.aria-label]="'Set ' + row.setNumber + ' reps' + (isShort(block, row) ? ', below plan' : '')"
                   [readonly]="row.saved && !row.editing"
                   [class.logged]="row.saved && !row.editing"
                   [attr.title]="row.saved && !row.editing ? 'Tap to edit' : null"
                   (click)="editRow($event, bi, si)"
-                  (keydown.enter)="editRow($event, bi, si)"
+                  (keydown.enter)="onEnter($event, bi, si, 'reps')"
                   (keydown.escape)="cancelEdit(bi, si)" />
 
                 <input
                   class="set-input rpe-input"
+                  type="text"
+                  inputmode="numeric"
+                  enterkeyhint="done"
+                  autocomplete="off"
                   [attr.aria-label]="'Set ' + row.setNumber + ' RPE, 1 to 10'"
-                  [class.input-error]="!!row.rpe && rpeInvalid(row.rpe)"
-                  type="number"
-                  min="1"
-                  max="10"
+                  [class.input-error]="filled(row.rpe) && rpeInvalid(row.rpe)"
                   [(ngModel)]="row.rpe"
                   (ngModelChange)="saveDraftSoon()"
                   [readonly]="row.saved && !row.editing"
                   [class.logged]="row.saved && !row.editing"
                   [attr.title]="row.saved && !row.editing ? 'Tap to edit' : null"
                   (click)="editRow($event, bi, si)"
-                  (keydown.enter)="editRow($event, bi, si)"
+                  (keydown.enter)="onEnter($event, bi, si, 'rpe')"
                   (keydown.escape)="cancelEdit(bi, si)" />
 
-                <button
-                  type="button"
-                  class="warmup-btn"
-                  [class.warmup-active]="row.isWarmup"
-                  [attr.aria-pressed]="row.isWarmup"
-                  [attr.aria-label]="'Warm-up, set ' + row.setNumber"
-                  title="{{ row.isWarmup ? 'Warm-up set' : 'Mark as warm-up' }}"
-                  (click)="toggleWarmup(bi, si)"><jiro-icon name="fire" [size]="16" /></button>
-
                 <div class="action-cell">
-                  @if (row.editing) {
-                    <button type="button" class="log-btn" [attr.aria-label]="'Save set ' + row.setNumber"
-                      [disabled]="row.saving || !editValid(row)" (click)="saveEdit(bi, si)">
-                      @if (row.saving) {
-                        <span class="spinner-sm"></span>
-                      } @else {
-                        <jiro-icon name="check" [size]="18" />
-                      }
-                    </button>
-                    <button type="button" class="del-btn" [attr.aria-label]="'Cancel editing set ' + row.setNumber" title="Cancel" (click)="cancelEdit(bi, si)">
-                      <jiro-icon name="x" [size]="14" />
-                    </button>
-                  } @else if (row.saved) {
-                    @if (row.isPR) {
-                      <jym-pr-badge />
-                    }
-                    <button type="button" class="del-btn" [attr.aria-label]="'Remove set ' + row.setNumber" title="Remove set" (click)="deleteSet(bi, si)">
-                      <jiro-icon name="trash" [size]="14" />
-                    </button>
-                  } @else {
+                  @if (!row.saved) {
                     <!-- One tap logs what the row shows: typed values, else the ghosts. -->
                     <button type="button" class="log-btn" [attr.aria-label]="logLabel(row)"
                       [disabled]="!canLog(row)" (click)="logSet(bi, si)">
                       @if (row.saving) {
                         <span class="spinner-sm"></span>
                       } @else {
-                        <jiro-icon name="check" [size]="18" />
+                        <jiro-icon name="check" [size]="20" />
                       }
                     </button>
+                  } @else if (row.saving) {
+                    <span class="spinner-sm" role="status" aria-label="Saving"></span>
+                  } @else if (!row.editing) {
+                    @if (row.isPR) {
+                      <jym-pr-badge />
+                    } @else {
+                      <jiro-icon class="logged-mark" name="check" [size]="16" label="Logged" />
+                    }
                   }
                 </div>
               </div>
-              @if ((!row.saved || row.editing) && !!row.rpe && rpeInvalid(row.rpe)) {
-<div class="rpe-err-msg">
-                RPE must be between 1 and 10
-              </div>
-}
-            
-}
+              <!-- Phones' number pads have no Enter key, so an edit always shows its own buttons.
+                   pointerdown is held back so the first tap doesn't blur, shift the layout and miss. -->
+              @if (row.editing) {
+                <div class="edit-actions">
+                  <button type="button" class="edit-btn" (pointerdown)="$event.preventDefault()" (click)="cancelEdit(bi, si)">Cancel</button>
+                  <button type="button" class="edit-btn edit-btn--save" [attr.aria-label]="'Save set ' + row.setNumber"
+                    (pointerdown)="$event.preventDefault()" [disabled]="row.saving || !editValid(row)" (click)="saveEdit(bi, si)">Save</button>
+                </div>
+              }
+              @if ((!row.saved || row.editing) && filled(row.rpe) && rpeInvalid(row.rpe)) {
+                <div class="rpe-err-msg" role="alert">RPE must be between 1 and 10</div>
+              }
+            }
 
             <!-- Add set -->
-            <button class="add-set-btn" (click)="addSet(bi)">+ Add set</button>
+            <button class="add-set-btn" type="button" [id]="'add-set-' + block.exerciseId" (click)="addSet(bi)">+ Add set</button>
 
             <!-- Form check upload -->
             <div class="form-check-row">
@@ -408,8 +422,11 @@ interface ExerciseBlock {
                   </span>
 }
                 </a>
-              
+
 }
+              <button type="button" class="plates-btn" aria-haspopup="dialog" (click)="openPlates(block)">
+                <jiro-icon name="barbell" [size]="16" /> Plates
+              </button>
             </div>
           
 }
@@ -423,53 +440,127 @@ interface ExerciseBlock {
 }
     </div>
 
-    <!-- Exit confirmation modal -->
-    @if (showExitConfirm()) {
-<jiro-modal title="Exit workout?" maxWidth="400px" (close)="showExitConfirm.set(false)">
-      <p style="font-size:var(--font-size-sm);color:var(--text-secondary);line-height:1.6;margin-bottom:var(--space-lg)">
-        Logged sets are saved. Sets you typed but haven't logged stay on this device until you come back.
-      </p>
-      <div style="display:flex;flex-direction:column;gap:var(--space-sm)">
-        <div style="display:flex;justify-content:flex-end;gap:var(--space-sm)">
-          <jiro-button variant="secondary" type="button" (click)="showExitConfirm.set(false)">Keep training</jiro-button>
-          <jiro-button variant="primary" type="button" (click)="exitSession()">Save & Exit</jiro-button>
+    <!-- Workout options: type, units, rest, and leaving -->
+    @if (showOptions()) {
+      <jiro-modal sheet title="Workout options" maxWidth="440px" (close)="showOptions.set(false)">
+        <div class="opt-group" role="group" aria-labelledby="opt-type-label">
+          <span class="opt-label" id="opt-type-label">Type</span>
+          <div class="seg">
+            @for (t of sessionTypes; track t.value) {
+              <button type="button" class="seg-btn" [class.active]="sessionType() === t.value" [attr.aria-pressed]="sessionType() === t.value" (click)="setSessionType(t.value)">{{ t.label }}</button>
+            }
+          </div>
+          <p class="opt-help">{{ typeHelp() }}</p>
         </div>
-        <div style="border-top:1px solid var(--border-color);padding-top:var(--space-sm)">
-          <jiro-button variant="danger" type="button" [disabled]="discarding()" (click)="discardSession()">
-            {{ discarding() ? 'Discarding...' : 'Discard session' }}
-          </jiro-button>
-        </div>
-      </div>
-    </jiro-modal>
-}
 
-    <!-- Save as template modal -->
+        <div class="opt-group" role="group" aria-labelledby="opt-unit-label">
+          <span class="opt-label" id="opt-unit-label">Units</span>
+          <div class="seg">
+            @for (u of units; track u) {
+              <button type="button" class="seg-btn" [class.active]="settingsService.weightUnit() === u" [attr.aria-pressed]="settingsService.weightUnit() === u" (click)="toggleUnit(u)">{{ u }}</button>
+            }
+          </div>
+          <p class="opt-help">Your account's unit, the same one as in Settings.</p>
+        </div>
+
+        <div class="opt-group" role="group" aria-labelledby="opt-rest-label">
+          <span class="opt-label" id="opt-rest-label">Rest timer</span>
+          <div class="seg">
+            @for (d of restPresets; track d) {
+              <button type="button" class="seg-btn" [class.active]="restSetting() === d" [attr.aria-pressed]="restSetting() === d" (click)="setRestDefault(d)">{{ restPresetLabel(d) }}</button>
+            }
+          </div>
+          <p class="opt-help">Starts after each logged set. Remembered for next time.</p>
+        </div>
+
+        <div class="opt-actions">
+          <button type="button" class="opt-row" (click)="showOptions.set(false); showTemplateSave.set(true)">
+            <jiro-icon name="floppy-disk" [size]="18" />
+            <span class="opt-row-text">Save as template</span>
+          </button>
+          <button type="button" class="opt-row" (click)="exitSession()">
+            <jiro-icon name="sign-out" [size]="18" />
+            <span class="opt-row-text">Leave for now<small>The workout stays open. Resume it from Jym.</small></span>
+          </button>
+          <button type="button" class="opt-row opt-row--danger" [disabled]="discarding()" (click)="discardSession()">
+            <jiro-icon name="trash" [size]="18" />
+            <span class="opt-row-text">{{ discarding() ? 'Discarding...' : 'Discard workout' }}</span>
+          </button>
+        </div>
+      </jiro-modal>
+    }
+
     @if (showTemplateSave()) {
-<jiro-modal title="Save as template" maxWidth="420px" (close)="showTemplateSave.set(false)">
-      <p style="font-size:var(--font-size-sm);color:var(--text-secondary);margin-bottom:var(--space-md);">
-        Give this workout layout a name to reuse it in future sessions.
-      </p>
-      <label class="field-label" for="template-name">Template name</label>
-      <input
-        id="template-name"
-        class="template-name-input"
-        type="text"
-        [(ngModel)]="templateName"
-        placeholder="e.g. Push Day A"
-        (keydown.enter)="saveAsTemplate()"
-        maxlength="80"
-      />
-      @if (templateSaveError()) {
-<div class="template-save-error">{{ templateSaveError() }}</div>
-}
-      <div style="display:flex;justify-content:flex-end;gap:var(--space-sm);margin-top:var(--space-md)">
-        <jiro-button variant="secondary" type="button" (click)="showTemplateSave.set(false)">Cancel</jiro-button>
-        <jiro-button variant="primary" type="button" [disabled]="!templateName.trim() || templateSaving()" (click)="saveAsTemplate()">
-          {{ templateSaving() ? 'Saving...' : 'Save template' }}
-        </jiro-button>
-      </div>
-    </jiro-modal>
-}
+      <jym-save-template-dialog [sessionId]="sessionId" (close)="showTemplateSave.set(false)" />
+    }
+
+    <!-- One set: warm-up or working, and remove -->
+    @if (setSheetRow(); as ref) {
+      <jiro-modal sheet [title]="'Set ' + ref.row.setNumber" maxWidth="400px" (close)="setSheet.set(null)">
+        <p class="sheet-sub">{{ ref.summary }}</p>
+        <div class="opt-actions opt-actions--plain">
+          <button type="button" class="opt-row" (click)="toggleWarmupFromSheet()">
+            <jiro-icon name="fire" [size]="18" />
+            <span class="opt-row-text">
+              {{ ref.row.isWarmup ? 'Make it a working set' : 'Mark as warm-up' }}
+              <small>{{ ref.row.isWarmup ? 'It counts for volume and records again.' : "Warm-ups don't count for volume or records." }}</small>
+            </span>
+          </button>
+          <button type="button" class="opt-row opt-row--danger" (click)="removeSetFromSheet()">
+            <jiro-icon name="trash" [size]="18" />
+            <span class="opt-row-text">Remove set</span>
+          </button>
+        </div>
+      </jiro-modal>
+    }
+
+    <!-- Plates for one side of the bar, from the account's bar and plates -->
+    @if (platesOpen()) {
+      <jiro-modal sheet title="Plates" maxWidth="420px" (close)="platesOpen.set(false)">
+        <label class="field-label" for="plates-weight">Weight ({{ settingsService.unitLabel() }})</label>
+        <input
+          id="plates-weight"
+          class="plates-input"
+          type="text"
+          inputmode="decimal"
+          enterkeyhint="done"
+          autocomplete="off"
+          [ngModel]="platesWeight()"
+          (ngModelChange)="platesWeight.set($event)"
+          (keydown.enter)="$any($event.target).blur()" />
+
+        @let r = plateResult();
+        <div class="plates-result" aria-live="polite">
+          @if (r.kind === 'plates') {
+            <div class="plate-stack" role="img" [attr.aria-label]="'Each side: ' + r.side.join(', ') + ' ' + settingsService.unitLabel()">
+              <span class="plate-sleeve" aria-hidden="true"></span>
+              @for (p of r.side; track $index) {
+                <span class="plate" aria-hidden="true" [style.height.px]="plateHeight(p)">{{ p }}</span>
+              }
+            </div>
+            <p class="plates-line">Each side: {{ r.side.join(', ') }}</p>
+          } @else if (r.kind === 'bar') {
+            <p class="plates-line">Just the bar.</p>
+          } @else if (r.kind === 'light') {
+            <p class="plates-line">That's lighter than the bar.</p>
+          } @else if (r.kind === 'near') {
+            <p class="plates-line">Your plates can't make exactly {{ platesWeight() }} {{ settingsService.unitLabel() }}. The closest you can load:</p>
+            <div class="near-chips">
+              @for (w of r.near; track w) {
+                <button type="button" class="near-chip" (click)="platesWeight.set('' + w)">{{ w }} {{ settingsService.unitLabel() }}</button>
+              }
+            </div>
+          } @else {
+            <p class="plates-line plates-muted">Type a weight to see the plates for each side.</p>
+          }
+        </div>
+
+        <p class="plates-bar">
+          On a {{ currentPlates().bar }} {{ settingsService.unitLabel() }} bar.
+          <a class="plates-link" routerLink="/settings" fragment="workouts" (click)="platesOpen.set(false)">Change bar and plates</a>
+        </p>
+      </jiro-modal>
+    }
 
 
     <!-- Exercise picker -->
@@ -550,22 +641,31 @@ interface ExerciseBlock {
     }
 
     .session-bar-row {
-      display: flex; align-items: center; justify-content: space-between;
+      display: flex; align-items: center; justify-content: space-between; gap: var(--space-md);
       padding: var(--space-sm) var(--space-xl);
     }
 
-    .session-bar-left { display: flex; align-items: center; gap: var(--space-md); }
+    .session-bar-left { display: flex; align-items: center; gap: var(--space-md); min-width: 0; }
 
     .bar-label { font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; }
 
-    .timer { font-size: var(--font-size-xl); font-weight: 700; font-variant-numeric: tabular-nums; }
+    .timer { font-size: var(--font-size-xl); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
-    .session-bar-right { display: flex; align-items: center; gap: var(--space-sm); }
+    .session-bar-right { display: flex; align-items: center; gap: var(--space-sm); flex-shrink: 0; }
+
+    /* On the coloured bar: the icon takes the bar's text colour, as the ghost button does. */
+    .bar-icon-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 44px; height: 44px; border-radius: var(--border-radius);
+      border: 1px solid color-mix(in srgb, currentColor 40%, transparent); background: none;
+      color: inherit; cursor: pointer; transition: background 0.15s, border-color 0.15s;
+    }
+    .bar-icon-btn:hover { background: color-mix(in srgb, currentColor 12%, transparent); border-color: color-mix(in srgb, currentColor 75%, transparent); }
 
     /* Rest timer row */
     .rest-row {
       display: flex; align-items: center; gap: var(--space-sm);
-      padding: var(--space-xs) var(--space-xl);
+      padding: var(--space-xs) var(--space-xl) calc(var(--space-xs) + 3px);
       background: rgba(var(--shadow-rgb), 0.18);
       border-top: 1px solid color-mix(in srgb, currentColor 15%, transparent);
       position: relative; overflow: hidden;
@@ -576,62 +676,58 @@ interface ExerciseBlock {
 
     .rest-label {
       font-size: var(--font-size-xs); text-transform: uppercase;
-      letter-spacing: 1px; opacity: 0.7; font-weight: 500; white-space: nowrap;
+      letter-spacing: 1px; opacity: 0.8; font-weight: 500; white-space: nowrap;
     }
 
     .rest-countdown {
       font-size: var(--font-size-lg); font-weight: 700;
-      font-variant-numeric: tabular-nums; min-width: 52px;
+      font-variant-numeric: tabular-nums; min-width: 52px; margin-right: auto;
     }
 
-    .rest-presets { display: flex; gap: 4px; margin-left: auto; }
-
-    .rest-chip {
-      min-height: 28px; padding: 2px 8px; border-radius: var(--border-radius-pill);
-      border: 1px solid color-mix(in srgb, currentColor 35%, transparent); background: none;
-      color: color-mix(in srgb, currentColor 88%, transparent); font-size: var(--font-size-xs);
-      cursor: pointer; transition: all 0.15s; font-family: inherit; white-space: nowrap;
+    .rest-btn {
+      min-height: 44px; min-width: 64px; padding: 0 var(--space-md); border-radius: var(--border-radius-pill);
+      border: 1px solid color-mix(in srgb, currentColor 40%, transparent); background: none;
+      color: inherit; font-size: var(--font-size-sm); font-weight: 600; font-family: inherit;
+      cursor: pointer; white-space: nowrap; transition: background 0.15s, border-color 0.15s;
     }
-
-    .rest-chip:hover { border-color: color-mix(in srgb, currentColor 70%, transparent); color: inherit; }
-
-    .rest-chip.active {
-      background: var(--text-on-primary); border-color: var(--text-on-primary);
-      color: var(--color-primary); font-weight: 600;
-    }
-
-    .rest-add-btn { border-style: dashed; }
-
-    .save-template-btn {
-      display: flex; align-items: center; justify-content: center;
-      width: 32px; height: 32px; border-radius: var(--border-radius-sm);
-      border: 1px solid color-mix(in srgb, currentColor 30%, transparent); background: none;
-      color: color-mix(in srgb, currentColor 88%, transparent); cursor: pointer; transition: all 0.15s;
-      flex-shrink: 0;
-    }
-    .save-template-btn:hover { border-color: color-mix(in srgb, currentColor 70%, transparent); color: inherit; }
-
-    .template-name-input {
-      width: 100%; padding: 9px 12px; border: 1px solid var(--border-color);
-      border-radius: var(--border-radius-sm); background: var(--bg-surface);
-      color: var(--text-primary); font-size: var(--font-size-base); font-family: inherit;
- box-sizing: border-box;
-    }
-    .template-name-input:focus { border-color: var(--color-primary); }
+    .rest-btn:hover { background: color-mix(in srgb, currentColor 12%, transparent); border-color: color-mix(in srgb, currentColor 75%, transparent); }
 
     .template-save-error {
       font-size: var(--font-size-sm); color: var(--color-negative); margin-top: var(--space-xs);
     }
 
-    .rest-skip-btn {
-      display: inline-flex; align-items: center; justify-content: center;
-      min-height: 28px; padding: 3px 8px; border-radius: var(--border-radius-pill);
-      border: 1px solid color-mix(in srgb, currentColor 30%, transparent); background: none;
-      color: color-mix(in srgb, currentColor 88%, transparent); cursor: pointer;
-      font-size: var(--font-size-xs); transition: all 0.15s; font-family: inherit;
-    }
+    /* Workout options sheet */
+    .opt-group { margin-bottom: var(--space-lg); }
+    .opt-label { display: block; font-size: var(--font-size-sm); font-weight: 600; margin-bottom: var(--space-xs); }
+    .opt-help { font-size: var(--font-size-xs); color: var(--text-secondary); margin-top: var(--space-xs); line-height: 1.5; }
 
-    .rest-skip-btn:hover { border-color: color-mix(in srgb, currentColor 70%, transparent); color: inherit; }
+    .seg {
+      display: flex; border: 1px solid var(--border-color); border-radius: var(--border-radius);
+      overflow: hidden; background: var(--bg-surface);
+    }
+    .seg-btn {
+      flex: 1; min-height: 44px; padding: 0 var(--space-xs);
+      background: none; border: none; color: var(--text-primary);
+      font-size: var(--font-size-sm); font-family: inherit; cursor: pointer; white-space: nowrap;
+    }
+    .seg-btn + .seg-btn { border-left: 1px solid var(--border-color); }
+    .seg-btn:hover:not(.active) { background: var(--bg-surface-hover); }
+    .seg-btn.active { background: var(--color-primary); color: var(--text-on-primary); font-weight: 600; }
+
+    .opt-actions { border-top: 1px solid var(--border-color); padding-top: var(--space-sm); display: flex; flex-direction: column; }
+    .opt-row {
+      display: flex; align-items: center; gap: var(--space-md); width: 100%;
+      min-height: 52px; padding: var(--space-sm) var(--space-xs);
+      background: none; border: none; border-radius: var(--border-radius);
+      color: var(--text-primary); font-size: var(--font-size-md); font-family: inherit;
+      text-align: left; cursor: pointer;
+    }
+    .opt-row:hover:not(:disabled) { background: var(--bg-surface-hover); }
+    .opt-row:disabled { opacity: 0.6; cursor: not-allowed; }
+    .opt-row jiro-icon { color: var(--text-secondary); flex-shrink: 0; }
+    .opt-row-text { display: flex; flex-direction: column; gap: 2px; }
+    .opt-row-text small { font-size: var(--font-size-xs); color: var(--text-secondary); }
+    .opt-row--danger, .opt-row--danger jiro-icon { color: var(--color-negative); }
 
     .rest-progress {
       position: absolute; bottom: 0; left: 0; right: 0;
@@ -644,26 +740,6 @@ interface ExerciseBlock {
     }
 
     .rest-row.rest-done .rest-progress-fill { background: var(--color-positive); }
-
-    .type-toggle {
-      display: flex; border-radius: var(--border-radius); overflow: hidden;
-      border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
-    }
-
-    .type-btn {
-      min-height: 28px; padding: 5px 10px; background: transparent; border: none;
-      color: color-mix(in srgb, currentColor 88%, transparent); font-size: var(--font-size-xs);
-      font-family: inherit;
-      cursor: pointer; transition: all 0.15s; white-space: nowrap;
-    }
-
-    .type-btn + .type-btn { border-left: 1px solid color-mix(in srgb, currentColor 35%, transparent); }
-
-    /* mirrors the Finish button: fill with the bar's own text colour so the
-       label stays readable on the maroon bar and on the lifted dark one.
-       currentColor cannot be used for the fill here: in a background it
-       resolves to this element's own colour, not the inherited one. */
-    .type-btn.active { background: var(--text-on-primary); color: var(--color-primary); font-weight: 600; }
 
     .type-notice {
       text-align: center; font-size: var(--font-size-sm); font-weight: 500;
@@ -678,13 +754,22 @@ interface ExerciseBlock {
 
 
 
-    /* Body */
-    .player-body { max-width: 700px; overflow-x: hidden; }
+    /* Body; the bottom clears the phone's home indicator now the nav bar is gone. */
+    .player-body { max-width: 700px; overflow-x: hidden; padding-bottom: calc(var(--space-xl) + env(safe-area-inset-bottom)); }
 
-    /* Notes panel */
+    .stale-banner {
+      max-width: 700px; margin-bottom: var(--space-md); padding: var(--space-md);
+      background: rgba(var(--color-warning-rgb), 0.08); border: 1px solid rgba(var(--color-warning-rgb), 0.35);
+      border-radius: var(--border-radius);
+    }
+    .stale-text { font-size: var(--font-size-sm); line-height: 1.5; margin-bottom: var(--space-sm); }
+    .stale-actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+
     .empty-session-error {
-      margin: var(--space-xs) var(--space-md) 0;
-      font-size: var(--font-size-sm); color: var(--color-danger); text-align: right;
+      max-width: 700px; margin-bottom: var(--space-md); padding: var(--space-sm) var(--space-md);
+      font-size: var(--font-size-sm); color: var(--color-negative);
+      background: rgba(var(--color-danger-rgb), 0.08); border: 1px solid rgba(var(--color-danger-rgb), 0.25);
+      border-radius: var(--border-radius);
     }
 
     .notes-panel { margin-bottom: var(--space-md); }
@@ -728,7 +813,7 @@ interface ExerciseBlock {
     .bw-row { display: flex; align-items: center; gap: var(--space-xs); }
 
     .bw-input {
-      width: 80px; padding: 6px 10px;
+      width: 96px; min-height: 44px; padding: 6px 10px;
       border: 1px solid var(--border-color); border-radius: var(--border-radius);
       background: var(--bg-canvas); color: var(--text-primary);
       font-size: var(--font-size-sm); font-family: inherit;
@@ -737,7 +822,7 @@ interface ExerciseBlock {
     .bw-input:focus { border-color: var(--color-primary); }
 
     .bw-save-btn {
-      padding: 6px 14px; background: var(--color-primary); color: var(--text-on-primary); font-family: inherit;
+      min-height: 44px; min-width: 64px; padding: 6px 14px; background: var(--color-primary); color: var(--text-on-primary); font-family: inherit;
       border: none; border-radius: var(--border-radius);
       font-size: var(--font-size-sm); font-weight: 500; cursor: pointer;
       transition: opacity 0.15s;
@@ -819,8 +904,8 @@ interface ExerciseBlock {
     }
 
     .ex-note-input {
-      width: 100%; box-sizing: border-box;
-      padding: 6px 10px;
+      width: 100%; box-sizing: border-box; min-height: 44px;
+      padding: 12px 10px;
       border: 1px solid transparent; border-radius: var(--border-radius);
       background: transparent; color: var(--text-secondary);
       font-size: var(--font-size-xs); font-family: inherit;
@@ -836,28 +921,24 @@ interface ExerciseBlock {
 
     .ex-note-input::placeholder { color: var(--text-muted); }
 
-    /* Set table */
-    .set-header-row {
+    /* Set table: set number, weight, reps, RPE, log. Every target is 44 px. */
+    .set-header-row, .set-row {
       display: grid;
-      grid-template-columns: 40px 1fr 1fr 64px 44px 92px;
+      grid-template-columns: 44px 1fr 1fr 56px 44px;
       gap: var(--space-sm);
       padding: var(--space-xs) var(--space-lg);
-      border-bottom: 1px solid var(--border-color);
     }
+
+    .set-header-row { border-bottom: 1px solid var(--border-color); }
 
     .sh {
       font-size: var(--font-size-xs); text-transform: uppercase;
       letter-spacing: 0.5px; color: var(--text-muted); font-weight: 500;
     }
-
-    .warmup-col { text-align: center; }
+    .sh.set-num { text-align: center; }
 
     .set-row {
-      display: grid;
-      grid-template-columns: 40px 1fr 1fr 64px 44px 92px;
-      gap: var(--space-sm);
       align-items: center;
-      padding: var(--space-xs) var(--space-lg);
       border-bottom: 1px solid var(--border-color);
       transition: background 0.2s;
     }
@@ -871,53 +952,46 @@ interface ExerciseBlock {
     /* A logged working set below the plan's reps */
     .set-row.set-short .reps-input { color: var(--color-warning); font-weight: 600; }
 
-    .warmup-btn {
-      width: 40px; height: 40px; border-radius: var(--border-radius-sm);
-      background: none; border: 1px solid var(--border-color);
-      color: var(--text-muted); cursor: pointer; transition: all 0.15s;
-      display: flex; align-items: center; justify-content: center;
+    /* The set number is the handle for warm-up and remove. */
+    .set-num-btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 2px;
+      width: 44px; height: 44px; padding: 0;
+      border: 1px solid var(--border-color); border-radius: var(--border-radius);
+      background: var(--bg-surface); color: var(--text-secondary);
+      font-size: var(--font-size-sm); font-weight: 600; font-family: inherit;
+      font-variant-numeric: tabular-nums; cursor: pointer;
     }
-
-    .warmup-btn:hover { border-color: var(--color-warning); color: var(--color-warning); }
-
-    .warmup-btn.warmup-active {
-      background: rgba(var(--color-warning-rgb), 0.15); border-color: var(--color-warning); color: var(--color-warning);
-    }
-
-    .set-num-cell { font-size: var(--font-size-sm); font-weight: 500; color: var(--text-muted); text-align: center; }
-
+    .set-num-btn:hover:not(:disabled) { border-color: var(--color-primary); color: var(--text-primary); }
+    .set-num-btn.is-warmup { color: var(--color-warning); border-color: rgba(var(--color-warning-rgb), 0.45); background: rgba(var(--color-warning-rgb), 0.1); }
 
     .set-input {
-      width: 100%; min-height: 44px; padding: 8px 10px;
+      width: 100%; min-width: 0; min-height: 44px; padding: 8px 10px;
       border: 1px solid var(--border-color); border-radius: var(--border-radius);
       background: var(--bg-canvas); color: var(--text-primary);
       font-size: var(--font-size-md); box-sizing: border-box;
-      font-family: inherit; transition: border-color 0.15s;
+      font-family: inherit; font-variant-numeric: tabular-nums; transition: border-color 0.15s;
     }
 
     .set-input:focus { border-color: var(--color-primary); }
 
     .set-input.logged { background: transparent; border-color: transparent; cursor: pointer; }
     .set-input.logged:hover { border-color: var(--border-color); }
-    .set-row.set-editing { background: rgba(var(--color-primary-rgb), 0.08); }
+    .set-row.set-editing { background: rgba(var(--color-primary-rgb), 0.08); border-bottom-color: transparent; }
 
     .set-input.has-ghost::placeholder { color: rgba(var(--color-primary-rgb), 0.55); font-style: italic; }
-
-
-    .rpe-input { width: 100%; }
 
     .input-error { border-color: var(--color-danger) !important; }
 
     .rpe-err-msg {
-      grid-column: 1 / -1;
       font-size: var(--font-size-xs); color: var(--color-danger);
       padding: 2px var(--space-lg) var(--space-xs);
     }
 
-    .action-cell { display: flex; align-items: center; justify-content: flex-end; gap: 4px; min-width: 0; }
+    .action-cell { display: flex; align-items: center; justify-content: center; min-width: 0; }
+    .logged-mark { color: var(--text-muted); }
 
     .log-btn {
-      width: 40px; height: 40px; border-radius: 50%;
+      width: 44px; height: 44px; border-radius: 50%;
       background: var(--color-primary); color: var(--text-on-primary); border: none;
       cursor: pointer; display: flex; align-items: center; justify-content: center;
       transition: opacity 0.15s;
@@ -927,8 +1001,83 @@ interface ExerciseBlock {
 
     .log-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+    /* Editing a logged set: its own Cancel and Save under the row. */
+    .edit-actions {
+      display: flex; justify-content: flex-end; gap: var(--space-sm);
+      padding: 0 var(--space-lg) var(--space-sm);
+      background: rgba(var(--color-primary-rgb), 0.08);
+      border-bottom: 1px solid var(--border-color);
+    }
+    .edit-btn {
+      min-height: 44px; min-width: 88px; padding: 0 var(--space-md);
+      border: 1px solid var(--border-color); border-radius: var(--border-radius);
+      background: var(--bg-surface); color: var(--text-primary);
+      font-size: var(--font-size-sm); font-weight: 600; font-family: inherit; cursor: pointer;
+    }
+    .edit-btn--save { background: var(--color-primary); border-color: var(--color-primary); color: var(--text-on-primary); }
+    .edit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .sheet-sub { font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-sm); }
+
+    /* Warm-up prompt: shown above the rows until a set is logged. */
+    .warmup-prompt {
+      display: flex; align-items: center; gap: var(--space-sm); width: 100%;
+      min-height: 52px; padding: var(--space-xs) var(--space-lg);
+      background: rgba(var(--color-warning-rgb), 0.06); border: none; border-bottom: 1px solid var(--border-color);
+      color: var(--color-warning); font-family: inherit; font-size: var(--font-size-sm); font-weight: 600;
+      text-align: left; cursor: pointer;
+    }
+    .warmup-prompt:hover { background: rgba(var(--color-warning-rgb), 0.12); }
+    .warmup-prompt-text { display: flex; flex-direction: column; gap: 2px; }
+    .warmup-prompt-text small { font-weight: 400; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+
+    .plates-btn {
+      display: inline-flex; align-items: center; gap: 6px; margin-left: auto;
+      min-height: 44px; padding: 0 var(--space-md);
+      border: 1px solid var(--border-color); border-radius: var(--border-radius);
+      background: var(--bg-surface); color: var(--text-secondary);
+      font-family: inherit; font-size: var(--font-size-sm); font-weight: 500; cursor: pointer; white-space: nowrap;
+    }
+    .plates-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+    /* Plates sheet */
+    .plates-input {
+      width: 100%; box-sizing: border-box; min-height: 48px; padding: 10px 12px;
+      border: 1px solid var(--border-color); border-radius: var(--border-radius);
+      background: var(--bg-surface); color: var(--text-primary);
+      font-size: var(--font-size-lg); font-weight: 600; font-family: inherit; font-variant-numeric: tabular-nums;
+    }
+    .plates-input:focus { border-color: var(--color-primary); }
+    .plates-result { min-height: 132px; padding: var(--space-md) 0 var(--space-sm); }
+    .plate-stack {
+      position: relative; display: flex; align-items: center; gap: 4px;
+      height: 88px; padding-left: var(--space-lg);
+    }
+    .plate-sleeve {
+      position: absolute; left: 0; right: 0; top: 50%; height: 8px; transform: translateY(-50%);
+      background: var(--border-color); border-radius: var(--border-radius-pill);
+    }
+    .plate {
+      position: relative; display: inline-flex; align-items: center; justify-content: center;
+      min-width: 32px; padding: 0 4px; border-radius: var(--border-radius-sm);
+      background: var(--text-primary); color: var(--bg-surface);
+      font-size: var(--font-size-xs); font-weight: 700; font-variant-numeric: tabular-nums;
+    }
+    .plates-line { font-size: var(--font-size-md); font-weight: 600; margin-top: var(--space-sm); font-variant-numeric: tabular-nums; }
+    .plates-muted { color: var(--text-secondary); font-weight: 400; }
+    .near-chips { display: flex; gap: var(--space-sm); margin-top: var(--space-sm); }
+    .near-chip {
+      min-height: 44px; padding: 0 var(--space-md);
+      border: 1px solid var(--color-primary); border-radius: var(--border-radius-pill);
+      background: none; color: var(--color-primary);
+      font-family: inherit; font-size: var(--font-size-sm); font-weight: 600; cursor: pointer;
+    }
+    .plates-bar { font-size: var(--font-size-sm); color: var(--text-secondary); border-top: 1px solid var(--border-color); padding-top: var(--space-sm); }
+    .plates-link { display: inline-flex; align-items: center; min-height: 44px; color: var(--color-primary); font-weight: 600; }
+    .opt-actions--plain { border-top: none; padding-top: 0; }
+
     .del-btn {
-      width: 40px; height: 40px; border-radius: var(--border-radius-sm);
+      width: 44px; height: 44px; border-radius: var(--border-radius-sm);
       background: none; color: var(--text-muted); border: 1px solid var(--border-color);
       cursor: pointer; display: flex; align-items: center; justify-content: center;
       transition: all 0.15s;
@@ -1001,7 +1150,7 @@ interface ExerciseBlock {
 
     .back-btn {
       display: inline-flex; align-items: center; gap: 4px;
-      background: none; border: none; padding: 0; margin-bottom: var(--space-md);
+      background: none; border: none; min-height: 44px; padding: 0; margin-bottom: var(--space-xs);
       color: var(--text-secondary); font-size: var(--font-size-sm); font-family: inherit; cursor: pointer;
     }
     .back-btn:hover { color: var(--text-primary); }
@@ -1027,53 +1176,28 @@ interface ExerciseBlock {
         margin-bottom: var(--space-md);
       }
 
-      /* Session bar inner row: stack into 2 rows */
-      .session-bar-row {
-        flex-direction: column;
-        padding: var(--space-sm) var(--space-md);
-        gap: var(--space-xs);
-        align-items: stretch;
-      }
+      /* One row on a phone too: the clock on the left, options and Finish on the right. */
+      .session-bar-row { padding: var(--space-xs) var(--space-md); }
 
-      .rest-row { padding: var(--space-xs) var(--space-md); }
-
-      .rest-presets { gap: 3px; }
-
-      .rest-chip { padding: 2px 6px; font-size: 0.65rem; }
-
-      .session-bar-left { gap: var(--space-sm); }
+      .rest-row { padding: var(--space-xs) var(--space-md) calc(var(--space-xs) + 3px); }
 
       .bar-label { display: none; }
 
       .timer { font-size: var(--font-size-lg); }
-
-      .session-bar-right {
-        flex-wrap: wrap;
-        gap: var(--space-xs);
-      }
-
-      /* Type toggle fills first sub-row */
-      .type-toggle { flex: 0 0 100%; }
-
-      .type-btn { flex: 1; padding: 6px 4px; font-size: 0.65rem; }
-
-      /* Exercise + Finish share second sub-row */
     }
 
     /* ── Set table on very small screens ── */
     @media (max-width: 480px) {
       .set-header-row,
       .set-row {
-        grid-template-columns: 24px 1fr 1fr 44px 36px 76px;
+        grid-template-columns: 44px 1fr 1fr 52px 44px;
         padding: var(--space-xs) var(--space-md);
-        gap: 4px;
+        gap: 6px;
       }
 
-      .set-input { min-height: 40px; padding: 6px 6px; font-size: var(--font-size-sm); }
+      .set-input { padding: 8px 8px; }
 
-      .log-btn { width: 36px; height: 36px; }
-
-      .warmup-btn, .del-btn { width: 36px; height: 36px; }
+      .edit-actions, .rpe-err-msg { padding-left: var(--space-md); padding-right: var(--space-md); }
 
       .ex-note-wrap { padding: var(--space-xs) var(--space-md); }
     }
@@ -1094,7 +1218,7 @@ interface ExerciseBlock {
     .form-check-btn {
       display: inline-flex; align-items: center; gap: 6px;
       font-size: var(--font-size-xs); color: var(--text-muted);
-      cursor: pointer; padding: 4px 10px; border-radius: var(--border-radius);
+      cursor: pointer; min-height: 44px; padding: 4px 12px; border-radius: var(--border-radius);
       border: 1px dashed var(--border-color); background: none;
       white-space: nowrap; transition: all 0.15s; font-family: inherit;
     }
@@ -1119,7 +1243,7 @@ interface ExerciseBlock {
 
     .fc-retry-btn {
       font-size: var(--font-size-xs); font-family: inherit; font-weight: 600;
-      padding: 4px 10px; min-height: 32px; border-radius: var(--border-radius);
+      padding: 4px 12px; min-height: 44px; border-radius: var(--border-radius);
       border: 1px solid var(--color-danger); background: none; color: var(--color-danger);
       cursor: pointer;
     }
@@ -1131,9 +1255,9 @@ interface ExerciseBlock {
     }
 
     .fc-clip-link { display: inline-flex; align-items: center; text-decoration: none; }
-    .fc-thumb { width: 32px; height: 32px; object-fit: cover; border-radius: var(--border-radius-sm); border: 1px solid var(--border-color); }
+    .fc-thumb { width: 44px; height: 44px; object-fit: cover; border-radius: var(--border-radius-sm); border: 1px solid var(--border-color); }
     .fc-thumb-video {
-      width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
+      width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center;
       background: var(--surface-secondary); border-radius: var(--border-radius-sm); border: 1px solid var(--border-color);
       color: var(--text-secondary);
     }
@@ -1144,15 +1268,23 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   finishing = signal(false);
   emptySessionError = signal<string | null>(null);
   showExPicker = signal(false);
-  showExitConfirm = signal(false);
+  showOptions = signal(false);
   discarding = signal(false);
   showTemplateSave = signal(false);
-  templateSaving = signal(false);
-  templateSaveError = signal('');
   private readonly toast = inject(ToastService);
   private readonly confirmService = inject(ConfirmService);
-  templateName = '';
   removingBlock = signal<number | null>(null);
+
+  readonly sessionTypes = [
+    { value: 'normal', label: 'Normal' },
+    { value: 'deload', label: 'Deload' },
+    { value: 'test', label: 'Test' },
+  ];
+  readonly units = ['lbs', 'kg'];
+  readonly typeHelp = computed(() => ({
+    deload: "A lighter workout. It doesn't set records or change next time's suggestion.",
+    test: "A max attempt. Records count, but next time's suggestion ignores it.",
+  } as Record<string, string>)[this.sessionType()] ?? "Counts for records and next time's suggestion.");
 
   // Inline exercise creation
   creatingExercise = signal(false);
@@ -1163,28 +1295,65 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   readonly muscleGroups = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs', 'Glutes', 'Core', 'Cardio', 'Other'];
   bwSaving = signal(false);
   bwLogged = signal(false);
-  bwValue: number | null = null;
+  bwValue = '';
   blocks = signal<ExerciseBlock[]>([]);
   elapsedDisplay = signal('0:00');
   sessionType = signal<string>('normal');
 
-  collapsedBlocks = signal<Set<number>>(new Set());
+  /** Collapsed exercises by id, so removing one never shifts which are closed. */
+  collapsedBlocks = signal<Set<string>>(new Set());
+  /** The set whose sheet (warm-up, remove) is open. */
+  readonly setSheet = signal<{ exerciseId: string; setNumber: number } | null>(null);
+  readonly setSheetRow = computed(() => {
+    const ref = this.setSheet();
+    const bi = ref ? this.blocks().findIndex(b => b.exerciseId === ref.exerciseId) : -1;
+    const block = this.blocks()[bi];
+    const si = block ? block.sets.findIndex(r => r.setNumber === ref!.setNumber) : -1;
+    if (!block || si < 0) return null;
+    const row = block.sets[si];
+    const values = filled(row.weight) && filled(row.reps) ? `, ${row.weight} ${this.settingsService.unitLabel()} × ${row.reps}` : '';
+    return { bi, si, row, summary: `${block.exerciseName}${values}${row.saved ? ', logged' : ', not logged yet'}` };
+  });
+  readonly filled = filled;
+  /** Set when the workout was opened after hours with nothing logged; "Keep going" clears it. */
+  readonly stale = signal<{ started: string; lastSet: string | null; lastSetTime: string; lastSetAt: string | null } | null>(null);
+
+  // Plates: the account's bar and plate sizes for the unit in use.
+  readonly currentPlates = computed(() => platesFor(this.settingsService.weightUnit(), this.settingsService.plates()));
+  readonly platesOpen = signal(false);
+  readonly platesWeight = signal('');
+  readonly plateResult = computed(() => {
+    const weight = parseDecimal(this.platesWeight());
+    const set = this.currentPlates();
+    const none = { side: [] as number[], near: [] as number[] };
+    if (weight === null || weight <= 0) return { kind: 'none', ...none };
+    if (weight < set.bar) return { kind: 'light', ...none };
+    const side = platesPerSide(weight, set);
+    if (side) return { kind: side.length ? 'plates' : 'bar', ...none, side };
+    const { below, above } = nearestLoadable(weight, set);
+    return { kind: 'near', ...none, near: [below, above].filter((w): w is number => w !== null) };
+  });
+  // Warm-up ramps keyed by exercise and inputs, so change detection doesn't redo the plate maths.
+  private readonly rampCache = new Map<string, { key: string; ramp: { weight: number; reps: number }[] | null }>();
   allExercises = signal<{ id: string; name: string; muscle_group: string | null }[]>([]);
   filteredExercises = signal<{ id: string; name: string; muscle_group: string | null }[]>([]);
   exSearch = '';
   sessionNotes = '';
 
-  // Rest timer
+  // Rest timer: restLength is this rest (+30s grows it); restSetting is how long every rest starts at.
   restTimerActive = signal(false);
   restTimerRemaining = signal(0);
-  restTimerDuration = signal(90);
+  restLength = signal(90);
   restTimerDone = signal(false);
   readonly restPresets = [60, 90, 120, 180, 300];
+  private readonly restChoice = signal<number | null>(null);
+  readonly restSetting = computed(() => this.restChoice() ?? this.settingsService.restSeconds());
   private restInterval: ReturnType<typeof setInterval> | null = null;
+  private restHideTimer: ReturnType<typeof setTimeout> | null = null;
   private restStartedAt: Date | null = null;
   private audioCtx: AudioContext | null = null;
 
-  private sessionId = '';
+  sessionId = '';
   private startedAt = new Date();
   private timerInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -1253,10 +1422,11 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
       next: session => {
         if (session.ended_at) {
           this.closeDraft();
-          this.openInHistory();
+          this.openSummary();
           return;
         }
         this.startedAt = new Date(session.started_at);
+        this.noteIfStale(session.started_at, session.sets ?? []);
         this.sessionType.set(session.session_type || 'normal');
         this.sessionNotes = session.notes || '';
         this.blocks.set(this.restoreBlocks(session.sets || [], session.targets ?? []));
@@ -1287,11 +1457,12 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   }
 
   // ── Rest timer ──────────────────────────────────────────────────
-  startRestTimer() {
+  startRestTimer(seconds = this.restSetting()) {
     this.clearRestTimer();
     this.warmUpAudio();
     this.restStartedAt = new Date();
-    this.restTimerRemaining.set(this.restTimerDuration());
+    this.restLength.set(seconds);
+    this.restTimerRemaining.set(seconds);
     this.restTimerDone.set(false);
     this.restTimerActive.set(true);
     // Tick at 500ms so the display snaps quickly after screen unlock
@@ -1318,13 +1489,15 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   private tickRestTimer() {
     if (!this.restStartedAt) return;
     const elapsed = Math.floor((Date.now() - this.restStartedAt.getTime()) / 1000);
-    const rem = Math.max(0, this.restTimerDuration() - elapsed);
+    const rem = Math.max(0, this.restLength() - elapsed);
     this.restTimerRemaining.set(rem);
     if (rem <= 0 && !this.restTimerDone()) {
       this.clearRestTimer();
       this.restTimerDone.set(true);
       this.playBeep();
-      setTimeout(() => {
+      // Kept so a rest started in these 3 s isn't hidden by the old one.
+      this.restHideTimer = setTimeout(() => {
+        this.restHideTimer = null;
         this.restTimerActive.set(false);
         this.restTimerDone.set(false);
       }, 3000);
@@ -1333,6 +1506,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
 
   private clearRestTimer() {
     if (this.restInterval) { clearInterval(this.restInterval); this.restInterval = null; }
+    if (this.restHideTimer) { clearTimeout(this.restHideTimer); this.restHideTimer = null; }
     this.restStartedAt = null;
   }
 
@@ -1342,21 +1516,26 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     this.restTimerDone.set(false);
   }
 
-  setRestDuration(seconds: number) {
-    this.restTimerDuration.set(seconds);
-    if (this.restTimerActive() && !this.restTimerDone()) {
-      this.startRestTimer();
-    }
+  /** Every rest's length, remembered on the account; applied at once, reverted if the save fails. */
+  setRestDefault(seconds: number) {
+    if (seconds === this.restSetting()) return;
+    this.restChoice.set(seconds);
+    if (this.restTimerActive() && !this.restTimerDone()) this.startRestTimer(seconds);
+    this.authService.updateSettings({ rest_seconds: seconds }).subscribe({
+      next: () => this.restChoice.set(null),
+      error: () => {
+        this.restChoice.set(null);
+        this.toast.error('Could not save the rest timer.');
+      },
+    });
   }
 
+  /** Lengthens this rest only; after the beep it starts a fresh rest of that length. */
   addRestTime(seconds: number) {
     if (this.restTimerDone()) {
-      // Re-arm with fresh duration
-      this.restTimerDuration.set(seconds);
-      this.startRestTimer();
+      this.startRestTimer(seconds);
     } else {
-      // Extend: increase duration, shift start back so remaining grows
-      this.restTimerDuration.update(d => d + seconds);
+      this.restLength.update(d => d + seconds);
       this.restTimerRemaining.update(r => r + seconds);
     }
   }
@@ -1409,7 +1588,12 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   }
 
   private updateElapsed() {
-    const elapsed = Math.floor((Date.now() - this.startedAt.getTime()) / 1000);
+    const elapsed = Math.max(0, Math.floor((Date.now() - this.startedAt.getTime()) / 1000));
+    // Past a day the seconds are noise: "2d 3h".
+    if (elapsed >= 86_400) {
+      this.elapsedDisplay.set(`${Math.floor(elapsed / 86_400)}d ${Math.floor((elapsed % 86_400) / 3600)}h`);
+      return;
+    }
     const h = Math.floor(elapsed / 3600);
     const m = Math.floor((elapsed % 3600) / 60);
     const s = elapsed % 60;
@@ -1466,31 +1650,27 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   }
 
   toggleUnit(unit: string) {
-    this.authService.updateSettings({ weight_unit: unit }).subscribe();
+    if (unit === this.settingsService.weightUnit()) return;
+    this.authService.updateSettings({ weight_unit: unit }).subscribe({
+      error: () => this.toast.error('Could not change the unit.'),
+    });
   }
 
   rpeInvalid(rpe: string): boolean {
-    const v = parseInt(rpe, 10);
-    return isNaN(v) || v < 1 || v > 10;
+    const v = parseWhole(rpe);
+    return v === null || v < 1 || v > 10;
   }
 
+  /** A new row's ghosts: the last logged working set, else the suggestion the other rows carry; never a warm-up. */
   addSet(blockIndex: number) {
     const block = this.blocks()[blockIndex];
-    const lastSaved = block.sets.filter(s => s.saved).slice(-1)[0];
-    const setNumber = block.sets.length + 1;
-    const newRow: SetRow = {
-      setNumber,
-      weight: '',
-      reps: '',
-      rpe: '',
-      saved: false,
-      isPR: false,
-      saving: false,
-      id: null,
-      ghostWeight: lastSaved ? lastSaved.weight : '',
-      ghostReps: lastSaved ? lastSaved.reps : '',
-      isWarmup: false,
-    };
+    const working = block.sets.filter(s => !s.isWarmup);
+    const lastLogged = working.filter(s => s.saved).at(-1);
+    const suggested = working.filter(s => !s.saved).at(-1);
+    const newRow = this.newRow(block.sets.length + 1, {
+      ghostWeight: lastLogged?.weight ?? suggested?.ghostWeight ?? '',
+      ghostReps: lastLogged?.reps ?? suggested?.ghostReps ?? '',
+    });
     this.blocks.update(bs => bs.map((b, i) => i === blockIndex ? { ...b, sets: [...b.sets, newRow] } : b));
   }
 
@@ -1502,9 +1682,12 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   private persistRow(blockIndex: number, setIndex: number, startRest: boolean): Promise<boolean> {
     const block = this.blocks()[blockIndex];
     const row = block?.sets[setIndex];
-    const weight = row?.weight || row?.ghostWeight;
-    const reps = row?.reps || row?.ghostReps;
-    if (!row || !weight || !reps) return Promise.resolve(false);
+    if (!row || !this.canLog(row)) return Promise.resolve(false);
+    // Typed values win, a typed 0 included; otherwise the ghosts the row shows.
+    const weightNum = parseDecimal(filled(row.weight) ? row.weight : row.ghostWeight)!;
+    const repsNum = parseWhole(filled(row.reps) ? row.reps : row.ghostReps)!;
+    const weight = String(weightNum);
+    const reps = String(repsNum);
 
     // Warm up audio NOW, synchronously while the tap gesture is still active.
     // Safari blocks AudioContext creation/resume in async callbacks (e.g. HTTP responses).
@@ -1518,9 +1701,9 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     const req: CreateSetRequest = {
       exercise_id: block.exerciseId,
       set_number: row.setNumber,
-      weight: this.settingsService.toKg(parseFloat(weight)),
-      reps_performed: parseInt(reps, 10),
-      rpe: row.rpe ? parseInt(row.rpe, 10) : undefined,
+      weight: this.settingsService.toKg(weightNum),
+      reps_performed: repsNum,
+      rpe: parseWhole(row.rpe) ?? undefined,
       is_warmup: row.isWarmup,
       exercise_note: block.exerciseNote || undefined,
     };
@@ -1589,7 +1772,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
       next: () => {
         this.deleteStaleFormChecks(block.exerciseId);
         if (this.targetIds.has(block.exerciseId)) this.removedTargets.add(block.exerciseId);
-        this.collapsedBlocks.update(set => new Set([...set].filter(i => i !== blockIndex).map(i => (i > blockIndex ? i - 1 : i))));
+        this.collapsedBlocks.update(set => { const next = new Set(set); next.delete(block.exerciseId); return next; });
         this.blocks.update(bs => bs.filter((_, bi) => bi !== blockIndex));
         this.removingBlock.set(null);
         this.toast.success(`${block.exerciseName} removed`);
@@ -1610,43 +1793,40 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     this.blockAttachments.update(m => { const n = new Map(m); n.delete(exerciseId); return n; });
   }
 
+  /** Leaves the workout open: logged sets are on the server, typed ones in this device's draft. */
   exitSession() {
+    this.showOptions.set(false);
     this.router.navigate(['/jym']);
   }
 
-  discardSession() {
+  async discardSession() {
+    const logged = this.blocks().reduce((n, b) => n + b.sets.filter(s => s.saved).length, 0);
+    this.showOptions.set(false);
+    const ok = await this.confirmService.confirm({
+      title: 'Discard this workout?',
+      message: logged > 0
+        ? `This deletes the ${logged} ${logged === 1 ? 'set' : 'sets'} you logged. It can't be undone.`
+        : 'Nothing is logged yet.',
+      confirmLabel: 'Discard workout',
+      danger: true,
+    });
+    if (!ok) return;
     this.discarding.set(true);
     this.jymService.deleteSession(this.sessionId).subscribe({
       next: () => {
         this.closeDraft();
         this.router.navigate(['/jym']);
       },
-      error: () => this.discarding.set(false),
+      error: () => {
+        this.discarding.set(false);
+        this.toast.error('Could not discard the workout.');
+      },
     });
   }
 
   saveNotes() {
     this.jymService.updateSession(this.sessionId, { notes: this.sessionNotes }).subscribe({
       error: err => { if (!this.handleEnded(err)) this.toast.error('Could not save the session notes.'); },
-    });
-  }
-
-  saveAsTemplate() {
-    const name = this.templateName.trim();
-    if (!name) return;
-    this.templateSaving.set(true);
-    this.templateSaveError.set('');
-    this.jymService.createTemplateFromSession(this.sessionId, name).subscribe({
-      next: () => {
-        this.showTemplateSave.set(false);
-        this.templateSaving.set(false);
-        this.templateName = '';
-        this.toast.success(`Template "${name}" saved`);
-      },
-      error: () => {
-        this.templateSaving.set(false);
-        this.templateSaveError.set('Could not save template. Make sure you have logged at least one set.');
-      },
     });
   }
 
@@ -1686,43 +1866,51 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     }).subscribe({
       next: () => {
         this.closeDraft();
-        const durationSeconds = Math.floor((Date.now() - this.startedAt.getTime()) / 1000);
-        this.router.navigate(['/jym/session-summary'], {
-          state: {
-            sessionId: this.sessionId,
-            durationSeconds,
-            sessionType: this.sessionType(),
-            weightUnit: this.settingsService.weightUnit(),
-            routineName: null,
-            blocks: this.blocks().map(b => ({
-              exerciseId: b.exerciseId,
-              exerciseName: b.exerciseName,
-              muscleGroup: b.muscleGroup,
-              sets: b.sets.map(s => ({
-                weight: parseFloat(s.weight) || 0,
-                reps: parseInt(s.reps, 10) || 0,
-                saved: s.saved,
-                isPR: s.isPR,
-                isWarmup: s.isWarmup,
-              })),
-            })),
-          },
-        });
+        // Replaced, so Back from the summary skips the finished player.
+        this.router.navigate(['/jym/sessions', this.sessionId, 'summary'], { replaceUrl: true, state: { from: 'finish' } });
       },
       error: err => {
         this.finishing.set(false);
-        this.handleEnded(err);
+        if (!this.handleEnded(err)) this.toast.error('Could not finish the workout. Check your connection and try again.');
       },
     });
   }
 
-  /** A finished session opens read-only in Track's history, never as a live workout. */
-  private openInHistory() {
-    if (this.timerInterval) clearInterval(this.timerInterval);
-    this.router.navigate(['/jym/track'], {
-      queryParams: { tab: 'sessions', session: this.sessionId },
-      replaceUrl: true,
+  /** A forgotten workout (nothing logged for hours) gets the banner; the times are the server's. */
+  private noteIfStale(startedAt: string, sets: SessionSet[]) {
+    const lastSetAt = sets.reduce<string | null>((m, s) => !m || Date.parse(s.created_at) > Date.parse(m) ? s.created_at : m, null);
+    if (!isStale({ started_at: startedAt, last_set_at: lastSetAt })) return;
+    const tz = this.settingsService.timezone();
+    const at = (iso: string) => `${formatInstant(iso, tz, { weekday: true })}, ${timeInZone(iso, tz)}`;
+    const sameDay = !!lastSetAt && dayKey(lastSetAt, tz) === dayKey(startedAt, tz);
+    this.stale.set({
+      started: at(startedAt),
+      lastSet: lastSetAt ? (sameDay ? timeInZone(lastSetAt, tz) : at(lastSetAt)) : null,
+      lastSetTime: lastSetAt ? timeInZone(lastSetAt, tz) : '',
+      lastSetAt,
     });
+  }
+
+  /** Ends a forgotten workout at its last logged set, so its duration is the training, not the days after. */
+  finishAtLastSet(endedAt: string) {
+    if (this.finishing()) return;
+    this.finishing.set(true);
+    this.jymService.updateSession(this.sessionId, { ended_at: endedAt, notes: this.sessionNotes }).subscribe({
+      next: () => {
+        this.closeDraft();
+        this.router.navigate(['/jym/sessions', this.sessionId, 'summary'], { replaceUrl: true, state: { from: 'finish' } });
+      },
+      error: err => {
+        this.finishing.set(false);
+        if (!this.handleEnded(err)) this.toast.error('Could not finish the workout. Try again.');
+      },
+    });
+  }
+
+  /** A finished workout opens as its summary, never as a live workout. */
+  private openSummary() {
+    if (this.timerInterval) clearInterval(this.timerInterval);
+    this.router.navigate(['/jym/sessions', this.sessionId, 'summary'], { replaceUrl: true });
   }
 
   /** The API refuses writes to a finished session (e.g. finished in another tab). */
@@ -1731,15 +1919,20 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     if (code !== 'SESSION_ENDED') return false;
     this.closeDraft();
     this.toast.error('This workout was already finished.');
-    this.openInHistory();
+    this.openSummary();
     return true;
   }
 
+  bwValid(): boolean {
+    const v = parseDecimal(this.bwValue);
+    return v !== null && v > 0;
+  }
+
   saveBodyWeight() {
-    if (!this.bwValue) return;
+    if (!this.bwValid() || this.bwSaving()) return;
     this.bwSaving.set(true);
     const today = todayKey(this.settingsService.timezone());
-    this.jymService.logBodyWeight({ recorded_at: today, weight_kg: this.settingsService.toKg(this.bwValue) }).subscribe({
+    this.jymService.logBodyWeight({ recorded_at: today, weight_kg: this.settingsService.toKg(parseDecimal(this.bwValue)!) }).subscribe({
       next: () => { this.bwLogged.set(true); this.bwSaving.set(false); },
       error: () => {
         this.bwSaving.set(false);
@@ -1749,15 +1942,119 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   }
 
   toggleBlock(bi: number) {
+    const id = this.blocks()[bi]?.exerciseId;
+    if (!id) return;
     this.collapsedBlocks.update(s => {
       const next = new Set(s);
-      if (next.has(bi)) next.delete(bi); else next.add(bi);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
   }
 
   isCollapsed(bi: number): boolean {
-    return this.collapsedBlocks().has(bi);
+    const id = this.blocks()[bi]?.exerciseId;
+    return !!id && this.collapsedBlocks().has(id);
+  }
+
+  openSetSheet(block: ExerciseBlock, row: SetRow) {
+    this.setSheet.set({ exerciseId: block.exerciseId, setNumber: row.setNumber });
+  }
+
+  toggleWarmupFromSheet() {
+    const ref = this.setSheetRow();
+    this.setSheet.set(null);
+    if (ref) this.toggleWarmup(ref.bi, ref.si);
+  }
+
+  /** A logged set is deleted on the server; an unlogged row just goes. Either way the rows renumber by position. */
+  removeSetFromSheet() {
+    const ref = this.setSheetRow();
+    this.setSheet.set(null);
+    if (!ref) return;
+    const exerciseId = this.blocks()[ref.bi].exerciseId;
+    if (ref.row.saved) {
+      this.deleteSet(ref.bi, ref.si);
+    } else {
+      this.blocks.update(bs => bs.map((b, bi) => bi !== ref.bi ? b : {
+        ...b,
+        sets: b.sets.filter((_, si) => si !== ref.si).map((s, i) => ({ ...s, setNumber: i + 1 })),
+      }));
+    }
+    // The set's own button is gone, so focus lands on the exercise's Add set.
+    setTimeout(() => document.getElementById('add-set-' + exerciseId)?.focus({ preventScroll: true }));
+  }
+
+  /** The weight an exercise works at next: the first unlogged working row, typed or ghosted, else the last logged. */
+  private workingWeight(block: ExerciseBlock): number | null {
+    const next = block.sets.find(s => !s.saved && !s.isWarmup);
+    const typed = next ? parseDecimal(filled(next.weight) ? next.weight : next.ghostWeight) : null;
+    if (typed !== null) return typed;
+    const last = block.sets.filter(s => s.saved && !s.isWarmup).at(-1);
+    return last ? parseDecimal(last.weight) : null;
+  }
+
+  /** Warm-up sets to offer: before anything is logged or marked warm-up, and only above the bar. */
+  warmupRampFor(block: ExerciseBlock): { weight: number; reps: number }[] | null {
+    if (block.sets.some(s => s.saved || s.isWarmup)) return null;
+    const work = this.workingWeight(block);
+    if (work === null) return null;
+    const set = this.currentPlates();
+    const key = `${work}|${set.bar}|${set.sizes.join(',')}`;
+    const cached = this.rampCache.get(block.exerciseId);
+    if (cached?.key === key) return cached.ramp;
+    const ramp = warmupRamp(work, set);
+    const value = ramp.length ? ramp : null;
+    this.rampCache.set(block.exerciseId, { key, ramp: value });
+    return value;
+  }
+
+  rampSummary(ramp: { weight: number; reps: number }[]): string {
+    return ramp.map(r => `${r.weight} × ${r.reps}`).join(', ');
+  }
+
+  /** Inserts the ramp as typed warm-up rows above the working rows; each then logs with one tap. */
+  addWarmups(bi: number, ramp: { weight: number; reps: number }[]) {
+    this.blocks.update(bs => bs.map((b, i) => i !== bi ? b : {
+      ...b,
+      sets: [
+        ...ramp.map(r => this.newRow(0, { weight: String(r.weight), reps: String(r.reps), isWarmup: true })),
+        ...b.sets,
+      ].map((s, n) => ({ ...s, setNumber: n + 1 })),
+    }));
+  }
+
+  openPlates(block: ExerciseBlock) {
+    const weight = this.workingWeight(block);
+    this.platesWeight.set(weight === null ? '' : String(weight));
+    this.platesOpen.set(true);
+  }
+
+  /** A plate drawn taller the heavier it is, against the heaviest size on hand. */
+  plateHeight(plate: number): number {
+    const heaviest = Math.max(...this.currentPlates().sizes);
+    return Math.round(32 + 52 * (plate / heaviest));
+  }
+
+  /**
+   * Enter on a phone keypad: a logged row opens for editing; in an edit, weight moves to reps and
+   * reps or RPE save; on a new row it just closes the keyboard (the check logs).
+   */
+  onEnter(event: Event, bi: number, si: number, field: 'weight' | 'reps' | 'rpe') {
+    const row = this.blocks()[bi]?.sets[si];
+    if (!row) return;
+    if (row.saved && !row.editing) {
+      this.editRow(event, bi, si);
+      return;
+    }
+    event.preventDefault();
+    const input = event.target as HTMLInputElement;
+    if (field === 'weight') {
+      input.parentElement?.querySelector<HTMLInputElement>('.reps-input')?.focus();
+    } else if (row.editing) {
+      this.saveEdit(bi, si);
+    } else {
+      input.blur();
+    }
   }
 
   savedCount(bi: number): number {
@@ -1884,20 +2181,25 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
 
   // ── Plan and draft ──────────────────────────────────────────────
 
-  /** Logged exercises in the order done, then the plan's unlogged ones, then exercises added on this device. */
+  /**
+   * Logged exercises in the order done, then the plan's unlogged ones, then exercises added on this device.
+   * A v2 draft holds every unlogged row of an exercise, so inserted warm-ups and removed rows survive a reload;
+   * without one, the plan pads each exercise to its planned sets.
+   */
   private restoreBlocks(sets: SessionSet[], targets: RoutineItem[]): ExerciseBlock[] {
-    const draft = this.readDraft();
+    const draft = readDraft(this.sessionId);
+    const whole = draft.v === DRAFT_VERSION;
     this.targetIds = new Set(targets.map(t => t.exercise_id));
     this.removedTargets = new Set(draft.removed.filter(id => this.targetIds.has(id)));
 
     const logged = this.buildBlocksFromSets(sets);
     const loggedIds = new Set(logged.map(b => b.exerciseId));
-    // A plan exercise logged part-way keeps its remaining planned rows.
+    // A plan exercise logged part-way keeps its remaining planned rows, ghosted from its last working set.
     this.targetById = new Map(targets.map(t => [t.exercise_id, t]));
     for (const b of logged) {
       const t = this.targetById.get(b.exerciseId);
       if (t) b.plan = { sets: t.target_sets, reps: t.target_reps };
-      const last = b.sets[b.sets.length - 1];
+      const last = b.sets.filter(s => !s.isWarmup).at(-1);
       for (let n = b.sets.length + 1; t && n <= t.target_sets; n++) {
         b.sets.push(this.newRow(n, { ghostWeight: last?.weight ?? '', ghostReps: String(t.target_reps) }));
       }
@@ -1912,11 +2214,25 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     const blocks = [...logged, ...planned, ...added];
     const unit = this.settingsService.weightUnit();
     for (const b of blocks) {
-      for (const saved of draft.rows[b.exerciseId] ?? []) {
-        const d = draft.unit && draft.unit !== unit ? { ...saved, weight: this.convertText(saved.weight, draft.unit, unit) } : saved;
-        const row = b.sets.find(r => r.setNumber === d.setNumber);
-        if (row && !row.saved) Object.assign(row, { weight: d.weight, reps: d.reps, rpe: d.rpe, isWarmup: d.isWarmup });
-        else if (!row) b.sets.push(this.newRow(d.setNumber, { weight: d.weight, reps: d.reps, rpe: d.rpe, isWarmup: d.isWarmup }));
+      const draftRows = draft.rows[b.exerciseId];
+      if (!draftRows) continue;
+      const rows = draftRows.map(d => draft.unit && draft.unit !== unit ? { ...d, weight: this.convertText(d.weight, draft.unit, unit) } : d);
+      if (whole) {
+        // The draft's rows replace the padding; a number a logged set now holds (logged elsewhere) is dropped.
+        const kept = b.sets.filter(r => r.saved);
+        const taken = new Set(kept.map(r => r.setNumber));
+        const last = kept.filter(r => !r.isWarmup).at(-1);
+        b.sets = [...kept, ...rows.filter(d => !taken.has(d.setNumber)).map(d => this.newRow(d.setNumber, {
+          weight: d.weight, reps: d.reps, rpe: d.rpe, isWarmup: d.isWarmup,
+          ghostWeight: d.isWarmup ? '' : last?.weight ?? '',
+          ghostReps: !d.isWarmup && b.plan ? String(b.plan.reps) : '',
+        }))];
+      } else {
+        for (const d of rows) {
+          const row = b.sets.find(r => r.setNumber === d.setNumber);
+          if (row && !row.saved) Object.assign(row, { weight: d.weight, reps: d.reps, rpe: d.rpe, isWarmup: d.isWarmup });
+          else if (!row) b.sets.push(this.newRow(d.setNumber, { weight: d.weight, reps: d.reps, rpe: d.rpe, isWarmup: d.isWarmup }));
+        }
       }
       b.sets.sort((x, y) => x.setNumber - y.setNumber);
     }
@@ -1946,55 +2262,34 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     return { exerciseId, exerciseName, muscleGroup, sets, ghostSets: [], suggestion: null, exerciseNote: '' };
   }
 
-  /** Rows with weight and reps typed but not ticked. */
+  /** Rows with a weight and reps typed but not ticked; a typed 0 counts. */
   private unloggedRows(): { bi: number; si: number }[] {
     const rows: { bi: number; si: number }[] = [];
     this.blocks().forEach((b, bi) => b.sets.forEach((s, si) => {
-      if (!s.saved && !s.saving && s.weight && s.reps && !(s.rpe && this.rpeInvalid(s.rpe))) rows.push({ bi, si });
+      if (!s.saved && filled(s.weight) && filled(s.reps) && this.canLog(s)) rows.push({ bi, si });
     }));
     return rows;
   }
 
-  private draftKey(): string {
-    return `jiro_session_draft_${this.sessionId}`;
-  }
-
-  private readDraft(): SessionDraft {
-    const empty: SessionDraft = { added: [], removed: [], rows: {} };
-    try {
-      const raw = localStorage.getItem(this.draftKey());
-      return raw ? { ...empty, ...JSON.parse(raw) } : empty;
-    } catch {
-      return empty;
-    }
-  }
-
-  /** Keeps what the server doesn't have yet for this session, on this device. */
+  /** Keeps what the server doesn't have yet for this workout, on this device: every unlogged row, empty ones too. */
   saveDraft() {
     if (this.closed || !this.draftReady) return;
     const blocks = this.blocks();
     const rows: SessionDraft['rows'] = {};
     for (const b of blocks) {
-      const typed = b.sets
-        .filter(s => !s.saved && (s.weight || s.reps || s.rpe || s.isWarmup))
+      rows[b.exerciseId] = b.sets
+        .filter(s => !s.saved)
         .map(s => ({ setNumber: s.setNumber, weight: s.weight, reps: s.reps, rpe: s.rpe, isWarmup: s.isWarmup }));
-      if (typed.length) rows[b.exerciseId] = typed;
     }
-    const draft: SessionDraft = {
+    writeDraft(this.sessionId, {
+      v: DRAFT_VERSION,
       unit: this.settingsService.weightUnit(),
       added: blocks
         .filter(b => !this.targetIds.has(b.exerciseId) && !b.sets.some(s => s.saved))
         .map(b => ({ exerciseId: b.exerciseId, exerciseName: b.exerciseName, muscleGroup: b.muscleGroup })),
       removed: [...this.removedTargets],
       rows,
-    };
-    try {
-      if (draft.added.length || draft.removed.length || Object.keys(rows).length) {
-        localStorage.setItem(this.draftKey(), JSON.stringify(draft));
-      } else {
-        localStorage.removeItem(this.draftKey());
-      }
-    } catch { /* storage unavailable: the draft is a convenience */ }
+    });
   }
 
   /** Typing saves shortly after the last keystroke. */
@@ -2017,10 +2312,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   private closeDraft() {
     this.closed = true;
     if (this.draftTimer) clearTimeout(this.draftTimer);
-    try {
-      localStorage.removeItem(this.draftKey());
-      localStorage.removeItem(`jiro_session_targets_${this.sessionId}`); // retired key, still on older devices
-    } catch { /* storage unavailable */ }
+    clearDraft(this.sessionId);
   }
 
   // ── Form check helpers ──────────────────────────────────────────
@@ -2118,7 +2410,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
       ...b,
       suggestion: next.text,
       suggestionIcon: next.icon,
-      sets: setGhosts ? b.sets.map(s => !s.saved ? { ...s, ghostWeight: next.ghostWeight, ghostReps: next.ghostReps } : s) : b.sets,
+      sets: setGhosts ? b.sets.map(s => !s.saved && !s.isWarmup ? { ...s, ghostWeight: next.ghostWeight, ghostReps: next.ghostReps } : s) : b.sets,
     } : b));
   }
 
@@ -2127,6 +2419,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     const unit = this.settingsService.unitLabel();
     const next = nextSets(history, {
       excludeSessionId: this.sessionId,
+      before: this.startedAt.toISOString(),
       plan: block.plan ?? null,
       unit,
       toDisplay: kg => this.settingsService.toDisplay(kg),
@@ -2162,16 +2455,18 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     };
   }
 
-  /** ✓ is ready when weight and reps are each typed or ghosted. */
+  /** ✓ is ready when weight and reps each read as numbers, typed (0 included) or ghosted. */
   canLog(row: SetRow): boolean {
-    return !row.saving && !!(row.weight || row.ghostWeight) && !!(row.reps || row.ghostReps)
-      && !(row.rpe && this.rpeInvalid(row.rpe));
+    const weight = parseDecimal(filled(row.weight) ? row.weight : row.ghostWeight);
+    const reps = parseWhole(filled(row.reps) ? row.reps : row.ghostReps);
+    return !row.saving && weight !== null && reps !== null && reps >= 1
+      && !(filled(row.rpe) && this.rpeInvalid(row.rpe));
   }
 
   logLabel(row: SetRow): string {
-    const weight = row.weight || row.ghostWeight;
-    const reps = row.reps || row.ghostReps;
-    return weight && reps
+    const weight = filled(row.weight) ? row.weight : row.ghostWeight;
+    const reps = filled(row.reps) ? row.reps : row.ghostReps;
+    return filled(weight) && filled(reps)
       ? `Log set ${row.setNumber}: ${weight} ${this.settingsService.unitLabel()} × ${reps}`
       : `Log set ${row.setNumber}`;
   }
@@ -2194,9 +2489,8 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   }
 
   editValid(row: SetRow): boolean {
-    const weight = parseFloat(row.weight);
-    const reps = parseInt(row.reps, 10);
-    return !isNaN(weight) && weight >= 0 && !isNaN(reps) && reps >= 1 && !(row.rpe && this.rpeInvalid(row.rpe));
+    const reps = parseWhole(row.reps);
+    return parseDecimal(row.weight) !== null && reps !== null && reps >= 1 && !(filled(row.rpe) && this.rpeInvalid(row.rpe));
   }
 
   /** Saves a corrected set; the API re-rates the exercise, so PR badges are re-read. */
@@ -2209,10 +2503,11 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
       return;
     }
     const id = row.id;
+    const rpe = parseWhole(row.rpe);
     const req: UpdateSetRequest = {
-      weight: this.settingsService.toKg(parseFloat(row.weight)),
-      reps_performed: parseInt(row.reps, 10),
-      ...(row.rpe ? { rpe: parseInt(row.rpe, 10) } : {}),
+      weight: this.settingsService.toKg(parseDecimal(row.weight)!),
+      reps_performed: parseWhole(row.reps)!,
+      ...(rpe !== null ? { rpe } : {}),
     };
     this.patchSet(id, { saving: true });
     this.jymService.updateSet(id, req).subscribe({
@@ -2250,12 +2545,12 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
 
   /** A logged working set below the plan's reps. */
   isShort(block: ExerciseBlock, row: SetRow): boolean {
-    return !!block.plan && row.saved && !row.isWarmup && +row.reps < block.plan.reps;
+    return !!block.plan && row.saved && !row.isWarmup && (parseWhole(row.reps) ?? 0) < block.plan.reps;
   }
 
   private convertText(value: string, from: string, to: string): string {
-    const n = parseFloat(value);
-    return value && !isNaN(n) ? String(this.settingsService.convertWeight(n, from, to)) : value;
+    const n = parseDecimal(value);
+    return n !== null ? String(this.settingsService.convertWeight(n, from, to)) : value;
   }
 
   /** Logged rows come back from their stored kg; typed rows and ghosts are converted; suggestions are rebuilt. */
@@ -2268,7 +2563,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
         ghostWeight: this.convertText(s.ghostWeight, from, to),
       })),
     })));
-    if (this.bwValue) this.bwValue = this.settingsService.convertWeight(this.bwValue, from, to);
+    this.bwValue = this.convertText(this.bwValue, from, to);
     for (const b of this.blocks()) this.applySuggestion(b.exerciseId);
   }
 }

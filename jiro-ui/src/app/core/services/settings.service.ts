@@ -1,5 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { AuthService } from './auth.service';
+import { AuthService, StoredPlates } from './auth.service';
 import { resolveTimeZone } from '../utils/day';
 
 const KG_TO_LBS = 2.20462;
@@ -32,6 +32,15 @@ export class SettingsService {
 
   /** The raw stored dashboard layout. Unvalidated: read it through resolveLayout(). */
   dashboard = computed<unknown>(() => this.parsedSettings()['dashboard']);
+
+  /** Seconds Jym's rest timer runs after each logged set. */
+  restSeconds = computed<number>(() => {
+    const v = this.parsedSettings()['rest_seconds'];
+    return typeof v === 'number' && v >= 15 && v <= 600 ? v : 90;
+  });
+
+  /** The stored bar and plates per unit; Jym's platesFor() fills in the defaults. */
+  plates = computed<StoredPlates>(() => (this.parsedSettings()['plates'] as StoredPlates | null | undefined) ?? {});
 
   // Dark mode is stored in localStorage — works without a round-trip and persists across sessions
   private _darkMode = signal<boolean>(

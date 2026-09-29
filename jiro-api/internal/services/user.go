@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/models"
@@ -183,6 +185,54 @@ func validateDashboard(raw json.RawMessage) (json.RawMessage, error) {
 	return json.Marshal(layout)
 }
 
+const (
+	minRestSeconds = 15
+	maxRestSeconds = 600
+	maxPlateBytes  = 1 << 10
+	maxPlateSizes  = 12
+)
+
+// validatePlates strictly decodes a bar and plate sizes per unit and returns them re-encoded,
+// sizes heaviest first.
+func validatePlates(raw json.RawMessage) (json.RawMessage, error) {
+	if len(raw) > maxPlateBytes {
+		return nil, invalidSettings("plates are too large")
+	}
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	var plates models.Plates
+	if err := dec.Decode(&plates); err != nil || dec.More() {
+		return nil, invalidSettings("plates are not valid")
+	}
+	if plates.Kg == nil && plates.Lbs == nil {
+		return nil, invalidSettings("plates need a kg or lbs set")
+	}
+	for _, set := range []*models.PlateSet{plates.Kg, plates.Lbs} {
+		if set == nil {
+			continue
+		}
+		if set.Bar < 0 || set.Bar > 250 {
+			return nil, invalidSettings("the bar must weigh 0 to 250")
+		}
+		if len(set.Sizes) == 0 || len(set.Sizes) > maxPlateSizes {
+			return nil, invalidSettings("choose 1 to 12 plate sizes")
+		}
+		seen := make(map[float64]struct{}, len(set.Sizes))
+		for _, size := range set.Sizes {
+			// Plates come in quarter steps: 0.25, 1.25, 2.5 and up.
+			if size <= 0 || size > 100 || math.Mod(size*4, 1) != 0 {
+				return nil, invalidSettings("a plate weighs 0.25 to 100, in steps of 0.25")
+			}
+			if _, dup := seen[size]; dup {
+				return nil, invalidSettings("each plate size is listed once")
+			}
+			seen[size] = struct{}{}
+		}
+		sort.Sort(sort.Reverse(sort.Float64Slice(set.Sizes)))
+	}
+	return json.Marshal(plates)
+}
+
 // UpdateSettings merges only the fields that were sent into the stored
 // settings object in a single statement. Keys this code does not know about
 // are preserved, and two concurrent saves of different keys cannot clobber
@@ -232,6 +282,23 @@ func (s *UserService) UpdateSettings(ctx context.Context, userID uuid.UUID, req 
 				return nil, err
 			}
 			patch["dashboard"] = layout
+		}
+	}
+	if req.RestSeconds != nil {
+		if *req.RestSeconds < minRestSeconds || *req.RestSeconds > maxRestSeconds {
+			return nil, invalidSettings("rest_seconds must be 15 to 600")
+		}
+		patch["rest_seconds"] = *req.RestSeconds
+	}
+	if len(req.Plates) > 0 {
+		if bytes.Equal(bytes.TrimSpace(req.Plates), []byte("null")) {
+			remove = append(remove, "plates")
+		} else {
+			plates, err := validatePlates(req.Plates)
+			if err != nil {
+				return nil, err
+			}
+			patch["plates"] = plates
 		}
 	}
 

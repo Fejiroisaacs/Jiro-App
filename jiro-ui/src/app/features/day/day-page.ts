@@ -92,7 +92,7 @@ const SLOT_LABELS: Record<string, string> = { breakfast: 'Breakfast', lunch: 'Lu
                   <ul class="rows">
                     @for (s of d.jym.sessions; track s.id) {
                       <li>
-                        <a class="row" [routerLink]="sessionLink(s).path" [queryParams]="sessionLink(s).query">
+                        <a class="row" [routerLink]="sessionLink(s).path" [state]="sessionLink(s).state">
                           <span class="row-main">
                             <span class="row-title">{{ s.routine_name || 'Freestyle' }}</span>
                             @if (!s.ended_at) { <span class="pill">In progress</span> }
@@ -481,11 +481,11 @@ export class DayPageComponent {
     }, { injector: this.injector });
   }
 
-  sessionLink(s: SessionSummary): { path: unknown[]; query: Record<string, string> | null } {
-    // Completed sessions open read-only in history; the player would restart its timer.
+  sessionLink(s: SessionSummary): { path: unknown[]; state: { back: string } | undefined } {
+    // A finished workout opens its summary, whose Done comes back here; an open one resumes.
     return s.ended_at
-      ? { path: ['/jym/track'], query: { tab: 'sessions', session: s.id } }
-      : { path: ['/jym/session', s.id], query: null };
+      ? { path: ['/jym/sessions', s.id, 'summary'], state: { back: this.router.url } }
+      : { path: ['/jym/session', s.id], state: undefined };
   }
 
   /** "7:30 AM · 45 min, 12 sets, 3,400 kg": one middle dot after the time, commas after that. */

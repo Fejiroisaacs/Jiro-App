@@ -30,17 +30,27 @@ var (
 	ErrShareExpired       = errors.New("share link has expired")
 	ErrShareForbidden     = errors.New("not your share link")
 
-	ErrInvalidSessionType = errors.New("session type must be normal, deload or test")
-	ErrSessionEnded       = errors.New("session has already ended")
-	ErrDuplicateRoutine   = errors.New("routine listed more than once")
-	ErrRoutineNotInSeries = errors.New("routine is not a day of the series' split")
+	ErrInvalidSessionType  = errors.New("session type must be normal, deload or test")
+	ErrSessionEnded        = errors.New("session has already ended")
+	ErrDuplicateRoutine    = errors.New("routine listed more than once")
+	ErrRoutineNotInSeries  = errors.New("routine is not a day of the series' split")
+	ErrInvalidSeriesLength = errors.New("a series runs 1 to 52 weeks or 1 to 200 sessions")
+	ErrSessionNotFinished  = errors.New("session has not finished")
 )
+
+// SessionTimesError is why an edit to a workout's times was refused; Reason is written for the user.
+type SessionTimesError struct{ Reason string }
+
+func (e *SessionTimesError) Error() string { return e.Reason }
 
 // SessionInProgressError is StartSession's answer while another session is unfinished and Force is off.
 type SessionInProgressError struct {
 	SessionID   uuid.UUID
 	RoutineName *string
 	StartedAt   time.Time
+	// SetCount and LastSetAt let the client offer to finish a forgotten workout, or discard an empty one.
+	SetCount  int
+	LastSetAt *time.Time
 }
 
 func (e *SessionInProgressError) Error() string { return "a session is already in progress" }
@@ -60,13 +70,6 @@ type JymService struct {
 
 func NewJymService(db *pgxpool.Pool) *JymService {
 	return &JymService{db: db}
-}
-
-func epley1RM(weight float64, reps int) float64 {
-	if reps == 1 {
-		return weight
-	}
-	return math.Round((weight*(1+float64(reps)/30.0))*10) / 10
 }
 
 // ─── Exercises ───────────────────────────────────────────────────────────────
@@ -149,23 +152,22 @@ func (s *JymService) GetExerciseWithHistory(ctx context.Context, userID, exercis
 		return nil, err
 	}
 
-	// Header stats cover every working set, however many sets the list returns.
+	// Header stats cover every working set outside deloads, however many sets the list returns.
 	var best1RM float64
 	if err := s.db.QueryRow(ctx,
 		`SELECT COALESCE(MAX(ss.weight), 0),
-		        COALESCE(MAX(CASE WHEN ss.reps_performed = 1 THEN ss.weight
-		                          ELSE ss.weight * (1 + ss.reps_performed / 30.0) END), 0)
+		        COALESCE(MAX(`+e1rmSQL("ss.weight", "ss.reps_performed")+`), 0)
 		 FROM session_sets ss
 		 JOIN sessions s ON ss.session_id = s.id
-		 WHERE ss.exercise_id = $1 AND s.user_id = $2 AND NOT ss.is_warmup`,
+		 WHERE ss.exercise_id = $1 AND s.user_id = $2 AND NOT ss.is_warmup AND s.session_type <> 'deload'`,
 		exerciseID, userID,
 	).Scan(&ex.BestWeight, &best1RM); err != nil {
 		return nil, err
 	}
-	ex.Est1RM = math.Round(best1RM*10) / 10
+	ex.Est1RM = roundTenth(best1RM)
 
 	rows, err := s.db.Query(ctx,
-		`SELECT ss.session_id, s.started_at, ss.set_number, ss.weight, ss.reps_performed, ss.rpe, ss.is_warmup,
+		`SELECT ss.session_id, s.started_at, s.ended_at, ss.set_number, ss.weight, ss.reps_performed, ss.rpe, ss.is_warmup,
 		        ss.is_pr, s.session_type, ss.exercise_note
 		 FROM session_sets ss
 		 JOIN sessions s ON ss.session_id = s.id
@@ -182,7 +184,7 @@ func (s *JymService) GetExerciseWithHistory(ctx context.Context, userID, exercis
 	ex.History = []models.SetHistory{}
 	for rows.Next() {
 		var h models.SetHistory
-		if err := rows.Scan(&h.SessionID, &h.Date, &h.SetNumber, &h.Weight, &h.Reps, &h.RPE, &h.IsWarmup,
+		if err := rows.Scan(&h.SessionID, &h.Date, &h.EndedAt, &h.SetNumber, &h.Weight, &h.Reps, &h.RPE, &h.IsWarmup,
 			&h.IsPR, &h.SessionType, &h.ExerciseNote); err != nil {
 			return nil, err
 		}
@@ -885,12 +887,14 @@ func (s *JymService) StartSession(ctx context.Context, userID uuid.UUID, req *mo
 	if !req.Force {
 		open := &SessionInProgressError{}
 		err := s.db.QueryRow(ctx,
-			`SELECT s.id, r.name, s.started_at
+			`SELECT s.id, r.name, s.started_at,
+			        (SELECT COUNT(*) FROM session_sets ss WHERE ss.session_id = s.id),
+			        (SELECT MAX(ss.created_at) FROM session_sets ss WHERE ss.session_id = s.id)
 			 FROM sessions s LEFT JOIN routines r ON r.id = s.routine_id
 			 WHERE s.user_id = $1 AND s.ended_at IS NULL
 			 ORDER BY s.started_at DESC LIMIT 1`,
 			userID,
-		).Scan(&open.SessionID, &open.RoutineName, &open.StartedAt)
+		).Scan(&open.SessionID, &open.RoutineName, &open.StartedAt, &open.SetCount, &open.LastSetAt)
 		if err == nil {
 			return nil, open
 		}
@@ -945,11 +949,7 @@ func (s *JymService) StartSession(ctx context.Context, userID uuid.UUID, req *mo
 // sessionPageSelect aggregates only the sessions its page CTE picks, newest first.
 const sessionPageSelect = `WITH page AS (%s)
 		 SELECT s.id, s.user_id, s.routine_id, s.series_id, s.session_type, s.started_at, s.ended_at, s.notes,
-		        r.name as routine_name,
-		        COUNT(ss.id) as set_count,
-		        COUNT(ss.id) FILTER (WHERE ss.is_pr) AS pr_count,
-		        COALESCE(SUM(ss.weight * ss.reps_performed), 0) as total_volume,
-		        COALESCE(array_agg(DISTINCT e.muscle_group) FILTER (WHERE e.muscle_group IS NOT NULL), '{}'::text[]) as muscle_groups
+		        r.name as routine_name, ` + sessionAggregatesSQL + `
 		 FROM page
 		 JOIN sessions s ON s.id = page.id
 		 LEFT JOIN routines r ON s.routine_id = r.id
@@ -1001,11 +1001,7 @@ func (s *JymService) ListAllSessions(ctx context.Context, userID uuid.UUID) ([]m
 
 // sessionSummarySelect is a session list row; callers append a WHERE on s.* then sessionSummaryGroup.
 const sessionSummarySelect = `SELECT s.id, s.user_id, s.routine_id, s.series_id, s.session_type, s.started_at, s.ended_at, s.notes,
-		        r.name as routine_name,
-		        COUNT(ss.id) as set_count,
-		        COUNT(ss.id) FILTER (WHERE ss.is_pr) AS pr_count,
-		        COALESCE(SUM(ss.weight * ss.reps_performed), 0) as total_volume,
-		        COALESCE(array_agg(DISTINCT e.muscle_group) FILTER (WHERE e.muscle_group IS NOT NULL), '{}'::text[]) as muscle_groups
+		        r.name as routine_name, ` + sessionAggregatesSQL + `
 		 FROM sessions s
 		 LEFT JOIN routines r ON s.routine_id = r.id
 		 LEFT JOIN session_sets ss ON ss.session_id = s.id
@@ -1047,6 +1043,7 @@ func scanSessionSummaries(rows pgx.Rows) ([]models.SessionSummary, error) {
 			&sess.ID, &sess.UserID, &sess.RoutineID, &sess.SeriesID, &sess.SessionType,
 			&sess.StartedAt, &sess.EndedAt, &sess.Notes,
 			&sess.RoutineName, &sess.SetCount, &sess.PRCount, &sess.TotalVolume, &sess.MuscleGroups,
+			&sess.FirstSetAt, &sess.LastSetAt,
 		); err != nil {
 			return nil, err
 		}
@@ -1254,6 +1251,80 @@ func (s *JymService) UpdateSession(ctx context.Context, userID, sessionID uuid.U
 		if err := rerateSessionExercises(ctx, tx, userID, sessionID); err != nil {
 			return nil, err
 		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return sess, nil
+}
+
+const (
+	// sessionTimeSlack covers times typed in whole minutes and a device clock slightly off the server's.
+	sessionTimeSlack = time.Minute
+	maxSessionLength = 24 * time.Hour
+)
+
+// UpdateSessionTimes moves a finished workout's start or end. The times must still hold every logged
+// set; PR flags follow the order sets were logged, so nothing is re-rated.
+func (s *JymService) UpdateSessionTimes(ctx context.Context, userID, sessionID uuid.UUID, req *models.UpdateSessionTimesRequest) (*models.Session, error) {
+	if req.StartedAt == nil && req.EndedAt == nil {
+		return nil, &SessionTimesError{"Change the start or the end."}
+	}
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	var start time.Time
+	var end, firstSet, lastSet *time.Time
+	err = tx.QueryRow(ctx,
+		`SELECT s.started_at, s.ended_at,
+		        (SELECT MIN(ss.created_at) FROM session_sets ss WHERE ss.session_id = s.id),
+		        (SELECT MAX(ss.created_at) FROM session_sets ss WHERE ss.session_id = s.id)
+		 FROM sessions s WHERE s.id = $1 AND s.user_id = $2
+		 FOR UPDATE OF s`,
+		sessionID, userID,
+	).Scan(&start, &end, &firstSet, &lastSet)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrSessionNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if end == nil {
+		return nil, ErrSessionNotFinished
+	}
+
+	newStart, newEnd := start, *end
+	if req.StartedAt != nil {
+		newStart = *req.StartedAt
+	}
+	if req.EndedAt != nil {
+		newEnd = *req.EndedAt
+	}
+	switch {
+	case !newEnd.After(newStart):
+		return nil, &SessionTimesError{"The end must be after the start."}
+	case newEnd.After(time.Now().Add(5 * time.Minute)):
+		return nil, &SessionTimesError{"The end can't be in the future."}
+	case newEnd.Sub(newStart) > maxSessionLength:
+		return nil, &SessionTimesError{"A workout can't be longer than 24 hours."}
+	// Only a field being changed is held to the sets, so an untouched end the device clocked early still saves.
+	case req.StartedAt != nil && firstSet != nil && newStart.After(firstSet.Add(sessionTimeSlack)):
+		return nil, &SessionTimesError{"The start can't be after your first set."}
+	case req.EndedAt != nil && lastSet != nil && newEnd.Before(lastSet.Add(-sessionTimeSlack)):
+		return nil, &SessionTimesError{"The end can't be before your last set."}
+	}
+
+	sess := &models.Session{}
+	err = tx.QueryRow(ctx,
+		`UPDATE sessions SET started_at = $3, ended_at = $4 WHERE id = $1 AND user_id = $2
+		 RETURNING id, user_id, routine_id, series_id, session_type, started_at, ended_at, notes`,
+		sessionID, userID, newStart, newEnd,
+	).Scan(&sess.ID, &sess.UserID, &sess.RoutineID, &sess.SeriesID, &sess.SessionType, &sess.StartedAt, &sess.EndedAt, &sess.Notes)
+	if err != nil {
+		return nil, err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
@@ -1656,100 +1727,6 @@ func (s *JymService) DeleteSet(ctx context.Context, userID, setID uuid.UUID) err
 	return tx.Commit(ctx)
 }
 
-// GetLastSessionSets returns the last logged sets for each exercise (for ghost text).
-func (s *JymService) GetLastSessionSets(ctx context.Context, userID uuid.UUID, exerciseIDs []uuid.UUID) (map[uuid.UUID][]models.SessionSet, error) {
-	if len(exerciseIDs) == 0 {
-		return map[uuid.UUID][]models.SessionSet{}, nil
-	}
-
-	// Build $2,$3,... placeholders
-	args := []interface{}{userID}
-	placeholders := ""
-	for i, id := range exerciseIDs {
-		args = append(args, id)
-		if i > 0 {
-			placeholders += ","
-		}
-		placeholders += "$" + intStr(i+2)
-	}
-
-	rows, err := s.db.Query(ctx,
-		`SELECT DISTINCT ON (ss.exercise_id) ss.id, ss.session_id, ss.exercise_id,
-		        ss.set_number, ss.weight, ss.reps_performed, ss.rpe, ss.is_pr, ss.is_warmup, ss.exercise_note, ss.created_at
-		 FROM session_sets ss
-		 JOIN sessions s ON ss.session_id = s.id
-		 WHERE s.user_id = $1 AND ss.exercise_id IN (`+placeholders+`)
-		 ORDER BY ss.exercise_id, s.started_at DESC`,
-		args...,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	result := make(map[uuid.UUID][]models.SessionSet)
-	for rows.Next() {
-		var set models.SessionSet
-		if err := rows.Scan(&set.ID, &set.SessionID, &set.ExerciseID, &set.SetNumber,
-			&set.Weight, &set.RepsPerformed, &set.RPE, &set.IsPR, &set.IsWarmup, &set.ExerciseNote, &set.CreatedAt); err != nil {
-			return nil, err
-		}
-		result[set.ExerciseID] = append(result[set.ExerciseID], set)
-	}
-	return result, nil
-}
-
-// GetPreviousBests returns, for each exercise, the best set (by weight, then
-// reps) from the most recent session before excludeSessionID — "last time
-// you did this" for the post-workout summary. excludeSessionID need not
-// belong to the caller: it is only ever used to exclude a row, never to
-// grant access, since every row is already scoped to user_id = $1.
-func (s *JymService) GetPreviousBests(ctx context.Context, userID, excludeSessionID uuid.UUID, exerciseIDs []uuid.UUID) ([]models.PreviousBest, error) {
-	if len(exerciseIDs) == 0 {
-		return []models.PreviousBest{}, nil
-	}
-
-	args := []interface{}{userID, excludeSessionID}
-	placeholders := ""
-	for i, id := range exerciseIDs {
-		args = append(args, id)
-		if i > 0 {
-			placeholders += ","
-		}
-		placeholders += "$" + intStr(i+3)
-	}
-
-	rows, err := s.db.Query(ctx, `
-		WITH prev_session AS (
-			SELECT DISTINCT ON (ss.exercise_id) ss.exercise_id, ss.session_id, s.started_at
-			FROM session_sets ss
-			JOIN sessions s ON s.id = ss.session_id
-			WHERE s.user_id = $1 AND s.id != $2 AND ss.exercise_id IN (`+placeholders+`)
-			ORDER BY ss.exercise_id, s.started_at DESC
-		)
-		SELECT DISTINCT ON (ps.exercise_id) ps.exercise_id, ss.weight, ss.reps_performed, ps.started_at
-		FROM prev_session ps
-		JOIN session_sets ss ON ss.session_id = ps.session_id AND ss.exercise_id = ps.exercise_id
-		ORDER BY ps.exercise_id, ss.weight DESC, ss.reps_performed DESC`,
-		args...,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	bests := []models.PreviousBest{}
-	for rows.Next() {
-		var b models.PreviousBest
-		if err := rows.Scan(&b.ExerciseID, &b.Weight, &b.Reps, &b.Date); err != nil {
-			return nil, err
-		}
-		b.Est1RM = epley1RM(b.Weight, b.Reps)
-		bests = append(bests, b)
-	}
-	return bests, nil
-}
-
 // GetPRs returns the best personal record set (by weight) for each exercise the user has logged.
 func (s *JymService) GetPRs(ctx context.Context, userID uuid.UUID) ([]models.ExercisePR, error) {
 	rows, err := s.db.Query(ctx,
@@ -1852,6 +1829,22 @@ func (s *JymService) DeleteBodyWeight(ctx context.Context, userID, id uuid.UUID)
 // ─── Split Series ─────────────────────────────────────────────────────────────
 
 func (s *JymService) CreateSeries(ctx context.Context, userID uuid.UUID, req *models.CreateSeriesRequest) (*models.SplitSeriesSummary, error) {
+	// A length in weeks or sessions needs its number; open-ended keeps none.
+	switch req.DurationType {
+	case "weeks":
+		if req.TargetWeeks == nil || *req.TargetWeeks < 1 || *req.TargetWeeks > 52 {
+			return nil, ErrInvalidSeriesLength
+		}
+		req.TargetSessions = nil
+	case "sessions":
+		if req.TargetSessions == nil || *req.TargetSessions < 1 || *req.TargetSessions > 200 {
+			return nil, ErrInvalidSeriesLength
+		}
+		req.TargetWeeks = nil
+	default:
+		req.TargetWeeks, req.TargetSessions = nil, nil
+	}
+
 	// Verify split ownership
 	var ownerID uuid.UUID
 	if err := s.db.QueryRow(ctx, `SELECT user_id FROM splits WHERE id = $1`, req.SplitID).Scan(&ownerID); err != nil {
@@ -1883,12 +1876,10 @@ func (s *JymService) ListSeries(ctx context.Context, userID uuid.UUID) ([]models
 		`SELECT sr.id, sr.user_id, sr.split_id, sr.name, sr.duration_type,
 		        sr.target_weeks, sr.target_sessions, sr.started_at, sr.ended_at, sr.created_at,
 		        sp.name as split_name,
-		        COUNT(sess.id) as session_count
+		        `+seriesSessionCountSQL("sr.id")+` as session_count
 		 FROM split_series sr
 		 JOIN splits sp ON sr.split_id = sp.id
-		 LEFT JOIN sessions sess ON sess.series_id = sr.id
 		 WHERE sr.user_id = $1
-		 GROUP BY sr.id, sp.name
 		 ORDER BY sr.started_at DESC`,
 		userID,
 	)
@@ -1980,12 +1971,10 @@ func (s *JymService) GetSeriesDetail(ctx context.Context, userID, seriesID uuid.
 		`SELECT sr.id, sr.user_id, sr.split_id, sr.name, sr.duration_type,
 		        sr.target_weeks, sr.target_sessions, sr.started_at, sr.ended_at, sr.created_at,
 		        sp.name,
-		        COUNT(sess.id)
+		        `+seriesSessionCountSQL("sr.id")+`
 		 FROM split_series sr
 		 JOIN splits sp ON sr.split_id = sp.id
-		 LEFT JOIN sessions sess ON sess.series_id = sr.id
-		 WHERE sr.id = $1 AND sr.user_id = $2
-		 GROUP BY sr.id, sp.name`,
+		 WHERE sr.id = $1 AND sr.user_id = $2`,
 		seriesID, userID,
 	).Scan(
 		&detail.ID, &detail.UserID, &detail.SplitID, &detail.Name, &detail.DurationType,
@@ -2008,11 +1997,11 @@ func (s *JymService) GetSeriesDetail(ctx context.Context, userID, seriesID uuid.
 	// Session points (for volume chart)
 	sessRows, err := s.db.Query(ctx,
 		`SELECT s.id, s.started_at, s.session_type,
-		        COALESCE(SUM(ss.weight * ss.reps_performed), 0) as total_volume,
-		        COUNT(ss.id) as set_count
+		        `+workingVolumeSQL+` as total_volume,
+		        `+workingSetCountSQL+` as set_count
 		 FROM sessions s
 		 LEFT JOIN session_sets ss ON ss.session_id = s.id
-		 WHERE s.series_id = $1
+		 WHERE s.series_id = $1 AND `+countedSessionSQL("s")+`
 		 GROUP BY s.id
 		 ORDER BY s.started_at ASC`,
 		seriesID,
@@ -2032,15 +2021,14 @@ func (s *JymService) GetSeriesDetail(ctx context.Context, userID, seriesID uuid.
 	}
 	sessRows.Close()
 
-	// Best working-set e1RM per exercise per session, oldest session first (1 rep is the weight itself).
+	// Best working-set e1RM per exercise per finished, non-deload session, oldest session first.
 	exRows, err := s.db.Query(ctx,
 		`SELECT ss.session_id, s.started_at, ss.exercise_id, e.name, e.muscle_group,
-		        MAX(CASE WHEN ss.reps_performed = 1 THEN ss.weight
-		                 ELSE ss.weight * (1 + ss.reps_performed / 30.0) END) AS best_est_1rm
+		        MAX(`+e1rmSQL("ss.weight", "ss.reps_performed")+`) AS best_est_1rm
 		 FROM session_sets ss
 		 JOIN sessions s ON s.id = ss.session_id
 		 JOIN exercises e ON ss.exercise_id = e.id
-		 WHERE s.series_id = $1 AND NOT ss.is_warmup
+		 WHERE s.series_id = $1 AND NOT ss.is_warmup AND s.ended_at IS NOT NULL AND s.session_type <> 'deload'
 		 GROUP BY ss.session_id, s.started_at, ss.exercise_id, e.name, e.muscle_group
 		 ORDER BY ss.exercise_id, s.started_at`,
 		seriesID,
@@ -2073,7 +2061,7 @@ func (s *JymService) GetSeriesDetail(ctx context.Context, userID, seriesID uuid.
 		exMap[exID].Points = append(exMap[exID].Points, models.ProgressionPoint{
 			SessionID:  sessID,
 			Date:       date,
-			BestEst1RM: math.Round(best1RM*10) / 10,
+			BestEst1RM: roundTenth(best1RM),
 		})
 	}
 	if err := exRows.Err(); err != nil {
@@ -2106,7 +2094,7 @@ func (s *JymService) UpdateSeries(ctx context.Context, userID, seriesID uuid.UUI
 		return nil, err
 	}
 	s.db.QueryRow(ctx, `SELECT name FROM splits WHERE id = $1`, sr.SplitID).Scan(&sr.SplitName)
-	s.db.QueryRow(ctx, `SELECT COUNT(*) FROM sessions WHERE series_id = $1`, seriesID).Scan(&sr.SessionCount)
+	s.db.QueryRow(ctx, `SELECT `+seriesSessionCountSQL("$1"), seriesID).Scan(&sr.SessionCount)
 	return sr, nil
 }
 
@@ -2179,8 +2167,7 @@ func (s *JymService) StreamSessionsCSV(ctx context.Context, userID uuid.UUID, fr
 			ss.reps_performed,
 			COALESCE(ss.rpe::text, ''),
 			ss.is_warmup,
-			ss.is_pr,
-			ROUND((ss.weight * (1 + ss.reps_performed::float / 30.0))::numeric, 1)
+			ss.is_pr
 		FROM sessions s
 		LEFT JOIN routines r ON s.routine_id = r.id
 		JOIN session_sets ss ON ss.session_id = s.id
@@ -2205,15 +2192,16 @@ func (s *JymService) StreamSessionsCSV(ctx context.Context, userID uuid.UUID, fr
 		var sessionID uuid.UUID
 		var routine, exercise, muscleGroup, rpe string
 		var setNum, reps int
-		var weight, est1rm float64
+		var weight float64
 		var isWarmup, isPR bool
 
 		if err := rows.Scan(
 			&date, &sessionID, &routine, &exercise, &muscleGroup,
-			&setNum, &weight, &reps, &rpe, &isWarmup, &isPR, &est1rm,
+			&setNum, &weight, &reps, &rpe, &isWarmup, &isPR,
 		); err != nil {
 			return err
 		}
+		est1rm := epley1RM(weight, reps)
 
 		_ = cw.Write([]string{
 			date.Format("2006-01-02"),
@@ -2643,7 +2631,7 @@ func (s *JymService) CreateTemplateFromSession(ctx context.Context, userID, sess
 	rows, err := s.db.Query(ctx,
 		`SELECT exercise_id,
 		        COUNT(*) FILTER (WHERE NOT is_warmup)::int AS target_sets,
-		        ROUND(AVG(reps_performed))::int            AS target_reps
+		        COALESCE(ROUND(AVG(reps_performed) FILTER (WHERE NOT is_warmup)), ROUND(AVG(reps_performed)))::int AS target_reps
 		 FROM session_sets
 		 WHERE session_id = $1
 		 GROUP BY exercise_id

@@ -59,7 +59,9 @@ func (h *UserHandler) UpdateMe(c *gin.Context) {
 		Timezone   *string `json:"timezone"`
 		Currency   *string `json:"currency"`
 		// Absent: empty (untouched). Explicit null: the bytes `null` (reset).
-		Dashboard json.RawMessage `json:"dashboard"`
+		Dashboard   json.RawMessage `json:"dashboard"`
+		RestSeconds *int            `json:"rest_seconds"`
+		Plates      json.RawMessage `json:"plates"`
 		// Profile fields
 		Username    *string `json:"username"`
 		DisplayName *string `json:"display_name"`
@@ -77,13 +79,16 @@ func (h *UserHandler) UpdateMe(c *gin.Context) {
 	var err error
 
 	// Apply settings update if any settings field is present.
-	if req.Theme != nil || req.WeightUnit != nil || req.Timezone != nil || req.Currency != nil || len(req.Dashboard) > 0 {
+	if req.Theme != nil || req.WeightUnit != nil || req.Timezone != nil || req.Currency != nil || len(req.Dashboard) > 0 ||
+		req.RestSeconds != nil || len(req.Plates) > 0 {
 		settingsReq := &models.UpdateSettingsRequest{
-			Theme:      req.Theme,
-			WeightUnit: req.WeightUnit,
-			Timezone:   req.Timezone,
-			Currency:   req.Currency,
-			Dashboard:  req.Dashboard,
+			Theme:       req.Theme,
+			WeightUnit:  req.WeightUnit,
+			Timezone:    req.Timezone,
+			Currency:    req.Currency,
+			Dashboard:   req.Dashboard,
+			RestSeconds: req.RestSeconds,
+			Plates:      req.Plates,
 		}
 		user, err = h.userService.UpdateSettings(c.Request.Context(), uid, settingsReq)
 		if err != nil {
