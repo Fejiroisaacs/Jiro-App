@@ -35,13 +35,22 @@ var (
 	ErrDuplicateRoutine    = errors.New("routine listed more than once")
 	ErrRoutineNotInSeries  = errors.New("routine is not a day of the series' split")
 	ErrInvalidSeriesLength = errors.New("a series runs 1 to 52 weeks or 1 to 200 sessions")
+	ErrSessionNotFinished  = errors.New("session has not finished")
 )
+
+// SessionTimesError is why an edit to a workout's times was refused; Reason is written for the user.
+type SessionTimesError struct{ Reason string }
+
+func (e *SessionTimesError) Error() string { return e.Reason }
 
 // SessionInProgressError is StartSession's answer while another session is unfinished and Force is off.
 type SessionInProgressError struct {
 	SessionID   uuid.UUID
 	RoutineName *string
 	StartedAt   time.Time
+	// SetCount and LastSetAt let the client offer to finish a forgotten workout, or discard an empty one.
+	SetCount  int
+	LastSetAt *time.Time
 }
 
 func (e *SessionInProgressError) Error() string { return "a session is already in progress" }
@@ -878,12 +887,14 @@ func (s *JymService) StartSession(ctx context.Context, userID uuid.UUID, req *mo
 	if !req.Force {
 		open := &SessionInProgressError{}
 		err := s.db.QueryRow(ctx,
-			`SELECT s.id, r.name, s.started_at
+			`SELECT s.id, r.name, s.started_at,
+			        (SELECT COUNT(*) FROM session_sets ss WHERE ss.session_id = s.id),
+			        (SELECT MAX(ss.created_at) FROM session_sets ss WHERE ss.session_id = s.id)
 			 FROM sessions s LEFT JOIN routines r ON r.id = s.routine_id
 			 WHERE s.user_id = $1 AND s.ended_at IS NULL
 			 ORDER BY s.started_at DESC LIMIT 1`,
 			userID,
-		).Scan(&open.SessionID, &open.RoutineName, &open.StartedAt)
+		).Scan(&open.SessionID, &open.RoutineName, &open.StartedAt, &open.SetCount, &open.LastSetAt)
 		if err == nil {
 			return nil, open
 		}
@@ -1032,6 +1043,7 @@ func scanSessionSummaries(rows pgx.Rows) ([]models.SessionSummary, error) {
 			&sess.ID, &sess.UserID, &sess.RoutineID, &sess.SeriesID, &sess.SessionType,
 			&sess.StartedAt, &sess.EndedAt, &sess.Notes,
 			&sess.RoutineName, &sess.SetCount, &sess.PRCount, &sess.TotalVolume, &sess.MuscleGroups,
+			&sess.FirstSetAt, &sess.LastSetAt,
 		); err != nil {
 			return nil, err
 		}
@@ -1239,6 +1251,80 @@ func (s *JymService) UpdateSession(ctx context.Context, userID, sessionID uuid.U
 		if err := rerateSessionExercises(ctx, tx, userID, sessionID); err != nil {
 			return nil, err
 		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return sess, nil
+}
+
+const (
+	// sessionTimeSlack covers times typed in whole minutes and a device clock slightly off the server's.
+	sessionTimeSlack = time.Minute
+	maxSessionLength = 24 * time.Hour
+)
+
+// UpdateSessionTimes moves a finished workout's start or end. The times must still hold every logged
+// set; PR flags follow the order sets were logged, so nothing is re-rated.
+func (s *JymService) UpdateSessionTimes(ctx context.Context, userID, sessionID uuid.UUID, req *models.UpdateSessionTimesRequest) (*models.Session, error) {
+	if req.StartedAt == nil && req.EndedAt == nil {
+		return nil, &SessionTimesError{"Change the start or the end."}
+	}
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	var start time.Time
+	var end, firstSet, lastSet *time.Time
+	err = tx.QueryRow(ctx,
+		`SELECT s.started_at, s.ended_at,
+		        (SELECT MIN(ss.created_at) FROM session_sets ss WHERE ss.session_id = s.id),
+		        (SELECT MAX(ss.created_at) FROM session_sets ss WHERE ss.session_id = s.id)
+		 FROM sessions s WHERE s.id = $1 AND s.user_id = $2
+		 FOR UPDATE OF s`,
+		sessionID, userID,
+	).Scan(&start, &end, &firstSet, &lastSet)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrSessionNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if end == nil {
+		return nil, ErrSessionNotFinished
+	}
+
+	newStart, newEnd := start, *end
+	if req.StartedAt != nil {
+		newStart = *req.StartedAt
+	}
+	if req.EndedAt != nil {
+		newEnd = *req.EndedAt
+	}
+	switch {
+	case !newEnd.After(newStart):
+		return nil, &SessionTimesError{"The end must be after the start."}
+	case newEnd.After(time.Now().Add(5 * time.Minute)):
+		return nil, &SessionTimesError{"The end can't be in the future."}
+	case newEnd.Sub(newStart) > maxSessionLength:
+		return nil, &SessionTimesError{"A workout can't be longer than 24 hours."}
+	// Only a field being changed is held to the sets, so an untouched end the device clocked early still saves.
+	case req.StartedAt != nil && firstSet != nil && newStart.After(firstSet.Add(sessionTimeSlack)):
+		return nil, &SessionTimesError{"The start can't be after your first set."}
+	case req.EndedAt != nil && lastSet != nil && newEnd.Before(lastSet.Add(-sessionTimeSlack)):
+		return nil, &SessionTimesError{"The end can't be before your last set."}
+	}
+
+	sess := &models.Session{}
+	err = tx.QueryRow(ctx,
+		`UPDATE sessions SET started_at = $3, ended_at = $4 WHERE id = $1 AND user_id = $2
+		 RETURNING id, user_id, routine_id, series_id, session_type, started_at, ended_at, notes`,
+		sessionID, userID, newStart, newEnd,
+	).Scan(&sess.ID, &sess.UserID, &sess.RoutineID, &sess.SeriesID, &sess.SessionType, &sess.StartedAt, &sess.EndedAt, &sess.Notes)
+	if err != nil {
+		return nil, err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err

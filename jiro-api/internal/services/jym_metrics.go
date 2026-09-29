@@ -72,8 +72,10 @@ const (
 	muscleGroupsSQL    = `COALESCE(array_agg(DISTINCT e.muscle_group) FILTER (WHERE e.muscle_group IS NOT NULL AND NOT ss.is_warmup), '{}'::text[])`
 )
 
-// sessionAggregatesSQL is the tail of a session list row: set_count, pr_count, total_volume, muscle_groups.
+// sessionAggregatesSQL is the tail of a session list row: set_count, pr_count, total_volume, muscle_groups,
+// then when the first and last sets (warm-ups included) were logged.
 const sessionAggregatesSQL = workingSetCountSQL + ` AS set_count, ` +
 	prLiftCountSQL + ` AS pr_count, ` +
 	workingVolumeSQL + ` AS total_volume, ` +
-	muscleGroupsSQL + ` AS muscle_groups`
+	muscleGroupsSQL + ` AS muscle_groups, ` +
+	`MIN(ss.created_at) AS first_set_at, MAX(ss.created_at) AS last_set_at`

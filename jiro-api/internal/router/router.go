@@ -248,6 +248,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 				jym.GET("/sessions", jymHandler.ListSessions)
 				jym.GET("/sessions/:id", jymHandler.GetSession)
 				jym.PATCH("/sessions/:id", jymHandler.UpdateSession)
+				jym.PATCH("/sessions/:id/times", jymHandler.UpdateSessionTimes)
 				jym.DELETE("/sessions/:id", jymHandler.DeleteSession)
 				jym.GET("/export/sessions.csv", jymHandler.ExportSessions)
 				jym.POST("/sessions/:id/template", jymHandler.CreateTemplateFromSession)

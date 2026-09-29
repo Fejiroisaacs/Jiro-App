@@ -330,6 +330,9 @@ type SessionSummary struct {
 	PRCount      int      `json:"pr_count"`
 	TotalVolume  float64  `json:"total_volume"`
 	MuscleGroups []string `json:"muscle_groups"`
+	// When the first and last sets were logged, by the server's clock; null with no sets.
+	FirstSetAt *time.Time `json:"first_set_at"`
+	LastSetAt  *time.Time `json:"last_set_at"`
 }
 
 // StartSessionResponse includes the created session and routine targets (if routine_id given).
@@ -362,6 +365,12 @@ type UpdateSessionRequest struct {
 	EndedAt     *time.Time `json:"ended_at"`
 	Notes       *string    `json:"notes"`
 	SessionType *string    `json:"session_type" binding:"omitempty,oneof=normal deload test"`
+}
+
+// UpdateSessionTimesRequest moves a finished workout's start or end; a field left out keeps its value.
+type UpdateSessionTimesRequest struct {
+	StartedAt *time.Time `json:"started_at"`
+	EndedAt   *time.Time `json:"ended_at"`
 }
 
 // ─── SessionAttachment ───────────────────────────────────────────────────────

@@ -522,6 +522,8 @@ func (h *JymHandler) StartSession(c *gin.Context) {
 				"session_id":   open.SessionID,
 				"routine_name": open.RoutineName,
 				"started_at":   open.StartedAt,
+				"set_count":    open.SetCount,
+				"last_set_at":  open.LastSetAt,
 			}})
 			return
 		}
@@ -651,6 +653,35 @@ func (h *JymHandler) UpdateSession(c *gin.Context) {
 		analytics.TrackEvent(h.db, userID, "session.finish", nil)
 	}
 	c.JSON(http.StatusOK, sess)
+}
+
+// UpdateSessionTimes handles PATCH /jym/sessions/:id/times for a finished workout.
+func (h *JymHandler) UpdateSessionTimes(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	sessionID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid session ID"}})
+		return
+	}
+	var req models.UpdateSessionTimesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()}})
+		return
+	}
+	sess, err := h.jymService.UpdateSessionTimes(c.Request.Context(), userID, sessionID, &req)
+	var timesErr *services.SessionTimesError
+	switch {
+	case err == nil:
+		c.JSON(http.StatusOK, sess)
+	case errors.As(err, &timesErr):
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: timesErr.Reason}})
+	case errors.Is(err, services.ErrSessionNotFound):
+		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Session not found"}})
+	case errors.Is(err, services.ErrSessionNotFinished):
+		c.JSON(http.StatusConflict, models.ErrorResponse{Error: models.ErrorDetail{Code: "SESSION_NOT_FINISHED", Message: "Finish the workout before changing its times"}})
+	default:
+		respondInternal(c, err, "failed to update session times")
+	}
 }
 
 func (h *JymHandler) DeleteSession(c *gin.Context) {
