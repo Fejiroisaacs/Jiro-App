@@ -76,6 +76,8 @@ import { JiroIconComponent } from '../jiro-icon/jiro-icon';
       .toaster {
         bottom: calc(60px + env(safe-area-inset-bottom) + var(--space-md));
       }
+      /* Focus screens (cook mode, a workout) hide the phone's bottom nav. */
+      :host(.no-nav) .toaster { bottom: calc(var(--space-lg) + env(safe-area-inset-bottom)); }
     }
   `]
 })

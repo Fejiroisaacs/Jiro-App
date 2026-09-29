@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, WritableSignal, effect, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, WritableSignal, computed, effect, inject, signal } from '@angular/core';
 
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -22,6 +22,7 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
+import { SaveTemplateDialogComponent } from '../shared/save-template-dialog';
 import { ToastService } from '../../../core/services/toast.service';
 import { ConfirmService } from '../../../core/services/confirm.service';
 
@@ -69,10 +70,10 @@ interface ExerciseBlock {
 @Component({
   selector: 'app-session-player',
   standalone: true,
-  imports: [FormsModule, JiroButtonComponent, JiroModalComponent, JiroIconComponent, JiroSkeletonComponent, JiroEmptyStateComponent, JymPrBadgeComponent],
+  imports: [FormsModule, JiroButtonComponent, JiroModalComponent, JiroIconComponent, JiroSkeletonComponent, JiroEmptyStateComponent, JymPrBadgeComponent, SaveTemplateDialogComponent],
   template: `
     <h1 class="sr-only">Active session</h1>
-    <!-- Sticky header bar -->
+    <!-- Sticky bar: the clock, the options, and Finish; everything else waits in the options sheet. -->
     <div class="session-bar">
       <div class="session-bar-row">
         <div class="session-bar-left">
@@ -80,48 +81,31 @@ interface ExerciseBlock {
           <span class="timer">{{ elapsedDisplay() }}</span>
         </div>
         <div class="session-bar-right">
-          <div class="type-toggle">
-            <button class="type-btn" [class.active]="sessionType() === 'normal'" (click)="setSessionType('normal')">Normal</button>
-            <button class="type-btn" [class.active]="sessionType() === 'deload'" (click)="setSessionType('deload')">Deload</button>
-            <button class="type-btn" [class.active]="sessionType() === 'test'" (click)="setSessionType('test')">Test</button>
-          </div>
-          <div class="type-toggle unit-toggle">
-            <button class="type-btn" [class.active]="settingsService.weightUnit() === 'lbs'" (click)="toggleUnit('lbs')">lbs</button>
-            <button class="type-btn" [class.active]="settingsService.weightUnit() === 'kg'" (click)="toggleUnit('kg')">kg</button>
-          </div>
-          <button class="save-template-btn" type="button" title="Save as template" aria-label="Save as template" (click)="showTemplateSave.set(true)">
-            <jiro-icon name="floppy-disk" [size]="15" />
+          <button class="bar-icon-btn" type="button" aria-label="Workout options" title="Workout options" aria-haspopup="dialog" (click)="showOptions.set(true)">
+            <jiro-icon name="dots-three" [size]="22" />
           </button>
-          <jiro-button size="sm" variant="ghost" type="button" (click)="showExitConfirm.set(true)">Exit</jiro-button>
-          <jiro-button size="sm" variant="inverse" type="button" (click)="finishSession()" [disabled]="finishing()">
+          <jiro-button size="lg" variant="inverse" type="button" (click)="finishSession()" [disabled]="finishing()">
             {{ finishing() ? 'Finishing...' : 'Finish' }}
           </jiro-button>
         </div>
-        @if (emptySessionError()) {
-<p class="empty-session-error">{{ emptySessionError() }}</p>
-}
       </div>
-      <!-- Rest timer row — expands the bar after logging a set -->
+      <!-- Rest timer row: opens after a logged set -->
       @if (restTimerActive()) {
-<div class="rest-row" [class.rest-done]="restTimerDone()">
-        <span class="rest-label">Rest</span>
-        <span class="rest-countdown">{{ restTimerDisplay() }}</span>
-        <div class="rest-presets">
-          @for (d of restPresets; track d) {
-<button class="rest-chip"
-            [class.active]="restTimerDuration() === d"
-            (click)="setRestDuration(d)">{{ restPresetLabel(d) }}</button>
-}
-          <button class="rest-chip rest-add-btn" type="button" (click)="addRestTime(30)" title="Add 30 seconds" aria-label="Add 30 seconds">+30s</button>
+        <div class="rest-row" [class.rest-done]="restTimerDone()">
+          <span class="rest-label">Rest</span>
+          <span class="rest-countdown" role="timer" aria-live="off">{{ restTimerDisplay() }}</span>
+          <button class="rest-btn" type="button" (click)="addRestTime(30)" aria-label="Add 30 seconds to this rest">+30s</button>
+          <button class="rest-btn" type="button" (click)="skipRestTimer()">Skip</button>
+          <div class="rest-progress" aria-hidden="true">
+            <div class="rest-progress-fill" [style.width.%]="(restTimerRemaining() / restLength()) * 100"></div>
+          </div>
         </div>
-        <button class="rest-skip-btn" type="button" (click)="skipRestTimer()" aria-label="Skip rest" title="Skip rest"><jiro-icon name="x" [size]="12" /></button>
-        <div class="rest-progress">
-          <div class="rest-progress-fill"
-            [style.width.%]="(restTimerRemaining() / restTimerDuration()) * 100"></div>
-        </div>
-      </div>
-}
+      }
     </div>
+
+    @if (emptySessionError()) {
+      <p class="empty-session-error" role="alert">{{ emptySessionError() }}</p>
+    }
 
     <!-- Deload / Test notice -->
     @if (sessionType() === 'deload') {
@@ -423,53 +407,59 @@ interface ExerciseBlock {
 }
     </div>
 
-    <!-- Exit confirmation modal -->
-    @if (showExitConfirm()) {
-<jiro-modal title="Exit workout?" maxWidth="400px" (close)="showExitConfirm.set(false)">
-      <p style="font-size:var(--font-size-sm);color:var(--text-secondary);line-height:1.6;margin-bottom:var(--space-lg)">
-        Logged sets are saved. Sets you typed but haven't logged stay on this device until you come back.
-      </p>
-      <div style="display:flex;flex-direction:column;gap:var(--space-sm)">
-        <div style="display:flex;justify-content:flex-end;gap:var(--space-sm)">
-          <jiro-button variant="secondary" type="button" (click)="showExitConfirm.set(false)">Keep training</jiro-button>
-          <jiro-button variant="primary" type="button" (click)="exitSession()">Save & Exit</jiro-button>
+    <!-- Workout options: type, units, rest, and leaving -->
+    @if (showOptions()) {
+      <jiro-modal sheet title="Workout options" maxWidth="440px" (close)="showOptions.set(false)">
+        <div class="opt-group" role="group" aria-labelledby="opt-type-label">
+          <span class="opt-label" id="opt-type-label">Type</span>
+          <div class="seg">
+            @for (t of sessionTypes; track t.value) {
+              <button type="button" class="seg-btn" [class.active]="sessionType() === t.value" [attr.aria-pressed]="sessionType() === t.value" (click)="setSessionType(t.value)">{{ t.label }}</button>
+            }
+          </div>
+          <p class="opt-help">{{ typeHelp() }}</p>
         </div>
-        <div style="border-top:1px solid var(--border-color);padding-top:var(--space-sm)">
-          <jiro-button variant="danger" type="button" [disabled]="discarding()" (click)="discardSession()">
-            {{ discarding() ? 'Discarding...' : 'Discard session' }}
-          </jiro-button>
-        </div>
-      </div>
-    </jiro-modal>
-}
 
-    <!-- Save as template modal -->
+        <div class="opt-group" role="group" aria-labelledby="opt-unit-label">
+          <span class="opt-label" id="opt-unit-label">Units</span>
+          <div class="seg">
+            @for (u of units; track u) {
+              <button type="button" class="seg-btn" [class.active]="settingsService.weightUnit() === u" [attr.aria-pressed]="settingsService.weightUnit() === u" (click)="toggleUnit(u)">{{ u }}</button>
+            }
+          </div>
+          <p class="opt-help">Your account's unit, the same one as in Settings.</p>
+        </div>
+
+        <div class="opt-group" role="group" aria-labelledby="opt-rest-label">
+          <span class="opt-label" id="opt-rest-label">Rest timer</span>
+          <div class="seg">
+            @for (d of restPresets; track d) {
+              <button type="button" class="seg-btn" [class.active]="restSetting() === d" [attr.aria-pressed]="restSetting() === d" (click)="setRestDefault(d)">{{ restPresetLabel(d) }}</button>
+            }
+          </div>
+          <p class="opt-help">Starts after each logged set. Remembered for next time.</p>
+        </div>
+
+        <div class="opt-actions">
+          <button type="button" class="opt-row" (click)="showOptions.set(false); showTemplateSave.set(true)">
+            <jiro-icon name="floppy-disk" [size]="18" />
+            <span class="opt-row-text">Save as template</span>
+          </button>
+          <button type="button" class="opt-row" (click)="exitSession()">
+            <jiro-icon name="sign-out" [size]="18" />
+            <span class="opt-row-text">Leave for now<small>The workout stays open. Resume it from Jym.</small></span>
+          </button>
+          <button type="button" class="opt-row opt-row--danger" [disabled]="discarding()" (click)="discardSession()">
+            <jiro-icon name="trash" [size]="18" />
+            <span class="opt-row-text">{{ discarding() ? 'Discarding...' : 'Discard workout' }}</span>
+          </button>
+        </div>
+      </jiro-modal>
+    }
+
     @if (showTemplateSave()) {
-<jiro-modal title="Save as template" maxWidth="420px" (close)="showTemplateSave.set(false)">
-      <p style="font-size:var(--font-size-sm);color:var(--text-secondary);margin-bottom:var(--space-md);">
-        Give this workout layout a name to reuse it in future sessions.
-      </p>
-      <label class="field-label" for="template-name">Template name</label>
-      <input
-        id="template-name"
-        class="template-name-input"
-        type="text"
-        [(ngModel)]="templateName"
-        placeholder="e.g. Push Day A"
-        (keydown.enter)="saveAsTemplate()"
-        maxlength="80"
-      />
-      @if (templateSaveError()) {
-<div class="template-save-error">{{ templateSaveError() }}</div>
-}
-      <div style="display:flex;justify-content:flex-end;gap:var(--space-sm);margin-top:var(--space-md)">
-        <jiro-button variant="secondary" type="button" (click)="showTemplateSave.set(false)">Cancel</jiro-button>
-        <jiro-button variant="primary" type="button" [disabled]="!templateName.trim() || templateSaving()" (click)="saveAsTemplate()">
-          {{ templateSaving() ? 'Saving...' : 'Save template' }}
-        </jiro-button>
-      </div>
-    </jiro-modal>
-}
+      <jym-save-template-dialog [sessionId]="sessionId" (close)="showTemplateSave.set(false)" />
+    }
 
 
     <!-- Exercise picker -->
@@ -550,22 +540,31 @@ interface ExerciseBlock {
     }
 
     .session-bar-row {
-      display: flex; align-items: center; justify-content: space-between;
+      display: flex; align-items: center; justify-content: space-between; gap: var(--space-md);
       padding: var(--space-sm) var(--space-xl);
     }
 
-    .session-bar-left { display: flex; align-items: center; gap: var(--space-md); }
+    .session-bar-left { display: flex; align-items: center; gap: var(--space-md); min-width: 0; }
 
     .bar-label { font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; }
 
-    .timer { font-size: var(--font-size-xl); font-weight: 700; font-variant-numeric: tabular-nums; }
+    .timer { font-size: var(--font-size-xl); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
-    .session-bar-right { display: flex; align-items: center; gap: var(--space-sm); }
+    .session-bar-right { display: flex; align-items: center; gap: var(--space-sm); flex-shrink: 0; }
+
+    /* On the coloured bar: the icon takes the bar's text colour, as the ghost button does. */
+    .bar-icon-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 44px; height: 44px; border-radius: var(--border-radius);
+      border: 1px solid color-mix(in srgb, currentColor 40%, transparent); background: none;
+      color: inherit; cursor: pointer; transition: background 0.15s, border-color 0.15s;
+    }
+    .bar-icon-btn:hover { background: color-mix(in srgb, currentColor 12%, transparent); border-color: color-mix(in srgb, currentColor 75%, transparent); }
 
     /* Rest timer row */
     .rest-row {
       display: flex; align-items: center; gap: var(--space-sm);
-      padding: var(--space-xs) var(--space-xl);
+      padding: var(--space-xs) var(--space-xl) calc(var(--space-xs) + 3px);
       background: rgba(var(--shadow-rgb), 0.18);
       border-top: 1px solid color-mix(in srgb, currentColor 15%, transparent);
       position: relative; overflow: hidden;
@@ -576,62 +575,58 @@ interface ExerciseBlock {
 
     .rest-label {
       font-size: var(--font-size-xs); text-transform: uppercase;
-      letter-spacing: 1px; opacity: 0.7; font-weight: 500; white-space: nowrap;
+      letter-spacing: 1px; opacity: 0.8; font-weight: 500; white-space: nowrap;
     }
 
     .rest-countdown {
       font-size: var(--font-size-lg); font-weight: 700;
-      font-variant-numeric: tabular-nums; min-width: 52px;
+      font-variant-numeric: tabular-nums; min-width: 52px; margin-right: auto;
     }
 
-    .rest-presets { display: flex; gap: 4px; margin-left: auto; }
-
-    .rest-chip {
-      min-height: 28px; padding: 2px 8px; border-radius: var(--border-radius-pill);
-      border: 1px solid color-mix(in srgb, currentColor 35%, transparent); background: none;
-      color: color-mix(in srgb, currentColor 88%, transparent); font-size: var(--font-size-xs);
-      cursor: pointer; transition: all 0.15s; font-family: inherit; white-space: nowrap;
+    .rest-btn {
+      min-height: 44px; min-width: 64px; padding: 0 var(--space-md); border-radius: var(--border-radius-pill);
+      border: 1px solid color-mix(in srgb, currentColor 40%, transparent); background: none;
+      color: inherit; font-size: var(--font-size-sm); font-weight: 600; font-family: inherit;
+      cursor: pointer; white-space: nowrap; transition: background 0.15s, border-color 0.15s;
     }
-
-    .rest-chip:hover { border-color: color-mix(in srgb, currentColor 70%, transparent); color: inherit; }
-
-    .rest-chip.active {
-      background: var(--text-on-primary); border-color: var(--text-on-primary);
-      color: var(--color-primary); font-weight: 600;
-    }
-
-    .rest-add-btn { border-style: dashed; }
-
-    .save-template-btn {
-      display: flex; align-items: center; justify-content: center;
-      width: 32px; height: 32px; border-radius: var(--border-radius-sm);
-      border: 1px solid color-mix(in srgb, currentColor 30%, transparent); background: none;
-      color: color-mix(in srgb, currentColor 88%, transparent); cursor: pointer; transition: all 0.15s;
-      flex-shrink: 0;
-    }
-    .save-template-btn:hover { border-color: color-mix(in srgb, currentColor 70%, transparent); color: inherit; }
-
-    .template-name-input {
-      width: 100%; padding: 9px 12px; border: 1px solid var(--border-color);
-      border-radius: var(--border-radius-sm); background: var(--bg-surface);
-      color: var(--text-primary); font-size: var(--font-size-base); font-family: inherit;
- box-sizing: border-box;
-    }
-    .template-name-input:focus { border-color: var(--color-primary); }
+    .rest-btn:hover { background: color-mix(in srgb, currentColor 12%, transparent); border-color: color-mix(in srgb, currentColor 75%, transparent); }
 
     .template-save-error {
       font-size: var(--font-size-sm); color: var(--color-negative); margin-top: var(--space-xs);
     }
 
-    .rest-skip-btn {
-      display: inline-flex; align-items: center; justify-content: center;
-      min-height: 28px; padding: 3px 8px; border-radius: var(--border-radius-pill);
-      border: 1px solid color-mix(in srgb, currentColor 30%, transparent); background: none;
-      color: color-mix(in srgb, currentColor 88%, transparent); cursor: pointer;
-      font-size: var(--font-size-xs); transition: all 0.15s; font-family: inherit;
-    }
+    /* Workout options sheet */
+    .opt-group { margin-bottom: var(--space-lg); }
+    .opt-label { display: block; font-size: var(--font-size-sm); font-weight: 600; margin-bottom: var(--space-xs); }
+    .opt-help { font-size: var(--font-size-xs); color: var(--text-secondary); margin-top: var(--space-xs); line-height: 1.5; }
 
-    .rest-skip-btn:hover { border-color: color-mix(in srgb, currentColor 70%, transparent); color: inherit; }
+    .seg {
+      display: flex; border: 1px solid var(--border-color); border-radius: var(--border-radius);
+      overflow: hidden; background: var(--bg-surface);
+    }
+    .seg-btn {
+      flex: 1; min-height: 44px; padding: 0 var(--space-xs);
+      background: none; border: none; color: var(--text-primary);
+      font-size: var(--font-size-sm); font-family: inherit; cursor: pointer; white-space: nowrap;
+    }
+    .seg-btn + .seg-btn { border-left: 1px solid var(--border-color); }
+    .seg-btn:hover:not(.active) { background: var(--bg-surface-hover); }
+    .seg-btn.active { background: var(--color-primary); color: var(--text-on-primary); font-weight: 600; }
+
+    .opt-actions { border-top: 1px solid var(--border-color); padding-top: var(--space-sm); display: flex; flex-direction: column; }
+    .opt-row {
+      display: flex; align-items: center; gap: var(--space-md); width: 100%;
+      min-height: 52px; padding: var(--space-sm) var(--space-xs);
+      background: none; border: none; border-radius: var(--border-radius);
+      color: var(--text-primary); font-size: var(--font-size-md); font-family: inherit;
+      text-align: left; cursor: pointer;
+    }
+    .opt-row:hover:not(:disabled) { background: var(--bg-surface-hover); }
+    .opt-row:disabled { opacity: 0.6; cursor: not-allowed; }
+    .opt-row jiro-icon { color: var(--text-secondary); flex-shrink: 0; }
+    .opt-row-text { display: flex; flex-direction: column; gap: 2px; }
+    .opt-row-text small { font-size: var(--font-size-xs); color: var(--text-secondary); }
+    .opt-row--danger, .opt-row--danger jiro-icon { color: var(--color-negative); }
 
     .rest-progress {
       position: absolute; bottom: 0; left: 0; right: 0;
@@ -644,26 +639,6 @@ interface ExerciseBlock {
     }
 
     .rest-row.rest-done .rest-progress-fill { background: var(--color-positive); }
-
-    .type-toggle {
-      display: flex; border-radius: var(--border-radius); overflow: hidden;
-      border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
-    }
-
-    .type-btn {
-      min-height: 28px; padding: 5px 10px; background: transparent; border: none;
-      color: color-mix(in srgb, currentColor 88%, transparent); font-size: var(--font-size-xs);
-      font-family: inherit;
-      cursor: pointer; transition: all 0.15s; white-space: nowrap;
-    }
-
-    .type-btn + .type-btn { border-left: 1px solid color-mix(in srgb, currentColor 35%, transparent); }
-
-    /* mirrors the Finish button: fill with the bar's own text colour so the
-       label stays readable on the maroon bar and on the lifted dark one.
-       currentColor cannot be used for the fill here: in a background it
-       resolves to this element's own colour, not the inherited one. */
-    .type-btn.active { background: var(--text-on-primary); color: var(--color-primary); font-weight: 600; }
 
     .type-notice {
       text-align: center; font-size: var(--font-size-sm); font-weight: 500;
@@ -678,13 +653,14 @@ interface ExerciseBlock {
 
 
 
-    /* Body */
-    .player-body { max-width: 700px; overflow-x: hidden; }
+    /* Body; the bottom clears the phone's home indicator now the nav bar is gone. */
+    .player-body { max-width: 700px; overflow-x: hidden; padding-bottom: calc(var(--space-xl) + env(safe-area-inset-bottom)); }
 
-    /* Notes panel */
     .empty-session-error {
-      margin: var(--space-xs) var(--space-md) 0;
-      font-size: var(--font-size-sm); color: var(--color-danger); text-align: right;
+      max-width: 700px; margin-bottom: var(--space-md); padding: var(--space-sm) var(--space-md);
+      font-size: var(--font-size-sm); color: var(--color-negative);
+      background: rgba(var(--color-danger-rgb), 0.08); border: 1px solid rgba(var(--color-danger-rgb), 0.25);
+      border-radius: var(--border-radius);
     }
 
     .notes-panel { margin-bottom: var(--space-md); }
@@ -1027,37 +1003,14 @@ interface ExerciseBlock {
         margin-bottom: var(--space-md);
       }
 
-      /* Session bar inner row: stack into 2 rows */
-      .session-bar-row {
-        flex-direction: column;
-        padding: var(--space-sm) var(--space-md);
-        gap: var(--space-xs);
-        align-items: stretch;
-      }
+      /* One row on a phone too: the clock on the left, options and Finish on the right. */
+      .session-bar-row { padding: var(--space-xs) var(--space-md); }
 
-      .rest-row { padding: var(--space-xs) var(--space-md); }
-
-      .rest-presets { gap: 3px; }
-
-      .rest-chip { padding: 2px 6px; font-size: 0.65rem; }
-
-      .session-bar-left { gap: var(--space-sm); }
+      .rest-row { padding: var(--space-xs) var(--space-md) calc(var(--space-xs) + 3px); }
 
       .bar-label { display: none; }
 
       .timer { font-size: var(--font-size-lg); }
-
-      .session-bar-right {
-        flex-wrap: wrap;
-        gap: var(--space-xs);
-      }
-
-      /* Type toggle fills first sub-row */
-      .type-toggle { flex: 0 0 100%; }
-
-      .type-btn { flex: 1; padding: 6px 4px; font-size: 0.65rem; }
-
-      /* Exercise + Finish share second sub-row */
     }
 
     /* ── Set table on very small screens ── */
@@ -1144,15 +1097,23 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   finishing = signal(false);
   emptySessionError = signal<string | null>(null);
   showExPicker = signal(false);
-  showExitConfirm = signal(false);
+  showOptions = signal(false);
   discarding = signal(false);
   showTemplateSave = signal(false);
-  templateSaving = signal(false);
-  templateSaveError = signal('');
   private readonly toast = inject(ToastService);
   private readonly confirmService = inject(ConfirmService);
-  templateName = '';
   removingBlock = signal<number | null>(null);
+
+  readonly sessionTypes = [
+    { value: 'normal', label: 'Normal' },
+    { value: 'deload', label: 'Deload' },
+    { value: 'test', label: 'Test' },
+  ];
+  readonly units = ['lbs', 'kg'];
+  readonly typeHelp = computed(() => ({
+    deload: "A lighter workout. It doesn't set records or change next time's suggestion.",
+    test: "A max attempt. Records count, but next time's suggestion ignores it.",
+  } as Record<string, string>)[this.sessionType()] ?? "Counts for records and next time's suggestion.");
 
   // Inline exercise creation
   creatingExercise = signal(false);
@@ -1174,17 +1135,20 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   exSearch = '';
   sessionNotes = '';
 
-  // Rest timer
+  // Rest timer: restLength is this rest (+30s grows it); restSetting is how long every rest starts at.
   restTimerActive = signal(false);
   restTimerRemaining = signal(0);
-  restTimerDuration = signal(90);
+  restLength = signal(90);
   restTimerDone = signal(false);
   readonly restPresets = [60, 90, 120, 180, 300];
+  private readonly restChoice = signal<number | null>(null);
+  readonly restSetting = computed(() => this.restChoice() ?? this.settingsService.restSeconds());
   private restInterval: ReturnType<typeof setInterval> | null = null;
+  private restHideTimer: ReturnType<typeof setTimeout> | null = null;
   private restStartedAt: Date | null = null;
   private audioCtx: AudioContext | null = null;
 
-  private sessionId = '';
+  sessionId = '';
   private startedAt = new Date();
   private timerInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -1253,7 +1217,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
       next: session => {
         if (session.ended_at) {
           this.closeDraft();
-          this.openInHistory();
+          this.openSummary();
           return;
         }
         this.startedAt = new Date(session.started_at);
@@ -1287,11 +1251,12 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   }
 
   // ── Rest timer ──────────────────────────────────────────────────
-  startRestTimer() {
+  startRestTimer(seconds = this.restSetting()) {
     this.clearRestTimer();
     this.warmUpAudio();
     this.restStartedAt = new Date();
-    this.restTimerRemaining.set(this.restTimerDuration());
+    this.restLength.set(seconds);
+    this.restTimerRemaining.set(seconds);
     this.restTimerDone.set(false);
     this.restTimerActive.set(true);
     // Tick at 500ms so the display snaps quickly after screen unlock
@@ -1318,13 +1283,15 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   private tickRestTimer() {
     if (!this.restStartedAt) return;
     const elapsed = Math.floor((Date.now() - this.restStartedAt.getTime()) / 1000);
-    const rem = Math.max(0, this.restTimerDuration() - elapsed);
+    const rem = Math.max(0, this.restLength() - elapsed);
     this.restTimerRemaining.set(rem);
     if (rem <= 0 && !this.restTimerDone()) {
       this.clearRestTimer();
       this.restTimerDone.set(true);
       this.playBeep();
-      setTimeout(() => {
+      // Kept so a rest started in these 3 s isn't hidden by the old one.
+      this.restHideTimer = setTimeout(() => {
+        this.restHideTimer = null;
         this.restTimerActive.set(false);
         this.restTimerDone.set(false);
       }, 3000);
@@ -1333,6 +1300,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
 
   private clearRestTimer() {
     if (this.restInterval) { clearInterval(this.restInterval); this.restInterval = null; }
+    if (this.restHideTimer) { clearTimeout(this.restHideTimer); this.restHideTimer = null; }
     this.restStartedAt = null;
   }
 
@@ -1342,21 +1310,26 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     this.restTimerDone.set(false);
   }
 
-  setRestDuration(seconds: number) {
-    this.restTimerDuration.set(seconds);
-    if (this.restTimerActive() && !this.restTimerDone()) {
-      this.startRestTimer();
-    }
+  /** Every rest's length, remembered on the account; applied at once, reverted if the save fails. */
+  setRestDefault(seconds: number) {
+    if (seconds === this.restSetting()) return;
+    this.restChoice.set(seconds);
+    if (this.restTimerActive() && !this.restTimerDone()) this.startRestTimer(seconds);
+    this.authService.updateSettings({ rest_seconds: seconds }).subscribe({
+      next: () => this.restChoice.set(null),
+      error: () => {
+        this.restChoice.set(null);
+        this.toast.error('Could not save the rest timer.');
+      },
+    });
   }
 
+  /** Lengthens this rest only; after the beep it starts a fresh rest of that length. */
   addRestTime(seconds: number) {
     if (this.restTimerDone()) {
-      // Re-arm with fresh duration
-      this.restTimerDuration.set(seconds);
-      this.startRestTimer();
+      this.startRestTimer(seconds);
     } else {
-      // Extend: increase duration, shift start back so remaining grows
-      this.restTimerDuration.update(d => d + seconds);
+      this.restLength.update(d => d + seconds);
       this.restTimerRemaining.update(r => r + seconds);
     }
   }
@@ -1409,7 +1382,12 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   }
 
   private updateElapsed() {
-    const elapsed = Math.floor((Date.now() - this.startedAt.getTime()) / 1000);
+    const elapsed = Math.max(0, Math.floor((Date.now() - this.startedAt.getTime()) / 1000));
+    // Past a day the seconds are noise: "2d 3h".
+    if (elapsed >= 86_400) {
+      this.elapsedDisplay.set(`${Math.floor(elapsed / 86_400)}d ${Math.floor((elapsed % 86_400) / 3600)}h`);
+      return;
+    }
     const h = Math.floor(elapsed / 3600);
     const m = Math.floor((elapsed % 3600) / 60);
     const s = elapsed % 60;
@@ -1466,7 +1444,10 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   }
 
   toggleUnit(unit: string) {
-    this.authService.updateSettings({ weight_unit: unit }).subscribe();
+    if (unit === this.settingsService.weightUnit()) return;
+    this.authService.updateSettings({ weight_unit: unit }).subscribe({
+      error: () => this.toast.error('Could not change the unit.'),
+    });
   }
 
   rpeInvalid(rpe: string): boolean {
@@ -1610,43 +1591,40 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     this.blockAttachments.update(m => { const n = new Map(m); n.delete(exerciseId); return n; });
   }
 
+  /** Leaves the workout open: logged sets are on the server, typed ones in this device's draft. */
   exitSession() {
+    this.showOptions.set(false);
     this.router.navigate(['/jym']);
   }
 
-  discardSession() {
+  async discardSession() {
+    const logged = this.blocks().reduce((n, b) => n + b.sets.filter(s => s.saved).length, 0);
+    this.showOptions.set(false);
+    const ok = await this.confirmService.confirm({
+      title: 'Discard this workout?',
+      message: logged > 0
+        ? `This deletes the ${logged} ${logged === 1 ? 'set' : 'sets'} you logged. It can't be undone.`
+        : 'Nothing is logged yet.',
+      confirmLabel: 'Discard workout',
+      danger: true,
+    });
+    if (!ok) return;
     this.discarding.set(true);
     this.jymService.deleteSession(this.sessionId).subscribe({
       next: () => {
         this.closeDraft();
         this.router.navigate(['/jym']);
       },
-      error: () => this.discarding.set(false),
+      error: () => {
+        this.discarding.set(false);
+        this.toast.error('Could not discard the workout.');
+      },
     });
   }
 
   saveNotes() {
     this.jymService.updateSession(this.sessionId, { notes: this.sessionNotes }).subscribe({
       error: err => { if (!this.handleEnded(err)) this.toast.error('Could not save the session notes.'); },
-    });
-  }
-
-  saveAsTemplate() {
-    const name = this.templateName.trim();
-    if (!name) return;
-    this.templateSaving.set(true);
-    this.templateSaveError.set('');
-    this.jymService.createTemplateFromSession(this.sessionId, name).subscribe({
-      next: () => {
-        this.showTemplateSave.set(false);
-        this.templateSaving.set(false);
-        this.templateName = '';
-        this.toast.success(`Template "${name}" saved`);
-      },
-      error: () => {
-        this.templateSaving.set(false);
-        this.templateSaveError.set('Could not save template. Make sure you have logged at least one set.');
-      },
     });
   }
 
@@ -1686,22 +1664,20 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     }).subscribe({
       next: () => {
         this.closeDraft();
-        this.router.navigate(['/jym/sessions', this.sessionId, 'summary']);
+        // Replaced, so Back from the summary skips the finished player.
+        this.router.navigate(['/jym/sessions', this.sessionId, 'summary'], { replaceUrl: true, state: { from: 'finish' } });
       },
       error: err => {
         this.finishing.set(false);
-        this.handleEnded(err);
+        if (!this.handleEnded(err)) this.toast.error('Could not finish the workout. Check your connection and try again.');
       },
     });
   }
 
-  /** A finished session opens read-only in Track's history, never as a live workout. */
-  private openInHistory() {
+  /** A finished workout opens as its summary, never as a live workout. */
+  private openSummary() {
     if (this.timerInterval) clearInterval(this.timerInterval);
-    this.router.navigate(['/jym/track'], {
-      queryParams: { tab: 'sessions', session: this.sessionId },
-      replaceUrl: true,
-    });
+    this.router.navigate(['/jym/sessions', this.sessionId, 'summary'], { replaceUrl: true });
   }
 
   /** The API refuses writes to a finished session (e.g. finished in another tab). */
@@ -1710,7 +1686,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     if (code !== 'SESSION_ENDED') return false;
     this.closeDraft();
     this.toast.error('This workout was already finished.');
-    this.openInHistory();
+    this.openSummary();
     return true;
   }
 

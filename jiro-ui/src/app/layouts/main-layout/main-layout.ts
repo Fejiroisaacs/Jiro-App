@@ -34,7 +34,7 @@ const VERIFY_DISMISSED_KEY = 'jiro_verify_dismissed';
     JiroModuleNavComponent, JiroUserMenuComponent, JiroSearchPaletteComponent,
   ],
   template: `
-    <jiro-toaster />
+    <jiro-toaster [class.no-nav]="!mobileNavAllowed()" />
     <jiro-confirm />
     @if (signedIn() && searchPalette.open()) {
       <jiro-search-palette />
