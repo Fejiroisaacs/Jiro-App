@@ -13,7 +13,9 @@ import {
 } from '../../../core/services/jym.service';
 import { UploadService } from '../../../core/services/upload.service';
 import { SettingsService } from '../../../core/services/settings.service';
-import { todayKey } from '../../../core/utils/day';
+import { dayKey, timeInZone, todayKey } from '../../../core/utils/day';
+import { formatInstant } from '../../../core/utils/format-date';
+import { isStale } from '../stale-workout';
 import { nextSets } from '../weight-suggestion';
 import { filled, parseDecimal, parseWhole } from '../number-input';
 import { nearestLoadable, platesFor, platesPerSide, warmupRamp } from '../plates';
@@ -98,6 +100,24 @@ interface ExerciseBlock {
         </div>
       }
     </div>
+
+    <!-- A workout left open for hours: finish it where it really ended, or throw away an empty one. -->
+    @if (stale(); as st) {
+      <div class="stale-banner" role="status">
+        <p class="stale-text">
+          This workout started {{ st.started }} and wasn't finished.
+          {{ st.lastSet ? 'Your last set was at ' + st.lastSet + '.' : 'Nothing was logged.' }}
+        </p>
+        <div class="stale-actions">
+          @if (st.lastSetAt) {
+            <jiro-button size="lg" type="button" [loading]="finishing()" (click)="finishAtLastSet(st.lastSetAt)">Finish at {{ st.lastSetTime }}</jiro-button>
+          } @else {
+            <jiro-button size="lg" variant="danger" type="button" [loading]="discarding()" (click)="discardSession()">Discard it</jiro-button>
+          }
+          <jiro-button size="lg" variant="secondary" type="button" (click)="stale.set(null)">Keep going</jiro-button>
+        </div>
+      </div>
+    }
 
     @if (emptySessionError()) {
       <p class="empty-session-error" role="alert">{{ emptySessionError() }}</p>
@@ -737,6 +757,14 @@ interface ExerciseBlock {
     /* Body; the bottom clears the phone's home indicator now the nav bar is gone. */
     .player-body { max-width: 700px; overflow-x: hidden; padding-bottom: calc(var(--space-xl) + env(safe-area-inset-bottom)); }
 
+    .stale-banner {
+      max-width: 700px; margin-bottom: var(--space-md); padding: var(--space-md);
+      background: rgba(var(--color-warning-rgb), 0.08); border: 1px solid rgba(var(--color-warning-rgb), 0.35);
+      border-radius: var(--border-radius);
+    }
+    .stale-text { font-size: var(--font-size-sm); line-height: 1.5; margin-bottom: var(--space-sm); }
+    .stale-actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+
     .empty-session-error {
       max-width: 700px; margin-bottom: var(--space-md); padding: var(--space-sm) var(--space-md);
       font-size: var(--font-size-sm); color: var(--color-negative);
@@ -1287,6 +1315,8 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     return { bi, si, row, summary: `${block.exerciseName}${values}${row.saved ? ', logged' : ', not logged yet'}` };
   });
   readonly filled = filled;
+  /** Set when the workout was opened after hours with nothing logged; "Keep going" clears it. */
+  readonly stale = signal<{ started: string; lastSet: string | null; lastSetTime: string; lastSetAt: string | null } | null>(null);
 
   // Plates: the account's bar and plate sizes for the unit in use.
   readonly currentPlates = computed(() => platesFor(this.settingsService.weightUnit(), this.settingsService.plates()));
@@ -1396,6 +1426,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
           return;
         }
         this.startedAt = new Date(session.started_at);
+        this.noteIfStale(session.started_at, session.sets ?? []);
         this.sessionType.set(session.session_type || 'normal');
         this.sessionNotes = session.notes || '';
         this.blocks.set(this.restoreBlocks(session.sets || [], session.targets ?? []));
@@ -1841,6 +1872,37 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
       error: err => {
         this.finishing.set(false);
         if (!this.handleEnded(err)) this.toast.error('Could not finish the workout. Check your connection and try again.');
+      },
+    });
+  }
+
+  /** A forgotten workout (nothing logged for hours) gets the banner; the times are the server's. */
+  private noteIfStale(startedAt: string, sets: SessionSet[]) {
+    const lastSetAt = sets.reduce<string | null>((m, s) => !m || Date.parse(s.created_at) > Date.parse(m) ? s.created_at : m, null);
+    if (!isStale({ started_at: startedAt, last_set_at: lastSetAt })) return;
+    const tz = this.settingsService.timezone();
+    const at = (iso: string) => `${formatInstant(iso, tz, { weekday: true })}, ${timeInZone(iso, tz)}`;
+    const sameDay = !!lastSetAt && dayKey(lastSetAt, tz) === dayKey(startedAt, tz);
+    this.stale.set({
+      started: at(startedAt),
+      lastSet: lastSetAt ? (sameDay ? timeInZone(lastSetAt, tz) : at(lastSetAt)) : null,
+      lastSetTime: lastSetAt ? timeInZone(lastSetAt, tz) : '',
+      lastSetAt,
+    });
+  }
+
+  /** Ends a forgotten workout at its last logged set, so its duration is the training, not the days after. */
+  finishAtLastSet(endedAt: string) {
+    if (this.finishing()) return;
+    this.finishing.set(true);
+    this.jymService.updateSession(this.sessionId, { ended_at: endedAt, notes: this.sessionNotes }).subscribe({
+      next: () => {
+        this.closeDraft();
+        this.router.navigate(['/jym/sessions', this.sessionId, 'summary'], { replaceUrl: true, state: { from: 'finish' } });
+      },
+      error: err => {
+        this.finishing.set(false);
+        if (!this.handleEnded(err)) this.toast.error('Could not finish the workout. Try again.');
       },
     });
   }

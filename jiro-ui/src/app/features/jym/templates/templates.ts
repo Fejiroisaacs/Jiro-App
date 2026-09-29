@@ -29,7 +29,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
         <jiro-empty-state
           icon="floppy-disk"
           heading="No templates yet"
-          message="During a session, use Save as template to keep its exercise layout for next time." />
+          message="In a workout, open Workout options and choose Save as template to keep its exercises." />
       }
 
       @if (!loading() && templates().length > 0) {

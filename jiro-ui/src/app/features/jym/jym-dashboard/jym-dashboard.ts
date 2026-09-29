@@ -7,7 +7,7 @@ import { WorkoutLauncher } from '../shared/workout-launcher';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { addDays, dayKey, mondayOfKey, relativeDayName, todayKey } from '../../../core/utils/day';
+import { addDays, dayKey, mondayOfKey, relativeDayName, timeInZone, todayKey } from '../../../core/utils/day';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
@@ -15,7 +15,9 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { suggestDeload } from '../deload-rule';
-import { formatDay } from '../../../core/utils/format-date';
+import { formatDay, formatInstant } from '../../../core/utils/format-date';
+import { isStale } from '../stale-workout';
+import { clearDraft } from '../shared/session-draft';
 import { weeksElapsed } from '../series-progress';
 
 /** Snooze stamp for the deload suggestion: the epoch ms of the last "Not now". */
@@ -49,7 +51,7 @@ const DELOAD_SNOOZE_DAYS = 7;
 <div class="in-progress-section">
         <h2 class="section-title">In progress</h2>
         @for (s of inProgressSessions(); track s) {
-<div class="ipc" (click)="router.navigate(['/jym/session', s.id])">
+<div class="ipc" [class.ipc--stale]="staleWorkout(s)" (click)="router.navigate(['/jym/session', s.id])">
           <div class="ipc-info">
             <div class="ipc-name">{{ s.routine_name || 'Freestyle session' }}</div>
             <div class="ipc-meta">Started {{ formatSessionTime(s.started_at) }}
@@ -57,11 +59,20 @@ const DELOAD_SNOOZE_DAYS = 7;
 <span> · {{ s.set_count }} sets logged</span>
 }
             </div>
+            <!-- Left open for hours: say when the training stopped, and offer to finish it there. -->
+            @if (staleWorkout(s)) {
+              <div class="ipc-meta ipc-stale">{{ s.last_set_at ? 'Last set ' + lastSetLabel(s) : 'Nothing logged' }}</div>
+            }
           </div>
           <div class="ipc-actions">
-            <jiro-button variant="primary" type="button" (click)="$event.stopPropagation(); router.navigate(['/jym/session', s.id])">
-              Resume
-            </jiro-button>
+            @if (staleWorkout(s) && s.last_set_at) {
+              <jiro-button variant="primary" size="lg" type="button" (click)="$event.stopPropagation(); finishStale(s)">Finish</jiro-button>
+              <jiro-button variant="secondary" size="lg" type="button" (click)="$event.stopPropagation(); router.navigate(['/jym/session', s.id])">Resume</jiro-button>
+            } @else {
+              <jiro-button variant="primary" size="lg" type="button" (click)="$event.stopPropagation(); router.navigate(['/jym/session', s.id])">
+                Resume
+              </jiro-button>
+            }
             <button class="ipc-discard-btn" type="button" title="Discard session"
               [attr.aria-label]="'Discard ' + (s.routine_name || 'freestyle session')"
               (click)="$event.stopPropagation(); discardSession(s)">
@@ -280,7 +291,7 @@ const DELOAD_SNOOZE_DAYS = 7;
           <jiro-empty-state
             compact
             heading="No templates yet"
-            message="During a session, use Save as template to keep its layout for next time." />
+            message="In a workout, open Workout options and choose Save as template to keep its layout." />
         }
         @if (!templatesLoading() && templates().length > 0) {
 <div class="splits-row">
@@ -383,6 +394,14 @@ const DELOAD_SNOOZE_DAYS = 7;
     .ipc-name { font-size: var(--font-size-md); font-weight: 600; }
 
     .ipc-meta { font-size: var(--font-size-xs); color: var(--text-muted); }
+    .ipc-stale { color: var(--color-warning); font-weight: 500; }
+    /* Two actions on a phone: they take their own row so the name and times keep the width. */
+    @media (max-width: 600px) {
+      .ipc--stale { flex-wrap: wrap; }
+      .ipc--stale .ipc-info { flex: 1 0 100%; }
+      .ipc--stale .ipc-actions { flex: 1; --jiro-btn-width: 100%; }
+      .ipc--stale .ipc-actions jiro-button { flex: 1; }
+    }
 
     .ipc-actions { display: flex; align-items: center; gap: var(--space-xs); flex-shrink: 0; }
 
@@ -390,7 +409,7 @@ const DELOAD_SNOOZE_DAYS = 7;
     .ipc-discard-btn {
       background: none; border: 1px solid var(--border-color);
       color: var(--text-muted); cursor: pointer;
-      width: 34px; height: 34px; border-radius: var(--border-radius);
+      width: 44px; height: 44px; border-radius: var(--border-radius);
       display: flex; align-items: center; justify-content: center;
       transition: all 0.15s; flex-shrink: 0;
     }
@@ -778,10 +797,6 @@ export class JymDashboardComponent implements OnInit {
     this.launcher.start({});
   }
 
-  /**
-   * Opens the next session already marked as a deload, so the player shows
-   * Deload selected without a second call.
-   */
   /** Up next's day in its series, as a deload; freestyle when no series is active. */
   startDeloadSession() {
     const sr = this.upNext();
@@ -811,6 +826,7 @@ export class JymDashboardComponent implements OnInit {
     if (!ok) return;
     this.jymService.deleteSession(s.id).subscribe({
       next: () => {
+        clearDraft(s.id);
         this.inProgressSessions.update(list => list.filter(x => x.id !== s.id));
         this.toast.success('Session discarded');
       },
@@ -820,10 +836,38 @@ export class JymDashboardComponent implements OnInit {
 
   formatSessionTime(iso: string): string {
     const diff = Date.now() - new Date(iso).getTime();
-    const mins = Math.floor(diff / 60000);
+    const mins = Math.max(0, Math.floor(diff / 60000));
     if (mins < 60) return `${mins}m ago`;
     const h = Math.floor(mins / 60);
-    return `${h}h ${mins % 60}m ago`;
+    if (h < 24) return `${h}h ${mins % 60}m ago`;
+    const tz = this.settingsService.timezone();
+    return `${formatInstant(iso, tz, { weekday: true })}, ${timeInZone(iso, tz)}`;
+  }
+
+  readonly staleWorkout = (s: SessionSummary) => isStale(s);
+
+  /** The last set's time; with its date too when that isn't the day the workout started. */
+  lastSetLabel(s: SessionSummary): string {
+    if (!s.last_set_at) return '';
+    const tz = this.settingsService.timezone();
+    if (Date.now() - Date.parse(s.last_set_at) < 24 * 3_600_000) return this.formatSessionTime(s.last_set_at);
+    return dayKey(s.last_set_at, tz) === dayKey(s.started_at, tz)
+      ? timeInZone(s.last_set_at, tz)
+      : this.formatSessionTime(s.last_set_at);
+  }
+
+  /** Ends a forgotten workout at its last set (server time), then reloads so Up next returns. */
+  finishStale(s: SessionSummary) {
+    if (!s.last_set_at) return;
+    const at = timeInZone(s.last_set_at, this.settingsService.timezone());
+    this.jymService.updateSession(s.id, { ended_at: s.last_set_at }).subscribe({
+      next: () => {
+        clearDraft(s.id);
+        this.toast.success(`Finished at ${at}`);
+        this.load();
+      },
+      error: () => this.toast.error('Could not finish the workout. Try again.'),
+    });
   }
 
   startFromSeriesSplit(splitId: string, seriesId: string) {
