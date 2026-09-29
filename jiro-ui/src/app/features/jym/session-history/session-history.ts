@@ -116,6 +116,9 @@ import { formatInstant } from '../../../core/utils/format-date';
               @if (s.session_type === 'test') {
 <span class="type-badge test">Test</span>
 }
+              @if (!s.ended_at) {
+                <span class="type-badge open">In progress</span>
+              }
             </div>
             <div class="session-right">
               <div class="session-stats">
@@ -149,6 +152,9 @@ import { formatInstant } from '../../../core/utils/format-date';
               @for (group of groupedSets(detail()!.sets); track group.exerciseName) {
 <div class="detail-ex">
                 <div class="detail-ex-name">{{ group.exerciseName }}</div>
+                @if (group.note) {
+                  <p class="detail-ex-note">{{ group.note }}</p>
+                }
                 <div class="detail-set-rows">
                   @for (set of group.sets; track set.id) {
 <div class="detail-set-row" [class.is-warmup]="set.is_warmup">
@@ -156,6 +162,9 @@ import { formatInstant } from '../../../core/utils/format-date';
                     <span class="ds-weight">{{ settingsService.toDisplay(set.weight) | number:'1.1-1' }} {{ settingsService.unitLabel() }}</span>
                     <span class="ds-x">×</span>
                     <span class="ds-reps">{{ set.reps_performed }} reps</span>
+                    @if (set.rpe != null) {
+                      <span class="ds-rpe">RPE {{ set.rpe }}</span>
+                    }
                     @if (set.is_warmup) {
 <span class="ds-warmup"><jiro-icon name="fire" [size]="12" />Warm-up</span>
 }
@@ -178,7 +187,14 @@ import { formatInstant } from '../../../core/utils/format-date';
 }
               </div>
 
-              <a class="day-link" [routerLink]="['/day', sessionDay(detail()!.started_at)]" (click)="$event.stopPropagation()">See this day</a>
+              <div class="detail-links">
+                @if (detail()!.ended_at) {
+                  <a class="day-link" [routerLink]="['/jym/sessions', detail()!.id, 'summary']" [state]="{ back: backUrl(detail()!.id) }" (click)="$event.stopPropagation()">View summary</a>
+                } @else {
+                  <a class="day-link" [routerLink]="['/jym/session', detail()!.id]" (click)="$event.stopPropagation()">Resume workout</a>
+                }
+                <a class="day-link" [routerLink]="['/day', sessionDay(detail()!.started_at)]" (click)="$event.stopPropagation()">See this day</a>
+              </div>
 
               <!-- Attachments panel -->
               @if (detail()!.attachments.length > 0) {
@@ -230,13 +246,13 @@ import { formatInstant } from '../../../core/utils/format-date';
           </div>
 }
         </div>
+}
+      </div>
         @if (hasMore()) {
           <div class="load-more">
             <jiro-button variant="secondary" type="button" [loading]="loadingMore()" (click)="loadMore()">Show older sessions</jiro-button>
           </div>
         }
-}
-      </div>
 }
     </div>
 
@@ -349,13 +365,15 @@ import { formatInstant } from '../../../core/utils/format-date';
 
     .type-badge.test { background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary); }
 
+    .type-badge.open { background: rgba(var(--color-accent-rgb), 0.14); color: var(--color-accent); }
+
     .session-right { display: flex; align-items: center; gap: var(--space-sm); }
 
     .session-stats { display: flex; gap: var(--space-sm); }
 
     .delete-session-btn {
       background: none; border: none; cursor: pointer;
-      color: var(--text-muted); padding: 6px; border-radius: var(--border-radius-sm);
+      color: var(--text-muted); width: 44px; height: 44px; justify-content: center; border-radius: var(--border-radius-sm);
       display: flex; align-items: center; transition: all 0.15s;
       flex-shrink: 0;
     }
@@ -388,6 +406,10 @@ import { formatInstant } from '../../../core/utils/format-date';
       color: var(--text-primary); margin-bottom: var(--space-xs);
     }
 
+    .detail-ex-note { font-size: var(--font-size-xs); color: var(--text-secondary); font-style: italic; margin: 0 0 var(--space-xs) var(--space-md); }
+
+    .ds-rpe { font-size: var(--font-size-xs); color: var(--text-muted); }
+
     .detail-set-rows { display: flex; flex-direction: column; gap: 2px; padding-left: var(--space-md); }
 
     .detail-set-row {
@@ -415,11 +437,12 @@ import { formatInstant } from '../../../core/utils/format-date';
 
 
 
+    .detail-links { display: flex; flex-wrap: wrap; gap: 0 var(--space-lg); margin-top: var(--space-sm); }
+
     .day-link {
       display: inline-flex;
       align-items: center;
-      min-height: 32px;
-      margin-top: var(--space-sm);
+      min-height: 44px;
       font-size: var(--font-size-sm);
       font-weight: 600;
       color: var(--color-primary);
@@ -676,20 +699,34 @@ export class SessionHistoryComponent implements OnInit {
     this.detail.set(null);
     this.detailLoading.set(true);
     this.jymService.getSession(s.id).subscribe({
-      next: d => { this.detail.set(d); this.detailLoading.set(false); },
-      error: () => this.detailLoading.set(false),
+      next: d => {
+        if (this.selectedId() !== s.id) return;
+        this.detail.set(d);
+        this.detailLoading.set(false);
+      },
+      error: () => {
+        if (this.selectedId() === s.id) this.detailLoading.set(false);
+      },
     });
   }
 
-  groupedSets(sets: SessionWithSets['sets']): { exerciseName: string; sets: SessionWithSets['sets'] }[] {
-    const map = new Map<string, { exerciseName: string; sets: SessionWithSets['sets'] }>();
+  /** Sets by exercise, with the exercise note (it's stored on each of its sets). */
+  groupedSets(sets: SessionWithSets['sets']): { exerciseName: string; note: string | null; sets: SessionWithSets['sets'] }[] {
+    const map = new Map<string, { exerciseName: string; note: string | null; sets: SessionWithSets['sets'] }>();
     for (const s of sets) {
       if (!map.has(s.exercise_id)) {
-        map.set(s.exercise_id, { exerciseName: s.exercise_name, sets: [] });
+        map.set(s.exercise_id, { exerciseName: s.exercise_name, note: null, sets: [] });
       }
-      map.get(s.exercise_id)!.sets.push(s);
+      const group = map.get(s.exercise_id)!;
+      group.note ??= s.exercise_note || null;
+      group.sets.push(s);
     }
     return Array.from(map.values());
+  }
+
+  /** Where the summary's Done returns to: this workout, open in history. */
+  backUrl(id: string): string {
+    return `/jym/track?tab=sessions&session=${id}`;
   }
 
   formatDate(instant: string): string {

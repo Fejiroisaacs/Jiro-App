@@ -1,11 +1,18 @@
-import { Component, OnInit, ViewChild, ElementRef, signal, inject } from '@angular/core';
+import { Component, DestroyRef, OnInit, ViewChild, ElementRef, computed, signal, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
-import { JymService, SessionReport } from '../../../core/services/jym.service';
+import { JymService, SessionReport, UpdateSessionTimesRequest } from '../../../core/services/jym.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { ToastService } from '../../../core/services/toast.service';
-import { dayKey } from '../../../core/utils/day';
+import { dayKey, fromZonedInput, timeInZone, toZonedInput } from '../../../core/utils/day';
+import { formatInstant } from '../../../core/utils/format-date';
+import { WorkoutLauncher } from '../shared/workout-launcher';
+import { SaveTemplateDialogComponent } from '../shared/save-template-dialog';
+import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
+import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { muscleColor } from '../shared/muscle-colors';
 
 interface LiftHighlight {
@@ -43,16 +50,24 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
 @Component({
   selector: 'app-session-summary',
   standalone: true,
-  imports: [JiroIconComponent, CommonModule, RouterLink, JymPrBadgeComponent],
+  imports: [JiroIconComponent, CommonModule, FormsModule, RouterLink, JymPrBadgeComponent, JiroModalComponent, JiroButtonComponent, SaveTemplateDialogComponent],
   template: `
     <div class="page">
 
       <div class="hero">
         <div class="hero-content">
-          <span class="trophy-ring"><jiro-icon name="trophy" [size]="48" /></span>
-          <h1 class="hero-title">Workout complete</h1>
+          <span class="trophy-ring"><jiro-icon [name]="inProgress() ? 'barbell' : 'trophy'" [size]="48" /></span>
+          <h1 class="hero-title">{{ inProgress() ? 'Workout in progress' : 'Workout complete' }}</h1>
           @if (routineName(); as name) {
             <p class="hero-sub">{{ name }}</p>
+          }
+          @if (whenLabel(); as when) {
+            <p class="hero-when">{{ when }}</p>
+          }
+          @if (report() && !inProgress()) {
+            <button type="button" class="hero-edit" aria-haspopup="dialog" (click)="openTimes()">
+              <jiro-icon name="pencil-simple" [size]="14" /> Edit times
+            </button>
           }
           @if (sessionType() !== 'normal') {
             <span class="type-pill">{{ sessionType() === 'deload' ? 'Deload' : 'Test' }} session</span>
@@ -68,6 +83,13 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
           <div class="action-row">
             <button class="btn-share" (click)="load()">Try again</button>
             <button class="btn-done" (click)="done()">Back to Jym</button>
+          </div>
+        </div>
+      } @else if (inProgress()) {
+        <div class="state-note">
+          <p>This workout isn't finished yet, so it has no summary.</p>
+          <div class="action-row">
+            <button class="btn-share" type="button" (click)="resume()">Resume workout</button>
           </div>
         </div>
       } @else {
@@ -161,12 +183,48 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
           </button>
           <button class="btn-done" (click)="done()">Done</button>
         </div>
+        <div class="action-row action-row--quiet">
+          <button class="btn-quiet" type="button" [disabled]="launcher.starting()" (click)="repeat()">
+            <jiro-icon name="repeat" [size]="16" /> Repeat workout
+          </button>
+          <button class="btn-quiet" type="button" aria-haspopup="dialog" (click)="showTemplateSave.set(true)">
+            <jiro-icon name="floppy-disk" [size]="16" /> Save as template
+          </button>
+        </div>
         @if (sessionDay()) {
           <p class="day-link-row"><a class="day-link" [routerLink]="['/day', sessionDay()]">See this day</a></p>
         }
       }
 
     </div>
+
+    @if (showTemplateSave() && report(); as r) {
+      <jym-save-template-dialog [sessionId]="r.id" [initialName]="r.routine_name ?? ''" (close)="showTemplateSave.set(false)" />
+    }
+
+    <!-- A finished workout's start and end; the times must still hold every logged set. -->
+    @if (timesOpen()) {
+      <jiro-modal sheet title="Workout times" maxWidth="420px" (close)="timesOpen.set(false)">
+        <div class="times-field">
+          <label class="field-label" for="times-start">Started</label>
+          <input id="times-start" class="times-input" type="datetime-local" [(ngModel)]="startText" />
+        </div>
+        <div class="times-field">
+          <label class="field-label" for="times-end">Finished</label>
+          <input id="times-end" class="times-input" type="datetime-local" [(ngModel)]="endText" />
+        </div>
+        @if (setSpan(); as span) {
+          <p class="times-help">{{ span }}</p>
+        }
+        @if (timesError()) {
+          <p class="times-error" role="alert">{{ timesError() }}</p>
+        }
+        <div class="times-actions">
+          <jiro-button variant="secondary" size="lg" type="button" (click)="timesOpen.set(false)">Cancel</jiro-button>
+          <jiro-button size="lg" type="button" [loading]="timesSaving()" (click)="saveTimes()">Save times</jiro-button>
+        </div>
+      </jiro-modal>
+    }
 
     <!-- Share card, 375 x 667, exported with html-to-image; styles use tokens, resolved via computed style at capture. -->
     <div #shareCard class="sc" aria-hidden="true">
@@ -288,6 +346,18 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
       font-weight: 600;
       color: var(--text-on-dark);
     }
+
+    .hero-when { margin: 0 0 var(--space-sm); font-size: var(--font-size-sm); color: var(--text-on-dark); opacity: 0.9; }
+
+    /* On the banner: takes the banner's text colour, like the workout bar's buttons. */
+    .hero-edit {
+      display: inline-flex; align-items: center; gap: 6px;
+      min-height: 44px; padding: 0 var(--space-md); margin-bottom: var(--space-sm);
+      border: 1px solid color-mix(in srgb, var(--text-on-dark) 40%, transparent); border-radius: var(--border-radius-pill);
+      background: none; color: var(--text-on-dark);
+      font-family: inherit; font-size: var(--font-size-sm); font-weight: 600; cursor: pointer;
+    }
+    .hero-edit:hover { background: color-mix(in srgb, var(--text-on-dark) 12%, transparent); }
 
     .type-pill {
       display: inline-block;
@@ -540,11 +610,36 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
 
     .btn-done:hover { opacity: 0.8; }
 
+    .action-row--quiet { margin-top: calc(-1 * var(--space-sm)); }
+    .btn-quiet {
+      flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+      min-height: 44px; padding: 0 12px;
+      border: 1px solid var(--border-color); border-radius: var(--border-radius);
+      background: none; color: var(--text-primary);
+      font-size: var(--font-size-sm); font-weight: 600; font-family: inherit; white-space: nowrap; cursor: pointer;
+    }
+    .btn-quiet:hover:not(:disabled) { background: var(--bg-surface-hover); }
+    .btn-quiet:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .times-field { margin-bottom: var(--space-md); }
+    .field-label { display: block; font-size: var(--font-size-sm); font-weight: 500; color: var(--text-secondary); margin-bottom: var(--space-xs); }
+    .times-input {
+      width: 100%; box-sizing: border-box; min-height: 48px; padding: 10px 12px;
+      border: 1px solid var(--border-color); border-radius: var(--border-radius);
+      background: var(--bg-surface); color: var(--text-primary);
+      font-size: var(--font-size-md); font-family: inherit;
+    }
+    .times-input:focus { border-color: var(--color-primary); }
+    .times-help { font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-sm); }
+    .times-error { font-size: var(--font-size-sm); color: var(--color-negative); margin-bottom: var(--space-sm); }
+    .times-actions { display: flex; justify-content: flex-end; gap: var(--space-sm); margin-top: var(--space-md); }
+    @media (max-width: 600px) { .times-actions > * { flex: 1; --jiro-btn-width: 100%; } }
+
     .day-link-row { margin: calc(-1 * var(--space-sm)) 0 var(--space-lg); text-align: center; }
     .day-link {
       display: inline-flex;
       align-items: center;
-      min-height: 32px;
+      min-height: 44px;
       font-size: var(--font-size-sm);
       font-weight: 600;
       color: var(--color-primary);
@@ -780,6 +875,24 @@ export class SessionSummaryComponent implements OnInit {
   loadError      = signal(false);
   /** The user's day the workout started on. */
   sessionDay     = signal('');
+  report         = signal<SessionReport | null>(null);
+  inProgress     = computed(() => !!this.report() && !this.report()!.ended_at);
+  /** "Mon 28 Sep, 7:30 PM to 8:42 PM". */
+  whenLabel      = signal('');
+  /** When the sets were logged, as the rule for editing times. */
+  setSpan        = signal('');
+  showTemplateSave = signal(false);
+
+  // Edit times
+  timesOpen   = signal(false);
+  timesSaving = signal(false);
+  timesError  = signal<string | null>(null);
+  startText = '';
+  endText = '';
+  private startShown = '';
+  private endShown = '';
+
+  readonly launcher = inject(WorkoutLauncher);
 
   @ViewChild('shareCard') shareCardEl!: ElementRef<HTMLDivElement>;
 
@@ -787,11 +900,13 @@ export class SessionSummaryComponent implements OnInit {
   private readonly settings = inject(SettingsService);
   private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
 
   constructor(private router: Router) {}
 
   ngOnInit(): void {
-    this.load();
+    // Search can open another workout's summary while this one is showing: follow the id.
+    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.load());
   }
 
   /** The server builds the summary, so it survives a reload and matches history. */
@@ -816,6 +931,14 @@ export class SessionSummaryComponent implements OnInit {
   }
 
   private show(r: SessionReport): void {
+    this.report.set(r);
+    const tz = this.settings.timezone();
+    const at = (iso: string) => `${formatInstant(iso, tz, { weekday: true })}, ${timeInZone(iso, tz)}`;
+    const later = (from: string, to: string) => dayKey(from, tz) === dayKey(to, tz) ? timeInZone(to, tz) : at(to);
+    this.whenLabel.set(r.ended_at ? `${at(r.started_at)} to ${later(r.started_at, r.ended_at)}` : `Started ${at(r.started_at)}`);
+    this.setSpan.set(r.first_set_at && r.last_set_at
+      ? `Your sets were logged from ${timeInZone(r.first_set_at, tz)} to ${later(r.first_set_at, r.last_set_at)}. The times need to include them.`
+      : '');
     this.sessionType.set(r.session_type || 'normal');
     this.routineName.set(r.routine_name);
     const started = new Date(r.started_at).getTime();
@@ -910,7 +1033,73 @@ export class SessionSummaryComponent implements OnInit {
     }
   }
 
+  /** Back where the summary was opened from (history, the day view), else Jym; never out of the app. */
   done(): void {
-    this.router.navigate(['/jym']);
+    const back = (history.state as { back?: unknown } | null)?.back;
+    if (typeof back === 'string' && back.startsWith('/')) this.router.navigateByUrl(back);
+    else this.router.navigate(['/jym']);
+  }
+
+  resume(): void {
+    const r = this.report();
+    if (r) this.router.navigate(['/jym/session', r.id]);
+  }
+
+  /** A normal workout of the same routine and exercises, done in the same order. */
+  repeat(): void {
+    const r = this.report();
+    if (!r) return;
+    this.launcher.start(r.routine_id ? { routine_id: r.routine_id } : {}, {
+      repeat: r.exercises.map(e => ({ exerciseId: e.exercise_id, exerciseName: e.name, muscleGroup: e.muscle_group })),
+    });
+  }
+
+  openTimes(): void {
+    const r = this.report();
+    if (!r?.ended_at) return;
+    const tz = this.settings.timezone();
+    this.startText = this.startShown = toZonedInput(r.started_at, tz);
+    this.endText = this.endShown = toZonedInput(r.ended_at, tz);
+    this.timesError.set(null);
+    this.timesOpen.set(true);
+  }
+
+  /** Sends only what changed (the fields have no seconds); the server holds the rules and explains a refusal. */
+  saveTimes(): void {
+    const r = this.report();
+    if (!r || this.timesSaving()) return;
+    const tz = this.settings.timezone();
+    const start = fromZonedInput(this.startText, tz);
+    const end = fromZonedInput(this.endText, tz);
+    if (!start || !end) {
+      this.timesError.set('Enter both a start and a finish time.');
+      return;
+    }
+    if (Date.parse(end) <= Date.parse(start)) {
+      this.timesError.set('The end must be after the start.');
+      return;
+    }
+    const req: UpdateSessionTimesRequest = {};
+    if (this.startText !== this.startShown) req.started_at = start;
+    if (this.endText !== this.endShown) req.ended_at = end;
+    if (!req.started_at && !req.ended_at) {
+      this.timesOpen.set(false);
+      return;
+    }
+    this.timesSaving.set(true);
+    this.jymService.updateSessionTimes(r.id, req).subscribe({
+      next: () => {
+        this.timesSaving.set(false);
+        this.timesOpen.set(false);
+        this.toast.success('Times saved');
+        this.load();
+      },
+      error: err => {
+        this.timesSaving.set(false);
+        this.timesError.set(err?.status === 400 && err?.error?.error?.message
+          ? err.error.error.message
+          : 'Could not save the times. Try again.');
+      },
+    });
   }
 }
