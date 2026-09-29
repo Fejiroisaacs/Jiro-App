@@ -1,9 +1,12 @@
-import { Component, computed, inject, signal, OnInit } from '@angular/core';
+import { Component, Injector, afterNextRender, computed, inject, signal, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { ActivatedRoute } from '@angular/router';
 
 import { FormsModule } from '@angular/forms';
 import { environment } from '../../../environments/environment';
-import { AuthService, UserSettings } from '../../core/services/auth.service';
+import { AuthService, StoredPlates, UserSettings } from '../../core/services/auth.service';
+import { COMMON_PLATES, PlateSet, platesFor } from '../jym/plates';
+import { parseDecimal } from '../jym/number-input';
 import { SettingsService, Theme } from '../../core/services/settings.service';
 import { resolveTimeZone, todayKey } from '../../core/utils/day';
 import { CURRENCIES } from '../ledger/shared/ledger-utils';
@@ -188,6 +191,63 @@ import { ToastService } from '../../core/services/toast.service';
 
         @if (prefError()) {
           <p class="pref-error" role="alert">{{ prefError() }}</p>
+        }
+      </jiro-card>
+
+      <!-- Workouts: the rest timer, and the bar and plates behind the plate calculator and warm-ups -->
+      <jiro-card class="settings-section" id="workouts">
+        <h2>Workouts</h2>
+
+        <div class="setting-row">
+          <div>
+            <label class="setting-label" for="setting-rest">Rest timer</label>
+            <p class="text-secondary setting-desc">How long it runs after each set you log.</p>
+          </div>
+          <select id="setting-rest" [ngModel]="restSeconds" (ngModelChange)="pickRest($event)" class="jiro-select">
+            @for (d of restOptions; track d) {
+              <option [ngValue]="d">{{ restLabel(d) }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="setting-row setting-row-stack">
+          <div>
+            <label class="setting-label" for="setting-bar">Bar weight ({{ weightUnit }})</label>
+            <p class="text-secondary setting-desc" id="setting-bar-desc">Used by the plate calculator and warm-up sets. Use 0 for a machine.</p>
+          </div>
+          <div class="bar-field">
+            <input
+              id="setting-bar"
+              class="jiro-select bar-input"
+              type="text"
+              inputmode="decimal"
+              enterkeyhint="done"
+              autocomplete="off"
+              [(ngModel)]="barText"
+              [attr.aria-invalid]="barError() ? true : null"
+              [attr.aria-describedby]="barError() ? 'setting-bar-desc setting-bar-error' : 'setting-bar-desc'"
+              (blur)="saveBar()"
+              (keydown.enter)="saveBar()" />
+            @if (barError()) {
+              <p class="pref-error" id="setting-bar-error" role="alert">{{ barError() }}</p>
+            }
+          </div>
+        </div>
+
+        <div class="setting-row setting-row-stack">
+          <div>
+            <span class="setting-label" id="setting-plates-label">Plates you have ({{ weightUnit }})</span>
+            <p class="text-secondary setting-desc">Switch off any size your gym doesn't have.</p>
+          </div>
+          <div class="plate-chips" role="group" aria-labelledby="setting-plates-label">
+            @for (size of plateChoices(); track size) {
+              <button type="button" class="plate-chip" [class.on]="plateOn(size)" [attr.aria-pressed]="plateOn(size)" (click)="togglePlate(size)">{{ size }}</button>
+            }
+          </div>
+        </div>
+
+        @if (workoutError()) {
+          <p class="pref-error" role="alert">{{ workoutError() }}</p>
         }
       </jiro-card>
 
@@ -431,6 +491,19 @@ import { ToastService } from '../../core/services/toast.service';
     .tz-search, .tz-select { width: 100%; max-width: 420px; min-height: 40px; font-family: inherit; }
     .pref-error { margin: var(--space-sm) 0 0; font-size: var(--font-size-sm); color: var(--color-danger); }
 
+    /* Linked from the plate calculator: land below the sticky top bar. */
+    #workouts { scroll-margin-top: calc(var(--topbar-height, 0px) + var(--space-md)); }
+    .bar-input { width: 120px; min-height: 44px; font-family: inherit; font-size: var(--font-size-md); font-variant-numeric: tabular-nums; }
+    .plate-chips { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+    .plate-chip {
+      min-width: 56px; min-height: 44px; padding: 0 var(--space-md);
+      border: 1px solid var(--border-color); border-radius: var(--border-radius-pill);
+      background: var(--bg-surface); color: var(--text-secondary);
+      font-family: inherit; font-size: var(--font-size-sm); font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer;
+    }
+    .plate-chip:hover { border-color: var(--color-primary); }
+    .plate-chip.on { background: var(--color-primary); border-color: var(--color-primary); color: var(--text-on-primary); }
+
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(8px); }
       to { opacity: 1; transform: translateY(0); }
@@ -562,6 +635,17 @@ export class SettingsComponent implements OnInit {
   /** Why the last preference save was refused, from the server. */
   prefError = signal<string | null>(null);
 
+  // Workouts: rest timer, bar and plates (per unit; the plates object is saved whole).
+  readonly restOptions = [60, 90, 120, 180, 300];
+  restSeconds = 90;
+  barText = '';
+  barError = signal<string | null>(null);
+  workoutError = signal<string | null>(null);
+  /** A plates change shown at once, until the server confirms or refuses it. */
+  private platesOverride = signal<StoredPlates | null>(null);
+  private readonly route = inject(ActivatedRoute);
+  private readonly injector = inject(Injector);
+
   // Profile fields
   displayName = '';
   username = '';
@@ -627,6 +711,12 @@ export class SettingsComponent implements OnInit {
       this.weightUnit = s.weight_unit || 'lbs';
       this.currency = s.currency || 'USD';
     }
+    this.restSeconds = this.settingsService.restSeconds();
+    this.barText = String(this.currentPlates().bar);
+    // The plate calculator links to #workouts; the page scrolls in body, so the router can't jump there.
+    if (this.route.snapshot.fragment === 'workouts') {
+      afterNextRender(() => document.getElementById('workouts')?.scrollIntoView({ block: 'start' }), { injector: this.injector });
+    }
     // The zone the app actually uses (the setting, else this device's).
     this.timezone = this.settingsService.timezone();
     this.tzCurrent.set(this.timezone);
@@ -661,7 +751,69 @@ export class SettingsComponent implements OnInit {
   pickWeightUnit(unit: string) {
     const previous = this.weightUnit;
     this.weightUnit = unit;
-    this.save({ weight_unit: unit }, () => (this.weightUnit = previous));
+    this.barText = String(this.currentPlates().bar);
+    this.save({ weight_unit: unit }, () => {
+      this.weightUnit = previous;
+      this.barText = String(this.currentPlates().bar);
+    });
+  }
+
+  restLabel(seconds: number): string {
+    const m = Math.floor(seconds / 60);
+    return seconds % 60 ? `${m} min ${seconds % 60} s` : `${m} min`;
+  }
+
+  pickRest(seconds: number) {
+    const previous = this.restSeconds;
+    this.restSeconds = seconds;
+    this.save({ rest_seconds: seconds }, () => (this.restSeconds = previous), this.workoutError);
+  }
+
+  /** The bar and plates for the unit shown: a pending change, else what's stored, else the defaults. */
+  currentPlates(): PlateSet {
+    return platesFor(this.weightUnit, this.platesOverride() ?? this.settingsService.plates());
+  }
+
+  /** The unit's common sizes, plus any other size already saved. */
+  plateChoices(): number[] {
+    const unit = this.weightUnit === 'kg' ? 'kg' : 'lbs';
+    return [...new Set([...COMMON_PLATES[unit], ...this.currentPlates().sizes])].sort((a, b) => b - a);
+  }
+
+  plateOn(size: number): boolean {
+    return this.currentPlates().sizes.includes(size);
+  }
+
+  togglePlate(size: number) {
+    const current = this.currentPlates();
+    const sizes = this.plateOn(size) ? current.sizes.filter(s => s !== size) : [...current.sizes, size].sort((a, b) => b - a);
+    if (sizes.length === 0) {
+      this.workoutError.set('Keep at least one plate size.');
+      return;
+    }
+    this.savePlates({ bar: current.bar, sizes });
+  }
+
+  saveBar() {
+    const bar = parseDecimal(this.barText);
+    if (bar === null || bar < 0 || bar > 250) {
+      this.barError.set('Enter a weight from 0 to 250.');
+      return;
+    }
+    this.barError.set(null);
+    this.barText = String(bar);
+    if (bar !== this.currentPlates().bar) this.savePlates({ bar, sizes: this.currentPlates().sizes });
+  }
+
+  /** Saves the unit's set; the other unit's set goes along unchanged, since plates are stored whole. */
+  private savePlates(set: PlateSet) {
+    const unit = this.weightUnit === 'kg' ? 'kg' : 'lbs';
+    const plates: StoredPlates = { ...this.settingsService.plates(), [unit]: set };
+    this.platesOverride.set(plates);
+    this.save({ plates }, () => {
+      this.platesOverride.set(null);
+      this.barText = String(this.currentPlates().bar);
+    }, this.workoutError, () => this.platesOverride.set(null));
   }
 
   pickTimezone(tz: string) {
@@ -686,10 +838,11 @@ export class SettingsComponent implements OnInit {
   }
 
   /** Saves one preference; applied only once the server accepts it, else the control reverts and shows why. */
-  private save(updates: Partial<UserSettings>, revert: () => void) {
-    this.prefError.set(null);
+  private save(updates: Partial<UserSettings>, revert: () => void, error = this.prefError, saved?: () => void) {
+    error.set(null);
     this.authService.updateSettings(updates).subscribe({
       next: () => {
+        saved?.();
         // On the demo the change applies for this visit only; nothing was saved.
         if (!this.authService.isDemo()) this.toast.success('Settings saved');
       },
@@ -698,7 +851,7 @@ export class SettingsComponent implements OnInit {
         const msg = err?.status === 0
           ? 'Could not reach the server, so the change was not saved. Check your connection and try again.'
           : err?.error?.error?.message ?? 'The change was not saved. Please try again.';
-        this.prefError.set(msg);
+        error.set(msg);
         this.toast.error(msg);
       },
     });
