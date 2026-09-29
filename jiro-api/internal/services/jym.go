@@ -840,6 +840,12 @@ func (s *JymService) StartSession(ctx context.Context, userID uuid.UUID, req *mo
 	if !validSessionTypes[sessionType] {
 		return nil, ErrInvalidSessionType
 	}
+	past := req.StartedAt != nil || req.EndedAt != nil
+	if past {
+		if err := checkPastWorkout(req.StartedAt, req.EndedAt); err != nil {
+			return nil, err
+		}
+	}
 
 	if req.RoutineID != nil {
 		if owned, err := s.ownsRoutine(ctx, *req.RoutineID, userID); err != nil {
@@ -849,14 +855,16 @@ func (s *JymService) StartSession(ctx context.Context, userID uuid.UUID, req *mo
 		}
 	}
 	seriesID := req.SeriesID
-	// A day of a split with an active series belongs to that series, whichever Start button was used.
+	// A day of a split with an active series belongs to that series, whichever Start button was used;
+	// a past workout only if it falls inside the series.
 	if req.RoutineID != nil && seriesID == nil {
 		var active uuid.UUID
 		err := s.db.QueryRow(ctx,
 			`SELECT sr.id FROM split_series sr JOIN routines r ON r.split_id = sr.split_id
 			 WHERE r.id = $1 AND sr.user_id = $2 AND sr.ended_at IS NULL
+			   AND ($3::timestamptz IS NULL OR sr.started_at <= $3)
 			 ORDER BY sr.started_at DESC LIMIT 1`,
-			*req.RoutineID, userID,
+			*req.RoutineID, userID, req.StartedAt,
 		).Scan(&active)
 		if err == nil {
 			seriesID = &active
@@ -884,7 +892,8 @@ func (s *JymService) StartSession(ctx context.Context, userID uuid.UUID, req *mo
 			return nil, ErrRoutineNotInSeries
 		}
 	}
-	if !req.Force {
+	// A past workout is created finished, so it never competes with the open one.
+	if !req.Force && !past {
 		open := &SessionInProgressError{}
 		err := s.db.QueryRow(ctx,
 			`SELECT s.id, r.name, s.started_at,
@@ -905,10 +914,10 @@ func (s *JymService) StartSession(ctx context.Context, userID uuid.UUID, req *mo
 
 	sess := &models.StartSessionResponse{}
 	err := s.db.QueryRow(ctx,
-		`INSERT INTO sessions (user_id, routine_id, series_id, session_type)
-		 VALUES ($1, $2, $3, $4)
+		`INSERT INTO sessions (user_id, routine_id, series_id, session_type, started_at, ended_at)
+		 VALUES ($1, $2, $3, $4, COALESCE($5, NOW()), $6)
 		 RETURNING id, user_id, routine_id, series_id, session_type, started_at, ended_at, notes`,
-		userID, req.RoutineID, seriesID, sessionType,
+		userID, req.RoutineID, seriesID, sessionType, req.StartedAt, req.EndedAt,
 	).Scan(&sess.ID, &sess.UserID, &sess.RoutineID, &sess.SeriesID, &sess.SessionType, &sess.StartedAt, &sess.EndedAt, &sess.Notes)
 	if err != nil {
 		return nil, err
@@ -944,6 +953,26 @@ func (s *JymService) StartSession(ctx context.Context, userID uuid.UUID, req *mo
 	}
 
 	return sess, nil
+}
+
+// oldestPastWorkout is how far back a past workout can be logged.
+const oldestPastWorkout = 366 * 24 * time.Hour
+
+// checkPastWorkout holds a logged-afterwards workout to the same times rules as an edit, and to the last year.
+func checkPastWorkout(start, end *time.Time) error {
+	switch {
+	case start == nil || end == nil:
+		return &SessionTimesError{"Give both a start and a finish time."}
+	case !end.After(*start):
+		return &SessionTimesError{"The end must be after the start."}
+	case end.After(time.Now().Add(5 * time.Minute)):
+		return &SessionTimesError{"The end can't be in the future."}
+	case end.Sub(*start) > maxSessionLength:
+		return &SessionTimesError{"A workout can't be longer than 24 hours."}
+	case start.Before(time.Now().Add(-oldestPastWorkout)):
+		return &SessionTimesError{"A past workout can go back a year at most."}
+	}
+	return nil
 }
 
 // sessionPageSelect aggregates only the sessions its page CTE picks, newest first.
@@ -1592,7 +1621,7 @@ func (s *JymService) RerateAllPRs(ctx context.Context) (exercises, changed int, 
 }
 
 func (s *JymService) LogSet(ctx context.Context, userID, sessionID uuid.UUID, req *models.CreateSetRequest) (*models.SessionSet, error) {
-	// Verify session ownership, and that it is still live
+	// Verify session ownership, and that it is still live unless the set is fixed into a finished one
 	var ownerID uuid.UUID
 	var endedAt *time.Time
 	if err := s.db.QueryRow(ctx, `SELECT user_id, ended_at FROM sessions WHERE id = $1`, sessionID).Scan(&ownerID, &endedAt); err != nil {
@@ -1604,7 +1633,7 @@ func (s *JymService) LogSet(ctx context.Context, userID, sessionID uuid.UUID, re
 	if ownerID != userID {
 		return nil, ErrNotOwner
 	}
-	if endedAt != nil {
+	if endedAt != nil && !req.Fix {
 		return nil, ErrSessionEnded
 	}
 
@@ -1624,10 +1653,16 @@ func (s *JymService) LogSet(ctx context.Context, userID, sessionID uuid.UUID, re
 	}
 	defer tx.Rollback(ctx)
 
+	// A set fixed into a finished workout is timed just after its last set (never past its end), so PR order,
+	// set order and the workout's times stay in the workout's own time; a live set is timed now.
 	set := &models.SessionSet{}
 	err = tx.QueryRow(ctx,
-		`INSERT INTO session_sets (session_id, exercise_id, set_number, weight, reps_performed, rpe, is_warmup, exercise_note)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		`INSERT INTO session_sets (session_id, exercise_id, set_number, weight, reps_performed, rpe, is_warmup, exercise_note, created_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE((
+		   SELECT LEAST(s.ended_at, GREATEST(s.started_at, COALESCE(MAX(x.created_at), s.started_at)) + interval '1 second')
+		   FROM sessions s LEFT JOIN session_sets x ON x.session_id = s.id
+		   WHERE s.id = $1 AND s.ended_at IS NOT NULL
+		   GROUP BY s.id), NOW()))
 		 RETURNING id, session_id, exercise_id, set_number, weight, reps_performed, rpe, is_pr, is_warmup, exercise_note, created_at`,
 		sessionID, req.ExerciseID, req.SetNumber, weight, req.RepsPerformed, req.RPE, isWarmup, req.ExerciseNote,
 	).Scan(&set.ID, &set.SessionID, &set.ExerciseID, &set.SetNumber, &set.Weight,

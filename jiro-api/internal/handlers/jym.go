@@ -527,6 +527,11 @@ func (h *JymHandler) StartSession(c *gin.Context) {
 			}})
 			return
 		}
+		var timesErr *services.SessionTimesError
+		if errors.As(err, &timesErr) {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: timesErr.Reason}})
+			return
+		}
 		if err == services.ErrRoutineNotInSeries {
 			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "ROUTINE_NOT_IN_SERIES", Message: "That day is not part of the series' split"}})
 			return

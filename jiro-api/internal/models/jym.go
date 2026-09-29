@@ -359,6 +359,9 @@ type CreateSessionRequest struct {
 	SessionType *string    `json:"session_type" binding:"omitempty,oneof=normal deload test"`
 	// Force starts even while another session is unfinished; without it that is a SessionInProgressError.
 	Force bool `json:"force"`
+	// StartedAt and EndedAt (both or neither) log a past workout: it is created finished.
+	StartedAt *time.Time `json:"started_at"`
+	EndedAt   *time.Time `json:"ended_at"`
 }
 
 type UpdateSessionRequest struct {
@@ -459,6 +462,8 @@ type CreateSetRequest struct {
 	RPE           *int      `json:"rpe" binding:"omitempty,min=1,max=10"`
 	IsWarmup      *bool     `json:"is_warmup"`
 	ExerciseNote  *string   `json:"exercise_note"`
+	// Fix adds the set to a finished workout (editing it afterwards); without it a finished one refuses.
+	Fix bool `json:"fix"`
 }
 
 type UpdateSetRequest struct {
