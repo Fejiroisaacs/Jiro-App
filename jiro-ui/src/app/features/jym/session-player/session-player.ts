@@ -15,6 +15,8 @@ import { UploadService } from '../../../core/services/upload.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { todayKey } from '../../../core/utils/day';
 import { nextSets } from '../weight-suggestion';
+import { filled, parseDecimal, parseWhole } from '../number-input';
+import { DRAFT_VERSION, SessionDraft, clearDraft, readDraft, writeDraft } from '../shared/session-draft';
 import { AuthService } from '../../../core/services/auth.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
@@ -26,6 +28,7 @@ import { SaveTemplateDialogComponent } from '../shared/save-template-dialog';
 import { ToastService } from '../../../core/services/toast.service';
 import { ConfirmService } from '../../../core/services/confirm.service';
 
+/** One row of an exercise; weight, reps and RPE are the text typed (a comma may be the decimal point). */
 interface SetRow {
   setNumber: number;
   weight: string;
@@ -43,14 +46,6 @@ interface SetRow {
   /** A logged set opened for correction, and its values before the edit. */
   editing?: boolean;
   before?: { weight: string; reps: string; rpe: string };
-}
-
-/** What only this device knows until it's logged: typed rows, added exercises, removed plan exercises. */
-interface SessionDraft {
-  unit?: string;
-  added: { exerciseId: string; exerciseName: string; muscleGroup: string | null }[];
-  removed: string[];
-  rows: Record<string, { setNumber: number; weight: string; reps: string; rpe: string; isWarmup: boolean }[]>;
 }
 
 interface ExerciseBlock {
@@ -153,14 +148,17 @@ interface ExerciseBlock {
           <input
             id="session-bw"
             class="bw-input"
-            type="number"
-            step="0.1"
-            min="0"
+            type="text"
+            inputmode="decimal"
+            enterkeyhint="done"
+            autocomplete="off"
             [(ngModel)]="bwValue"
-            [placeholder]="settingsService.unitLabel()" />
+            [placeholder]="settingsService.unitLabel()"
+            (keydown.enter)="saveBodyWeight()" />
           <button
             class="bw-save-btn"
-            [disabled]="bwSaving() || !bwValue"
+            type="button"
+            [disabled]="bwSaving() || !bwValid()"
             (click)="saveBodyWeight()">
             {{ bwSaving() ? '...' : 'Log' }}
           </button>
@@ -240,122 +238,122 @@ interface ExerciseBlock {
             </div>
 
             <!-- Set header -->
-            <div class="set-header-row">
+            <div class="set-header-row" aria-hidden="true">
               <span class="sh set-num">Set</span>
-              <span class="sh weight">Weight ({{ settingsService.unitLabel() }})</span>
-              <span class="sh reps">Reps</span>
-              <span class="sh rpe">RPE</span>
-              <span class="sh warmup-col" title="Warm-up"><jiro-icon name="fire" [size]="14" label="Warm-up" /></span>
-              <span class="sh action"></span>
+              <span class="sh">Weight ({{ settingsService.unitLabel() }})</span>
+              <span class="sh">Reps</span>
+              <span class="sh">RPE</span>
+              <span class="sh"></span>
             </div>
 
-            <!-- Set rows -->
+            <!-- Set rows: the number opens warm-up and remove; the check logs what the row shows. -->
             @for (row of block.sets; track row.id ?? 'new-' + row.setNumber; let si = $index) {
-
               <div class="set-row" [class.set-done]="row.saved" [class.set-warmup]="row.isWarmup" [class.set-short]="isShort(block, row)" [class.set-editing]="row.editing">
-                <span class="set-num-cell">{{ row.setNumber }}</span>
+                <button
+                  type="button"
+                  class="set-num-btn"
+                  [class.is-warmup]="row.isWarmup"
+                  aria-haspopup="dialog"
+                  [attr.aria-label]="'Set ' + row.setNumber + (row.isWarmup ? ', warm-up' : '') + ', options'"
+                  [disabled]="row.saving"
+                  (click)="openSetSheet(block, row)">
+                  @if (row.isWarmup) {
+                    <jiro-icon name="fire" [size]="12" />
+                  }
+                  {{ row.setNumber }}
+                </button>
 
                 <input
                   class="set-input"
-                  type="number"
-                  step="0.5"
-                  min="0"
+                  type="text"
+                  inputmode="decimal"
+                  enterkeyhint="next"
+                  autocomplete="off"
                   [(ngModel)]="row.weight"
                   (ngModelChange)="saveDraftSoon()"
                   [placeholder]="row.ghostWeight || '0'"
-                  [class.has-ghost]="row.ghostWeight && !row.weight"
+                  [class.has-ghost]="row.ghostWeight && !filled(row.weight)"
                   [attr.aria-label]="'Set ' + row.setNumber + ' weight (' + settingsService.unitLabel() + ')'"
                   [readonly]="row.saved && !row.editing"
                   [class.logged]="row.saved && !row.editing"
                   [attr.title]="row.saved && !row.editing ? 'Tap to edit' : null"
                   (click)="editRow($event, bi, si)"
-                  (keydown.enter)="editRow($event, bi, si)"
+                  (keydown.enter)="onEnter($event, bi, si, 'weight')"
                   (keydown.escape)="cancelEdit(bi, si)" />
 
                 <input
                   class="set-input reps-input"
-                  type="number"
-                  min="1"
+                  type="text"
+                  inputmode="numeric"
+                  enterkeyhint="done"
+                  autocomplete="off"
                   [(ngModel)]="row.reps"
                   (ngModelChange)="saveDraftSoon()"
                   [placeholder]="row.ghostReps || '0'"
-                  [class.has-ghost]="row.ghostReps && !row.reps"
+                  [class.has-ghost]="row.ghostReps && !filled(row.reps)"
                   [attr.aria-label]="'Set ' + row.setNumber + ' reps' + (isShort(block, row) ? ', below plan' : '')"
                   [readonly]="row.saved && !row.editing"
                   [class.logged]="row.saved && !row.editing"
                   [attr.title]="row.saved && !row.editing ? 'Tap to edit' : null"
                   (click)="editRow($event, bi, si)"
-                  (keydown.enter)="editRow($event, bi, si)"
+                  (keydown.enter)="onEnter($event, bi, si, 'reps')"
                   (keydown.escape)="cancelEdit(bi, si)" />
 
                 <input
                   class="set-input rpe-input"
+                  type="text"
+                  inputmode="numeric"
+                  enterkeyhint="done"
+                  autocomplete="off"
                   [attr.aria-label]="'Set ' + row.setNumber + ' RPE, 1 to 10'"
-                  [class.input-error]="!!row.rpe && rpeInvalid(row.rpe)"
-                  type="number"
-                  min="1"
-                  max="10"
+                  [class.input-error]="filled(row.rpe) && rpeInvalid(row.rpe)"
                   [(ngModel)]="row.rpe"
                   (ngModelChange)="saveDraftSoon()"
                   [readonly]="row.saved && !row.editing"
                   [class.logged]="row.saved && !row.editing"
                   [attr.title]="row.saved && !row.editing ? 'Tap to edit' : null"
                   (click)="editRow($event, bi, si)"
-                  (keydown.enter)="editRow($event, bi, si)"
+                  (keydown.enter)="onEnter($event, bi, si, 'rpe')"
                   (keydown.escape)="cancelEdit(bi, si)" />
 
-                <button
-                  type="button"
-                  class="warmup-btn"
-                  [class.warmup-active]="row.isWarmup"
-                  [attr.aria-pressed]="row.isWarmup"
-                  [attr.aria-label]="'Warm-up, set ' + row.setNumber"
-                  title="{{ row.isWarmup ? 'Warm-up set' : 'Mark as warm-up' }}"
-                  (click)="toggleWarmup(bi, si)"><jiro-icon name="fire" [size]="16" /></button>
-
                 <div class="action-cell">
-                  @if (row.editing) {
-                    <button type="button" class="log-btn" [attr.aria-label]="'Save set ' + row.setNumber"
-                      [disabled]="row.saving || !editValid(row)" (click)="saveEdit(bi, si)">
-                      @if (row.saving) {
-                        <span class="spinner-sm"></span>
-                      } @else {
-                        <jiro-icon name="check" [size]="18" />
-                      }
-                    </button>
-                    <button type="button" class="del-btn" [attr.aria-label]="'Cancel editing set ' + row.setNumber" title="Cancel" (click)="cancelEdit(bi, si)">
-                      <jiro-icon name="x" [size]="14" />
-                    </button>
-                  } @else if (row.saved) {
-                    @if (row.isPR) {
-                      <jym-pr-badge />
-                    }
-                    <button type="button" class="del-btn" [attr.aria-label]="'Remove set ' + row.setNumber" title="Remove set" (click)="deleteSet(bi, si)">
-                      <jiro-icon name="trash" [size]="14" />
-                    </button>
-                  } @else {
+                  @if (!row.saved) {
                     <!-- One tap logs what the row shows: typed values, else the ghosts. -->
                     <button type="button" class="log-btn" [attr.aria-label]="logLabel(row)"
                       [disabled]="!canLog(row)" (click)="logSet(bi, si)">
                       @if (row.saving) {
                         <span class="spinner-sm"></span>
                       } @else {
-                        <jiro-icon name="check" [size]="18" />
+                        <jiro-icon name="check" [size]="20" />
                       }
                     </button>
+                  } @else if (row.saving) {
+                    <span class="spinner-sm" role="status" aria-label="Saving"></span>
+                  } @else if (!row.editing) {
+                    @if (row.isPR) {
+                      <jym-pr-badge />
+                    } @else {
+                      <jiro-icon class="logged-mark" name="check" [size]="16" label="Logged" />
+                    }
                   }
                 </div>
               </div>
-              @if ((!row.saved || row.editing) && !!row.rpe && rpeInvalid(row.rpe)) {
-<div class="rpe-err-msg">
-                RPE must be between 1 and 10
-              </div>
-}
-            
-}
+              <!-- Phones' number pads have no Enter key, so an edit always shows its own buttons.
+                   pointerdown is held back so the first tap doesn't blur, shift the layout and miss. -->
+              @if (row.editing) {
+                <div class="edit-actions">
+                  <button type="button" class="edit-btn" (pointerdown)="$event.preventDefault()" (click)="cancelEdit(bi, si)">Cancel</button>
+                  <button type="button" class="edit-btn edit-btn--save" [attr.aria-label]="'Save set ' + row.setNumber"
+                    (pointerdown)="$event.preventDefault()" [disabled]="row.saving || !editValid(row)" (click)="saveEdit(bi, si)">Save</button>
+                </div>
+              }
+              @if ((!row.saved || row.editing) && filled(row.rpe) && rpeInvalid(row.rpe)) {
+                <div class="rpe-err-msg" role="alert">RPE must be between 1 and 10</div>
+              }
+            }
 
             <!-- Add set -->
-            <button class="add-set-btn" (click)="addSet(bi)">+ Add set</button>
+            <button class="add-set-btn" type="button" [id]="'add-set-' + block.exerciseId" (click)="addSet(bi)">+ Add set</button>
 
             <!-- Form check upload -->
             <div class="form-check-row">
@@ -459,6 +457,26 @@ interface ExerciseBlock {
 
     @if (showTemplateSave()) {
       <jym-save-template-dialog [sessionId]="sessionId" (close)="showTemplateSave.set(false)" />
+    }
+
+    <!-- One set: warm-up or working, and remove -->
+    @if (setSheetRow(); as ref) {
+      <jiro-modal sheet [title]="'Set ' + ref.row.setNumber" maxWidth="400px" (close)="setSheet.set(null)">
+        <p class="sheet-sub">{{ ref.summary }}</p>
+        <div class="opt-actions opt-actions--plain">
+          <button type="button" class="opt-row" (click)="toggleWarmupFromSheet()">
+            <jiro-icon name="fire" [size]="18" />
+            <span class="opt-row-text">
+              {{ ref.row.isWarmup ? 'Make it a working set' : 'Mark as warm-up' }}
+              <small>{{ ref.row.isWarmup ? 'It counts for volume and records again.' : "Warm-ups don't count for volume or records." }}</small>
+            </span>
+          </button>
+          <button type="button" class="opt-row opt-row--danger" (click)="removeSetFromSheet()">
+            <jiro-icon name="trash" [size]="18" />
+            <span class="opt-row-text">Remove set</span>
+          </button>
+        </div>
+      </jiro-modal>
     }
 
 
@@ -704,7 +722,7 @@ interface ExerciseBlock {
     .bw-row { display: flex; align-items: center; gap: var(--space-xs); }
 
     .bw-input {
-      width: 80px; padding: 6px 10px;
+      width: 96px; min-height: 44px; padding: 6px 10px;
       border: 1px solid var(--border-color); border-radius: var(--border-radius);
       background: var(--bg-canvas); color: var(--text-primary);
       font-size: var(--font-size-sm); font-family: inherit;
@@ -713,7 +731,7 @@ interface ExerciseBlock {
     .bw-input:focus { border-color: var(--color-primary); }
 
     .bw-save-btn {
-      padding: 6px 14px; background: var(--color-primary); color: var(--text-on-primary); font-family: inherit;
+      min-height: 44px; min-width: 64px; padding: 6px 14px; background: var(--color-primary); color: var(--text-on-primary); font-family: inherit;
       border: none; border-radius: var(--border-radius);
       font-size: var(--font-size-sm); font-weight: 500; cursor: pointer;
       transition: opacity 0.15s;
@@ -795,8 +813,8 @@ interface ExerciseBlock {
     }
 
     .ex-note-input {
-      width: 100%; box-sizing: border-box;
-      padding: 6px 10px;
+      width: 100%; box-sizing: border-box; min-height: 44px;
+      padding: 12px 10px;
       border: 1px solid transparent; border-radius: var(--border-radius);
       background: transparent; color: var(--text-secondary);
       font-size: var(--font-size-xs); font-family: inherit;
@@ -812,28 +830,24 @@ interface ExerciseBlock {
 
     .ex-note-input::placeholder { color: var(--text-muted); }
 
-    /* Set table */
-    .set-header-row {
+    /* Set table: set number, weight, reps, RPE, log. Every target is 44 px. */
+    .set-header-row, .set-row {
       display: grid;
-      grid-template-columns: 40px 1fr 1fr 64px 44px 92px;
+      grid-template-columns: 44px 1fr 1fr 56px 44px;
       gap: var(--space-sm);
       padding: var(--space-xs) var(--space-lg);
-      border-bottom: 1px solid var(--border-color);
     }
+
+    .set-header-row { border-bottom: 1px solid var(--border-color); }
 
     .sh {
       font-size: var(--font-size-xs); text-transform: uppercase;
       letter-spacing: 0.5px; color: var(--text-muted); font-weight: 500;
     }
-
-    .warmup-col { text-align: center; }
+    .sh.set-num { text-align: center; }
 
     .set-row {
-      display: grid;
-      grid-template-columns: 40px 1fr 1fr 64px 44px 92px;
-      gap: var(--space-sm);
       align-items: center;
-      padding: var(--space-xs) var(--space-lg);
       border-bottom: 1px solid var(--border-color);
       transition: background 0.2s;
     }
@@ -847,53 +861,46 @@ interface ExerciseBlock {
     /* A logged working set below the plan's reps */
     .set-row.set-short .reps-input { color: var(--color-warning); font-weight: 600; }
 
-    .warmup-btn {
-      width: 40px; height: 40px; border-radius: var(--border-radius-sm);
-      background: none; border: 1px solid var(--border-color);
-      color: var(--text-muted); cursor: pointer; transition: all 0.15s;
-      display: flex; align-items: center; justify-content: center;
+    /* The set number is the handle for warm-up and remove. */
+    .set-num-btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 2px;
+      width: 44px; height: 44px; padding: 0;
+      border: 1px solid var(--border-color); border-radius: var(--border-radius);
+      background: var(--bg-surface); color: var(--text-secondary);
+      font-size: var(--font-size-sm); font-weight: 600; font-family: inherit;
+      font-variant-numeric: tabular-nums; cursor: pointer;
     }
-
-    .warmup-btn:hover { border-color: var(--color-warning); color: var(--color-warning); }
-
-    .warmup-btn.warmup-active {
-      background: rgba(var(--color-warning-rgb), 0.15); border-color: var(--color-warning); color: var(--color-warning);
-    }
-
-    .set-num-cell { font-size: var(--font-size-sm); font-weight: 500; color: var(--text-muted); text-align: center; }
-
+    .set-num-btn:hover:not(:disabled) { border-color: var(--color-primary); color: var(--text-primary); }
+    .set-num-btn.is-warmup { color: var(--color-warning); border-color: rgba(var(--color-warning-rgb), 0.45); background: rgba(var(--color-warning-rgb), 0.1); }
 
     .set-input {
-      width: 100%; min-height: 44px; padding: 8px 10px;
+      width: 100%; min-width: 0; min-height: 44px; padding: 8px 10px;
       border: 1px solid var(--border-color); border-radius: var(--border-radius);
       background: var(--bg-canvas); color: var(--text-primary);
       font-size: var(--font-size-md); box-sizing: border-box;
-      font-family: inherit; transition: border-color 0.15s;
+      font-family: inherit; font-variant-numeric: tabular-nums; transition: border-color 0.15s;
     }
 
     .set-input:focus { border-color: var(--color-primary); }
 
     .set-input.logged { background: transparent; border-color: transparent; cursor: pointer; }
     .set-input.logged:hover { border-color: var(--border-color); }
-    .set-row.set-editing { background: rgba(var(--color-primary-rgb), 0.08); }
+    .set-row.set-editing { background: rgba(var(--color-primary-rgb), 0.08); border-bottom-color: transparent; }
 
     .set-input.has-ghost::placeholder { color: rgba(var(--color-primary-rgb), 0.55); font-style: italic; }
-
-
-    .rpe-input { width: 100%; }
 
     .input-error { border-color: var(--color-danger) !important; }
 
     .rpe-err-msg {
-      grid-column: 1 / -1;
       font-size: var(--font-size-xs); color: var(--color-danger);
       padding: 2px var(--space-lg) var(--space-xs);
     }
 
-    .action-cell { display: flex; align-items: center; justify-content: flex-end; gap: 4px; min-width: 0; }
+    .action-cell { display: flex; align-items: center; justify-content: center; min-width: 0; }
+    .logged-mark { color: var(--text-muted); }
 
     .log-btn {
-      width: 40px; height: 40px; border-radius: 50%;
+      width: 44px; height: 44px; border-radius: 50%;
       background: var(--color-primary); color: var(--text-on-primary); border: none;
       cursor: pointer; display: flex; align-items: center; justify-content: center;
       transition: opacity 0.15s;
@@ -903,8 +910,27 @@ interface ExerciseBlock {
 
     .log-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+    /* Editing a logged set: its own Cancel and Save under the row. */
+    .edit-actions {
+      display: flex; justify-content: flex-end; gap: var(--space-sm);
+      padding: 0 var(--space-lg) var(--space-sm);
+      background: rgba(var(--color-primary-rgb), 0.08);
+      border-bottom: 1px solid var(--border-color);
+    }
+    .edit-btn {
+      min-height: 44px; min-width: 88px; padding: 0 var(--space-md);
+      border: 1px solid var(--border-color); border-radius: var(--border-radius);
+      background: var(--bg-surface); color: var(--text-primary);
+      font-size: var(--font-size-sm); font-weight: 600; font-family: inherit; cursor: pointer;
+    }
+    .edit-btn--save { background: var(--color-primary); border-color: var(--color-primary); color: var(--text-on-primary); }
+    .edit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .sheet-sub { font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-sm); }
+    .opt-actions--plain { border-top: none; padding-top: 0; }
+
     .del-btn {
-      width: 40px; height: 40px; border-radius: var(--border-radius-sm);
+      width: 44px; height: 44px; border-radius: var(--border-radius-sm);
       background: none; color: var(--text-muted); border: 1px solid var(--border-color);
       cursor: pointer; display: flex; align-items: center; justify-content: center;
       transition: all 0.15s;
@@ -977,7 +1003,7 @@ interface ExerciseBlock {
 
     .back-btn {
       display: inline-flex; align-items: center; gap: 4px;
-      background: none; border: none; padding: 0; margin-bottom: var(--space-md);
+      background: none; border: none; min-height: 44px; padding: 0; margin-bottom: var(--space-xs);
       color: var(--text-secondary); font-size: var(--font-size-sm); font-family: inherit; cursor: pointer;
     }
     .back-btn:hover { color: var(--text-primary); }
@@ -1017,16 +1043,14 @@ interface ExerciseBlock {
     @media (max-width: 480px) {
       .set-header-row,
       .set-row {
-        grid-template-columns: 24px 1fr 1fr 44px 36px 76px;
+        grid-template-columns: 44px 1fr 1fr 52px 44px;
         padding: var(--space-xs) var(--space-md);
-        gap: 4px;
+        gap: 6px;
       }
 
-      .set-input { min-height: 40px; padding: 6px 6px; font-size: var(--font-size-sm); }
+      .set-input { padding: 8px 8px; }
 
-      .log-btn { width: 36px; height: 36px; }
-
-      .warmup-btn, .del-btn { width: 36px; height: 36px; }
+      .edit-actions, .rpe-err-msg { padding-left: var(--space-md); padding-right: var(--space-md); }
 
       .ex-note-wrap { padding: var(--space-xs) var(--space-md); }
     }
@@ -1047,7 +1071,7 @@ interface ExerciseBlock {
     .form-check-btn {
       display: inline-flex; align-items: center; gap: 6px;
       font-size: var(--font-size-xs); color: var(--text-muted);
-      cursor: pointer; padding: 4px 10px; border-radius: var(--border-radius);
+      cursor: pointer; min-height: 44px; padding: 4px 12px; border-radius: var(--border-radius);
       border: 1px dashed var(--border-color); background: none;
       white-space: nowrap; transition: all 0.15s; font-family: inherit;
     }
@@ -1124,12 +1148,26 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   readonly muscleGroups = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs', 'Glutes', 'Core', 'Cardio', 'Other'];
   bwSaving = signal(false);
   bwLogged = signal(false);
-  bwValue: number | null = null;
+  bwValue = '';
   blocks = signal<ExerciseBlock[]>([]);
   elapsedDisplay = signal('0:00');
   sessionType = signal<string>('normal');
 
-  collapsedBlocks = signal<Set<number>>(new Set());
+  /** Collapsed exercises by id, so removing one never shifts which are closed. */
+  collapsedBlocks = signal<Set<string>>(new Set());
+  /** The set whose sheet (warm-up, remove) is open. */
+  readonly setSheet = signal<{ exerciseId: string; setNumber: number } | null>(null);
+  readonly setSheetRow = computed(() => {
+    const ref = this.setSheet();
+    const bi = ref ? this.blocks().findIndex(b => b.exerciseId === ref.exerciseId) : -1;
+    const block = this.blocks()[bi];
+    const si = block ? block.sets.findIndex(r => r.setNumber === ref!.setNumber) : -1;
+    if (!block || si < 0) return null;
+    const row = block.sets[si];
+    const values = filled(row.weight) && filled(row.reps) ? `, ${row.weight} ${this.settingsService.unitLabel()} × ${row.reps}` : '';
+    return { bi, si, row, summary: `${block.exerciseName}${values}${row.saved ? ', logged' : ', not logged yet'}` };
+  });
+  readonly filled = filled;
   allExercises = signal<{ id: string; name: string; muscle_group: string | null }[]>([]);
   filteredExercises = signal<{ id: string; name: string; muscle_group: string | null }[]>([]);
   exSearch = '';
@@ -1451,27 +1489,20 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   }
 
   rpeInvalid(rpe: string): boolean {
-    const v = parseInt(rpe, 10);
-    return isNaN(v) || v < 1 || v > 10;
+    const v = parseWhole(rpe);
+    return v === null || v < 1 || v > 10;
   }
 
+  /** A new row's ghosts: the last logged working set, else the suggestion the other rows carry; never a warm-up. */
   addSet(blockIndex: number) {
     const block = this.blocks()[blockIndex];
-    const lastSaved = block.sets.filter(s => s.saved).slice(-1)[0];
-    const setNumber = block.sets.length + 1;
-    const newRow: SetRow = {
-      setNumber,
-      weight: '',
-      reps: '',
-      rpe: '',
-      saved: false,
-      isPR: false,
-      saving: false,
-      id: null,
-      ghostWeight: lastSaved ? lastSaved.weight : '',
-      ghostReps: lastSaved ? lastSaved.reps : '',
-      isWarmup: false,
-    };
+    const working = block.sets.filter(s => !s.isWarmup);
+    const lastLogged = working.filter(s => s.saved).at(-1);
+    const suggested = working.filter(s => !s.saved).at(-1);
+    const newRow = this.newRow(block.sets.length + 1, {
+      ghostWeight: lastLogged?.weight ?? suggested?.ghostWeight ?? '',
+      ghostReps: lastLogged?.reps ?? suggested?.ghostReps ?? '',
+    });
     this.blocks.update(bs => bs.map((b, i) => i === blockIndex ? { ...b, sets: [...b.sets, newRow] } : b));
   }
 
@@ -1483,9 +1514,12 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   private persistRow(blockIndex: number, setIndex: number, startRest: boolean): Promise<boolean> {
     const block = this.blocks()[blockIndex];
     const row = block?.sets[setIndex];
-    const weight = row?.weight || row?.ghostWeight;
-    const reps = row?.reps || row?.ghostReps;
-    if (!row || !weight || !reps) return Promise.resolve(false);
+    if (!row || !this.canLog(row)) return Promise.resolve(false);
+    // Typed values win, a typed 0 included; otherwise the ghosts the row shows.
+    const weightNum = parseDecimal(filled(row.weight) ? row.weight : row.ghostWeight)!;
+    const repsNum = parseWhole(filled(row.reps) ? row.reps : row.ghostReps)!;
+    const weight = String(weightNum);
+    const reps = String(repsNum);
 
     // Warm up audio NOW, synchronously while the tap gesture is still active.
     // Safari blocks AudioContext creation/resume in async callbacks (e.g. HTTP responses).
@@ -1499,9 +1533,9 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     const req: CreateSetRequest = {
       exercise_id: block.exerciseId,
       set_number: row.setNumber,
-      weight: this.settingsService.toKg(parseFloat(weight)),
-      reps_performed: parseInt(reps, 10),
-      rpe: row.rpe ? parseInt(row.rpe, 10) : undefined,
+      weight: this.settingsService.toKg(weightNum),
+      reps_performed: repsNum,
+      rpe: parseWhole(row.rpe) ?? undefined,
       is_warmup: row.isWarmup,
       exercise_note: block.exerciseNote || undefined,
     };
@@ -1570,7 +1604,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
       next: () => {
         this.deleteStaleFormChecks(block.exerciseId);
         if (this.targetIds.has(block.exerciseId)) this.removedTargets.add(block.exerciseId);
-        this.collapsedBlocks.update(set => new Set([...set].filter(i => i !== blockIndex).map(i => (i > blockIndex ? i - 1 : i))));
+        this.collapsedBlocks.update(set => { const next = new Set(set); next.delete(block.exerciseId); return next; });
         this.blocks.update(bs => bs.filter((_, bi) => bi !== blockIndex));
         this.removingBlock.set(null);
         this.toast.success(`${block.exerciseName} removed`);
@@ -1690,11 +1724,16 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     return true;
   }
 
+  bwValid(): boolean {
+    const v = parseDecimal(this.bwValue);
+    return v !== null && v > 0;
+  }
+
   saveBodyWeight() {
-    if (!this.bwValue) return;
+    if (!this.bwValid() || this.bwSaving()) return;
     this.bwSaving.set(true);
     const today = todayKey(this.settingsService.timezone());
-    this.jymService.logBodyWeight({ recorded_at: today, weight_kg: this.settingsService.toKg(this.bwValue) }).subscribe({
+    this.jymService.logBodyWeight({ recorded_at: today, weight_kg: this.settingsService.toKg(parseDecimal(this.bwValue)!) }).subscribe({
       next: () => { this.bwLogged.set(true); this.bwSaving.set(false); },
       error: () => {
         this.bwSaving.set(false);
@@ -1704,15 +1743,68 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   }
 
   toggleBlock(bi: number) {
+    const id = this.blocks()[bi]?.exerciseId;
+    if (!id) return;
     this.collapsedBlocks.update(s => {
       const next = new Set(s);
-      if (next.has(bi)) next.delete(bi); else next.add(bi);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
   }
 
   isCollapsed(bi: number): boolean {
-    return this.collapsedBlocks().has(bi);
+    const id = this.blocks()[bi]?.exerciseId;
+    return !!id && this.collapsedBlocks().has(id);
+  }
+
+  openSetSheet(block: ExerciseBlock, row: SetRow) {
+    this.setSheet.set({ exerciseId: block.exerciseId, setNumber: row.setNumber });
+  }
+
+  toggleWarmupFromSheet() {
+    const ref = this.setSheetRow();
+    this.setSheet.set(null);
+    if (ref) this.toggleWarmup(ref.bi, ref.si);
+  }
+
+  /** A logged set is deleted on the server; an unlogged row just goes. Either way the rows renumber by position. */
+  removeSetFromSheet() {
+    const ref = this.setSheetRow();
+    this.setSheet.set(null);
+    if (!ref) return;
+    const exerciseId = this.blocks()[ref.bi].exerciseId;
+    if (ref.row.saved) {
+      this.deleteSet(ref.bi, ref.si);
+    } else {
+      this.blocks.update(bs => bs.map((b, bi) => bi !== ref.bi ? b : {
+        ...b,
+        sets: b.sets.filter((_, si) => si !== ref.si).map((s, i) => ({ ...s, setNumber: i + 1 })),
+      }));
+    }
+    // The set's own button is gone, so focus lands on the exercise's Add set.
+    setTimeout(() => document.getElementById('add-set-' + exerciseId)?.focus({ preventScroll: true }));
+  }
+
+  /**
+   * Enter on a phone keypad: a logged row opens for editing; in an edit, weight moves to reps and
+   * reps or RPE save; on a new row it just closes the keyboard (the check logs).
+   */
+  onEnter(event: Event, bi: number, si: number, field: 'weight' | 'reps' | 'rpe') {
+    const row = this.blocks()[bi]?.sets[si];
+    if (!row) return;
+    if (row.saved && !row.editing) {
+      this.editRow(event, bi, si);
+      return;
+    }
+    event.preventDefault();
+    const input = event.target as HTMLInputElement;
+    if (field === 'weight') {
+      input.parentElement?.querySelector<HTMLInputElement>('.reps-input')?.focus();
+    } else if (row.editing) {
+      this.saveEdit(bi, si);
+    } else {
+      input.blur();
+    }
   }
 
   savedCount(bi: number): number {
@@ -1839,20 +1931,25 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
 
   // ── Plan and draft ──────────────────────────────────────────────
 
-  /** Logged exercises in the order done, then the plan's unlogged ones, then exercises added on this device. */
+  /**
+   * Logged exercises in the order done, then the plan's unlogged ones, then exercises added on this device.
+   * A v2 draft holds every unlogged row of an exercise, so inserted warm-ups and removed rows survive a reload;
+   * without one, the plan pads each exercise to its planned sets.
+   */
   private restoreBlocks(sets: SessionSet[], targets: RoutineItem[]): ExerciseBlock[] {
-    const draft = this.readDraft();
+    const draft = readDraft(this.sessionId);
+    const whole = draft.v === DRAFT_VERSION;
     this.targetIds = new Set(targets.map(t => t.exercise_id));
     this.removedTargets = new Set(draft.removed.filter(id => this.targetIds.has(id)));
 
     const logged = this.buildBlocksFromSets(sets);
     const loggedIds = new Set(logged.map(b => b.exerciseId));
-    // A plan exercise logged part-way keeps its remaining planned rows.
+    // A plan exercise logged part-way keeps its remaining planned rows, ghosted from its last working set.
     this.targetById = new Map(targets.map(t => [t.exercise_id, t]));
     for (const b of logged) {
       const t = this.targetById.get(b.exerciseId);
       if (t) b.plan = { sets: t.target_sets, reps: t.target_reps };
-      const last = b.sets[b.sets.length - 1];
+      const last = b.sets.filter(s => !s.isWarmup).at(-1);
       for (let n = b.sets.length + 1; t && n <= t.target_sets; n++) {
         b.sets.push(this.newRow(n, { ghostWeight: last?.weight ?? '', ghostReps: String(t.target_reps) }));
       }
@@ -1867,11 +1964,25 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     const blocks = [...logged, ...planned, ...added];
     const unit = this.settingsService.weightUnit();
     for (const b of blocks) {
-      for (const saved of draft.rows[b.exerciseId] ?? []) {
-        const d = draft.unit && draft.unit !== unit ? { ...saved, weight: this.convertText(saved.weight, draft.unit, unit) } : saved;
-        const row = b.sets.find(r => r.setNumber === d.setNumber);
-        if (row && !row.saved) Object.assign(row, { weight: d.weight, reps: d.reps, rpe: d.rpe, isWarmup: d.isWarmup });
-        else if (!row) b.sets.push(this.newRow(d.setNumber, { weight: d.weight, reps: d.reps, rpe: d.rpe, isWarmup: d.isWarmup }));
+      const draftRows = draft.rows[b.exerciseId];
+      if (!draftRows) continue;
+      const rows = draftRows.map(d => draft.unit && draft.unit !== unit ? { ...d, weight: this.convertText(d.weight, draft.unit, unit) } : d);
+      if (whole) {
+        // The draft's rows replace the padding; a number a logged set now holds (logged elsewhere) is dropped.
+        const kept = b.sets.filter(r => r.saved);
+        const taken = new Set(kept.map(r => r.setNumber));
+        const last = kept.filter(r => !r.isWarmup).at(-1);
+        b.sets = [...kept, ...rows.filter(d => !taken.has(d.setNumber)).map(d => this.newRow(d.setNumber, {
+          weight: d.weight, reps: d.reps, rpe: d.rpe, isWarmup: d.isWarmup,
+          ghostWeight: d.isWarmup ? '' : last?.weight ?? '',
+          ghostReps: !d.isWarmup && b.plan ? String(b.plan.reps) : '',
+        }))];
+      } else {
+        for (const d of rows) {
+          const row = b.sets.find(r => r.setNumber === d.setNumber);
+          if (row && !row.saved) Object.assign(row, { weight: d.weight, reps: d.reps, rpe: d.rpe, isWarmup: d.isWarmup });
+          else if (!row) b.sets.push(this.newRow(d.setNumber, { weight: d.weight, reps: d.reps, rpe: d.rpe, isWarmup: d.isWarmup }));
+        }
       }
       b.sets.sort((x, y) => x.setNumber - y.setNumber);
     }
@@ -1901,55 +2012,34 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     return { exerciseId, exerciseName, muscleGroup, sets, ghostSets: [], suggestion: null, exerciseNote: '' };
   }
 
-  /** Rows with weight and reps typed but not ticked. */
+  /** Rows with a weight and reps typed but not ticked; a typed 0 counts. */
   private unloggedRows(): { bi: number; si: number }[] {
     const rows: { bi: number; si: number }[] = [];
     this.blocks().forEach((b, bi) => b.sets.forEach((s, si) => {
-      if (!s.saved && !s.saving && s.weight && s.reps && !(s.rpe && this.rpeInvalid(s.rpe))) rows.push({ bi, si });
+      if (!s.saved && filled(s.weight) && filled(s.reps) && this.canLog(s)) rows.push({ bi, si });
     }));
     return rows;
   }
 
-  private draftKey(): string {
-    return `jiro_session_draft_${this.sessionId}`;
-  }
-
-  private readDraft(): SessionDraft {
-    const empty: SessionDraft = { added: [], removed: [], rows: {} };
-    try {
-      const raw = localStorage.getItem(this.draftKey());
-      return raw ? { ...empty, ...JSON.parse(raw) } : empty;
-    } catch {
-      return empty;
-    }
-  }
-
-  /** Keeps what the server doesn't have yet for this session, on this device. */
+  /** Keeps what the server doesn't have yet for this workout, on this device: every unlogged row, empty ones too. */
   saveDraft() {
     if (this.closed || !this.draftReady) return;
     const blocks = this.blocks();
     const rows: SessionDraft['rows'] = {};
     for (const b of blocks) {
-      const typed = b.sets
-        .filter(s => !s.saved && (s.weight || s.reps || s.rpe || s.isWarmup))
+      rows[b.exerciseId] = b.sets
+        .filter(s => !s.saved)
         .map(s => ({ setNumber: s.setNumber, weight: s.weight, reps: s.reps, rpe: s.rpe, isWarmup: s.isWarmup }));
-      if (typed.length) rows[b.exerciseId] = typed;
     }
-    const draft: SessionDraft = {
+    writeDraft(this.sessionId, {
+      v: DRAFT_VERSION,
       unit: this.settingsService.weightUnit(),
       added: blocks
         .filter(b => !this.targetIds.has(b.exerciseId) && !b.sets.some(s => s.saved))
         .map(b => ({ exerciseId: b.exerciseId, exerciseName: b.exerciseName, muscleGroup: b.muscleGroup })),
       removed: [...this.removedTargets],
       rows,
-    };
-    try {
-      if (draft.added.length || draft.removed.length || Object.keys(rows).length) {
-        localStorage.setItem(this.draftKey(), JSON.stringify(draft));
-      } else {
-        localStorage.removeItem(this.draftKey());
-      }
-    } catch { /* storage unavailable: the draft is a convenience */ }
+    });
   }
 
   /** Typing saves shortly after the last keystroke. */
@@ -1972,10 +2062,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   private closeDraft() {
     this.closed = true;
     if (this.draftTimer) clearTimeout(this.draftTimer);
-    try {
-      localStorage.removeItem(this.draftKey());
-      localStorage.removeItem(`jiro_session_targets_${this.sessionId}`); // retired key, still on older devices
-    } catch { /* storage unavailable */ }
+    clearDraft(this.sessionId);
   }
 
   // ── Form check helpers ──────────────────────────────────────────
@@ -2073,7 +2160,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
       ...b,
       suggestion: next.text,
       suggestionIcon: next.icon,
-      sets: setGhosts ? b.sets.map(s => !s.saved ? { ...s, ghostWeight: next.ghostWeight, ghostReps: next.ghostReps } : s) : b.sets,
+      sets: setGhosts ? b.sets.map(s => !s.saved && !s.isWarmup ? { ...s, ghostWeight: next.ghostWeight, ghostReps: next.ghostReps } : s) : b.sets,
     } : b));
   }
 
@@ -2118,16 +2205,18 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     };
   }
 
-  /** ✓ is ready when weight and reps are each typed or ghosted. */
+  /** ✓ is ready when weight and reps each read as numbers, typed (0 included) or ghosted. */
   canLog(row: SetRow): boolean {
-    return !row.saving && !!(row.weight || row.ghostWeight) && !!(row.reps || row.ghostReps)
-      && !(row.rpe && this.rpeInvalid(row.rpe));
+    const weight = parseDecimal(filled(row.weight) ? row.weight : row.ghostWeight);
+    const reps = parseWhole(filled(row.reps) ? row.reps : row.ghostReps);
+    return !row.saving && weight !== null && reps !== null && reps >= 1
+      && !(filled(row.rpe) && this.rpeInvalid(row.rpe));
   }
 
   logLabel(row: SetRow): string {
-    const weight = row.weight || row.ghostWeight;
-    const reps = row.reps || row.ghostReps;
-    return weight && reps
+    const weight = filled(row.weight) ? row.weight : row.ghostWeight;
+    const reps = filled(row.reps) ? row.reps : row.ghostReps;
+    return filled(weight) && filled(reps)
       ? `Log set ${row.setNumber}: ${weight} ${this.settingsService.unitLabel()} × ${reps}`
       : `Log set ${row.setNumber}`;
   }
@@ -2150,9 +2239,8 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   }
 
   editValid(row: SetRow): boolean {
-    const weight = parseFloat(row.weight);
-    const reps = parseInt(row.reps, 10);
-    return !isNaN(weight) && weight >= 0 && !isNaN(reps) && reps >= 1 && !(row.rpe && this.rpeInvalid(row.rpe));
+    const reps = parseWhole(row.reps);
+    return parseDecimal(row.weight) !== null && reps !== null && reps >= 1 && !(filled(row.rpe) && this.rpeInvalid(row.rpe));
   }
 
   /** Saves a corrected set; the API re-rates the exercise, so PR badges are re-read. */
@@ -2165,10 +2253,11 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
       return;
     }
     const id = row.id;
+    const rpe = parseWhole(row.rpe);
     const req: UpdateSetRequest = {
-      weight: this.settingsService.toKg(parseFloat(row.weight)),
-      reps_performed: parseInt(row.reps, 10),
-      ...(row.rpe ? { rpe: parseInt(row.rpe, 10) } : {}),
+      weight: this.settingsService.toKg(parseDecimal(row.weight)!),
+      reps_performed: parseWhole(row.reps)!,
+      ...(rpe !== null ? { rpe } : {}),
     };
     this.patchSet(id, { saving: true });
     this.jymService.updateSet(id, req).subscribe({
@@ -2206,12 +2295,12 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
 
   /** A logged working set below the plan's reps. */
   isShort(block: ExerciseBlock, row: SetRow): boolean {
-    return !!block.plan && row.saved && !row.isWarmup && +row.reps < block.plan.reps;
+    return !!block.plan && row.saved && !row.isWarmup && (parseWhole(row.reps) ?? 0) < block.plan.reps;
   }
 
   private convertText(value: string, from: string, to: string): string {
-    const n = parseFloat(value);
-    return value && !isNaN(n) ? String(this.settingsService.convertWeight(n, from, to)) : value;
+    const n = parseDecimal(value);
+    return n !== null ? String(this.settingsService.convertWeight(n, from, to)) : value;
   }
 
   /** Logged rows come back from their stored kg; typed rows and ghosts are converted; suggestions are rebuilt. */
@@ -2224,7 +2313,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
         ghostWeight: this.convertText(s.ghostWeight, from, to),
       })),
     })));
-    if (this.bwValue) this.bwValue = this.settingsService.convertWeight(this.bwValue, from, to);
+    this.bwValue = this.convertText(this.bwValue, from, to);
     for (const b of this.blocks()) this.applySuggestion(b.exerciseId);
   }
 }
