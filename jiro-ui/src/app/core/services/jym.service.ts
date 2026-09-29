@@ -497,6 +497,11 @@ export class JymService {
     return this.http.post<{ share_id: string; url: string; expires_at: string }>(`${API_URL}/splits/${splitId}/share`, {});
   }
 
+  /** The split's live share links, newest first; expires_at is null for old links that never expire. */
+  listShares(splitId: string): Observable<{ share_id: string; url: string; expires_at: string | null }[]> {
+    return this.http.get<{ share_id: string; url: string; expires_at: string | null }[]>(`${API_URL}/splits/${splitId}/shares`);
+  }
+
   revokeShare(shareId: string): Observable<void> {
     return this.http.delete<void>(`${API_URL}/shares/${shareId}`);
   }

@@ -1,4 +1,6 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { CdkScrollable } from '@angular/cdk/scrolling';
+import { Observable, firstValueFrom, forkJoin } from 'rxjs';
 
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -17,7 +19,7 @@ import { formatInstant } from '../../../core/utils/format-date';
 @Component({
   selector: 'app-split-detail',
   standalone: true,
-  imports: [FormsModule, DragDropModule, JiroButtonComponent, JiroModalComponent, JiroIconComponent, JiroSkeletonComponent, JymNewSeriesModalComponent],
+  imports: [FormsModule, DragDropModule, CdkScrollable, JiroButtonComponent, JiroModalComponent, JiroIconComponent, JiroSkeletonComponent, JymNewSeriesModalComponent],
   template: `
     @if (!split() && loading()) {
       <div class="split-detail" role="status" aria-label="Loading split">
@@ -101,33 +103,26 @@ import { formatInstant } from '../../../core/utils/format-date';
             <jiro-icon name="share-network" [size]="13" />
             {{ sharing() ? 'Generating...' : 'Share' }}
           </jiro-button>
-          <jiro-button variant="primary" type="button" (click)="showAddRoutine.set(true)">
+          <jiro-button variant="primary" type="button" (click)="openAddRoutine()">
             Add day
           </jiro-button>
         </div>
       </div>
 
       <!-- Share panel -->
-      @if (shareUrl()) {
-<div class="share-panel">
-        <div class="share-url-row">
-          <input class="share-url-input" [value]="shareUrl()" readonly />
-          <button class="share-copy-btn" (click)="copyLink()" [class.copied]="copied()">
-            @if (!copied()) {
-<jiro-icon name="copy" [size]="14" />
-}
-            @if (copied()) {
-<jiro-icon name="check" [size]="14" />
-}
-            {{ copied() ? 'Copied!' : 'Copy' }}
-          </button>
+      @for (link of shares(); track link.share_id) {
+        <div class="share-panel">
+          <div class="share-url-row">
+            <input class="share-url-input" [value]="link.url" readonly [attr.aria-label]="'Share link'" />
+            <button class="share-copy-btn" type="button" (click)="copyLink(link.share_id, link.url)" [class.copied]="copied() === link.share_id">
+              <jiro-icon [name]="copied() === link.share_id ? 'check' : 'copy'" [size]="14" />
+              {{ copied() === link.share_id ? 'Copied' : 'Copy' }}
+            </button>
+          </div>
+          <span class="share-expiry">{{ link.expires_at ? 'Expires ' + expiryLabel(link.expires_at) : 'Never expires' }}</span>
+          <button class="share-revoke-btn" type="button" (click)="revokeShare(link.share_id)">Revoke link</button>
         </div>
-        @if (shareExpiresAt()) {
-          <span class="share-expiry">Expires {{ expiryLabel() }}</span>
-        }
-        <button class="share-revoke-btn" (click)="revokeShare()">Revoke link</button>
-      </div>
-}
+      }
 
       <!-- Loading -->
       @if (loading()) {
@@ -143,20 +138,35 @@ import { formatInstant } from '../../../core/utils/format-date';
 
       <!-- Routines (drag-drop columns) -->
       @if (!loading()) {
-<div class="routines-board">
-        @for (routine of routines(); track routine; let ri = $index) {
+<div class="routines-board" cdkScrollable>
+        @for (routine of routines(); track routine.id; let ri = $index) {
 <div
          
           class="routine-column">
           <div class="routine-header">
             <div class="routine-title">
               <span class="day-chip">Day {{ routine.day_order }}</span>
-              <span class="routine-name">{{ routine.name }}</span>
+              @if (renamingDay() === routine.id) {
+                <input class="day-name-input" [(ngModel)]="dayNameDraft" [attr.aria-label]="'Name for day ' + routine.day_order"
+                  maxlength="80" enterkeyhint="done" (blur)="saveDayName(routine)" (keydown.enter)="saveDayName(routine)" (keydown.escape)="renamingDay.set(null)" autofocus />
+              } @else {
+                <button class="routine-name" type="button" title="Rename" [attr.aria-label]="'Rename ' + routine.name" (click)="startRenameDay(routine)">{{ routine.name }}</button>
+              }
             </div>
-            <button class="icon-btn danger" type="button" (click)="deleteRoutine(routine, ri)" title="Delete day"
-              [attr.aria-label]="'Delete training day ' + routine.name">
-              <jiro-icon name="trash" [size]="14" />
-            </button>
+            <div class="day-actions">
+              <button class="icon-btn" type="button" [disabled]="ri === 0 || movingDay()" (click)="moveDay(ri, -1)"
+                [attr.aria-label]="'Move ' + routine.name + ' earlier'" title="Move earlier">
+                <jiro-icon name="caret-left" [size]="16" />
+              </button>
+              <button class="icon-btn" type="button" [disabled]="ri === routines().length - 1 || movingDay()" (click)="moveDay(ri, 1)"
+                [attr.aria-label]="'Move ' + routine.name + ' later'" title="Move later">
+                <jiro-icon name="caret-right" [size]="16" />
+              </button>
+              <button class="icon-btn danger" type="button" (click)="deleteRoutine(routine, ri)" title="Delete day"
+                [attr.aria-label]="'Delete training day ' + routine.name">
+                <jiro-icon name="trash" [size]="16" />
+              </button>
+            </div>
           </div>
 
           <!-- Exercise items (drag-drop list) -->
@@ -209,7 +219,7 @@ import { formatInstant } from '../../../core/utils/format-date';
         @if (routines().length === 0) {
 <div class="board-empty">
           <p class="text-secondary">No training days yet. Add your first day to start building.</p>
-          <jiro-button variant="primary" type="button" (click)="showAddRoutine.set(true)">+ Add day</jiro-button>
+          <jiro-button variant="primary" type="button" (click)="openAddRoutine()">+ Add day</jiro-button>
         </div>
 }
       </div>
@@ -481,8 +491,15 @@ import { formatInstant } from '../../../core/utils/format-date';
     }
 
     .routine-header {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: var(--space-md); border-bottom: 1px solid var(--border-color);
+      display: flex; align-items: center; gap: var(--space-xs);
+      padding: var(--space-xs) var(--space-xs) var(--space-xs) var(--space-md); border-bottom: 1px solid var(--border-color);
+    }
+    .day-actions { display: flex; flex-shrink: 0; }
+    .day-name-input {
+      flex: 1; min-width: 0; min-height: 44px; padding: 6px 10px;
+      border: 1px solid var(--color-primary); border-radius: var(--border-radius-sm);
+      background: var(--bg-canvas); color: var(--text-primary);
+      font: inherit; font-weight: 600; font-size: var(--font-size-md);
     }
 
     .routine-title { display: flex; align-items: center; gap: var(--space-xs); flex: 1; min-width: 0; }
@@ -500,15 +517,19 @@ import { formatInstant } from '../../../core/utils/format-date';
     }
 
     .routine-name {
+      min-height: 44px; min-width: 44px; padding: 0 4px; border: none; border-radius: var(--border-radius-sm);
+      background: none; color: inherit; font-family: inherit; text-align: left; cursor: text;
       font-weight: 600; font-size: var(--font-size-sm);
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
+    .routine-name:hover { background: var(--bg-surface-hover); }
 
     .icon-btn {
       background: none; border: none; cursor: pointer;
-      color: var(--text-muted); padding: 4px; border-radius: var(--border-radius-sm);
+      color: var(--text-muted); min-width: 44px; min-height: 44px; justify-content: center; border-radius: var(--border-radius-sm);
       display: flex; align-items: center; flex-shrink: 0;
     }
+    .icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
     .icon-btn:hover { color: var(--text-primary); background: var(--bg-surface-hover); }
     .icon-btn.danger:hover { color: var(--color-danger); background: rgba(var(--color-danger-rgb), 0.1); }
@@ -666,10 +687,10 @@ import { formatInstant } from '../../../core/utils/format-date';
       margin-bottom: var(--space-lg); flex-wrap: wrap;
     }
 
-    .share-url-row { display: flex; flex: 1; gap: var(--space-xs); min-width: 0; }
+    .share-url-row { display: flex; flex: 1 1 100%; gap: var(--space-xs); min-width: 0; }
 
     .share-url-input {
-      flex: 1; min-width: 0; padding: 6px 10px;
+      flex: 1; min-width: 0; min-height: 44px; padding: 6px 10px;
       border: 1px solid var(--border-color); border-radius: var(--border-radius);
       background: var(--bg-canvas); color: var(--text-secondary);
       font-size: var(--font-size-sm); font-family: monospace;
@@ -677,7 +698,7 @@ import { formatInstant } from '../../../core/utils/format-date';
 
     .share-copy-btn {
       display: inline-flex; align-items: center; gap: 5px;
-      padding: 6px 12px; border: 1px solid var(--border-color);
+      min-height: 44px; padding: 6px 12px; border: 1px solid var(--border-color);
       border-radius: var(--border-radius); background: var(--bg-surface);
       color: var(--text-primary); font-size: var(--font-size-sm); cursor: pointer;
       white-space: nowrap; transition: all 0.15s;
@@ -688,9 +709,9 @@ import { formatInstant } from '../../../core/utils/format-date';
     .share-expiry { color: var(--text-muted); font-size: var(--font-size-sm); white-space: nowrap; }
 
     .share-revoke-btn {
-      background: none; border: none; color: var(--text-muted);
+      margin-left: auto; background: none; border: none; color: var(--text-muted);
       font-size: var(--font-size-sm); cursor: pointer; white-space: nowrap;
-      padding: 4px 6px; transition: color 0.15s;
+      min-height: 44px; padding: 4px var(--space-sm); transition: color 0.15s;
     }
     .share-revoke-btn:hover { color: var(--color-danger); }
 
@@ -731,13 +752,20 @@ export class SplitDetailComponent implements OnInit {
   newRoutineName = '';
   newRoutineDay = 1;
 
-  // Share
-  shareId = signal('');
-  shareUrl = signal('');
-  shareExpiresAt = signal('');
-  expiryLabel = computed(() => this.shareExpiresAt() ? formatInstant(this.shareExpiresAt(), this.settings.timezone()) : '');
+  // Share: the split's live links (Share reuses the newest)
+  shares = signal<{ share_id: string; url: string; expires_at: string | null }[]>([]);
   sharing = signal(false);
-  copied = signal(false);
+  /** The link just copied, for its tick. */
+  copied = signal('');
+
+  // Days
+  renamingDay = signal<string | null>(null);
+  dayNameDraft = '';
+  movingDay = signal(false);
+
+  // Item saves run one after another; a response lands only if no newer edit of its days came since.
+  private saveQueue: Promise<unknown> = Promise.resolve();
+  private editStamp = new Map<string, number>();
 
   allExercises = signal<Exercise[]>([]);
   filteredExercises = signal<Exercise[]>([]);
@@ -777,11 +805,73 @@ export class SplitDetailComponent implements OnInit {
     this.jymService.getSplit(this.splitId).subscribe({
       next: s => {
         this.split.set(s);
-        this.routines.set(s.routines.map(r => ({ ...r, items: r.items || [] })));
+        this.routines.set(s.routines.map(r => ({ ...r, items: r.items || [] })).sort((a, b) => a.day_order - b.day_order));
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
     });
+    this.jymService.listShares(this.splitId).subscribe({ next: links => this.shares.set(links), error: () => {} });
+  }
+
+  expiryLabel(iso: string): string {
+    return formatInstant(iso, this.settings.timezone());
+  }
+
+  /** Opens Add day with the next day number, not always 1. */
+  openAddRoutine() {
+    this.newRoutineName = '';
+    this.newRoutineDay = Math.max(0, ...this.routines().map(r => r.day_order)) + 1;
+    this.showAddRoutine.set(true);
+  }
+
+  startRenameDay(routine: Routine) {
+    this.dayNameDraft = routine.name;
+    this.renamingDay.set(routine.id);
+  }
+
+  saveDayName(routine: Routine) {
+    if (this.renamingDay() !== routine.id) return;
+    const name = this.dayNameDraft.trim();
+    this.renamingDay.set(null);
+    if (!name || name === routine.name) return;
+    this.routines.update(rs => rs.map(r => r.id === routine.id ? { ...r, name } : r));
+    this.jymService.updateRoutine(routine.id, { name }).subscribe({
+      error: () => {
+        this.routines.update(rs => rs.map(r => r.id === routine.id ? { ...r, name: routine.name } : r));
+        this.toast.error('Could not rename the day.');
+      },
+    });
+  }
+
+  /** Swaps a day with its neighbour: their day numbers trade places. */
+  moveDay(ri: number, step: -1 | 1) {
+    const rs = this.routines();
+    const a = rs[ri];
+    const b = rs[ri + step];
+    if (!a || !b || this.movingDay()) return;
+    this.movingDay.set(true);
+    const swapped = rs.map(r => r.id === a.id ? { ...r, day_order: b.day_order } : r.id === b.id ? { ...r, day_order: a.day_order } : r);
+    this.routines.set([...swapped].sort((x, y) => x.day_order - y.day_order));
+    forkJoin([
+      this.jymService.updateRoutine(a.id, { day_order: b.day_order }),
+      this.jymService.updateRoutine(b.id, { day_order: a.day_order }),
+    ]).subscribe({
+      next: () => this.movingDay.set(false),
+      error: () => { this.movingDay.set(false); this.saveFailed(); },
+    });
+  }
+
+  /** Queues one save of whole day lists; applies its answer only if those days haven't been edited since. */
+  private queueSave<T>(routineIds: string[], request: () => Observable<T>, apply: (res: T) => void) {
+    const stamps = routineIds.map(id => {
+      const n = (this.editStamp.get(id) ?? 0) + 1;
+      this.editStamp.set(id, n);
+      return [id, n] as const;
+    });
+    this.saveQueue = this.saveQueue.then(() => firstValueFrom(request()).then(
+      res => { if (stamps.every(([id, n]) => this.editStamp.get(id) === n)) apply(res); },
+      () => this.saveFailed(),
+    ));
   }
 
   goBack() { this.router.navigate(['/jym/plan']); }
@@ -834,10 +924,9 @@ export class SplitDetailComponent implements OnInit {
     this.saving.set(true);
     this.jymService.createRoutine(this.splitId, { name: this.newRoutineName.trim(), day_order: this.newRoutineDay }).subscribe({
       next: r => {
-        this.routines.update(list => [...list, { ...r, items: [] }]);
+        this.routines.update(list => [...list, { ...r, items: [] }].sort((a, b) => a.day_order - b.day_order));
         this.showAddRoutine.set(false);
         this.newRoutineName = '';
-        this.newRoutineDay = this.routines().length + 1;
         this.saving.set(false);
       },
       error: () => this.saving.set(false),
@@ -893,25 +982,22 @@ export class SplitDetailComponent implements OnInit {
 
     const source = this.routines()[prevIdx];
     const target = this.routines()[currIdx];
-    this.jymService.replaceSplitItems(this.splitId, [
+    const body = [
       { routine_id: source.id, items: toEntries(source.items) },
       { routine_id: target.id, items: toEntries(target.items) },
-    ]).subscribe({
-      next: saved => {
-        const byId = new Map(saved.map(r => [r.routine_id, r.items]));
-        this.routines.update(rs => rs.map(r => byId.has(r.id) ? { ...r, items: byId.get(r.id)! } : r));
-      },
-      error: () => this.saveFailed(),
+    ];
+    this.queueSave([source.id, target.id], () => this.jymService.replaceSplitItems(this.splitId, body), saved => {
+      const byId = new Map(saved.map(r => [r.routine_id, r.items]));
+      this.routines.update(rs => rs.map(r => byId.has(r.id) ? { ...r, items: byId.get(r.id)! } : r));
     });
   }
 
-  /** Saves one day's full item list; on failure reloads so the page matches the server. */
+  /** Saves one day's full item list, after any save still running; on failure reloads so the page matches the server. */
   private persistItems(routineIndex: number) {
     const routine = this.routines()[routineIndex];
-    this.jymService.replaceRoutineItems(routine.id, toEntries(routine.items)).subscribe({
-      next: saved => this.routines.update(rs => rs.map(r => r.id === routine.id ? { ...r, items: saved } : r)),
-      error: () => this.saveFailed(),
-    });
+    const entries = toEntries(routine.items);
+    this.queueSave([routine.id], () => this.jymService.replaceRoutineItems(routine.id, entries),
+      saved => this.routines.update(rs => rs.map(r => r.id === routine.id ? { ...r, items: saved } : r)));
   }
 
   private saveFailed() {
@@ -1024,34 +1110,32 @@ export class SplitDetailComponent implements OnInit {
     this.pickerSelectedEx.set(null);
   }
 
+  /** Shows the split's live link, making one only when there is none. */
   shareSplit() {
     this.sharing.set(true);
     this.jymService.createShare(this.splitId).subscribe({
       next: res => {
-        this.shareId.set(res.share_id);
-        this.shareUrl.set(res.url);
-        this.shareExpiresAt.set(res.expires_at);
+        this.shares.update(list => list.some(l => l.share_id === res.share_id) ? list : [res, ...list]);
         this.sharing.set(false);
       },
-      error: () => this.sharing.set(false),
+      error: () => {
+        this.sharing.set(false);
+        this.toast.error('Could not make a share link.');
+      },
     });
   }
 
-  revokeShare() {
-    this.jymService.revokeShare(this.shareId()).subscribe({
-      next: () => {
-        this.shareId.set('');
-        this.shareUrl.set('');
-        this.shareExpiresAt.set('');
-      },
+  revokeShare(shareId: string) {
+    this.jymService.revokeShare(shareId).subscribe({
+      next: () => this.shares.update(list => list.filter(l => l.share_id !== shareId)),
       error: () => this.toast.error('Could not turn off the link.'),
     });
   }
 
-  copyLink() {
-    navigator.clipboard.writeText(this.shareUrl()).then(() => {
-      this.copied.set(true);
-      setTimeout(() => this.copied.set(false), 2000);
+  copyLink(shareId: string, url: string) {
+    navigator.clipboard.writeText(url).then(() => {
+      this.copied.set(shareId);
+      setTimeout(() => this.copied.set(''), 2000);
     });
   }
 

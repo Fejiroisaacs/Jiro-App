@@ -1038,6 +1038,26 @@ func (h *JymHandler) CreateShare(c *gin.Context) {
 	c.JSON(http.StatusCreated, resp)
 }
 
+// ListShares handles GET /jym/splits/:split_id/shares: the split's live links.
+func (h *JymHandler) ListShares(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	splitID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid split ID"}})
+		return
+	}
+	links, err := h.jymService.ListShares(c.Request.Context(), userID, splitID, h.appBaseURL)
+	if err != nil {
+		if err == services.ErrSplitNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Split not found"}})
+			return
+		}
+		respondInternal(c, err, "failed to list shares")
+		return
+	}
+	c.JSON(http.StatusOK, links)
+}
+
 func (h *JymHandler) RevokeShare(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 	shareID, err := uuid.Parse(c.Param("share_id"))

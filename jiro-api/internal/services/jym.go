@@ -2284,12 +2284,21 @@ func (s *JymService) CreateShare(ctx context.Context, userID, splitID uuid.UUID,
 		return nil, ErrSplitNotFound
 	}
 
+	// Share again hands back the live link (with a day or more left) instead of minting one per click.
 	var shareID uuid.UUID
 	var expiresAt time.Time
 	err = s.db.QueryRow(ctx,
-		`INSERT INTO split_shares (split_id, created_by, expires_at) VALUES ($1, $2, $3) RETURNING id, expires_at`,
-		splitID, userID, time.Now().Add(SplitShareTTL),
+		`SELECT id, expires_at FROM split_shares
+		 WHERE split_id = $1 AND created_by = $2 AND expires_at > NOW() + interval '1 day'
+		 ORDER BY created_at DESC LIMIT 1`,
+		splitID, userID,
 	).Scan(&shareID, &expiresAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		err = s.db.QueryRow(ctx,
+			`INSERT INTO split_shares (split_id, created_by, expires_at) VALUES ($1, $2, $3) RETURNING id, expires_at`,
+			splitID, userID, time.Now().Add(SplitShareTTL),
+		).Scan(&shareID, &expiresAt)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -2299,6 +2308,40 @@ func (s *JymService) CreateShare(ctx context.Context, userID, splitID uuid.UUID,
 		URL:       appBaseURL + "/jym/share/" + shareID.String(),
 		ExpiresAt: expiresAt,
 	}, nil
+}
+
+// ListShares returns the live links to one of the user's splits, newest first.
+func (s *JymService) ListShares(ctx context.Context, userID, splitID uuid.UUID, appBaseURL string) ([]models.ShareLink, error) {
+	var ownerID uuid.UUID
+	err := s.db.QueryRow(ctx, `SELECT user_id FROM splits WHERE id = $1`, splitID).Scan(&ownerID)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && ownerID != userID) {
+		return nil, ErrSplitNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.db.Query(ctx,
+		`SELECT id, expires_at FROM split_shares
+		 WHERE split_id = $1 AND created_by = $2 AND (expires_at IS NULL OR expires_at > NOW())
+		 ORDER BY created_at DESC`,
+		splitID, userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	links := []models.ShareLink{}
+	for rows.Next() {
+		var link models.ShareLink
+		var id uuid.UUID
+		if err := rows.Scan(&id, &link.ExpiresAt); err != nil {
+			return nil, err
+		}
+		link.ShareID = id.String()
+		link.URL = appBaseURL + "/jym/share/" + link.ShareID
+		links = append(links, link)
+	}
+	return links, rows.Err()
 }
 
 // RevokeShare deletes a share the user owns.
@@ -2420,11 +2463,23 @@ func (s *JymService) ImportShare(ctx context.Context, importerID, shareID uuid.U
 }
 
 // copySplit deep-copies split splitID into importerID's account and returns the new split ID.
+// Importing the same split again returns the copy made the first time.
 func (s *JymService) copySplit(ctx context.Context, importerID, splitID uuid.UUID) (uuid.UUID, error) {
+	var existing uuid.UUID
+	err := s.db.QueryRow(ctx,
+		`SELECT id FROM splits WHERE user_id = $1 AND source_split_id = $2`, importerID, splitID,
+	).Scan(&existing)
+	if err == nil {
+		return existing, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil, err
+	}
+
 	// Load original split
 	var origName string
 	var origDesc *string
-	err := s.db.QueryRow(ctx,
+	err = s.db.QueryRow(ctx,
 		`SELECT name, description FROM splits WHERE id = $1`, splitID,
 	).Scan(&origName, &origDesc)
 	if err != nil {
@@ -2524,8 +2579,8 @@ func (s *JymService) copySplit(ctx context.Context, importerID, splitID uuid.UUI
 
 	var newSplitID uuid.UUID
 	err = tx.QueryRow(ctx,
-		`INSERT INTO splits (user_id, name, description) VALUES ($1, $2, $3) RETURNING id`,
-		importerID, origName, origDesc,
+		`INSERT INTO splits (user_id, name, description, source_split_id) VALUES ($1, $2, $3, $4) RETURNING id`,
+		importerID, origName, origDesc, splitID,
 	).Scan(&newSplitID)
 	if err != nil {
 		return uuid.Nil, err

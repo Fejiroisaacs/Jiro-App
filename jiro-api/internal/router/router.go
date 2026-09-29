@@ -274,6 +274,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 
 				// Split shares (auth required for create/revoke/import)
 				jym.POST("/splits/:split_id/share", jymHandler.CreateShare)
+				jym.GET("/splits/:id/shares", jymHandler.ListShares)
 				jym.DELETE("/shares/:share_id", jymHandler.RevokeShare)
 				jym.POST("/shares/:share_id/import", jymHandler.ImportShare)
 

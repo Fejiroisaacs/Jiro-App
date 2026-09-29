@@ -58,8 +58,8 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
         @if (imported()) {
 <div class="import-banner">
           <jiro-icon name="check-circle" [size]="15" />
-          Split added to your account.
-          <button class="goto-btn" type="button" (click)="router.navigate(['/jym/plan'])">Go to my splits</button>
+          It's in your splits.
+          <button class="goto-btn" type="button" (click)="router.navigate(['/jym/splits', newSplitId])">Open it</button>
         </div>
 }
 
@@ -127,6 +127,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .goto-btn {
       background: none; border: none; color: var(--color-positive); font-weight: 600;
       text-decoration: underline; cursor: pointer; font-size: var(--font-size-sm);
+      min-height: 44px; padding: 0 var(--space-xs); margin-left: auto;
     }
 
     .routines-grid {
@@ -191,6 +192,8 @@ export class DiscoverDetailComponent implements OnInit {
   imported = signal(false);
 
   private splitId = '';
+  /** Your copy; importing again returns the same one. */
+  newSplitId = '';
 
   private readonly toast = inject(ToastService);
 
@@ -212,7 +215,7 @@ export class DiscoverDetailComponent implements OnInit {
     if (this.imported()) return;
     this.importing.set(true);
     this.jymService.importPublicSplit(this.splitId).subscribe({
-      next: () => { this.importing.set(false); this.imported.set(true); },
+      next: res => { this.newSplitId = res.split_id; this.importing.set(false); this.imported.set(true); },
       error: () => {
         this.importing.set(false);
         this.toast.error('Could not add this split. Try again.');

@@ -281,6 +281,13 @@ type SplitShare struct {
 	ExpiresAt *time.Time `json:"expires_at"`
 }
 
+// ShareLink is one live link to a split; ExpiresAt is null for links made before links expired.
+type ShareLink struct {
+	ShareID   string     `json:"share_id"`
+	URL       string     `json:"url"`
+	ExpiresAt *time.Time `json:"expires_at"`
+}
+
 type CreateShareResponse struct {
 	ShareID   string    `json:"share_id"`
 	URL       string    `json:"url"`
