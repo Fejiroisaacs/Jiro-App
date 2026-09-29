@@ -65,9 +65,14 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
             <p class="hero-when">{{ when }}</p>
           }
           @if (report() && !inProgress()) {
-            <button type="button" class="hero-edit" aria-haspopup="dialog" (click)="openTimes()">
-              <jiro-icon name="pencil-simple" [size]="14" /> Edit times
-            </button>
+            <div class="hero-edits">
+              <button type="button" class="hero-edit" (click)="editWorkout()">
+                <jiro-icon name="barbell" [size]="14" /> Edit workout
+              </button>
+              <button type="button" class="hero-edit" aria-haspopup="dialog" (click)="openTimes()">
+                <jiro-icon name="pencil-simple" [size]="14" /> Edit times
+              </button>
+            </div>
           }
           @if (sessionType() !== 'normal') {
             <span class="type-pill">{{ sessionType() === 'deload' ? 'Deload' : 'Test' }} session</span>
@@ -358,6 +363,7 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
       font-family: inherit; font-size: var(--font-size-sm); font-weight: 600; cursor: pointer;
     }
     .hero-edit:hover { background: color-mix(in srgb, var(--text-on-dark) 12%, transparent); }
+    .hero-edits { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-sm); }
 
     .type-pill {
       display: inline-block;
@@ -1038,6 +1044,14 @@ export class SessionSummaryComponent implements OnInit {
     const back = (history.state as { back?: unknown } | null)?.back;
     if (typeof back === 'string' && back.startsWith('/')) this.router.navigateByUrl(back);
     else this.router.navigate(['/jym']);
+  }
+
+  /** Opens the workout for fixing in place of this page; Done there comes back here, keeping this page's way back. */
+  editWorkout(): void {
+    const r = this.report();
+    if (!r) return;
+    const back = (history.state as { back?: unknown } | null)?.back;
+    this.router.navigate(['/jym/sessions', r.id, 'edit'], { replaceUrl: true, state: typeof back === 'string' ? { back } : {} });
   }
 
   resume(): void {

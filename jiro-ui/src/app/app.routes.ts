@@ -265,6 +265,13 @@ export const routes: Routes = [
         loadComponent: () => import('./features/jym/session-player/session-player').then(m => m.SessionPlayerComponent),
       },
       {
+        // The player again, fixing a finished workout: add, correct or remove its sets.
+        path: 'jym/sessions/:id/edit',
+        title: 'Edit workout',
+        data: { ...PRIVATE_PAGE, moduleNav: false, mobileNav: false, fix: true },
+        loadComponent: () => import('./features/jym/session-player/session-player').then(m => m.SessionPlayerComponent),
+      },
+      {
         path: 'jym/sessions/:id/summary',
         title: 'Session summary',
         data: { ...PRIVATE_PAGE, moduleNav: false },

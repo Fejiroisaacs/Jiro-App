@@ -75,16 +75,25 @@ interface ExerciseBlock {
     <div class="session-bar">
       <div class="session-bar-row">
         <div class="session-bar-left">
-          <span class="bar-label">Active session</span>
-          <span class="timer">{{ elapsedDisplay() }}</span>
+          @if (fix) {
+            <span class="bar-label bar-label--always">Editing</span>
+            <span class="timer timer--date">{{ fixDate() }}</span>
+          } @else {
+            <span class="bar-label">Active session</span>
+            <span class="timer">{{ elapsedDisplay() }}</span>
+          }
         </div>
         <div class="session-bar-right">
           <button class="bar-icon-btn" type="button" aria-label="Workout options" title="Workout options" aria-haspopup="dialog" (click)="showOptions.set(true)">
             <jiro-icon name="dots-three" [size]="22" />
           </button>
-          <jiro-button size="lg" variant="inverse" type="button" (click)="finishSession()" [disabled]="finishing()">
-            {{ finishing() ? 'Finishing...' : 'Finish' }}
-          </jiro-button>
+          @if (fix) {
+            <jiro-button size="lg" variant="inverse" type="button" (click)="doneFixing()">Done</jiro-button>
+          } @else {
+            <jiro-button size="lg" variant="inverse" type="button" (click)="finishSession()" [disabled]="finishing()">
+              {{ finishing() ? 'Finishing...' : 'Finish' }}
+            </jiro-button>
+          }
         </div>
       </div>
       <!-- Rest timer row: opens after a logged set -->
@@ -160,8 +169,8 @@ interface ExerciseBlock {
       </div>
 }
 
-      <!-- Body weight panel -->
-      @if (!loading()) {
+      <!-- Body weight panel (today's, so not when fixing a past workout) -->
+      @if (!loading() && !fix) {
 <div class="bw-panel">
         <label class="bw-label" for="session-bw">Body weight</label>
         @if (!bwLogged()) {
@@ -463,6 +472,7 @@ interface ExerciseBlock {
           <p class="opt-help">Your account's unit, the same one as in Settings.</p>
         </div>
 
+        @if (!fix) {
         <div class="opt-group" role="group" aria-labelledby="opt-rest-label">
           <span class="opt-label" id="opt-rest-label">Rest timer</span>
           <div class="seg">
@@ -472,12 +482,14 @@ interface ExerciseBlock {
           </div>
           <p class="opt-help">Starts after each logged set. Remembered for next time.</p>
         </div>
+        }
 
         <div class="opt-actions">
           <button type="button" class="opt-row" (click)="showOptions.set(false); showTemplateSave.set(true)">
             <jiro-icon name="floppy-disk" [size]="18" />
             <span class="opt-row-text">Save as template</span>
           </button>
+          @if (!fix) {
           <button type="button" class="opt-row" (click)="exitSession()">
             <jiro-icon name="sign-out" [size]="18" />
             <span class="opt-row-text">Leave for now<small>The workout stays open. Resume it from Jym.</small></span>
@@ -486,6 +498,7 @@ interface ExerciseBlock {
             <jiro-icon name="trash" [size]="18" />
             <span class="opt-row-text">{{ discarding() ? 'Discarding...' : 'Discard workout' }}</span>
           </button>
+          }
         </div>
       </jiro-modal>
     }
@@ -648,6 +661,7 @@ interface ExerciseBlock {
     .session-bar-left { display: flex; align-items: center; gap: var(--space-md); min-width: 0; }
 
     .bar-label { font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; }
+    .timer--date { font-size: var(--font-size-lg); }
 
     .timer { font-size: var(--font-size-xl); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
@@ -1181,7 +1195,7 @@ interface ExerciseBlock {
 
       .rest-row { padding: var(--space-xs) var(--space-md) calc(var(--space-xs) + 3px); }
 
-      .bar-label { display: none; }
+      .bar-label:not(.bar-label--always) { display: none; }
 
       .timer { font-size: var(--font-size-lg); }
     }
@@ -1354,6 +1368,9 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   private audioCtx: AudioContext | null = null;
 
   sessionId = '';
+  /** Fixing a finished workout (route data `fix`): no clock, rest, draft or Finish; sets are fixed in. */
+  fix = false;
+  readonly fixDate = signal('');
   private startedAt = new Date();
   private timerInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -1408,8 +1425,11 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.sessionId = this.route.snapshot.paramMap.get('id') || '';
-    this.startTimer();
-    document.addEventListener('visibilitychange', this.onVisibilityChange);
+    this.fix = this.route.snapshot.data['fix'] === true;
+    if (!this.fix) {
+      this.startTimer();
+      document.addEventListener('visibilitychange', this.onVisibilityChange);
+    }
 
     // Load all exercises for the picker
     this.jymService.listExercises().subscribe(exs => {
@@ -1420,17 +1440,27 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     // Load session + sets (restores mid-workout state on page refresh)
     this.jymService.getSession(this.sessionId).subscribe({
       next: session => {
-        if (session.ended_at) {
+        if (session.ended_at && !this.fix) {
           this.closeDraft();
           this.openSummary();
           return;
         }
+        // Only a finished workout is fixed; an open one is simply resumed.
+        if (this.fix && !session.ended_at) {
+          this.router.navigate(['/jym/session', this.sessionId], { replaceUrl: true });
+          return;
+        }
+        if (this.fix) {
+          const tz = this.settingsService.timezone();
+          this.fixDate.set(`${formatInstant(session.started_at, tz, { weekday: true })}, ${timeInZone(session.started_at, tz)}`);
+        }
         this.startedAt = new Date(session.started_at);
-        this.noteIfStale(session.started_at, session.sets ?? []);
+        if (!this.fix) this.noteIfStale(session.started_at, session.sets ?? []);
         this.sessionType.set(session.session_type || 'normal');
         this.sessionNotes = session.notes || '';
         this.blocks.set(this.restoreBlocks(session.sets || [], session.targets ?? []));
-        this.draftReady = true;
+        // A fix is saved set by set; only a live workout keeps a device draft.
+        this.draftReady = !this.fix;
 
         // Populate form check counts from existing attachments
         const amap = new Map<string, SessionAttachment[]>();
@@ -1706,6 +1736,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
       rpe: parseWhole(row.rpe) ?? undefined,
       is_warmup: row.isWarmup,
       exercise_note: block.exerciseNote || undefined,
+      ...(this.fix ? { fix: true } : {}),
     };
 
     return new Promise<boolean>(resolve => {
@@ -1717,7 +1748,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
               ...s, saving: false, saved: true, isPR: saved.is_pr, id: saved.id, weightKg: saved.weight,
             } : s),
           } : b));
-          if (startRest) this.startRestTimer();
+          if (startRest && !this.fix) this.startRestTimer();
           resolve(true);
         },
         error: err => {
@@ -1830,28 +1861,43 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     });
   }
 
-  async finishSession() {
+  /** Typed rows that weren't ticked: log them, skip them, or stay. Resolves false to stay. */
+  private async settleTypedRows(action: string): Promise<boolean> {
     const pending = this.unloggedRows();
-    if (pending.length > 0) {
-      const n = pending.length;
-      const choice = await this.confirmService.choose({
-        title: n === 1 ? 'Log the unlogged set?' : `Log ${n} unlogged sets?`,
-        message: n === 1
-          ? 'You typed a set but did not tick it. Log it before you finish?'
-          : `You typed ${n} sets but did not tick them. Log them before you finish?`,
-        confirmLabel: 'Log and finish',
-        altLabel: n === 1 ? 'Skip it' : 'Skip them',
-        cancelLabel: 'Go back',
-        danger: false,
-      });
-      if (choice === 'cancel') return;
-      if (choice === 'confirm') {
-        for (const { bi, si } of pending) {
-          // A failed save keeps the user here, with the row still typed.
-          if (!(await this.persistRow(bi, si, false))) return;
-        }
+    if (pending.length === 0) return true;
+    const n = pending.length;
+    const choice = await this.confirmService.choose({
+      title: n === 1 ? 'Log the unlogged set?' : `Log ${n} unlogged sets?`,
+      message: n === 1
+        ? `You typed a set but did not tick it. Log it before you ${action}?`
+        : `You typed ${n} sets but did not tick them. Log them before you ${action}?`,
+      confirmLabel: `Log and ${action}`,
+      altLabel: n === 1 ? 'Skip it' : 'Skip them',
+      cancelLabel: 'Go back',
+      danger: false,
+    });
+    if (choice === 'cancel') return false;
+    if (choice === 'confirm') {
+      for (const { bi, si } of pending) {
+        // A failed save keeps the user here, with the row still typed.
+        if (!(await this.persistRow(bi, si, false))) return false;
       }
     }
+    return true;
+  }
+
+  /** Done fixing: back to the summary in place of this page, keeping where the summary returns to. */
+  async doneFixing() {
+    if (!(await this.settleTypedRows('finish'))) return;
+    const back = (history.state as { back?: unknown } | null)?.back;
+    this.router.navigate(['/jym/sessions', this.sessionId, 'summary'], {
+      replaceUrl: true,
+      state: typeof back === 'string' ? { back } : {},
+    });
+  }
+
+  async finishSession() {
+    if (!(await this.settleTypedRows('finish'))) return;
 
     const hasSavedSets = this.blocks().some(b => b.sets.some(s => s.saved));
     if (!hasSavedSets && !this.sessionNotes.trim()) {
@@ -2187,7 +2233,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
    * without one, the plan pads each exercise to its planned sets.
    */
   private restoreBlocks(sets: SessionSet[], targets: RoutineItem[]): ExerciseBlock[] {
-    const draft = readDraft(this.sessionId);
+    const draft: SessionDraft = this.fix ? { added: [], removed: [], rows: {} } : readDraft(this.sessionId);
     const whole = draft.v === DRAFT_VERSION;
     this.targetIds = new Set(targets.map(t => t.exercise_id));
     this.removedTargets = new Set(draft.removed.filter(id => this.targetIds.has(id)));
