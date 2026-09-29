@@ -74,6 +74,7 @@ import { GUIDE } from '../shared';
           <li>On the <a routerLink="/jym">Jym</a> home page, select the play button on a split. You can also select <strong>Start</strong> on a split in <a routerLink="/jym/plan">Plan</a>.</li>
           <li>In <strong>Choose routine</strong>, pick the day you are training, or <strong>Freestyle (no routine)</strong>.</li>
           <li>For a workout with no plan, select <strong>Freestyle session</strong> on the Jym home page, or <strong>New session</strong> in <a routerLink="/jym/track">Track</a>.</li>
+          <li>With Jiro installed on an Android phone or a computer, press and hold (or right-click) its icon for <strong>Start workout</strong> and <strong>Resume workout</strong>. iPhones don't offer these shortcuts.</li>
         </guide-steps>
         <guide-tip>If you leave a workout without finishing it, it waits under <strong>In progress</strong> on the Jym home page until you resume or discard it.</guide-tip>
       </guide-section>
@@ -82,16 +83,30 @@ import { GUIDE } from '../shared';
         lead="The workout screen has a row for every set, and it times your rest between them.">
         <guide-steps>
           <li>A workout started from a split day or template already lists its exercises, with one row for each target set. In a freestyle session, select <strong>+ Add exercise</strong> first.</li>
-          <li>The faint numbers in an empty row are a suggestion: the heaviest weight from your last session plus a small step, and the reps you did then. A note above the rows shows what you lifted last time and the weight to try. For an exercise you have never logged, the row shows only the target reps.</li>
-          <li>Type the <strong>Weight</strong> and <strong>Reps</strong> you did. The suggestion is not filled in for you.</li>
-          <li>Optionally, enter an <strong>RPE</strong> from 1 to 10 for how hard the set felt, and select the flame button to mark a warm-up set.</li>
-          <li>Select the tick to log the set. If it beats your best for that exercise, it gets a <strong>PR</strong> badge. Warm-up sets never get one.</li>
-          <li>The rest timer starts in the bar at the top. Choose <strong>1m</strong>, <strong>1:30</strong>, <strong>2m</strong>, <strong>3m</strong> or <strong>5m</strong>, add <strong>+30s</strong>, or select the x to skip it. It beeps when your rest is over.</li>
-          <li>Use <strong>+ Add set</strong> for another set and <strong>+ Add exercise</strong> for another exercise. The x on a logged set removes it.</li>
+          <li>The faint numbers in an empty row are today's aim, worked out from your last workout. A note above the rows shows what you lifted last time and what to try. For an exercise you have never logged, the row shows only the target reps.</li>
+          <li>Type the <strong>Weight</strong> and <strong>Reps</strong> you did, or leave the aim as it is. A number keypad opens for each box.</li>
+          <li>Optionally, enter an <strong>RPE</strong> from 1 to 10 for how hard the set felt.</li>
+          <li>Select the tick to log what the row shows, so repeating a set is one tap. If it beats your best for that exercise, it gets a <strong>PR</strong> badge. Warm-up sets never get one.</li>
+          <li>The rest timer opens under the bar at the top. Select <strong>+30s</strong> for a longer rest this time, or <strong>Skip</strong>. It beeps when your rest is over.</li>
+          <li>Select a set's number to mark it as a warm-up or to remove it. To fix a logged set, select its weight or reps, change them and select <strong>Save</strong>.</li>
+          <li>Use <strong>+ Add set</strong> for another set and <strong>+ Add exercise</strong> for another exercise.</li>
         </guide-steps>
-        <guide-shot guide="jym" name="session-sets" [width]="1400" [height]="1204"
-          alt="Bench Press during a workout: a note from last time, a warm-up set of 95 lbs, four logged sets of 175 lbs with the 6-rep set marked PR, and a sixth row suggesting 180 lbs and 5 reps." />
+        <guide-shot guide="jym" name="session-sets" [width]="1400" [height]="1268"
+          alt="Bench Press during a workout: a note saying last time was 175 lbs for 5, 5, 5, 5 and to try 180 lbs, a warm-up set of 95 lbs marked with a flame, four logged sets of 175 lbs with the 6-rep set marked PR, a sixth row ready to log 175 lbs for 5, and a Plates button." />
         <guide-tip>A set is a PR when it is the heaviest weight you have logged for that exercise, or the same top weight for more reps. Warm-ups are left out on both sides: they never count as a PR and never raise the bar for one. Marking a PR set as a warm-up takes its badge away.</guide-tip>
+      </guide-section>
+
+      <guide-section id="warm-up-and-load-the-bar" title="Warm up and load the bar"
+        lead="Jym can plan your warm-up sets and tell you which plates go on each side of the bar.">
+        <guide-steps>
+          <li>Before you log an exercise's first set, select <strong>Add warm-up sets</strong> above its rows. It adds the bar for 10, then about half, 70% and 85% of your working weight for 5, 3 and 1, rounded down to weights you can load.</li>
+          <li>Log each warm-up with its tick, like any other set.</li>
+          <li>Select <strong>Plates</strong> under an exercise to see the plates for each side at the next set's weight, or type any weight. If your plates can't make it exactly, it offers the nearest weights you can load.</li>
+          <li>Set your bar weight and the plates you have in <a routerLink="/settings" fragment="workouts">Settings, Workouts</a>.</li>
+        </guide-steps>
+        <guide-shot guide="jym" name="plates" [width]="780" [height]="686"
+          alt="The Plates window for 225 lbs: a 45 plate and a 45 plate drawn on the bar, the words Each side: 45, 45, and a line saying On a 45 lbs bar with a Change bar and plates link." />
+        <guide-tip>The warm-up offer appears once an exercise has a working weight above the bar, typed or suggested from last time.</guide-tip>
       </guide-section>
 
       <guide-section id="add-notes-body-weight-and-form-checks" title="Add notes, body weight and form checks"
@@ -100,7 +115,7 @@ import { GUIDE } from '../shared';
           <li>Type in <strong>Session notes</strong> at the top for the whole workout, or in <strong>Exercise note</strong> under an exercise. Notes save when you leave the box.</li>
           <li>To record today's body weight, type it next to <strong>Body weight</strong> and select <strong>Log</strong>.</li>
           <li>To film your form, log at least one set of the exercise, then select <strong>+ Form check</strong> and choose a video or photo. You can add one clip per exercise in each workout. If the upload fails, select <strong>Retry</strong>.</li>
-          <li>To mark the workout as lighter or as a max attempt, select <strong>Deload</strong> or <strong>Test</strong> in the top bar instead of <strong>Normal</strong>.</li>
+          <li>To mark the workout as lighter or as a max attempt, select the <strong>Workout options</strong> button (three dots) in the top bar, then <strong>Deload</strong> or <strong>Test</strong> instead of <strong>Normal</strong>.</li>
         </guide-steps>
         <guide-tip>Deload sessions are left out of the next workout's suggestions and your series volume chart.</guide-tip>
       </guide-section>
@@ -112,18 +127,19 @@ import { GUIDE } from '../shared';
           <li>The summary shows your <strong>Duration</strong>, <strong>Volume</strong> and <strong>Work sets</strong> (warm-ups are not counted), any new PRs, and how your sets compare with <strong>Last time</strong>.</li>
           <li>Select <strong>Share workout</strong> to make an image of the summary to share or save, or <strong>Done</strong> to go back to Jym.</li>
         </guide-steps>
-        <guide-tip>To stop without finishing, select <strong>Exit</strong>. <strong>Save &amp; Exit</strong> keeps your sets so you can resume later, and <strong>Discard session</strong> deletes the workout.</guide-tip>
-        <p>A finished workout is closed for new sets. If you open its old workout link, Jym shows it in <a routerLink="/jym/track">Track</a> instead, with every set you logged.</p>
+        <guide-tip>To stop without finishing, open <strong>Workout options</strong>. <strong>Leave for now</strong> keeps the workout open so you can resume it later, and <strong>Discard workout</strong> deletes it.</guide-tip>
+        <p>Forgot to finish? After 3 hours with no new set, Jym offers to finish the workout at your last set, so it doesn't run on for days. The offer shows in the workout, on the Jym home page, and when you start your next one.</p>
+        <p>A finished workout is closed for new sets. If you open its old workout link, Jym shows its summary instead.</p>
       </guide-section>
 
       <guide-section id="save-and-reuse-a-template" title="Save and reuse a template"
         lead="A template keeps a workout's exercises so you can start the same workout again.">
         <guide-steps>
-          <li>During a workout with at least one logged set, select the save button in the top bar, labelled <strong>Save as template</strong>.</li>
+          <li>During a workout with at least one logged set, open <strong>Workout options</strong> and select <strong>Save as template</strong>. A finished workout's summary has the same button.</li>
           <li>Enter a name and select <strong>Save template</strong>.</li>
           <li>To use it, select the template under <strong>Templates</strong> on the <a routerLink="/jym">Jym</a> home page, or select <strong>Start</strong> on it in <a routerLink="/jym/plan" [queryParams]="{ tab: 'templates' }">Plan, Templates</a>.</li>
         </guide-steps>
-        <guide-shot guide="jym" name="save-template" [width]="840" [height]="554"
+        <guide-shot guide="jym" name="save-template" [width]="840" [height]="584"
           alt="The Save as template window with the name Push day A, and Cancel and Save template buttons." />
       </guide-section>
 
@@ -148,7 +164,8 @@ import { GUIDE } from '../shared';
         lead="Every finished workout is listed in Track, newest first.">
         <guide-steps>
           <li>Open <a routerLink="/jym/track">Track</a>. Each workout shows its date, day, sets, time and volume.</li>
-          <li>Select a workout to see every set, with PR badges and warm-up sets marked, its notes and any form check clips. <strong>See this day</strong> opens everything else you logged that day.</li>
+          <li>Select a workout to see every set, with PR badges, warm-ups, RPE and exercise notes, plus its notes and any form check clips. <strong>View summary</strong> opens its summary, and <strong>See this day</strong> opens everything else you logged that day.</li>
+          <li>On a summary, <strong>Edit times</strong> fixes when the workout started or finished, as long as the times still include every set you logged. <strong>Repeat workout</strong> starts it again with the same exercises.</li>
           <li>To download your workouts as a spreadsheet, optionally choose <strong>From</strong> and <strong>To</strong> dates, then select <strong>Export CSV</strong>.</li>
         </guide-steps>
         <guide-shot guide="jym" name="track-sessions" [width]="1600" [height]="1600"
@@ -201,7 +218,7 @@ import { GUIDE } from '../shared';
           <li>Open <a routerLink="/settings">Settings</a>.</li>
           <li>Under <strong>Preferences</strong>, choose <strong>Pounds (lbs)</strong> or <strong>Kilograms (kg)</strong> for <strong>Weight unit</strong>. It saves straight away.</li>
         </guide-steps>
-        <guide-tip>During a workout, the <strong>lbs</strong> and <strong>kg</strong> buttons in the top bar change the same setting.</guide-tip>
+        <guide-tip>During a workout, <strong>Units</strong> in <strong>Workout options</strong> changes the same setting.</guide-tip>
       </guide-section>
 
     </guide-page>

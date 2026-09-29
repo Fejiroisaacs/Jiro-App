@@ -108,7 +108,7 @@ import { GUIDE } from '../shared';
         </guide-steps>
         <guide-shot guide="basics" name="settings-preferences" [width]="1280" [height]="1068"
           alt="The Preferences card in Settings: Weight unit set to Pounds (lbs), the Timezone search box above a list set to America/New York (UTC-04:00) with a Use this device's timezone button, and Currency set to USD (US dollar)." />
-        <p>Each choice saves as soon as you make it; there is no Save button. Units, timezone, currency and colour theme are saved to your account. If a change cannot be saved (for example, before you have verified your email), Settings says why under the choices and puts the old value back. Dark mode is remembered on each device, so you can have it on your phone and off on your computer.</p>
+        <p>Each choice saves as soon as you make it; there is no Save button. Units, timezone, currency, colour theme and the <strong>Workouts</strong> settings (rest timer, bar weight and plates) are saved to your account. If a change cannot be saved (for example, before you have verified your email), Settings says why under the choices and puts the old value back. Dark mode is remembered on each device, so you can have it on your phone and off on your computer.</p>
         <guide-tip>You can also switch dark mode from the account menu: select your name at the bottom of the sidebar, or the round button with your initial at the top right on a phone, then <strong>Dark mode</strong>.</guide-tip>
       </guide-section>
 
