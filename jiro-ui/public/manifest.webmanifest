@@ -21,6 +21,22 @@
       "purpose": "any maskable"
     }
   ],
+  "shortcuts": [
+    {
+      "name": "Start workout",
+      "short_name": "Start",
+      "description": "Start your next workout",
+      "url": "/jym?go=start",
+      "icons": [{ "src": "/icons/shortcut-jym-96.png", "sizes": "96x96", "type": "image/png" }]
+    },
+    {
+      "name": "Resume workout",
+      "short_name": "Resume",
+      "description": "Go back to the workout you have open",
+      "url": "/jym?go=resume",
+      "icons": [{ "src": "/icons/shortcut-jym-96.png", "sizes": "96x96", "type": "image/png" }]
+    }
+  ],
   "categories": ["health", "fitness", "food"],
   "lang": "en"
 }

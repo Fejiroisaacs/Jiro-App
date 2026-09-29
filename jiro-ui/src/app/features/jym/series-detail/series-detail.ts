@@ -46,10 +46,7 @@ import { seriesProgress } from '../series-progress';
               <span class="status-badge" [class.active]="!series()!.ended_at">
                 {{ series()!.ended_at ? 'Ended' : 'Active' }}
               </span>
-              <span class="meta-text">Started {{ formatDate(series()!.started_at) }}</span>
-              @if (series()!.ended_at) {
-<span class="meta-text">· Ended {{ formatDate(series()!.ended_at!) }}</span>
-}
+              <span class="meta-text">Started {{ formatDate(series()!.started_at) }}{{ series()!.ended_at ? ', ended ' + formatDate(series()!.ended_at!) : '' }}</span>
               <span class="meta-text">· {{ series()!.session_count }} sessions</span>
             </div>
           </div>
@@ -265,6 +262,13 @@ import { seriesProgress } from '../series-progress';
     }
 
     .header-btns { display: flex; gap: var(--space-sm); flex-shrink: 0; }
+
+    /* On a phone the buttons take their own row; side by side, End series ran off the screen. */
+    @media (max-width: 600px) {
+      .detail-header { flex-direction: column; gap: var(--space-md); }
+      .header-btns { width: 100%; }
+      .header-btns > * { flex: 1; --jiro-btn-width: 100%; }
+    }
 
     .split-label { font-size: var(--font-size-xs); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
 

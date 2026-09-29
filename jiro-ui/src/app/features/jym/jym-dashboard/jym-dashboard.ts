@@ -1,7 +1,7 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { JymService, Split, SplitSeriesSummary, SessionSummary, Routine } from '../../../core/services/jym.service';
 import { WorkoutLauncher } from '../shared/workout-launcher';
 import { ConfirmService } from '../../../core/services/confirm.service';
@@ -760,11 +760,36 @@ export class JymDashboardComponent implements OnInit {
   private selectedSeriesId = '';
 
   readonly launcher = inject(WorkoutLauncher);
+  private readonly route = inject(ActivatedRoute);
+  /** A home-screen shortcut (?go=start or ?go=resume) waiting for the series and sessions to load. */
+  private pendingGo: 'start' | 'resume' | null = null;
+  private loaded = { series: false, sessions: false };
 
   constructor(private jymService: JymService, public router: Router) { }
 
   ngOnInit() {
+    const go = this.route.snapshot.queryParamMap.get('go');
+    if (go === 'start' || go === 'resume') {
+      this.pendingGo = go;
+      this.router.navigate([], { relativeTo: this.route, queryParams: { go: null }, queryParamsHandling: 'merge', replaceUrl: true });
+    }
     this.load();
+  }
+
+  /** Runs the shortcut once both lists are in: resume the open workout, or start Up next (else freestyle). */
+  private runShortcut() {
+    const go = this.pendingGo;
+    if (!go || !this.loaded.series || !this.loaded.sessions) return;
+    this.pendingGo = null;
+    const open = this.inProgressSessions()[0];
+    if (go === 'resume') {
+      if (open) this.router.navigate(['/jym/session', open.id]);
+      else this.toast.info('No workout in progress. Start one here.');
+      return;
+    }
+    // An open workout gets the launcher's own Resume / Finish choice.
+    const next = this.upNext();
+    this.launcher.start(next?.next_routine ? { routine_id: next.next_routine.id, series_id: next.id } : {});
   }
 
   load() {
@@ -777,13 +802,19 @@ export class JymDashboardComponent implements OnInit {
       error: () => { this.loading.set(false); failed(); },
     });
     this.jymService.listSeries().subscribe({
-      next: s => this.activeSeries.set(s.filter(sr => !sr.ended_at)),
+      next: s => {
+        this.activeSeries.set(s.filter(sr => !sr.ended_at));
+        this.loaded.series = true;
+        this.runShortcut();
+      },
       error: failed,
     });
     this.jymService.listSessions({ from: heatmapStartKey(this.settingsService.timezone()) }).subscribe({
       next: s => {
         this.allSessions.set(s);
         this.inProgressSessions.set(s.filter(sess => !sess.ended_at));
+        this.loaded.sessions = true;
+        this.runShortcut();
       },
       error: failed,
     });

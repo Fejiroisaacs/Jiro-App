@@ -1,4 +1,5 @@
-import { Component, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef, inject, signal, computed } from '@angular/core';
+import { Component, DestroyRef, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef, inject, signal, computed } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
@@ -727,6 +728,8 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
   plateauStatus = computed<PlateauStatus>(() => detectPlateau(this.exercise()?.history ?? []));
 
   private chart: Chart | null = null;
+  private currentId = '';
+  private readonly destroyRef = inject(DestroyRef);
   private dataLoaded = false;
   private viewReady = false;
 
@@ -739,20 +742,40 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
   ) {}
 
   ngOnInit() {
-    const id = this.route.snapshot.paramMap.get('id') || '';
+    // The page is reused when Ctrl K opens another exercise from this one, so follow the id.
+    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(p => this.load(p.get('id') || ''));
+  }
+
+  private load(id: string) {
+    this.currentId = id;
+    this.exercise.set(null);
+    this.loading.set(true);
+    this.formChecks.set([]);
+    this.formChecksLoading.set(true);
+    this.selectedWeight.set(null);
+    this.historyPage.set(0);
+    this.formPage.set(0);
+    this.dataLoaded = false;
+    this.chart?.destroy();
+    this.chart = null;
     this.jymService.getExercise(id).subscribe({
       next: ex => {
+        if (id !== this.currentId) return;
         this.exercise.set(ex);
         this.loading.set(false);
         this.uniqueWeights.set(this.getUniqueWeights());
         this.dataLoaded = true;
         setTimeout(() => this.maybeDrawChart(), 0);
       },
-      error: () => this.loading.set(false),
+      error: () => { if (id === this.currentId) this.loading.set(false); },
     });
     this.jymService.listExerciseFormChecks(id).subscribe({
-      next: checks => { this.formChecks.set(checks); this.formChecksLoading.set(false); },
-      error: () => this.formChecksLoading.set(false),
+      next: checks => {
+        if (id !== this.currentId) return;
+        this.formChecks.set(checks);
+        this.formChecksLoading.set(false);
+      },
+      error: () => { if (id === this.currentId) this.formChecksLoading.set(false); },
     });
   }
 
