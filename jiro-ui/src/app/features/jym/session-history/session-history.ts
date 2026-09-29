@@ -779,11 +779,14 @@ const HISTORY_PAGE = 50;
 function summaryFromDetail(d: SessionWithSets): SessionSummary {
   const { sets, attachments: _attachments, targets: _targets, ...session } = d;
   const working = sets.filter(x => !x.is_warmup);
+  const times = sets.map(x => x.created_at).sort((a, b) => Date.parse(a) - Date.parse(b));
   return {
     ...session,
     set_count: working.length,
     pr_count: new Set(sets.filter(x => x.is_pr).map(x => x.exercise_id)).size,
     total_volume: working.reduce((sum, x) => sum + x.weight * x.reps_performed, 0),
     muscle_groups: [],
+    first_set_at: times[0] ?? null,
+    last_set_at: times.at(-1) ?? null,
   };
 }

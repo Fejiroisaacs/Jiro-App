@@ -25,6 +25,7 @@ import { Component, booleanAttribute, input } from '@angular/core';
       [class.jiro-btn--inverse]="variant() === 'inverse'"
       [class.jiro-btn--ghost]="variant() === 'ghost'"
       [class.jiro-btn--sm]="size() === 'sm'"
+      [class.jiro-btn--lg]="size() === 'lg'"
       [disabled]="disabled() || loading()"
       [attr.aria-busy]="loading() ? 'true' : null"
       [type]="type()">
@@ -65,6 +66,9 @@ import { Component, booleanAttribute, input } from '@angular/core';
       font-size: var(--font-size-xs);
       gap: var(--space-xs);
     }
+
+    /* A 44 px touch target, for screens used on the move such as the workout player. */
+    .jiro-btn--lg { min-height: 44px; padding: 11px 20px; }
 
     .jiro-btn:disabled {
       opacity: 0.6;
@@ -153,7 +157,7 @@ import { Component, booleanAttribute, input } from '@angular/core';
 })
 export class JiroButtonComponent {
   variant = input<'primary' | 'secondary' | 'danger' | 'inverse' | 'ghost'>('primary');
-  size = input<'sm' | 'md'>('md');
+  size = input<'sm' | 'md' | 'lg'>('md');
   type = input<'button' | 'submit'>('button');
   disabled = input(false, { transform: booleanAttribute });
   loading = input(false, { transform: booleanAttribute });

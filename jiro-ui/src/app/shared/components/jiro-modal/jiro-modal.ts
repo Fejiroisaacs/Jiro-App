@@ -1,5 +1,5 @@
 import { A11yModule } from '@angular/cdk/a11y';
-import { AfterViewInit, Component, ElementRef, EventEmitter, HostListener, Injector, Input, OnDestroy, Output, afterNextRender, inject, viewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, EventEmitter, HostListener, Injector, Input, OnDestroy, Output, afterNextRender, booleanAttribute, inject, viewChild } from '@angular/core';
 
 import { JiroIconComponent } from '../jiro-icon/jiro-icon';
 
@@ -18,7 +18,7 @@ export function isJiroModalOpen(): boolean {
   standalone: true,
   imports: [A11yModule, JiroIconComponent],
   template: `
-    <div class="modal-backdrop" (click)="onBackdropClick($event)">
+    <div class="modal-backdrop" [class.sheet]="sheet" (click)="onBackdropClick($event)">
       <div
         #dialog
         class="modal-content"
@@ -28,7 +28,7 @@ export function isJiroModalOpen(): boolean {
         cdkTrapFocus
         [cdkTrapFocusAutoCapture]="true"
         [attr.aria-labelledby]="title ? titleId : null"
-        [style.max-width]="maxWidth">
+        [style.--modal-max]="maxWidth">
         @if (title) {
 <div class="modal-header">
           <h2 [id]="titleId">{{ title }}</h2>
@@ -63,6 +63,7 @@ export function isJiroModalOpen(): boolean {
       border-radius: var(--border-radius-lg);
       box-shadow: var(--shadow-lg);
       width: 100%;
+      max-width: var(--modal-max, 520px);
       max-height: 90dvh;
       overflow-y: auto;
       animation: slideUp 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
@@ -115,11 +116,35 @@ export function isJiroModalOpen(): boolean {
       from { opacity: 0; transform: translateY(16px); }
       to { opacity: 1; transform: translateY(0); }
     }
+
+    /* Opt-in bottom sheet on phones, in reach of the thumb (as the journal day sheet). */
+    @media (max-width: 600px) {
+      .modal-backdrop.sheet { align-items: flex-end; padding: 0; }
+      .sheet .modal-content {
+        max-width: none;
+        max-height: 88dvh;
+        border-bottom: none;
+        border-radius: var(--border-radius-lg) var(--border-radius-lg) 0 0;
+        padding-bottom: env(safe-area-inset-bottom);
+        overscroll-behavior: contain;
+        animation: sheetIn 280ms cubic-bezier(0.32, 0.72, 0, 1);
+      }
+      .sheet .modal-close { width: 44px; height: 44px; margin: -10px -10px -10px 0; }
+      .sheet .modal-header { padding: var(--space-md) var(--space-md) 0; }
+      .sheet .modal-body { padding: var(--space-md); }
+    }
+
+    @keyframes sheetIn {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
   `]
 })
 export class JiroModalComponent implements AfterViewInit, OnDestroy {
   @Input() title = '';
   @Input() maxWidth = '520px';
+  /** A bottom sheet at 600 px and below; a dialog above. */
+  @Input({ transform: booleanAttribute }) sheet = false;
   @Output() close = new EventEmitter<void>();
 
   readonly titleId = `jiro-modal-title-${++modalSeq}`;

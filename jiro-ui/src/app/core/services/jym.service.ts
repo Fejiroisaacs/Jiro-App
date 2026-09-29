@@ -215,6 +215,9 @@ export interface SessionSummary extends Session {
   /** Weight × reps over working sets, in kg. */
   total_volume: number;
   muscle_groups: string[];
+  /** When the first and last sets (warm-ups included) were logged, by the server's clock; null with no sets. */
+  first_set_at: string | null;
+  last_set_at: string | null;
 }
 
 export interface SessionSet {
@@ -274,6 +277,8 @@ export interface RoutineItemsEntry { routine_id: string; items: ReplaceItemEntry
 export interface RoutineItemsResult { routine_id: string; items: RoutineItem[]; }
 export interface CreateSessionRequest { routine_id?: string; series_id?: string; session_type?: 'normal' | 'deload' | 'test'; /** Start even though another workout is open. */ force?: boolean; }
 export interface UpdateSessionRequest { ended_at?: string; notes?: string; session_type?: string; }
+/** A finished workout's new start or end; a field left out keeps its value. */
+export interface UpdateSessionTimesRequest { started_at?: string; ended_at?: string; }
 export interface CreateSetRequest { exercise_id: string; set_number: number; weight: number; reps_performed: number; rpe?: number; is_warmup?: boolean; exercise_note?: string; }
 export interface UpdateSetRequest { weight?: number; reps_performed?: number; rpe?: number; is_warmup?: boolean; exercise_note?: string; }
 export interface CreateSeriesRequest { split_id: string; name: string; duration_type: 'weeks' | 'sessions' | 'open'; target_weeks?: number; target_sessions?: number; }
@@ -403,6 +408,11 @@ export class JymService {
 
   updateSession(id: string, req: UpdateSessionRequest): Observable<Session> {
     return this.http.patch<Session>(`${API_URL}/sessions/${id}`, req);
+  }
+
+  /** Moves a finished workout's start or end; the times must still hold every logged set. */
+  updateSessionTimes(id: string, req: UpdateSessionTimesRequest): Observable<Session> {
+    return this.http.patch<Session>(`${API_URL}/sessions/${id}/times`, req);
   }
 
   deleteSession(id: string): Observable<void> {
