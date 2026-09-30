@@ -22,7 +22,10 @@ import { nextSets } from '../weight-suggestion';
 import { filled, parseDecimal, parseWhole } from '../number-input';
 import { nearestLoadable, platesFor, platesPerSide, warmupRamp } from '../plates';
 import { DRAFT_VERSION, SessionDraft, clearDraft, readDraft, writeDraft } from '../shared/session-draft';
-import { ExerciseBlock, SetRow, blockFromEntry, buildBlocks, newRow } from './player-blocks';
+import {
+  ExerciseBlock, SetRow, Suggestion, blockFromEntry, buildBlocks, canLog, isShort, logLabel as logLabelText, newRow,
+  rampSummary, rpeInvalid, suggestionFrom, workingWeight,
+} from './player-blocks';
 import { AuthService } from '../../../core/services/auth.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
@@ -1284,6 +1287,10 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     return { bi, si, row, summary: `${block.exerciseName}${values}${row.saved ? ', logged' : ', not logged yet'}` };
   });
   readonly filled = filled;
+  readonly canLog = canLog;
+  readonly isShort = isShort;
+  readonly rpeInvalid = rpeInvalid;
+  readonly rampSummary = rampSummary;
   /** Set when the workout was opened after hours with nothing logged; "Keep going" clears it. */
   readonly stale = signal<{ started: string; lastSet: string | null; lastSetTime: string; lastSetAt: string | null } | null>(null);
 
@@ -1613,11 +1620,6 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     this.authService.updateSettings({ weight_unit: unit }).subscribe({
       error: () => this.toast.error('Could not change the unit.'),
     });
-  }
-
-  rpeInvalid(rpe: string): boolean {
-    const v = parseWhole(rpe);
-    return v === null || v < 1 || v > 10;
   }
 
   /** A new row's ghosts: the last logged working set, else the suggestion the other rows carry; never a warm-up. */
@@ -1991,18 +1993,10 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   }
 
   /** The weight an exercise works at next: the first unlogged working row, typed or ghosted, else the last logged. */
-  private workingWeight(block: ExerciseBlock): number | null {
-    const next = block.sets.find(s => !s.saved && !s.isWarmup);
-    const typed = next ? parseDecimal(filled(next.weight) ? next.weight : next.ghostWeight) : null;
-    if (typed !== null) return typed;
-    const last = block.sets.filter(s => s.saved && !s.isWarmup).at(-1);
-    return last ? parseDecimal(last.weight) : null;
-  }
-
   /** Warm-up sets to offer: before anything is logged or marked warm-up, and only above the bar. */
   warmupRampFor(block: ExerciseBlock): { weight: number; reps: number }[] | null {
     if (block.sets.some(s => s.saved || s.isWarmup)) return null;
-    const work = this.workingWeight(block);
+    const work = workingWeight(block);
     if (work === null) return null;
     const set = this.currentPlates();
     const key = `${work}|${set.bar}|${set.sizes.join(',')}`;
@@ -2012,10 +2006,6 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     const value = ramp.length ? ramp : null;
     this.rampCache.set(block.exerciseId, { key, ramp: value });
     return value;
-  }
-
-  rampSummary(ramp: { weight: number; reps: number }[]): string {
-    return ramp.map(r => `${r.weight} × ${r.reps}`).join(', ');
   }
 
   /** Inserts the ramp as typed warm-up rows above the working rows; each then logs with one tap. */
@@ -2030,7 +2020,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   }
 
   openPlates(block: ExerciseBlock) {
-    const weight = this.workingWeight(block);
+    const weight = workingWeight(block);
     this.platesWeight.set(weight === null ? '' : String(weight));
     this.platesOpen.set(true);
   }
@@ -2372,7 +2362,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   }
 
   /** The hint line ("Last time ... Stay at ...") and the ghost values, from nextSets(). */
-  private suggestionFor(block: ExerciseBlock, history: SetHistory[]): { text: string; ghostWeight: string; ghostReps: string; icon: 'trend-up' | 'repeat' } | null {
+  private suggestionFor(block: ExerciseBlock, history: SetHistory[]): Suggestion | null {
     const unit = this.settingsService.unitLabel();
     const next = nextSets(history, {
       excludeSessionId: this.sessionId,
@@ -2381,51 +2371,11 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
       unit,
       toDisplay: kg => this.settingsService.toDisplay(kg),
     });
-    if (!next) return null;
-
-    const w = (x: number) => `${+x.toFixed(2)} ${unit}`;
-    const working = next.last.filter(s => !s.warmup);
-    const oneWeight = working.every(s => s.weight === working[0].weight);
-    const last = working[0].weight === 0 && oneWeight
-      ? `${working.map(s => s.reps).join(', ')} reps`
-      : oneWeight
-        ? `${w(working[0].weight)} × ${working.map(s => s.reps).join(', ')}`
-        : working.map(s => `${w(s.weight)} × ${s.reps}`).join(', ');
-
-    let advice: string;
-    if (next.move === 'reps') {
-      advice = `Aim for ${next.reps} reps.`;
-    } else if (next.move === 'up') {
-      advice = block.plan
-        ? `Hit ${block.plan.sets} × ${block.plan.reps}, try ${w(next.weight)}.`
-        : `Try ${w(next.weight)} × ${next.reps}.`;
-    } else {
-      advice = next.reason === 'plan'
-        ? `Stay at ${w(next.weight)} until every set hits ${next.reps}.`
-        : `That was RPE 9 or more, so stay at ${w(next.weight)} and aim for ${next.reps}.`;
-    }
-    return {
-      text: `Last time ${last}. ${advice}`,
-      ghostWeight: String(+next.weight.toFixed(2)),
-      ghostReps: String(next.reps),
-      icon: next.move === 'hold' ? 'repeat' : 'trend-up',
-    };
-  }
-
-  /** ✓ is ready when weight and reps each read as numbers, typed (0 included) or ghosted. */
-  canLog(row: SetRow): boolean {
-    const weight = parseDecimal(filled(row.weight) ? row.weight : row.ghostWeight);
-    const reps = parseWhole(filled(row.reps) ? row.reps : row.ghostReps);
-    return !row.saving && weight !== null && reps !== null && reps >= 1
-      && !(filled(row.rpe) && this.rpeInvalid(row.rpe));
+    return next ? suggestionFrom(next, block.plan, unit) : null;
   }
 
   logLabel(row: SetRow): string {
-    const weight = filled(row.weight) ? row.weight : row.ghostWeight;
-    const reps = filled(row.reps) ? row.reps : row.ghostReps;
-    return filled(weight) && filled(reps)
-      ? `Log set ${row.setNumber}: ${weight} ${this.settingsService.unitLabel()} × ${reps}`
-      : `Log set ${row.setNumber}`;
+    return logLabelText(row, this.settingsService.unitLabel());
   }
 
   /** A tap on a logged value opens its row for editing; unlocking and focusing inside the tap lets a phone open its keyboard. */
@@ -2501,10 +2451,6 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   }
 
   /** A logged working set below the plan's reps. */
-  isShort(block: ExerciseBlock, row: SetRow): boolean {
-    return !!block.plan && row.saved && !row.isWarmup && (parseWhole(row.reps) ?? 0) < block.plan.reps;
-  }
-
   private convertText(value: string, from: string, to: string): string {
     const n = parseDecimal(value);
     return n !== null ? String(this.settingsService.convertWeight(n, from, to)) : value;

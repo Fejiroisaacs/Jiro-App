@@ -1,7 +1,7 @@
 // Run with: npm run test:unit
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildBlocks } from './player-blocks.ts';
+import { buildBlocks, canLog, isShort, logLabel, newRow, rampSummary, rpeInvalid, suggestionFrom, workingWeight, emptyBlock } from './player-blocks.ts';
 
 const same = (kg: number) => kg;
 const entry = (id: string, sets: number | null = null, reps: number | null = null, position = 1) =>
@@ -63,4 +63,50 @@ test('the exercise note comes from the logged sets', () => {
 
 test('a logged exercise missing from the list still shows, after it', () => {
   assert.equal(shape(buildBlocks([entry('squat')], [set('ghost', 1, 10, 10)], {}, same)), 'squat[1] ghost[1L=10]');
+});
+
+test('RPE is a whole number from 1 to 10', () => {
+  assert.equal(rpeInvalid('8'), false);
+  assert.equal(rpeInvalid('0'), true);
+  assert.equal(rpeInvalid('11'), true);
+  assert.equal(rpeInvalid('8.5'), true);
+});
+
+test('one tap logs typed values, else the ghosts; a typed 0 counts', () => {
+  assert.equal(canLog(newRow(1, { ghostWeight: '100', ghostReps: '5' })), true);
+  assert.equal(canLog(newRow(1, { weight: '0', reps: '8' })), true);
+  assert.equal(canLog(newRow(1, { weight: '100' })), false);
+  assert.equal(canLog(newRow(1, { weight: '100', reps: '5', rpe: '12' })), false);
+  assert.equal(canLog(newRow(1, { weight: '100', reps: '5', saving: true })), false);
+  assert.equal(logLabel(newRow(2, { ghostWeight: '100', reps: '6' }), 'lbs'), 'Log set 2: 100 lbs × 6');
+  assert.equal(logLabel(newRow(3), 'kg'), 'Log set 3');
+});
+
+test('a logged working set under the plan is short; warm-ups never are', () => {
+  const block = { ...emptyBlock('x', 'x', null, []), plan: { sets: 3, reps: 8 } };
+  assert.equal(isShort(block, newRow(1, { reps: '7', saved: true })), true);
+  assert.equal(isShort(block, newRow(1, { reps: '8', saved: true })), false);
+  assert.equal(isShort(block, newRow(1, { reps: '5', saved: true, isWarmup: true })), false);
+  assert.equal(isShort(emptyBlock('x', 'x', null, []), newRow(1, { reps: '1', saved: true })), false);
+});
+
+test('the working weight is the next working row, typed or ghosted, else the last logged', () => {
+  const b = (sets: ReturnType<typeof newRow>[]) => emptyBlock('x', 'x', null, sets);
+  assert.equal(workingWeight(b([newRow(1, { weight: '45', isWarmup: true }), newRow(2, { ghostWeight: '135' })])), 135);
+  assert.equal(workingWeight(b([newRow(1, { weight: '140' })])), 140);
+  assert.equal(workingWeight(b([newRow(1, { weight: '100', saved: true })])), 100);
+  assert.equal(workingWeight(b([])), null);
+  assert.equal(rampSummary([{ weight: 45, reps: 10 }, { weight: 95, reps: 5 }]), '45 × 10, 95 × 5');
+});
+
+test('the suggestion line: up with a plan, hold after a miss, reps for bodyweight', () => {
+  const last = [{ weight: 100, reps: 8, warmup: false }, { weight: 100, reps: 8, warmup: false }];
+  const up = suggestionFrom({ last, move: 'up', weight: 105, reps: 8, reason: null }, { sets: 2, reps: 8 }, 'lbs');
+  assert.equal(up.text, 'Last time 100 lbs × 8, 8. Hit 2 × 8, try 105 lbs.');
+  assert.deepEqual([up.ghostWeight, up.ghostReps, up.icon], ['105', '8', 'trend-up']);
+  const hold = suggestionFrom({ last: [...last.slice(0, 1), { weight: 100, reps: 6, warmup: false }], move: 'hold', weight: 100, reps: 8, reason: 'plan' }, { sets: 2, reps: 8 }, 'lbs');
+  assert.equal(hold.text, 'Last time 100 lbs × 8, 6. Stay at 100 lbs until every set hits 8.');
+  assert.equal(hold.icon, 'repeat');
+  const bw = suggestionFrom({ last: [{ weight: 0, reps: 10, warmup: false }, { weight: 0, reps: 9, warmup: false }], move: 'reps', weight: 0, reps: 11, reason: null }, undefined, 'kg');
+  assert.equal(bw.text, 'Last time 10, 9 reps. Aim for 11 reps.');
 });
