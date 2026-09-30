@@ -34,6 +34,8 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
 import { JiroMenuComponent, JiroMenuItem } from '../../../shared/components/jiro-menu/jiro-menu';
+import { RestTimer } from './rest-timer';
+import { RestRowComponent } from './rest-row';
 import { SaveTemplateDialogComponent } from '../shared/save-template-dialog';
 import { ToastService } from '../../../core/services/toast.service';
 import { ConfirmService } from '../../../core/services/confirm.service';
@@ -42,7 +44,7 @@ import { ConfirmService } from '../../../core/services/confirm.service';
 @Component({
   selector: 'app-session-player',
   standalone: true,
-  imports: [FormsModule, RouterLink, JiroButtonComponent, JiroModalComponent, JiroIconComponent, JiroSkeletonComponent, JiroEmptyStateComponent, JymPrBadgeComponent, SaveTemplateDialogComponent, JiroMenuComponent],
+  imports: [FormsModule, RouterLink, JiroButtonComponent, JiroModalComponent, JiroIconComponent, JiroSkeletonComponent, JiroEmptyStateComponent, JymPrBadgeComponent, SaveTemplateDialogComponent, JiroMenuComponent, RestRowComponent],
   template: `
     <h1 class="sr-only">Active session</h1>
     <!-- Sticky bar: the clock, the options, and Finish; everything else waits in the options sheet. -->
@@ -71,16 +73,8 @@ import { ConfirmService } from '../../../core/services/confirm.service';
         </div>
       </div>
       <!-- Rest timer row: opens after a logged set -->
-      @if (restTimerActive()) {
-        <div class="rest-row" [class.rest-done]="restTimerDone()">
-          <span class="rest-label">Rest</span>
-          <span class="rest-countdown" role="timer" aria-live="off">{{ restTimerDisplay() }}</span>
-          <button class="rest-btn" type="button" (click)="addRestTime(30)" aria-label="Add 30 seconds to this rest">+30s</button>
-          <button class="rest-btn" type="button" (click)="skipRestTimer()">Skip</button>
-          <div class="rest-progress" aria-hidden="true">
-            <div class="rest-progress-fill" [style.width.%]="(restTimerRemaining() / restLength()) * 100"></div>
-          </div>
-        </div>
+      @if (rest.active()) {
+        <jym-rest-row [timer]="rest" />
       }
     </div>
 
@@ -643,36 +637,6 @@ import { ConfirmService } from '../../../core/services/confirm.service';
     }
     .bar-icon-btn:hover { background: color-mix(in srgb, currentColor 12%, transparent); border-color: color-mix(in srgb, currentColor 75%, transparent); }
 
-    /* Rest timer row */
-    .rest-row {
-      display: flex; align-items: center; gap: var(--space-sm);
-      padding: var(--space-xs) var(--space-xl) calc(var(--space-xs) + 3px);
-      background: rgba(var(--shadow-rgb), 0.18);
-      border-top: 1px solid color-mix(in srgb, currentColor 15%, transparent);
-      position: relative; overflow: hidden;
-      transition: background 0.4s;
-    }
-
-    .rest-row.rest-done { background: rgba(var(--color-accent-rgb), 0.45); }
-
-    .rest-label {
-      font-size: var(--font-size-xs); text-transform: uppercase;
-      letter-spacing: 1px; opacity: 0.8; font-weight: 500; white-space: nowrap;
-    }
-
-    .rest-countdown {
-      font-size: var(--font-size-lg); font-weight: 700;
-      font-variant-numeric: tabular-nums; min-width: 52px; margin-right: auto;
-    }
-
-    .rest-btn {
-      min-height: 44px; min-width: 64px; padding: 0 var(--space-md); border-radius: var(--border-radius-pill);
-      border: 1px solid color-mix(in srgb, currentColor 40%, transparent); background: none;
-      color: inherit; font-size: var(--font-size-sm); font-weight: 600; font-family: inherit;
-      cursor: pointer; white-space: nowrap; transition: background 0.15s, border-color 0.15s;
-    }
-    .rest-btn:hover { background: color-mix(in srgb, currentColor 12%, transparent); border-color: color-mix(in srgb, currentColor 75%, transparent); }
-
     .template-save-error {
       font-size: var(--font-size-sm); color: var(--color-negative); margin-top: var(--space-xs);
     }
@@ -709,18 +673,6 @@ import { ConfirmService } from '../../../core/services/confirm.service';
     .opt-row-text { display: flex; flex-direction: column; gap: 2px; }
     .opt-row-text small { font-size: var(--font-size-xs); color: var(--text-secondary); }
     .opt-row--danger, .opt-row--danger jiro-icon { color: var(--color-negative); }
-
-    .rest-progress {
-      position: absolute; bottom: 0; left: 0; right: 0;
-      height: 3px; background: color-mix(in srgb, currentColor 15%, transparent);
-    }
-
-    .rest-progress-fill {
-      height: 100%; background: color-mix(in srgb, currentColor 75%, transparent);
-      transition: width 1s linear;
-    }
-
-    .rest-row.rest-done .rest-progress-fill { background: var(--color-positive); }
 
     .type-notice {
       text-align: center; font-size: var(--font-size-sm); font-weight: 500;
@@ -1151,8 +1103,6 @@ import { ConfirmService } from '../../../core/services/confirm.service';
       /* One row on a phone too: the clock on the left, options and Finish on the right. */
       .session-bar-row { padding: var(--space-xs) var(--space-md); }
 
-      .rest-row { padding: var(--space-xs) var(--space-md) calc(var(--space-xs) + 3px); }
-
       .bar-label:not(.bar-label--always) { display: none; }
 
       .timer { font-size: var(--font-size-lg); }
@@ -1316,18 +1266,11 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   exSearch = '';
   sessionNotes = '';
 
-  // Rest timer: restLength is this rest (+30s grows it); restSetting is how long every rest starts at.
-  restTimerActive = signal(false);
-  restTimerRemaining = signal(0);
-  restLength = signal(90);
-  restTimerDone = signal(false);
+  // Rest timer: this rest (rest-timer.ts); restSetting is how long every rest starts at.
+  readonly rest = new RestTimer();
   readonly restPresets = [60, 90, 120, 180, 300];
   private readonly restChoice = signal<number | null>(null);
   readonly restSetting = computed(() => this.restChoice() ?? this.settingsService.restSeconds());
-  private restInterval: ReturnType<typeof setInterval> | null = null;
-  private restHideTimer: ReturnType<typeof setTimeout> | null = null;
-  private restStartedAt: Date | null = null;
-  private audioCtx: AudioContext | null = null;
 
   sessionId = '';
   /** Fixing a finished workout (route data `fix`): no clock, rest, draft or Finish; sets are fixed in. */
@@ -1366,7 +1309,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   // Re-sync both timers when the user returns from a locked screen; save the draft when leaving.
   private readonly onVisibilityChange = () => {
     if (document.visibilityState === 'visible') {
-      this.tickRestTimer();
+      this.rest.tick();
       this.updateElapsed();
     } else {
       this.flushDraft();
@@ -1450,75 +1393,20 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.flushDraft();
     if (this.timerInterval) clearInterval(this.timerInterval);
-    this.clearRestTimer();
+    this.rest.clear();
     document.removeEventListener('visibilitychange', this.onVisibilityChange);
   }
 
   // ── Rest timer ──────────────────────────────────────────────────
   startRestTimer(seconds = this.restSetting()) {
-    this.clearRestTimer();
-    this.warmUpAudio();
-    this.restStartedAt = new Date();
-    this.restLength.set(seconds);
-    this.restTimerRemaining.set(seconds);
-    this.restTimerDone.set(false);
-    this.restTimerActive.set(true);
-    // Tick at 500ms so the display snaps quickly after screen unlock
-    this.restInterval = setInterval(() => this.tickRestTimer(), 500);
-  }
-
-  // Call during a user gesture so the AudioContext is created/unlocked while
-  // the browser permits it — avoids the "play blocked, no user gesture" error
-  // that fires when we try to create one from the timer callback.
-  private warmUpAudio() {
-    try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtx) return;
-      if (!this.audioCtx) {
-        this.audioCtx = new AudioCtx();
-      }
-      // Unlock immediately if it was suspended (happens after screen lock)
-      if (this.audioCtx.state === 'suspended') {
-        this.audioCtx.resume();
-      }
-    } catch (_) {}
-  }
-
-  private tickRestTimer() {
-    if (!this.restStartedAt) return;
-    const elapsed = Math.floor((Date.now() - this.restStartedAt.getTime()) / 1000);
-    const rem = Math.max(0, this.restLength() - elapsed);
-    this.restTimerRemaining.set(rem);
-    if (rem <= 0 && !this.restTimerDone()) {
-      this.clearRestTimer();
-      this.restTimerDone.set(true);
-      this.playBeep();
-      // Kept so a rest started in these 3 s isn't hidden by the old one.
-      this.restHideTimer = setTimeout(() => {
-        this.restHideTimer = null;
-        this.restTimerActive.set(false);
-        this.restTimerDone.set(false);
-      }, 3000);
-    }
-  }
-
-  private clearRestTimer() {
-    if (this.restInterval) { clearInterval(this.restInterval); this.restInterval = null; }
-    if (this.restHideTimer) { clearTimeout(this.restHideTimer); this.restHideTimer = null; }
-    this.restStartedAt = null;
-  }
-
-  skipRestTimer() {
-    this.clearRestTimer();
-    this.restTimerActive.set(false);
-    this.restTimerDone.set(false);
+    this.rest.start(seconds);
   }
 
   /** Every rest's length, remembered on the account; applied at once, reverted if the save fails. */
   setRestDefault(seconds: number) {
     if (seconds === this.restSetting()) return;
     this.restChoice.set(seconds);
-    if (this.restTimerActive() && !this.restTimerDone()) this.startRestTimer(seconds);
+    if (this.rest.active() && !this.rest.done()) this.startRestTimer(seconds);
     this.authService.updateSettings({ rest_seconds: seconds }).subscribe({
       next: () => this.restChoice.set(null),
       error: () => {
@@ -1528,57 +1416,10 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     });
   }
 
-  /** Lengthens this rest only; after the beep it starts a fresh rest of that length. */
-  addRestTime(seconds: number) {
-    if (this.restTimerDone()) {
-      this.startRestTimer(seconds);
-    } else {
-      this.restLength.update(d => d + seconds);
-      this.restTimerRemaining.update(r => r + seconds);
-    }
-  }
-
-  restTimerDisplay(): string {
-    const s = this.restTimerRemaining();
-    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-  }
-
   restPresetLabel(seconds: number): string {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return s ? `${m}:${String(s).padStart(2, '0')}` : `${m}m`;
-  }
-
-  private playBeep() {
-    // Vibrate: short-pause-short-pause-long (works even with silent mode on Android)
-    try { navigator.vibrate?.([150, 80, 150, 80, 400]); } catch (_) {}
-
-    // Audio ping: three ascending tones using the pre-warmed context
-    try {
-      const ctx = this.audioCtx;
-      if (!ctx) return;
-      // resume() is async — schedule tones only after the context is running
-      const play = () => {
-        const tones = [660, 880, 1100];
-        tones.forEach((freq, i) => {
-          const offset = i * 0.22;
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.connect(gain); gain.connect(ctx.destination);
-          osc.type = 'sine';
-          osc.frequency.value = freq;
-          gain.gain.setValueAtTime(0.4, ctx.currentTime + offset);
-          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + offset + 0.3);
-          osc.start(ctx.currentTime + offset);
-          osc.stop(ctx.currentTime + offset + 0.35);
-        });
-      };
-      if (ctx.state === 'suspended') {
-        ctx.resume().then(play);
-      } else {
-        play();
-      }
-    } catch (_) { /* audio not supported */ }
   }
 
   private startTimer() {
@@ -1652,7 +1493,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
 
     // Warm up audio NOW, synchronously while the tap gesture is still active.
     // Safari blocks AudioContext creation/resume in async callbacks (e.g. HTTP responses).
-    this.warmUpAudio();
+    this.rest.warmUpAudio();
 
     this.blocks.update(bs => bs.map((b, bi) => bi === blockIndex ? {
       ...b,
