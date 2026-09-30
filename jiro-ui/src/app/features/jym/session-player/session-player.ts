@@ -1,39 +1,20 @@
-import { Component, OnInit, OnDestroy, WritableSignal, computed, effect, inject, signal } from '@angular/core';
-
+import { Component, OnInit, OnDestroy, effect, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import {
-  JymService,
-  CreateSetRequest,
-  UpdateSetRequest,
-  SetHistory,
-  SessionAttachment,
-  SessionExercise,
-  SessionSet,
-  SessionWithSets,
-} from '../../../core/services/jym.service';
-import { firstValueFrom } from 'rxjs';
-import { UploadService } from '../../../core/services/upload.service';
+import { JymService, SessionAttachment, SessionSet } from '../../../core/services/jym.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { dayKey, timeInZone, todayKey } from '../../../core/utils/day';
 import { formatInstant } from '../../../core/utils/format-date';
 import { isStale } from '../stale-workout';
-import { nextSets } from '../weight-suggestion';
-import { filled, parseDecimal, parseWhole } from '../number-input';
-import { platesFor, warmupRamp } from '../plates';
-import { DRAFT_VERSION, SessionDraft, clearDraft, readDraft, writeDraft } from '../shared/session-draft';
-import {
-  ExerciseBlock, SetRow, Suggestion, blockFromEntry, buildBlocks, canLog, isShort, logLabel as logLabelText, newRow,
-  rampSummary, rpeInvalid, suggestionFrom, workingWeight,
-} from './player-blocks';
+import { parseDecimal } from '../number-input';
 import { AuthService } from '../../../core/services/auth.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
-import { JiroMenuComponent, JiroMenuItem } from '../../../shared/components/jiro-menu/jiro-menu';
-import { RestTimer } from './rest-timer';
+import { JiroMenuComponent } from '../../../shared/components/jiro-menu/jiro-menu';
+import { PlayerStore } from './player-store';
 import { RestRowComponent } from './rest-row';
 import { PlatesSheetComponent } from './plates-sheet';
 import { OptionsSheetComponent, SetSheetComponent } from './player-sheets';
@@ -42,9 +23,9 @@ import { SaveTemplateDialogComponent } from '../shared/save-template-dialog';
 import { ToastService } from '../../../core/services/toast.service';
 import { ConfirmService } from '../../../core/services/confirm.service';
 
-
 @Component({
   selector: 'app-session-player',
+  providers: [PlayerStore],
   standalone: true,
   imports: [FormsModule, JiroButtonComponent, JiroIconComponent, JiroSkeletonComponent, JiroEmptyStateComponent, JymPrBadgeComponent, SaveTemplateDialogComponent, JiroMenuComponent, RestRowComponent, PlatesSheetComponent, OptionsSheetComponent, SetSheetComponent, ExercisePickerComponent],
   template: `
@@ -53,7 +34,7 @@ import { ConfirmService } from '../../../core/services/confirm.service';
     <div class="session-bar">
       <div class="session-bar-row">
         <div class="session-bar-left">
-          @if (fix) {
+          @if (store.fix) {
             <span class="bar-label bar-label--always">Editing</span>
             <span class="timer timer--date">{{ fixDate() }}</span>
           } @else {
@@ -65,7 +46,7 @@ import { ConfirmService } from '../../../core/services/confirm.service';
           <button class="bar-icon-btn" type="button" aria-label="Workout options" title="Workout options" aria-haspopup="dialog" (click)="showOptions.set(true)">
             <jiro-icon name="dots-three" [size]="22" />
           </button>
-          @if (fix) {
+          @if (store.fix) {
             <jiro-button size="lg" variant="inverse" type="button" (click)="doneFixing()">Done</jiro-button>
           } @else {
             <jiro-button size="lg" variant="inverse" type="button" (click)="finishSession()" [disabled]="finishing()">
@@ -75,8 +56,8 @@ import { ConfirmService } from '../../../core/services/confirm.service';
         </div>
       </div>
       <!-- Rest timer row: opens after a logged set -->
-      @if (rest.active()) {
-        <jym-rest-row [timer]="rest" />
+      @if (store.rest.active()) {
+        <jym-rest-row [timer]="store.rest" />
       }
     </div>
 
@@ -140,7 +121,7 @@ import { ConfirmService } from '../../../core/services/confirm.service';
 }
 
       <!-- Body weight panel (today's, so not when fixing a past workout) -->
-      @if (!loading() && !fix) {
+      @if (!loading() && !store.fix) {
 <div class="bw-panel">
         <label class="bw-label" for="session-bw">Body weight</label>
         @if (!bwLogged()) {
@@ -174,44 +155,44 @@ import { ConfirmService } from '../../../core/services/confirm.service';
       @if (!loading()) {
 <div class="exercises">
         <!-- Empty state -->
-        @if (blocks().length === 0) {
+        @if (store.blocks().length === 0) {
           <jiro-empty-state compact icon="barbell" heading="No exercises yet" message="Add your first lift to start logging sets.">
             <jiro-button size="sm" type="button" (click)="addExercise()">Add exercise</jiro-button>
           </jiro-empty-state>
         }
 
         <!-- Exercise blocks -->
-        @for (block of blocks(); track block.exerciseId; let bi = $index) {
+        @for (block of store.blocks(); track block.exerciseId; let bi = $index) {
 <div class="ex-block">
           <!-- The header toggles on click; the name button is its keyboard handle (its click bubbles up). -->
-          <div class="block-header" [class.block-open]="!isCollapsed(bi)" (click)="toggleBlock(bi)">
+          <div class="block-header" [class.block-open]="!store.isCollapsed(bi)" (click)="store.toggleBlock(bi)">
             <div class="block-title">
-              <h2><button type="button" class="block-toggle" [attr.aria-expanded]="!isCollapsed(bi)" [attr.aria-controls]="'block-body-' + bi">{{ block.exerciseName }}</button></h2>
+              <h2><button type="button" class="block-toggle" [attr.aria-expanded]="!store.isCollapsed(bi)" [attr.aria-controls]="'block-body-' + bi">{{ block.exerciseName }}</button></h2>
               @if (block.muscleGroup) {
 <span class="mg-tag">{{ block.muscleGroup }}</span>
 }
               @if (block.plan) {
                 <span class="plan-tag">Plan {{ block.plan.sets }} × {{ block.plan.reps }}</span>
               }
-              @if (isCollapsed(bi) && savedCount(bi) > 0) {
-<span class="sets-done-tag">{{ savedCount(bi) }} sets</span>
+              @if (store.isCollapsed(bi) && store.savedCount(bi) > 0) {
+<span class="sets-done-tag">{{ store.savedCount(bi) }} sets</span>
 }
             </div>
             <div class="block-actions">
-              @if (removingBlock() === bi) {
+              @if (store.removingBlock() === bi) {
                 <span class="block-busy" role="status" aria-label="Removing"><span class="spinner-sm"></span></span>
               } @else {
-                <jiro-menu touch [items]="blockActions(bi)" [label]="'More actions for ' + block.exerciseName" (select)="onBlockAction(bi, $event)" />
+                <jiro-menu touch [items]="store.blockActions(bi)" [label]="'More actions for ' + block.exerciseName" (select)="store.onBlockAction(bi, $event)" />
               }
-              <jiro-icon name="caret-down" [size]="16" class="chevron" [class.open]="!isCollapsed(bi)" />
+              <jiro-icon name="caret-down" [size]="16" class="chevron" [class.open]="!store.isCollapsed(bi)" />
             </div>
           </div>
 
           <div [id]="'block-body-' + bi">
-          @if (!isCollapsed(bi)) {
+          @if (!store.isCollapsed(bi)) {
 
             <!-- Last time, and what to aim for today -->
-            @if (block.suggestion && !allSaved(bi)) {
+            @if (block.suggestion && !store.allSaved(bi)) {
 <div class="overload-hint">
               <jiro-icon [name]="block.suggestionIcon ?? 'trend-up'" [size]="12" />
               {{ block.suggestion }}
@@ -227,16 +208,16 @@ import { ConfirmService } from '../../../core/services/confirm.service';
                 [(ngModel)]="block.exerciseNote"
                 placeholder="Optional"
                 rows="1"
-                (blur)="saveExerciseNote(bi)"></textarea>
+                (blur)="store.saveExerciseNote(bi)"></textarea>
             </div>
 
             <!-- Warm-ups before the first working set: the bar, then about 50, 70 and 85 percent. -->
-            @if (warmupRampFor(block); as ramp) {
-              <button type="button" class="warmup-prompt" (click)="addWarmups(bi, ramp)">
+            @if (store.warmupRampFor(block); as ramp) {
+              <button type="button" class="warmup-prompt" (click)="store.addWarmups(bi, ramp)">
                 <jiro-icon name="fire" [size]="16" />
                 <span class="warmup-prompt-text">
                   Add warm-up sets
-                  <small>{{ rampSummary(ramp) }}</small>
+                  <small>{{ store.rampSummary(ramp) }}</small>
                 </span>
               </button>
             }
@@ -252,7 +233,7 @@ import { ConfirmService } from '../../../core/services/confirm.service';
 
             <!-- Set rows: the number opens warm-up and remove; the check logs what the row shows. -->
             @for (row of block.sets; track row.id ?? 'new-' + row.setNumber; let si = $index) {
-              <div class="set-row" [class.set-done]="row.saved" [class.set-warmup]="row.isWarmup" [class.set-short]="isShort(block, row)" [class.set-editing]="row.editing">
+              <div class="set-row" [class.set-done]="row.saved" [class.set-warmup]="row.isWarmup" [class.set-short]="store.isShort(block, row)" [class.set-editing]="row.editing">
                 <button
                   type="button"
                   class="set-num-btn"
@@ -260,7 +241,7 @@ import { ConfirmService } from '../../../core/services/confirm.service';
                   aria-haspopup="dialog"
                   [attr.aria-label]="'Set ' + row.setNumber + (row.isWarmup ? ', warm-up' : '') + ', options'"
                   [disabled]="row.saving"
-                  (click)="openSetSheet(block, row)">
+                  (click)="store.openSetSheet(block, row)">
                   @if (row.isWarmup) {
                     <jiro-icon name="fire" [size]="12" />
                   }
@@ -274,16 +255,16 @@ import { ConfirmService } from '../../../core/services/confirm.service';
                   enterkeyhint="next"
                   autocomplete="off"
                   [(ngModel)]="row.weight"
-                  (ngModelChange)="saveDraftSoon()"
+                  (ngModelChange)="store.saveDraftSoon()"
                   [placeholder]="row.ghostWeight || '0'"
-                  [class.has-ghost]="row.ghostWeight && !filled(row.weight)"
+                  [class.has-ghost]="row.ghostWeight && !store.filled(row.weight)"
                   [attr.aria-label]="'Set ' + row.setNumber + ' weight (' + settingsService.unitLabel() + ')'"
                   [readonly]="row.saved && !row.editing"
                   [class.logged]="row.saved && !row.editing"
                   [attr.title]="row.saved && !row.editing ? 'Tap to edit' : null"
-                  (click)="editRow($event, bi, si)"
-                  (keydown.enter)="onEnter($event, bi, si, 'weight')"
-                  (keydown.escape)="cancelEdit(bi, si)" />
+                  (click)="store.editRow($event, bi, si)"
+                  (keydown.enter)="store.onEnter($event, bi, si, 'weight')"
+                  (keydown.escape)="store.cancelEdit(bi, si)" />
 
                 <input
                   class="set-input reps-input"
@@ -292,16 +273,16 @@ import { ConfirmService } from '../../../core/services/confirm.service';
                   enterkeyhint="done"
                   autocomplete="off"
                   [(ngModel)]="row.reps"
-                  (ngModelChange)="saveDraftSoon()"
+                  (ngModelChange)="store.saveDraftSoon()"
                   [placeholder]="row.ghostReps || '0'"
-                  [class.has-ghost]="row.ghostReps && !filled(row.reps)"
-                  [attr.aria-label]="'Set ' + row.setNumber + ' reps' + (isShort(block, row) ? ', below plan' : '')"
+                  [class.has-ghost]="row.ghostReps && !store.filled(row.reps)"
+                  [attr.aria-label]="'Set ' + row.setNumber + ' reps' + (store.isShort(block, row) ? ', below plan' : '')"
                   [readonly]="row.saved && !row.editing"
                   [class.logged]="row.saved && !row.editing"
                   [attr.title]="row.saved && !row.editing ? 'Tap to edit' : null"
-                  (click)="editRow($event, bi, si)"
-                  (keydown.enter)="onEnter($event, bi, si, 'reps')"
-                  (keydown.escape)="cancelEdit(bi, si)" />
+                  (click)="store.editRow($event, bi, si)"
+                  (keydown.enter)="store.onEnter($event, bi, si, 'reps')"
+                  (keydown.escape)="store.cancelEdit(bi, si)" />
 
                 <input
                   class="set-input rpe-input"
@@ -310,21 +291,21 @@ import { ConfirmService } from '../../../core/services/confirm.service';
                   enterkeyhint="done"
                   autocomplete="off"
                   [attr.aria-label]="'Set ' + row.setNumber + ' RPE, 1 to 10'"
-                  [class.input-error]="filled(row.rpe) && rpeInvalid(row.rpe)"
+                  [class.input-error]="store.filled(row.rpe) && store.rpeInvalid(row.rpe)"
                   [(ngModel)]="row.rpe"
-                  (ngModelChange)="saveDraftSoon()"
+                  (ngModelChange)="store.saveDraftSoon()"
                   [readonly]="row.saved && !row.editing"
                   [class.logged]="row.saved && !row.editing"
                   [attr.title]="row.saved && !row.editing ? 'Tap to edit' : null"
-                  (click)="editRow($event, bi, si)"
-                  (keydown.enter)="onEnter($event, bi, si, 'rpe')"
-                  (keydown.escape)="cancelEdit(bi, si)" />
+                  (click)="store.editRow($event, bi, si)"
+                  (keydown.enter)="store.onEnter($event, bi, si, 'rpe')"
+                  (keydown.escape)="store.cancelEdit(bi, si)" />
 
                 <div class="action-cell">
                   @if (!row.saved) {
                     <!-- One tap logs what the row shows: typed values, else the ghosts. -->
-                    <button type="button" class="log-btn" [attr.aria-label]="logLabel(row)"
-                      [disabled]="!canLog(row)" (click)="logSet(bi, si)">
+                    <button type="button" class="log-btn" [attr.aria-label]="store.logLabel(row)"
+                      [disabled]="!store.canLog(row)" (click)="store.logSet(bi, si)">
                       @if (row.saving) {
                         <span class="spinner-sm"></span>
                       } @else {
@@ -346,43 +327,43 @@ import { ConfirmService } from '../../../core/services/confirm.service';
                    pointerdown is held back so the first tap doesn't blur, shift the layout and miss. -->
               @if (row.editing) {
                 <div class="edit-actions">
-                  <button type="button" class="edit-btn" (pointerdown)="$event.preventDefault()" (click)="cancelEdit(bi, si)">Cancel</button>
+                  <button type="button" class="edit-btn" (pointerdown)="$event.preventDefault()" (click)="store.cancelEdit(bi, si)">Cancel</button>
                   <button type="button" class="edit-btn edit-btn--save" [attr.aria-label]="'Save set ' + row.setNumber"
-                    (pointerdown)="$event.preventDefault()" [disabled]="row.saving || !editValid(row)" (click)="saveEdit(bi, si)">Save</button>
+                    (pointerdown)="$event.preventDefault()" [disabled]="row.saving || !store.editValid(row)" (click)="store.saveEdit(bi, si)">Save</button>
                 </div>
               }
-              @if ((!row.saved || row.editing) && filled(row.rpe) && rpeInvalid(row.rpe)) {
+              @if ((!row.saved || row.editing) && store.filled(row.rpe) && store.rpeInvalid(row.rpe)) {
                 <div class="rpe-err-msg" role="alert">RPE must be between 1 and 10</div>
               }
             }
 
             <!-- Add set -->
-            <button class="add-set-btn" type="button" [id]="'add-set-' + block.exerciseId" (click)="addSet(bi)">+ Add set</button>
+            <button class="add-set-btn" type="button" [id]="'add-set-' + block.exerciseId" (click)="store.addSet(bi)">+ Add set</button>
 
             <!-- Form check upload -->
             <div class="form-check-row">
-              <label [for]="canUploadFormCheck(bi, block.exerciseId) ? 'fc-input-' + block.exerciseId : ''"
+              <label [for]="store.canUploadFormCheck(bi, block.exerciseId) ? 'fc-input-' + block.exerciseId : ''"
                      class="form-check-btn"
-                     [class.fc-uploading]="isFormCheckUploading(block.exerciseId)"
-                     [class.fc-disabled]="!canUploadFormCheck(bi, block.exerciseId)"
-                     [title]="formCheckBtnTitle(bi, block.exerciseId)">
+                     [class.fc-uploading]="store.isFormCheckUploading(block.exerciseId)"
+                     [class.fc-disabled]="!store.canUploadFormCheck(bi, block.exerciseId)"
+                     [title]="store.formCheckBtnTitle(bi, block.exerciseId)">
                 <jiro-icon name="camera" [size]="13" />
-                {{ isFormCheckUploading(block.exerciseId) ? 'Uploading...' : '+ Form check' }}
+                {{ store.isFormCheckUploading(block.exerciseId) ? 'Uploading...' : '+ Form check' }}
               </label>
               <input type="file" [id]="'fc-input-' + block.exerciseId"
                 accept="video/mp4,video/webm,image/jpeg,image/png"
                 style="display:none"
-                (change)="onFormCheckFileChange($event, bi)">
-              @if (formCheckError().get(block.exerciseId); as fcErr) {
+                (change)="store.onFormCheckFileChange($event, bi)">
+              @if (store.formCheckError().get(block.exerciseId); as fcErr) {
                 <span class="fc-error" role="alert">{{ fcErr }}</span>
-                <button type="button" class="fc-retry-btn" (click)="retryFormCheck(bi)">Retry</button>
+                <button type="button" class="fc-retry-btn" (click)="store.retryFormCheck(bi)">Retry</button>
               }
-              @if (isFormCheckUploading(block.exerciseId)) {
+              @if (store.isFormCheckUploading(block.exerciseId)) {
 <div class="fc-progress-bar">
-                <div class="fc-progress-fill" [style.width.%]="getFormCheckProgress(block.exerciseId)"></div>
+                <div class="fc-progress-fill" [style.width.%]="store.getFormCheckProgress(block.exerciseId)"></div>
               </div>
 }
-              @if (getFirstAttachment(block.exerciseId); as clip) {
+              @if (store.getFirstAttachment(block.exerciseId); as clip) {
 
                 <a [href]="clip.file_url" target="_blank" class="fc-clip-link">
                   @if (clip.file_type.startsWith('image/')) {
@@ -396,7 +377,7 @@ import { ConfirmService } from '../../../core/services/confirm.service';
                 </a>
 
 }
-              <button type="button" class="plates-btn" aria-haspopup="dialog" (click)="openPlates(block)">
+              <button type="button" class="plates-btn" aria-haspopup="dialog" (click)="store.openPlates(block)">
                 <jiro-icon name="barbell" [size]="16" /> Plates
               </button>
             </div>
@@ -415,32 +396,32 @@ import { ConfirmService } from '../../../core/services/confirm.service';
     <!-- Workout options: type, units, rest, and leaving -->
     @if (showOptions()) {
       <jym-options-sheet
-        [sessionType]="sessionType()" [restSetting]="restSetting()" [fix]="fix" [discarding]="discarding()"
-        (type)="setSessionType($event)" (unit)="toggleUnit($event)" (rest)="setRestDefault($event)"
+        [sessionType]="sessionType()" [restSetting]="store.restSetting()" [fix]="store.fix" [discarding]="discarding()"
+        (type)="setSessionType($event)" (unit)="toggleUnit($event)" (rest)="store.setRestDefault($event)"
         (saveTemplate)="showOptions.set(false); showTemplateSave.set(true)"
         (leave)="exitSession()" (discard)="discardSession()" (close)="showOptions.set(false)" />
     }
 
     @if (showTemplateSave()) {
-      <jym-save-template-dialog [sessionId]="sessionId" (close)="showTemplateSave.set(false)" />
+      <jym-save-template-dialog [sessionId]="store.sessionId" (close)="showTemplateSave.set(false)" />
     }
 
     <!-- One set: warm-up or working, and remove -->
-    @if (setSheetRow(); as ref) {
+    @if (store.setSheetRow(); as ref) {
       <jym-set-sheet [setNumber]="ref.row.setNumber" [summary]="ref.summary" [isWarmup]="ref.row.isWarmup"
-        (toggleWarmup)="toggleWarmupFromSheet()" (remove)="removeSetFromSheet()" (close)="setSheet.set(null)" />
+        (toggleWarmup)="store.toggleWarmupFromSheet()" (remove)="store.removeSetFromSheet()" (close)="store.setSheet.set(null)" />
     }
 
     <!-- Plates for one side of the bar, from the account's bar and plates -->
-    @if (platesOpen()) {
-      <jym-plates-sheet [weight]="platesWeight()" (close)="platesOpen.set(false)" />
+    @if (store.platesOpen()) {
+      <jym-plates-sheet [weight]="store.platesWeight()" (close)="store.platesOpen.set(false)" />
     }
 
 
     <!-- Exercise picker -->
     @if (showExPicker()) {
       <jym-exercise-picker [exercises]="allExercises()" (created)="allExercises.update(list => [...list, $event])"
-        (picked)="pickExercise($event)" (close)="showExPicker.set(false)" />
+        (picked)="showExPicker.set(false); store.pickExercise($event)" (close)="showExPicker.set(false)" />
     }
   `,
   styles: [`
@@ -897,6 +878,8 @@ import { ConfirmService } from '../../../core/services/confirm.service';
   `]
 })
 export class SessionPlayerComponent implements OnInit, OnDestroy {
+  /** This workout's exercises, sets, draft, rest timer and form checks. */
+  readonly store = inject(PlayerStore);
   loading = signal(true);
   finishing = signal(false);
   emptySessionError = signal<string | null>(null);
@@ -906,99 +889,41 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   showTemplateSave = signal(false);
   private readonly toast = inject(ToastService);
   private readonly confirmService = inject(ConfirmService);
-  removingBlock = signal<number | null>(null);
-
   bwSaving = signal(false);
   bwLogged = signal(false);
   bwValue = '';
-  blocks = signal<ExerciseBlock[]>([]);
+  private bwUnit: string | null = null;
+  // The unit can change mid-workout: a typed body weight is converted like the rows (the store converts those).
+  private readonly convertBodyWeight = effect(() => {
+    const unit = this.settingsService.weightUnit();
+    if (this.bwUnit && unit !== this.bwUnit) this.bwValue = this.store.convertText(this.bwValue, this.bwUnit, unit);
+    this.bwUnit = unit;
+  });
   elapsedDisplay = signal('0:00');
   sessionType = signal<string>('normal');
 
-  /** Collapsed exercises by id, so removing one never shifts which are closed. */
-  collapsedBlocks = signal<Set<string>>(new Set());
-  /** The set whose sheet (warm-up, remove) is open. */
-  readonly setSheet = signal<{ exerciseId: string; setNumber: number } | null>(null);
-  readonly setSheetRow = computed(() => {
-    const ref = this.setSheet();
-    const bi = ref ? this.blocks().findIndex(b => b.exerciseId === ref.exerciseId) : -1;
-    const block = this.blocks()[bi];
-    const si = block ? block.sets.findIndex(r => r.setNumber === ref!.setNumber) : -1;
-    if (!block || si < 0) return null;
-    const row = block.sets[si];
-    const values = filled(row.weight) && filled(row.reps) ? `, ${row.weight} ${this.settingsService.unitLabel()} × ${row.reps}` : '';
-    return { bi, si, row, summary: `${block.exerciseName}${values}${row.saved ? ', logged' : ', not logged yet'}` };
-  });
-  readonly filled = filled;
-  readonly canLog = canLog;
-  readonly isShort = isShort;
-  readonly rpeInvalid = rpeInvalid;
-  readonly rampSummary = rampSummary;
   /** Set when the workout was opened after hours with nothing logged; "Keep going" clears it. */
   readonly stale = signal<{ started: string; lastSet: string | null; lastSetTime: string; lastSetAt: string | null } | null>(null);
 
-  // The account's bar and plate sizes for the unit in use (warm-up ramps); the sheet opens at platesWeight.
-  readonly currentPlates = computed(() => platesFor(this.settingsService.weightUnit(), this.settingsService.plates()));
-  readonly platesOpen = signal(false);
-  readonly platesWeight = signal('');
-  // Warm-up ramps keyed by exercise and inputs, so change detection doesn't redo the plate maths.
-  private readonly rampCache = new Map<string, { key: string; ramp: { weight: number; reps: number }[] | null }>();
   /** The library, for the exercise picker. */
   allExercises = signal<PickerExercise[]>([]);
   sessionNotes = '';
 
-  // Rest timer: this rest (rest-timer.ts); restSetting is how long every rest starts at.
-  readonly rest = new RestTimer();
-  private readonly restChoice = signal<number | null>(null);
-  readonly restSetting = computed(() => this.restChoice() ?? this.settingsService.restSeconds());
-
-  sessionId = '';
-  /** Fixing a finished workout (route data `fix`): no clock, rest, draft or Finish; sets are fixed in. */
-  fix = false;
   readonly fixDate = signal('');
-  private startedAt = new Date();
   private timerInterval: ReturnType<typeof setInterval> | null = null;
-
-  // Form check upload state (keyed by exerciseId)
-  formCheckUploading = signal<Map<string, boolean>>(new Map());
-  formCheckProgressMap = signal<Map<string, number>>(new Map());
-  formCheckError = signal<Map<string, string>>(new Map());
-  private formCheckFiles = new Map<string, File>();
-  blockAttachments = signal<Map<string, SessionAttachment[]>>(new Map());
-
-  // History behind each exercise's suggestion, kept to rebuild it in another unit.
-  private readonly historyByExercise = new Map<string, SetHistory[]>();
-  private lastUnit: string | null = null;
-  // The bar's kg/lbs toggle changes the unit mid-workout: convert the rows, never reread their numbers.
-  private readonly convertOnUnitChange = effect(() => {
-    const unit = this.settingsService.weightUnit();
-    if (this.lastUnit && unit !== this.lastUnit) this.convertWorkout(this.lastUnit, unit);
-    this.lastUnit = unit;
-  });
-
-  private draftReady = false;
-  private orderSave: Promise<unknown> = Promise.resolve();
-  private closed = false;
-  private draftTimer: ReturnType<typeof setTimeout> | null = null;
-  // Structural changes (added, removed, logged) reach the draft; typing goes through saveDraftSoon().
-  private readonly draftOnChange = effect(() => {
-    this.blocks();
-    if (this.draftReady) this.saveDraft();
-  });
 
   // Re-sync both timers when the user returns from a locked screen; save the draft when leaving.
   private readonly onVisibilityChange = () => {
     if (document.visibilityState === 'visible') {
-      this.rest.tick();
+      this.store.rest.tick();
       this.updateElapsed();
     } else {
-      this.flushDraft();
+      this.store.flushDraft();
     }
   };
 
   constructor(
     private jymService: JymService,
-    private uploadService: UploadService,
     private route: ActivatedRoute,
     private router: Router,
     public settingsService: SettingsService,
@@ -1006,9 +931,10 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   ) { }
 
   ngOnInit() {
-    this.sessionId = this.route.snapshot.paramMap.get('id') || '';
-    this.fix = this.route.snapshot.data['fix'] === true;
-    if (!this.fix) {
+    this.store.onEnded = () => this.openSummary();
+    this.store.sessionId = this.route.snapshot.paramMap.get('id') || '';
+    this.store.fix = this.route.snapshot.data['fix'] === true;
+    if (!this.store.fix) {
       this.startTimer();
       document.addEventListener('visibilitychange', this.onVisibilityChange);
     }
@@ -1019,24 +945,24 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     });
 
     // Load session + sets (restores mid-workout state on page refresh)
-    this.jymService.getSession(this.sessionId).subscribe({
+    this.jymService.getSession(this.store.sessionId).subscribe({
       next: session => {
-        if (session.ended_at && !this.fix) {
-          this.closeDraft();
+        if (session.ended_at && !this.store.fix) {
+          this.store.closeDraft();
           this.openSummary();
           return;
         }
         // Only a finished workout is fixed; an open one is simply resumed.
-        if (this.fix && !session.ended_at) {
-          this.router.navigate(['/jym/session', this.sessionId], { replaceUrl: true });
+        if (this.store.fix && !session.ended_at) {
+          this.router.navigate(['/jym/session', this.store.sessionId], { replaceUrl: true });
           return;
         }
-        if (this.fix) {
+        if (this.store.fix) {
           const tz = this.settingsService.timezone();
           this.fixDate.set(`${formatInstant(session.started_at, tz, { weekday: true })}, ${timeInZone(session.started_at, tz)}`);
         }
-        this.startedAt = new Date(session.started_at);
-        if (!this.fix) this.noteIfStale(session.started_at, session.sets ?? []);
+        this.store.startedAt = new Date(session.started_at);
+        if (!this.store.fix) this.noteIfStale(session.started_at, session.sets ?? []);
         this.sessionType.set(session.session_type || 'normal');
         this.sessionNotes = session.notes || '';
 
@@ -1049,13 +975,13 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
             amap.set(a.exercise_id, arr);
           }
         }
-        this.blockAttachments.set(amap);
+        this.store.blockAttachments.set(amap);
 
-        this.restoreBlocks(session).then(
+        this.store.restoreBlocks(session).then(
           blocks => {
-            this.blocks.set(blocks);
+            this.store.blocks.set(blocks);
             // A fix is saved set by set; only a live workout keeps a device draft.
-            this.draftReady = !this.fix;
+            this.store.draftReady = !this.store.fix;
             this.loading.set(false);
           },
           () => {
@@ -1070,29 +996,10 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
-    this.flushDraft();
+    this.store.flushDraft();
     if (this.timerInterval) clearInterval(this.timerInterval);
-    this.rest.clear();
+    this.store.rest.clear();
     document.removeEventListener('visibilitychange', this.onVisibilityChange);
-  }
-
-  // ── Rest timer ──────────────────────────────────────────────────
-  startRestTimer(seconds = this.restSetting()) {
-    this.rest.start(seconds);
-  }
-
-  /** Every rest's length, remembered on the account; applied at once, reverted if the save fails. */
-  setRestDefault(seconds: number) {
-    if (seconds === this.restSetting()) return;
-    this.restChoice.set(seconds);
-    if (this.rest.active() && !this.rest.done()) this.startRestTimer(seconds);
-    this.authService.updateSettings({ rest_seconds: seconds }).subscribe({
-      next: () => this.restChoice.set(null),
-      error: () => {
-        this.restChoice.set(null);
-        this.toast.error('Could not save the rest timer.');
-      },
-    });
   }
 
   private startTimer() {
@@ -1100,7 +1007,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   }
 
   private updateElapsed() {
-    const elapsed = Math.max(0, Math.floor((Date.now() - this.startedAt.getTime()) / 1000));
+    const elapsed = Math.max(0, Math.floor((Date.now() - this.store.startedAt.getTime()) / 1000));
     // Past a day the seconds are noise: "2d 3h".
     if (elapsed >= 86_400) {
       this.elapsedDisplay.set(`${Math.floor(elapsed / 86_400)}d ${Math.floor((elapsed % 86_400) / 3600)}h`);
@@ -1118,11 +1025,11 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   setSessionType(type: string) {
     const previous = this.sessionType();
     this.sessionType.set(type);
-    this.jymService.updateSession(this.sessionId, { session_type: type }).subscribe({
+    this.jymService.updateSession(this.store.sessionId, { session_type: type }).subscribe({
       // Deload sets never count, so the type can move PR badges.
-      next: () => this.refreshPrBadges(),
+      next: () => this.store.refreshPrBadges(),
       error: err => {
-        if (this.handleEnded(err)) return;
+        if (this.store.handleEnded(err)) return;
         this.sessionType.set(previous);
         this.toast.error('Could not change the session type.');
       },
@@ -1136,170 +1043,6 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     });
   }
 
-  /** A new row's ghosts: the last logged working set, else the suggestion the other rows carry; never a warm-up. */
-  addSet(blockIndex: number) {
-    const block = this.blocks()[blockIndex];
-    const working = block.sets.filter(s => !s.isWarmup);
-    const lastLogged = working.filter(s => s.saved).at(-1);
-    const suggested = working.filter(s => !s.saved).at(-1);
-    const row = newRow(block.sets.length + 1, {
-      ghostWeight: lastLogged?.weight ?? suggested?.ghostWeight ?? '',
-      ghostReps: lastLogged?.reps ?? suggested?.ghostReps ?? '',
-    });
-    this.blocks.update(bs => bs.map((b, i) => i === blockIndex ? { ...b, sets: [...b.sets, row] } : b));
-  }
-
-  logSet(blockIndex: number, setIndex: number) {
-    this.persistRow(blockIndex, setIndex, true);
-  }
-
-  /** Saves one typed row; resolves false when it didn't save. */
-  private persistRow(blockIndex: number, setIndex: number, startRest: boolean): Promise<boolean> {
-    const block = this.blocks()[blockIndex];
-    const row = block?.sets[setIndex];
-    if (!row || !this.canLog(row)) return Promise.resolve(false);
-    // Typed values win, a typed 0 included; otherwise the ghosts the row shows.
-    const weightNum = parseDecimal(filled(row.weight) ? row.weight : row.ghostWeight)!;
-    const repsNum = parseWhole(filled(row.reps) ? row.reps : row.ghostReps)!;
-    const weight = String(weightNum);
-    const reps = String(repsNum);
-
-    // Warm up audio NOW, synchronously while the tap gesture is still active.
-    // Safari blocks AudioContext creation/resume in async callbacks (e.g. HTTP responses).
-    this.rest.warmUpAudio();
-
-    this.blocks.update(bs => bs.map((b, bi) => bi === blockIndex ? {
-      ...b,
-      sets: b.sets.map((s, si) => si === setIndex ? { ...s, weight, reps, saving: true } : s),
-    } : b));
-
-    const req: CreateSetRequest = {
-      exercise_id: block.exerciseId,
-      set_number: row.setNumber,
-      weight: this.settingsService.toKg(weightNum),
-      reps_performed: repsNum,
-      rpe: parseWhole(row.rpe) ?? undefined,
-      is_warmup: row.isWarmup,
-      exercise_note: block.exerciseNote || undefined,
-      ...(this.fix ? { fix: true } : {}),
-    };
-
-    return new Promise<boolean>(resolve => {
-      this.jymService.logSet(this.sessionId, req).subscribe({
-        next: saved => {
-          this.blocks.update(bs => bs.map((b, bi) => bi === blockIndex ? {
-            ...b,
-            sets: b.sets.map((s, si) => si === setIndex ? {
-              ...s, saving: false, saved: true, isPR: saved.is_pr, id: saved.id, weightKg: saved.weight,
-            } : s),
-          } : b));
-          if (startRest && !this.fix) this.startRestTimer();
-          resolve(true);
-        },
-        error: err => {
-          if (this.handleEnded(err)) { resolve(false); return; }
-          this.blocks.update(bs => bs.map((b, bi) => bi === blockIndex ? {
-            ...b,
-            sets: b.sets.map((s, si) => si === setIndex ? { ...s, saving: false } : s),
-          } : b));
-          this.toast.error('Could not save that set. Check your connection and try again.');
-          resolve(false);
-        },
-      });
-    });
-  }
-
-  deleteSet(blockIndex: number, setIndex: number) {
-    const row = this.blocks()[blockIndex].sets[setIndex];
-    if (!row.id) return;
-    const exerciseId = this.blocks()[blockIndex].exerciseId;
-    this.jymService.deleteSet(row.id).subscribe({
-      next: () => {
-        this.blocks.update(bs => bs.map((b, bi) => bi === blockIndex ? {
-          ...b,
-          sets: b.sets
-            .filter((_, si) => si !== setIndex)
-            .map((s, i) => ({ ...s, setNumber: i + 1 })),
-        } : b));
-        // If this exercise now has no saved sets, remove any stale form check attachment.
-        if (this.savedCount(blockIndex) === 0) {
-          this.deleteStaleFormChecks(exerciseId);
-        }
-        this.refreshPrBadges();
-      },
-      error: () => this.toast.error('Could not remove the set.'),
-    });
-  }
-
-  /** The exercise's menu: move it up or down one place, or remove it. */
-  blockActions(bi: number): JiroMenuItem[] {
-    const last = this.blocks().length - 1;
-    return bi === 0 && bi === last ? BLOCK_ACTIONS.only
-      : bi === 0 ? BLOCK_ACTIONS.first
-      : bi === last ? BLOCK_ACTIONS.last
-      : BLOCK_ACTIONS.middle;
-  }
-
-  onBlockAction(bi: number, action: string) {
-    if (action === 'up') this.moveBlock(bi, -1);
-    else if (action === 'down') this.moveBlock(bi, 1);
-    else if (action === 'remove') this.removeBlock(bi);
-  }
-
-  /** Moves an exercise one place. Orders are saved one at a time; if one fails, the server's order comes back. */
-  moveBlock(bi: number, step: -1 | 1) {
-    const bs = [...this.blocks()];
-    const to = bi + step;
-    if (to < 0 || to >= bs.length) return;
-    [bs[bi], bs[to]] = [bs[to], bs[bi]];
-    this.blocks.set(bs);
-    const order = bs.map(b => b.exerciseId);
-    this.orderSave = this.orderSave.then(() => firstValueFrom(this.jymService.reorderSessionExercises(this.sessionId, order)).catch(() => {
-      this.toast.error('Could not save the new order.');
-      this.jymService.getSession(this.sessionId).subscribe(s => {
-        const pos = new Map((s.exercises ?? []).map((x, i) => [x.exercise_id, i]));
-        this.blocks.update(list => [...list].sort((a, b) => (pos.get(a.exerciseId) ?? list.length) - (pos.get(b.exerciseId) ?? list.length)));
-      });
-    }));
-  }
-
-  async removeBlock(blockIndex: number) {
-    const block = this.blocks()[blockIndex];
-    const ok = await this.confirmService.confirm({
-      title: `Remove ${block.exerciseName}?`,
-      message: this.savedCount(blockIndex) > 0
-        ? `This deletes ${this.savedCount(blockIndex)} logged ${this.savedCount(blockIndex) === 1 ? 'set' : 'sets'} for this exercise. It cannot be undone.`
-        : 'It has no logged sets yet.',
-      confirmLabel: 'Remove exercise',
-      danger: true,
-    });
-    if (!ok) return;
-
-    this.removingBlock.set(blockIndex);
-    this.jymService.deleteSessionExercise(this.sessionId, block.exerciseId).subscribe({
-      next: () => {
-        this.deleteStaleFormChecks(block.exerciseId);
-        this.collapsedBlocks.update(set => { const next = new Set(set); next.delete(block.exerciseId); return next; });
-        this.blocks.update(bs => bs.filter((_, bi) => bi !== blockIndex));
-        this.removingBlock.set(null);
-        this.toast.success(`${block.exerciseName} removed`);
-      },
-      error: () => {
-        this.removingBlock.set(null);
-        this.toast.error('Could not remove the exercise.');
-      },
-    });
-  }
-
-  private deleteStaleFormChecks(exerciseId: string) {
-    const attachments = this.blockAttachments().get(exerciseId);
-    if (!attachments || attachments.length === 0) return;
-    for (const att of attachments) {
-      this.uploadService.deleteSessionAttachment(att.id).subscribe();
-    }
-    this.blockAttachments.update(m => { const n = new Map(m); n.delete(exerciseId); return n; });
-  }
-
   /** Leaves the workout open: logged sets are on the server, typed ones in this device's draft. */
   exitSession() {
     this.showOptions.set(false);
@@ -1307,7 +1050,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   }
 
   async discardSession() {
-    const logged = this.blocks().reduce((n, b) => n + b.sets.filter(s => s.saved).length, 0);
+    const logged = this.store.blocks().reduce((n, b) => n + b.sets.filter(s => s.saved).length, 0);
     this.showOptions.set(false);
     const ok = await this.confirmService.confirm({
       title: 'Discard this workout?',
@@ -1319,9 +1062,9 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     });
     if (!ok) return;
     this.discarding.set(true);
-    this.jymService.deleteSession(this.sessionId).subscribe({
+    this.jymService.deleteSession(this.store.sessionId).subscribe({
       next: () => {
-        this.closeDraft();
+        this.store.closeDraft();
         this.router.navigate(['/jym']);
       },
       error: () => {
@@ -1332,14 +1075,14 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   }
 
   saveNotes() {
-    this.jymService.updateSession(this.sessionId, { notes: this.sessionNotes }).subscribe({
-      error: err => { if (!this.handleEnded(err)) this.toast.error('Could not save the session notes.'); },
+    this.jymService.updateSession(this.store.sessionId, { notes: this.sessionNotes }).subscribe({
+      error: err => { if (!this.store.handleEnded(err)) this.toast.error('Could not save the session notes.'); },
     });
   }
 
   /** Typed rows that weren't ticked: log them, skip them, or stay. Resolves false to stay. */
   private async settleTypedRows(action: string): Promise<boolean> {
-    const pending = this.unloggedRows();
+    const pending = this.store.unloggedRows();
     if (pending.length === 0) return true;
     const n = pending.length;
     const choice = await this.confirmService.choose({
@@ -1356,7 +1099,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     if (choice === 'confirm') {
       for (const { bi, si } of pending) {
         // A failed save keeps the user here, with the row still typed.
-        if (!(await this.persistRow(bi, si, false))) return false;
+        if (!(await this.store.persistRow(bi, si, false))) return false;
       }
     }
     return true;
@@ -1366,7 +1109,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   async doneFixing() {
     if (!(await this.settleTypedRows('finish'))) return;
     const back = (history.state as { back?: unknown } | null)?.back;
-    this.router.navigate(['/jym/sessions', this.sessionId, 'summary'], {
+    this.router.navigate(['/jym/sessions', this.store.sessionId, 'summary'], {
       replaceUrl: true,
       state: typeof back === 'string' ? { back } : {},
     });
@@ -1375,25 +1118,25 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   async finishSession() {
     if (!(await this.settleTypedRows('finish'))) return;
 
-    const hasSavedSets = this.blocks().some(b => b.sets.some(s => s.saved));
+    const hasSavedSets = this.store.blocks().some(b => b.sets.some(s => s.saved));
     if (!hasSavedSets && !this.sessionNotes.trim()) {
       this.emptySessionError.set('Nothing to save. Log at least one set or add session notes first.');
       return;
     }
     this.emptySessionError.set(null);
     this.finishing.set(true);
-    this.jymService.updateSession(this.sessionId, {
+    this.jymService.updateSession(this.store.sessionId, {
       ended_at: new Date().toISOString(),
       notes: this.sessionNotes,
     }).subscribe({
       next: () => {
-        this.closeDraft();
+        this.store.closeDraft();
         // Replaced, so Back from the summary skips the finished player.
-        this.router.navigate(['/jym/sessions', this.sessionId, 'summary'], { replaceUrl: true, state: { from: 'finish' } });
+        this.router.navigate(['/jym/sessions', this.store.sessionId, 'summary'], { replaceUrl: true, state: { from: 'finish' } });
       },
       error: err => {
         this.finishing.set(false);
-        if (!this.handleEnded(err)) this.toast.error('Could not finish the workout. Check your connection and try again.');
+        if (!this.store.handleEnded(err)) this.toast.error('Could not finish the workout. Check your connection and try again.');
       },
     });
   }
@@ -1417,14 +1160,14 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   finishAtLastSet(endedAt: string) {
     if (this.finishing()) return;
     this.finishing.set(true);
-    this.jymService.updateSession(this.sessionId, { ended_at: endedAt, notes: this.sessionNotes }).subscribe({
+    this.jymService.updateSession(this.store.sessionId, { ended_at: endedAt, notes: this.sessionNotes }).subscribe({
       next: () => {
-        this.closeDraft();
-        this.router.navigate(['/jym/sessions', this.sessionId, 'summary'], { replaceUrl: true, state: { from: 'finish' } });
+        this.store.closeDraft();
+        this.router.navigate(['/jym/sessions', this.store.sessionId, 'summary'], { replaceUrl: true, state: { from: 'finish' } });
       },
       error: err => {
         this.finishing.set(false);
-        if (!this.handleEnded(err)) this.toast.error('Could not finish the workout. Try again.');
+        if (!this.store.handleEnded(err)) this.toast.error('Could not finish the workout. Try again.');
       },
     });
   }
@@ -1432,17 +1175,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   /** A finished workout opens as its summary, never as a live workout. */
   private openSummary() {
     if (this.timerInterval) clearInterval(this.timerInterval);
-    this.router.navigate(['/jym/sessions', this.sessionId, 'summary'], { replaceUrl: true });
-  }
-
-  /** The API refuses writes to a finished session (e.g. finished in another tab). */
-  private handleEnded(err: unknown): boolean {
-    const code = (err as { status?: number; error?: { error?: { code?: string } } })?.error?.error?.code;
-    if (code !== 'SESSION_ENDED') return false;
-    this.closeDraft();
-    this.toast.error('This workout was already finished.');
-    this.openSummary();
-    return true;
+    this.router.navigate(['/jym/sessions', this.store.sessionId, 'summary'], { replaceUrl: true });
   }
 
   bwValid(): boolean {
@@ -1463,497 +1196,8 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     });
   }
 
-  toggleBlock(bi: number) {
-    const id = this.blocks()[bi]?.exerciseId;
-    if (!id) return;
-    this.collapsedBlocks.update(s => {
-      const next = new Set(s);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }
-
-  isCollapsed(bi: number): boolean {
-    const id = this.blocks()[bi]?.exerciseId;
-    return !!id && this.collapsedBlocks().has(id);
-  }
-
-  openSetSheet(block: ExerciseBlock, row: SetRow) {
-    this.setSheet.set({ exerciseId: block.exerciseId, setNumber: row.setNumber });
-  }
-
-  toggleWarmupFromSheet() {
-    const ref = this.setSheetRow();
-    this.setSheet.set(null);
-    if (ref) this.toggleWarmup(ref.bi, ref.si);
-  }
-
-  /** A logged set is deleted on the server; an unlogged row just goes. Either way the rows renumber by position. */
-  removeSetFromSheet() {
-    const ref = this.setSheetRow();
-    this.setSheet.set(null);
-    if (!ref) return;
-    const exerciseId = this.blocks()[ref.bi].exerciseId;
-    if (ref.row.saved) {
-      this.deleteSet(ref.bi, ref.si);
-    } else {
-      this.blocks.update(bs => bs.map((b, bi) => bi !== ref.bi ? b : {
-        ...b,
-        sets: b.sets.filter((_, si) => si !== ref.si).map((s, i) => ({ ...s, setNumber: i + 1 })),
-      }));
-    }
-    // The set's own button is gone, so focus lands on the exercise's Add set.
-    setTimeout(() => document.getElementById('add-set-' + exerciseId)?.focus({ preventScroll: true }));
-  }
-
-  /** Warm-up sets to offer: before anything is logged or marked warm-up, and only above the bar. */
-  warmupRampFor(block: ExerciseBlock): { weight: number; reps: number }[] | null {
-    if (block.sets.some(s => s.saved || s.isWarmup)) return null;
-    const work = workingWeight(block);
-    if (work === null) return null;
-    const set = this.currentPlates();
-    const key = `${work}|${set.bar}|${set.sizes.join(',')}`;
-    const cached = this.rampCache.get(block.exerciseId);
-    if (cached?.key === key) return cached.ramp;
-    const ramp = warmupRamp(work, set);
-    const value = ramp.length ? ramp : null;
-    this.rampCache.set(block.exerciseId, { key, ramp: value });
-    return value;
-  }
-
-  /** Inserts the ramp as typed warm-up rows above the working rows; each then logs with one tap. */
-  addWarmups(bi: number, ramp: { weight: number; reps: number }[]) {
-    this.blocks.update(bs => bs.map((b, i) => i !== bi ? b : {
-      ...b,
-      sets: [
-        ...ramp.map(r => newRow(0, { weight: String(r.weight), reps: String(r.reps), isWarmup: true })),
-        ...b.sets,
-      ].map((s, n) => ({ ...s, setNumber: n + 1 })),
-    }));
-  }
-
-  openPlates(block: ExerciseBlock) {
-    const weight = workingWeight(block);
-    this.platesWeight.set(weight === null ? '' : String(weight));
-    this.platesOpen.set(true);
-  }
-
-  /**
-   * Enter on a phone keypad: a logged row opens for editing; in an edit, weight moves to reps and
-   * reps or RPE save; on a new row it just closes the keyboard (the check logs).
-   */
-  onEnter(event: Event, bi: number, si: number, field: 'weight' | 'reps' | 'rpe') {
-    const row = this.blocks()[bi]?.sets[si];
-    if (!row) return;
-    if (row.saved && !row.editing) {
-      this.editRow(event, bi, si);
-      return;
-    }
-    event.preventDefault();
-    const input = event.target as HTMLInputElement;
-    if (field === 'weight') {
-      input.parentElement?.querySelector<HTMLInputElement>('.reps-input')?.focus();
-    } else if (row.editing) {
-      this.saveEdit(bi, si);
-    } else {
-      input.blur();
-    }
-  }
-
-  savedCount(bi: number): number {
-    return this.blocks()[bi]?.sets.filter(s => s.saved).length ?? 0;
-  }
-
-  allSaved(bi: number): boolean {
-    const sets = this.blocks()[bi]?.sets;
-    return !!sets?.length && sets.every(s => s.saved);
-  }
-
-  toggleWarmup(bi: number, si: number) {
-    const row = this.blocks()[bi]?.sets[si];
-    if (!row) return;
-    const newVal = !row.isWarmup;
-    this.blocks.update(bs => bs.map((b, i) => i !== bi ? b : {
-      ...b,
-      sets: b.sets.map((s, j) => j !== si ? s : { ...s, isWarmup: newVal }),
-    }));
-    if (row.id) {
-      const id = row.id;
-      this.jymService.updateSet(id, { is_warmup: newVal }).subscribe({
-        next: () => this.refreshPrBadges(),
-        error: () => {
-          this.blocks.update(bs => bs.map((b, i) => i !== bi ? b : {
-            ...b,
-            sets: b.sets.map(s => s.id !== id ? s : { ...s, isWarmup: !newVal }),
-          }));
-          this.toast.error('Could not change the warm-up.');
-        },
-      });
-    }
-  }
-
-  saveExerciseNote(bi: number) {
-    const block = this.blocks()[bi];
-    if (!block) return;
-    const note = (block.exerciseNote || '').trim();
-    const savedIds = block.sets.filter(s => s.saved && s.id).map(s => s.id!);
-    let warned = false;
-    for (const id of savedIds) {
-      this.jymService.updateSet(id, { exercise_note: note }).subscribe({
-        error: () => {
-          if (warned) return;
-          warned = true;
-          this.toast.error('Could not save the exercise note.');
-        },
-      });
-    }
-  }
-
   addExercise() {
     this.showExPicker.set(true);
   }
 
-  /** The server keeps the workout's list; a plan exercise added back comes back with its plan. */
-  pickExercise(ex: PickerExercise) {
-    this.showExPicker.set(false);
-    if (this.blocks().some(b => b.exerciseId === ex.id)) return;
-    this.jymService.addSessionExercise(this.sessionId, ex.id).subscribe({
-      next: entry => {
-        if (this.blocks().some(b => b.exerciseId === entry.exercise_id)) return;
-        const block = blockFromEntry(entry);
-        this.blocks.update(bs => [...bs, block]);
-        this.loadSuggestionsForBlocks([block]);
-      },
-      error: () => this.toast.error(`Could not add ${ex.name}. Try again.`),
-    });
-  }
-
-  /** Deleting a set, a warm-up or a type change can move a PR to another set: re-read the flags. */
-  private refreshPrBadges() {
-    this.jymService.getSession(this.sessionId).subscribe({
-      next: s => {
-        const pr = new Map(s.sets.map(x => [x.id, x.is_pr]));
-        this.blocks.update(bs => bs.map(b => ({
-          ...b,
-          sets: b.sets.map(r => (r.id && pr.has(r.id) ? { ...r, isPR: pr.get(r.id)! } : r)),
-        })));
-      },
-    });
-  }
-
-  // ── Plan and draft ──────────────────────────────────────────────
-
-  /**
-   * The workout's blocks: the server's list and logged sets, plus this device's unlogged rows.
-   * A v2 draft's added and removed exercises are sent to the server first, once.
-   */
-  private async restoreBlocks(session: SessionWithSets): Promise<ExerciseBlock[]> {
-    const draft = this.fix ? null : readDraft(this.sessionId);
-    let exercises = session.exercises ?? [];
-    if (draft && (draft.added?.length || draft.removed?.length)) {
-      exercises = await this.upgradeDraft(draft, exercises, session.sets ?? []);
-    }
-    // v1 drafts (typed rows only) are from long before; their rows are not restored.
-    const unit = this.settingsService.weightUnit();
-    const rows: SessionDraft['rows'] = {};
-    if (draft && (draft.v ?? 1) >= 2) {
-      for (const [id, list] of Object.entries(draft.rows)) {
-        rows[id] = list.map(d => draft.unit && draft.unit !== unit ? { ...d, weight: this.convertText(d.weight, draft.unit, unit) } : d);
-      }
-    }
-    const blocks = buildBlocks(exercises, session.sets ?? [], rows, kg => this.settingsService.toDisplay(kg));
-    this.loadSuggestionsForBlocks(blocks);
-    return blocks;
-  }
-
-  /** A draft from before the list lived on the server: its removed plan exercises and added ones, sent once. */
-  private async upgradeDraft(draft: SessionDraft, list: SessionExercise[], sets: SessionSet[]): Promise<SessionExercise[]> {
-    const logged = new Set(sets.map(x => x.exercise_id));
-    let next = list;
-    for (const id of draft.removed ?? []) {
-      if (logged.has(id) || !next.some(x => x.exercise_id === id)) continue;
-      await firstValueFrom(this.jymService.deleteSessionExercise(this.sessionId, id));
-      next = next.filter(x => x.exercise_id !== id);
-    }
-    for (const a of draft.added ?? []) {
-      if (next.some(x => x.exercise_id === a.exerciseId)) continue;
-      next = [...next, await firstValueFrom(this.jymService.addSessionExercise(this.sessionId, a.exerciseId))];
-    }
-    return next;
-  }
-
-  /** Rows with a weight and reps typed but not ticked; a typed 0 counts. */
-  private unloggedRows(): { bi: number; si: number }[] {
-    const rows: { bi: number; si: number }[] = [];
-    this.blocks().forEach((b, bi) => b.sets.forEach((s, si) => {
-      if (!s.saved && filled(s.weight) && filled(s.reps) && this.canLog(s)) rows.push({ bi, si });
-    }));
-    return rows;
-  }
-
-  /** Keeps what the server doesn't have for this workout, on this device: every unlogged row, empty ones too. */
-  saveDraft() {
-    if (this.closed || !this.draftReady) return;
-    const blocks = this.blocks();
-    const rows: SessionDraft['rows'] = {};
-    for (const b of blocks) {
-      rows[b.exerciseId] = b.sets
-        .filter(s => !s.saved)
-        .map(s => ({ setNumber: s.setNumber, weight: s.weight, reps: s.reps, rpe: s.rpe, isWarmup: s.isWarmup }));
-    }
-    writeDraft(this.sessionId, { v: DRAFT_VERSION, unit: this.settingsService.weightUnit(), rows });
-  }
-
-  /** Typing saves shortly after the last keystroke. */
-  saveDraftSoon() {
-    if (this.draftTimer) clearTimeout(this.draftTimer);
-    this.draftTimer = setTimeout(() => {
-      this.draftTimer = null;
-      this.saveDraft();
-    }, 300);
-  }
-
-  private flushDraft() {
-    if (!this.draftTimer) return;
-    clearTimeout(this.draftTimer);
-    this.draftTimer = null;
-    this.saveDraft();
-  }
-
-  /** The session is over (finished, discarded or ended elsewhere): drop its draft for good. */
-  private closeDraft() {
-    this.closed = true;
-    if (this.draftTimer) clearTimeout(this.draftTimer);
-    clearDraft(this.sessionId);
-  }
-
-  // ── Form check helpers ──────────────────────────────────────────
-  isFormCheckUploading(exerciseId: string): boolean {
-    return this.formCheckUploading().get(exerciseId) ?? false;
-  }
-
-  getFormCheckProgress(exerciseId: string): number {
-    return this.formCheckProgressMap().get(exerciseId) ?? 0;
-  }
-
-  getFormCheckCount(exerciseId: string): number {
-    return this.blockAttachments().get(exerciseId)?.length ?? 0;
-  }
-
-  getFirstAttachment(exerciseId: string): SessionAttachment | null {
-    return this.blockAttachments().get(exerciseId)?.[0] ?? null;
-  }
-
-  canUploadFormCheck(bi: number, exerciseId: string): boolean {
-    return this.savedCount(bi) > 0 && this.getFormCheckCount(exerciseId) < 1 && !this.isFormCheckUploading(exerciseId);
-  }
-
-  formCheckBtnTitle(bi: number, exerciseId: string): string {
-    if (this.savedCount(bi) === 0) return 'Log at least one set first';
-    if (this.getFormCheckCount(exerciseId) >= 1) return 'One clip per exercise per session';
-    return '';
-  }
-
-  onFormCheckFileChange(event: Event, blockIndex: number) {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    input.value = ''; // reset so the same file can be re-selected
-    if (file) this.uploadFormCheck(blockIndex, file);
-  }
-
-  retryFormCheck(blockIndex: number) {
-    const exId = this.blocks()[blockIndex]?.exerciseId;
-    const file = exId ? this.formCheckFiles.get(exId) : undefined;
-    if (file) this.uploadFormCheck(blockIndex, file);
-  }
-
-  private uploadFormCheck(blockIndex: number, file: File) {
-    const block = this.blocks()[blockIndex];
-    if (!block) return;
-    const exId = block.exerciseId;
-    this.formCheckFiles.set(exId, file);
-    setKey(this.formCheckError, exId);
-    setKey(this.formCheckUploading, exId, true);
-    setKey(this.formCheckProgressMap, exId, 0);
-
-    this.uploadService.uploadSessionAttachment(
-      this.sessionId, file, exId, undefined,
-      (pct) => setKey(this.formCheckProgressMap, exId, pct)
-    ).subscribe({
-      next: attachment => {
-        this.blockAttachments.update(m => {
-          const n = new Map(m);
-          n.set(exId, [...(n.get(exId) ?? []), attachment]);
-          return n;
-        });
-        this.formCheckFiles.delete(exId);
-        setKey(this.formCheckUploading, exId, false);
-      },
-      error: () => {
-        setKey(this.formCheckUploading, exId, false);
-        setKey(this.formCheckError, exId, 'Form check upload failed.');
-      },
-    });
-  }
-
-  private loadSuggestionsForBlocks(blocks: ExerciseBlock[]) {
-    for (const block of blocks) {
-      this.jymService.getExercise(block.exerciseId, { limit: SUGGESTION_SETS }).subscribe({
-        next: ex => {
-          this.historyByExercise.set(block.exerciseId, ex.history);
-          this.applySuggestion(block.exerciseId);
-        },
-      });
-    }
-  }
-
-  /**
-   * Last time and today's aim as the block's hint line. Before the first set of the
-   * day the aim is also the ghost on every row; after it, rows keep what was just lifted.
-   */
-  private applySuggestion(exerciseId: string) {
-    const history = this.historyByExercise.get(exerciseId);
-    const block = this.blocks().find(b => b.exerciseId === exerciseId);
-    if (!history || !block) return;
-    const next = this.suggestionFor(block, history);
-    if (!next) return;
-    const setGhosts = !block.sets.some(s => s.saved);
-    this.blocks.update(bs => bs.map(b => b.exerciseId === exerciseId ? {
-      ...b,
-      suggestion: next.text,
-      suggestionIcon: next.icon,
-      sets: setGhosts ? b.sets.map(s => !s.saved && !s.isWarmup ? { ...s, ghostWeight: next.ghostWeight, ghostReps: next.ghostReps } : s) : b.sets,
-    } : b));
-  }
-
-  /** The hint line ("Last time ... Stay at ...") and the ghost values, from nextSets(). */
-  private suggestionFor(block: ExerciseBlock, history: SetHistory[]): Suggestion | null {
-    const unit = this.settingsService.unitLabel();
-    const next = nextSets(history, {
-      excludeSessionId: this.sessionId,
-      before: this.startedAt.toISOString(),
-      plan: block.plan ?? null,
-      unit,
-      toDisplay: kg => this.settingsService.toDisplay(kg),
-    });
-    return next ? suggestionFrom(next, block.plan, unit) : null;
-  }
-
-  logLabel(row: SetRow): string {
-    return logLabelText(row, this.settingsService.unitLabel());
-  }
-
-  /** A tap on a logged value opens its row for editing; unlocking and focusing inside the tap lets a phone open its keyboard. */
-  editRow(event: Event, bi: number, si: number) {
-    const row = this.blocks()[bi]?.sets[si];
-    if (!row?.saved || row.editing || row.saving) return;
-    event.preventDefault();
-    this.patchRow(bi, si, { editing: true, before: { weight: row.weight, reps: row.reps, rpe: row.rpe } });
-    const input = event.target as HTMLInputElement;
-    input.readOnly = false;
-    input.focus();
-  }
-
-  cancelEdit(bi: number, si: number) {
-    const row = this.blocks()[bi]?.sets[si];
-    if (!row?.editing || row.saving) return;
-    this.patchRow(bi, si, { editing: false, ...(row.before ?? {}), before: undefined });
-  }
-
-  editValid(row: SetRow): boolean {
-    const reps = parseWhole(row.reps);
-    return parseDecimal(row.weight) !== null && reps !== null && reps >= 1 && !(filled(row.rpe) && this.rpeInvalid(row.rpe));
-  }
-
-  /** Saves a corrected set; the API re-rates the exercise, so PR badges are re-read. */
-  saveEdit(bi: number, si: number) {
-    const row = this.blocks()[bi]?.sets[si];
-    if (!row?.id || !row.editing || row.saving || !this.editValid(row)) return;
-    const before = row.before;
-    if (before && row.weight === before.weight && row.reps === before.reps && row.rpe === before.rpe) {
-      this.patchRow(bi, si, { editing: false, before: undefined });
-      return;
-    }
-    const id = row.id;
-    const rpe = parseWhole(row.rpe);
-    const req: UpdateSetRequest = {
-      weight: this.settingsService.toKg(parseDecimal(row.weight)!),
-      reps_performed: parseWhole(row.reps)!,
-      ...(rpe !== null ? { rpe } : {}),
-    };
-    this.patchSet(id, { saving: true });
-    this.jymService.updateSet(id, req).subscribe({
-      next: saved => {
-        this.patchSet(id, {
-          saving: false, editing: false, before: undefined,
-          weightKg: saved.weight,
-          weight: String(this.settingsService.toDisplay(saved.weight)),
-          reps: String(saved.reps_performed),
-          rpe: saved.rpe != null ? String(saved.rpe) : '',
-        });
-        this.refreshPrBadges();
-      },
-      error: () => {
-        this.patchSet(id, { saving: false });
-        this.toast.error('Could not save the change.');
-      },
-    });
-  }
-
-  private patchRow(bi: number, si: number, patch: Partial<SetRow>) {
-    this.blocks.update(bs => bs.map((b, i) => i !== bi ? b : {
-      ...b,
-      sets: b.sets.map((r, j) => j !== si ? r : { ...r, ...patch }),
-    }));
-  }
-
-  /** Patches a logged set by id: rows can move while a request is out. */
-  private patchSet(id: string, patch: Partial<SetRow>) {
-    this.blocks.update(bs => bs.map(b => ({
-      ...b,
-      sets: b.sets.map(r => r.id !== id ? r : { ...r, ...patch }),
-    })));
-  }
-
-  /** A logged working set below the plan's reps. */
-  private convertText(value: string, from: string, to: string): string {
-    const n = parseDecimal(value);
-    return n !== null ? String(this.settingsService.convertWeight(n, from, to)) : value;
-  }
-
-  /** Logged rows come back from their stored kg; typed rows and ghosts are converted; suggestions are rebuilt. */
-  private convertWorkout(from: string, to: string) {
-    this.blocks.update(bs => bs.map(b => ({
-      ...b,
-      sets: b.sets.map(s => ({
-        ...s,
-        weight: s.saved && s.weightKg != null ? String(this.settingsService.toDisplay(s.weightKg)) : this.convertText(s.weight, from, to),
-        ghostWeight: this.convertText(s.ghostWeight, from, to),
-      })),
-    })));
-    this.bwValue = this.convertText(this.bwValue, from, to);
-    for (const b of this.blocks()) this.applySuggestion(b.exerciseId);
-  }
-}
-
-/** Recent sets fetched per exercise for the "last time" suggestion. */
-const SUGGESTION_SETS = 60;
-
-const MOVE_UP: JiroMenuItem = { id: 'up', label: 'Move up', icon: 'caret-up' };
-const MOVE_DOWN: JiroMenuItem = { id: 'down', label: 'Move down', icon: 'caret-down' };
-const REMOVE: JiroMenuItem = { id: 'remove', label: 'Remove exercise', icon: 'trash', danger: true };
-const BLOCK_ACTIONS = {
-  only: [REMOVE],
-  first: [MOVE_DOWN, REMOVE],
-  last: [MOVE_UP, REMOVE],
-  middle: [MOVE_UP, MOVE_DOWN, REMOVE],
-};
-
-/** Sets (or, with no value, removes) one key of a Map held in a signal. */
-function setKey<T>(sig: WritableSignal<Map<string, T>>, key: string, value?: T) {
-  sig.update(m => {
-    const n = new Map(m);
-    if (value === undefined) n.delete(key); else n.set(key, value);
-    return n;
-  });
 }
