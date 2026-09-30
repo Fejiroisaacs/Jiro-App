@@ -252,16 +252,29 @@ export interface ExerciseFormCheck extends SessionAttachment {
   session_date: string;
 }
 
+/** One exercise in a workout's own list; targets are the plan's when it started, null outside it. */
+export interface SessionExercise {
+  exercise_id: string;
+  exercise_name: string;
+  muscle_group: string | null;
+  position: number;
+  target_sets: number | null;
+  target_reps: number | null;
+}
+
 export interface SessionWithSets extends Session {
   routine_name: string | null;
   sets: SessionSet[];
   attachments: SessionAttachment[];
-  /** The routine's plan when the session has one. */
+  /** The routine's live plan, kept for older app versions; the player reads `exercises`. */
   targets: RoutineItem[];
+  /** The workout's own list, in order. */
+  exercises: SessionExercise[];
 }
 
 export interface StartSessionResponse extends Session {
   targets: RoutineItem[];
+  exercises: SessionExercise[];
 }
 
 // ─── Requests ─────────────────────────────────────────────────────────────────
@@ -279,6 +292,7 @@ export interface CreateSessionRequest {
   routine_id?: string; series_id?: string; session_type?: 'normal' | 'deload' | 'test';
   /** Start even though another workout is open. */ force?: boolean;
   /** Both together log a past workout, created finished. */ started_at?: string; ended_at?: string;
+  /** The workout's exercises in order (Repeat); omitted, the routine's items. */ exercise_ids?: string[];
 }
 export interface UpdateSessionRequest { ended_at?: string; notes?: string; session_type?: string; }
 /** A finished workout's new start or end; a field left out keeps its value. */
@@ -437,6 +451,11 @@ export class JymService {
 
   deleteSet(id: string): Observable<void> {
     return this.http.delete<void>(`${API_URL}/sets/${id}`);
+  }
+
+  /** Puts an exercise on a workout's list, last; one already there stays where it is. */
+  addSessionExercise(sessionId: string, exerciseId: string): Observable<SessionExercise> {
+    return this.http.post<SessionExercise>(`${API_URL}/sessions/${sessionId}/exercises`, { exercise_id: exerciseId });
   }
 
   /** Removes an entire exercise block from a session — every logged set for it, in one call. */

@@ -1063,8 +1063,9 @@ export class SessionSummaryComponent implements OnInit {
   repeat(): void {
     const r = this.report();
     if (!r) return;
-    this.launcher.start(r.routine_id ? { routine_id: r.routine_id } : {}, {
-      repeat: r.exercises.map(e => ({ exerciseId: e.exercise_id, exerciseName: e.name, muscleGroup: e.muscle_group })),
+    this.launcher.start({
+      ...(r.routine_id ? { routine_id: r.routine_id } : {}),
+      exercise_ids: r.exercises.map(e => e.exercise_id),
     });
   }
 

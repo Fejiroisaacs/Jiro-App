@@ -825,7 +825,7 @@ const HISTORY_PAGE = 50;
 
 /** A list row for a session fetched on its own, counted like the list: working sets, and lifts with a record. */
 function summaryFromDetail(d: SessionWithSets): SessionSummary {
-  const { sets, attachments: _attachments, targets: _targets, ...session } = d;
+  const { sets, attachments: _attachments, targets: _targets, exercises: _exercises, ...session } = d;
   const working = sets.filter(x => !x.is_warmup);
   const times = sets.map(x => x.created_at).sort((a, b) => Date.parse(a) - Date.parse(b));
   return {

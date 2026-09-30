@@ -4,13 +4,15 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import {
   JymService,
-  RoutineItem,
   CreateSetRequest,
   UpdateSetRequest,
   SetHistory,
   SessionAttachment,
+  SessionExercise,
   SessionSet,
+  SessionWithSets,
 } from '../../../core/services/jym.service';
+import { firstValueFrom } from 'rxjs';
 import { UploadService } from '../../../core/services/upload.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { dayKey, timeInZone, todayKey } from '../../../core/utils/day';
@@ -20,6 +22,7 @@ import { nextSets } from '../weight-suggestion';
 import { filled, parseDecimal, parseWhole } from '../number-input';
 import { nearestLoadable, platesFor, platesPerSide, warmupRamp } from '../plates';
 import { DRAFT_VERSION, SessionDraft, clearDraft, readDraft, writeDraft } from '../shared/session-draft';
+import { ExerciseBlock, SetRow, blockFromEntry, buildBlocks, newRow } from './player-blocks';
 import { AuthService } from '../../../core/services/auth.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
@@ -31,39 +34,6 @@ import { SaveTemplateDialogComponent } from '../shared/save-template-dialog';
 import { ToastService } from '../../../core/services/toast.service';
 import { ConfirmService } from '../../../core/services/confirm.service';
 
-/** One row of an exercise; weight, reps and RPE are the text typed (a comma may be the decimal point). */
-interface SetRow {
-  setNumber: number;
-  weight: string;
-  /** Stored kg of a logged set, so a unit switch re-derives it instead of reinterpreting the text. */
-  weightKg?: number;
-  reps: string;
-  rpe: string;
-  saved: boolean;
-  isPR: boolean;
-  saving: boolean;
-  id: string | null;
-  ghostWeight: string;
-  ghostReps: string;
-  isWarmup: boolean;
-  /** A logged set opened for correction, and its values before the edit. */
-  editing?: boolean;
-  before?: { weight: string; reps: string; rpe: string };
-}
-
-interface ExerciseBlock {
-  exerciseId: string;
-  exerciseName: string;
-  muscleGroup: string | null;
-  sets: SetRow[];
-  ghostSets: { weight: number; reps: number }[];
-  suggestion: string | null;
-  exerciseNote: string;
-  /** The routine's target for this exercise, when the workout follows one. */
-  plan?: { sets: number; reps: number };
-  /** repeat when the advice is to hold the weight, trend-up otherwise. */
-  suggestionIcon?: 'trend-up' | 'repeat';
-}
 
 @Component({
   selector: 'app-session-player',
@@ -1391,10 +1361,6 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     this.lastUnit = unit;
   });
 
-  // Plan exercises (routine targets), and those removed from the plan on this device.
-  private targetIds = new Set<string>();
-  private targetById = new Map<string, RoutineItem>();
-  private removedTargets = new Set<string>();
   private draftReady = false;
   private closed = false;
   private draftTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1458,9 +1424,6 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
         if (!this.fix) this.noteIfStale(session.started_at, session.sets ?? []);
         this.sessionType.set(session.session_type || 'normal');
         this.sessionNotes = session.notes || '';
-        this.blocks.set(this.restoreBlocks(session.sets || [], session.targets ?? []));
-        // A fix is saved set by set; only a live workout keeps a device draft.
-        this.draftReady = !this.fix;
 
         // Populate form check counts from existing attachments
         const amap = new Map<string, SessionAttachment[]>();
@@ -1473,7 +1436,19 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
         }
         this.blockAttachments.set(amap);
 
-        this.loading.set(false);
+        this.restoreBlocks(session).then(
+          blocks => {
+            this.blocks.set(blocks);
+            // A fix is saved set by set; only a live workout keeps a device draft.
+            this.draftReady = !this.fix;
+            this.loading.set(false);
+          },
+          () => {
+            // The old draft is left as it was, so the next load tries again.
+            this.toast.error("Could not load this workout's exercises. Reload to try again.");
+            this.loading.set(false);
+          },
+        );
       },
       error: () => this.loading.set(false),
     });
@@ -1633,38 +1608,6 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     );
   }
 
-  private buildBlocksFromSets(sets: import('../../../core/services/jym.service').SessionSet[]): ExerciseBlock[] {
-    const blockMap = new Map<string, ExerciseBlock>();
-    for (const s of sets) {
-      if (!blockMap.has(s.exercise_id)) {
-        blockMap.set(s.exercise_id, {
-          exerciseId: s.exercise_id,
-          exerciseName: s.exercise_name,
-          muscleGroup: s.muscle_group,
-          sets: [],
-          ghostSets: [],
-          suggestion: null,
-          exerciseNote: s.exercise_note || '',
-        });
-      }
-      blockMap.get(s.exercise_id)!.sets.push({
-        setNumber: s.set_number,
-        weight: String(this.settingsService.toDisplay(s.weight)),
-        weightKg: s.weight,
-        reps: String(s.reps_performed),
-        rpe: s.rpe != null ? String(s.rpe) : '',
-        saved: true,
-        isPR: s.is_pr,
-        saving: false,
-        id: s.id,
-        ghostWeight: '',
-        ghostReps: '',
-        isWarmup: s.is_warmup,
-      });
-    }
-    return Array.from(blockMap.values());
-  }
-
   setSessionType(type: string) {
     const previous = this.sessionType();
     this.sessionType.set(type);
@@ -1697,11 +1640,11 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     const working = block.sets.filter(s => !s.isWarmup);
     const lastLogged = working.filter(s => s.saved).at(-1);
     const suggested = working.filter(s => !s.saved).at(-1);
-    const newRow = this.newRow(block.sets.length + 1, {
+    const row = newRow(block.sets.length + 1, {
       ghostWeight: lastLogged?.weight ?? suggested?.ghostWeight ?? '',
       ghostReps: lastLogged?.reps ?? suggested?.ghostReps ?? '',
     });
-    this.blocks.update(bs => bs.map((b, i) => i === blockIndex ? { ...b, sets: [...b.sets, newRow] } : b));
+    this.blocks.update(bs => bs.map((b, i) => i === blockIndex ? { ...b, sets: [...b.sets, row] } : b));
   }
 
   logSet(blockIndex: number, setIndex: number) {
@@ -1802,7 +1745,6 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     this.jymService.deleteSessionExercise(this.sessionId, block.exerciseId).subscribe({
       next: () => {
         this.deleteStaleFormChecks(block.exerciseId);
-        if (this.targetIds.has(block.exerciseId)) this.removedTargets.add(block.exerciseId);
         this.collapsedBlocks.update(set => { const next = new Set(set); next.delete(block.exerciseId); return next; });
         this.blocks.update(bs => bs.filter((_, bi) => bi !== blockIndex));
         this.removingBlock.set(null);
@@ -2063,7 +2005,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     this.blocks.update(bs => bs.map((b, i) => i !== bi ? b : {
       ...b,
       sets: [
-        ...ramp.map(r => this.newRow(0, { weight: String(r.weight), reps: String(r.reps), isWarmup: true })),
+        ...ramp.map(r => newRow(0, { weight: String(r.weight), reps: String(r.reps), isWarmup: true })),
         ...b.sets,
       ].map((s, n) => ({ ...s, setNumber: n + 1 })),
     }));
@@ -2198,18 +2140,19 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     ));
   }
 
+  /** The server keeps the workout's list; a plan exercise added back comes back with its plan. */
   pickExercise(ex: { id: string; name: string; muscle_group: string | null }) {
     this.showExPicker.set(false);
-    const existing = this.blocks().find(b => b.exerciseId === ex.id);
-    if (existing) return;
-
-    this.removedTargets.delete(ex.id);
-    // A plan exercise added back comes back with its plan.
-    const target = this.targetById.get(ex.id);
-    const newBlock = target ? this.blockFromTarget(target) : this.emptyBlock(ex.id, ex.name, ex.muscle_group, [this.newRow(1)]);
-    this.blocks.update(bs => [...bs, newBlock]);
-
-    this.loadSuggestionsForBlocks([newBlock]);
+    if (this.blocks().some(b => b.exerciseId === ex.id)) return;
+    this.jymService.addSessionExercise(this.sessionId, ex.id).subscribe({
+      next: entry => {
+        if (this.blocks().some(b => b.exerciseId === entry.exercise_id)) return;
+        const block = blockFromEntry(entry);
+        this.blocks.update(bs => [...bs, block]);
+        this.loadSuggestionsForBlocks([block]);
+      },
+      error: () => this.toast.error(`Could not add ${ex.name}. Try again.`),
+    });
   }
 
   /** Deleting a set, a warm-up or a type change can move a PR to another set: re-read the flags. */
@@ -2228,84 +2171,42 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   // ── Plan and draft ──────────────────────────────────────────────
 
   /**
-   * Logged exercises in the order done, then the plan's unlogged ones, then exercises added on this device.
-   * A v2 draft holds every unlogged row of an exercise, so inserted warm-ups and removed rows survive a reload;
-   * without one, the plan pads each exercise to its planned sets.
+   * The workout's blocks: the server's list and logged sets, plus this device's unlogged rows.
+   * A v2 draft's added and removed exercises are sent to the server first, once.
    */
-  private restoreBlocks(sets: SessionSet[], targets: RoutineItem[]): ExerciseBlock[] {
-    const draft: SessionDraft = this.fix ? { added: [], removed: [], rows: {} } : readDraft(this.sessionId);
-    const whole = draft.v === DRAFT_VERSION;
-    this.targetIds = new Set(targets.map(t => t.exercise_id));
-    this.removedTargets = new Set(draft.removed.filter(id => this.targetIds.has(id)));
-
-    const logged = this.buildBlocksFromSets(sets);
-    const loggedIds = new Set(logged.map(b => b.exerciseId));
-    // A plan exercise logged part-way keeps its remaining planned rows, ghosted from its last working set.
-    this.targetById = new Map(targets.map(t => [t.exercise_id, t]));
-    for (const b of logged) {
-      const t = this.targetById.get(b.exerciseId);
-      if (t) b.plan = { sets: t.target_sets, reps: t.target_reps };
-      const last = b.sets.filter(s => !s.isWarmup).at(-1);
-      for (let n = b.sets.length + 1; t && n <= t.target_sets; n++) {
-        b.sets.push(this.newRow(n, { ghostWeight: last?.weight ?? '', ghostReps: String(t.target_reps) }));
-      }
+  private async restoreBlocks(session: SessionWithSets): Promise<ExerciseBlock[]> {
+    const draft = this.fix ? null : readDraft(this.sessionId);
+    let exercises = session.exercises ?? [];
+    if (draft && (draft.added?.length || draft.removed?.length)) {
+      exercises = await this.upgradeDraft(draft, exercises, session.sets ?? []);
     }
-    const planned = targets
-      .filter(t => !loggedIds.has(t.exercise_id) && !this.removedTargets.has(t.exercise_id))
-      .map(t => this.blockFromTarget(t));
-    const added = draft.added
-      .filter(a => !loggedIds.has(a.exerciseId) && !this.targetIds.has(a.exerciseId))
-      .map(a => this.emptyBlock(a.exerciseId, a.exerciseName, a.muscleGroup, [this.newRow(1)]));
-
-    const blocks = [...logged, ...planned, ...added];
+    // v1 drafts (typed rows only) are from long before; their rows are not restored.
     const unit = this.settingsService.weightUnit();
-    for (const b of blocks) {
-      const draftRows = draft.rows[b.exerciseId];
-      if (!draftRows) continue;
-      const rows = draftRows.map(d => draft.unit && draft.unit !== unit ? { ...d, weight: this.convertText(d.weight, draft.unit, unit) } : d);
-      if (whole) {
-        // The draft's rows replace the padding; a number a logged set now holds (logged elsewhere) is dropped.
-        const kept = b.sets.filter(r => r.saved);
-        const taken = new Set(kept.map(r => r.setNumber));
-        const last = kept.filter(r => !r.isWarmup).at(-1);
-        b.sets = [...kept, ...rows.filter(d => !taken.has(d.setNumber)).map(d => this.newRow(d.setNumber, {
-          weight: d.weight, reps: d.reps, rpe: d.rpe, isWarmup: d.isWarmup,
-          ghostWeight: d.isWarmup ? '' : last?.weight ?? '',
-          ghostReps: !d.isWarmup && b.plan ? String(b.plan.reps) : '',
-        }))];
-      } else {
-        for (const d of rows) {
-          const row = b.sets.find(r => r.setNumber === d.setNumber);
-          if (row && !row.saved) Object.assign(row, { weight: d.weight, reps: d.reps, rpe: d.rpe, isWarmup: d.isWarmup });
-          else if (!row) b.sets.push(this.newRow(d.setNumber, { weight: d.weight, reps: d.reps, rpe: d.rpe, isWarmup: d.isWarmup }));
-        }
+    const rows: SessionDraft['rows'] = {};
+    if (draft && (draft.v ?? 1) >= 2) {
+      for (const [id, list] of Object.entries(draft.rows)) {
+        rows[id] = list.map(d => draft.unit && draft.unit !== unit ? { ...d, weight: this.convertText(d.weight, draft.unit, unit) } : d);
       }
-      b.sets.sort((x, y) => x.setNumber - y.setNumber);
     }
+    const blocks = buildBlocks(exercises, session.sets ?? [], rows, kg => this.settingsService.toDisplay(kg));
     this.loadSuggestionsForBlocks(blocks);
     return blocks;
   }
 
-  private newRow(setNumber: number, init: Partial<SetRow> = {}): SetRow {
-    return {
-      setNumber, weight: '', reps: '', rpe: '',
-      saved: false, isPR: false, saving: false, id: null,
-      ghostWeight: '', ghostReps: '', isWarmup: false,
-      ...init,
-    };
-  }
-
-  /** An unlogged plan exercise: its planned rows, with the planned reps as ghosts. */
-  private blockFromTarget(t: RoutineItem): ExerciseBlock {
-    return {
-      ...this.emptyBlock(t.exercise_id, t.exercise_name, t.muscle_group,
-        Array.from({ length: t.target_sets }, (_, i) => this.newRow(i + 1, { ghostReps: String(t.target_reps) }))),
-      plan: { sets: t.target_sets, reps: t.target_reps },
-    };
-  }
-
-  private emptyBlock(exerciseId: string, exerciseName: string, muscleGroup: string | null, sets: SetRow[]): ExerciseBlock {
-    return { exerciseId, exerciseName, muscleGroup, sets, ghostSets: [], suggestion: null, exerciseNote: '' };
+  /** A draft from before the list lived on the server: its removed plan exercises and added ones, sent once. */
+  private async upgradeDraft(draft: SessionDraft, list: SessionExercise[], sets: SessionSet[]): Promise<SessionExercise[]> {
+    const logged = new Set(sets.map(x => x.exercise_id));
+    let next = list;
+    for (const id of draft.removed ?? []) {
+      if (logged.has(id) || !next.some(x => x.exercise_id === id)) continue;
+      await firstValueFrom(this.jymService.deleteSessionExercise(this.sessionId, id));
+      next = next.filter(x => x.exercise_id !== id);
+    }
+    for (const a of draft.added ?? []) {
+      if (next.some(x => x.exercise_id === a.exerciseId)) continue;
+      next = [...next, await firstValueFrom(this.jymService.addSessionExercise(this.sessionId, a.exerciseId))];
+    }
+    return next;
   }
 
   /** Rows with a weight and reps typed but not ticked; a typed 0 counts. */
@@ -2317,7 +2218,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     return rows;
   }
 
-  /** Keeps what the server doesn't have yet for this workout, on this device: every unlogged row, empty ones too. */
+  /** Keeps what the server doesn't have for this workout, on this device: every unlogged row, empty ones too. */
   saveDraft() {
     if (this.closed || !this.draftReady) return;
     const blocks = this.blocks();
@@ -2327,15 +2228,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
         .filter(s => !s.saved)
         .map(s => ({ setNumber: s.setNumber, weight: s.weight, reps: s.reps, rpe: s.rpe, isWarmup: s.isWarmup }));
     }
-    writeDraft(this.sessionId, {
-      v: DRAFT_VERSION,
-      unit: this.settingsService.weightUnit(),
-      added: blocks
-        .filter(b => !this.targetIds.has(b.exerciseId) && !b.sets.some(s => s.saved))
-        .map(b => ({ exerciseId: b.exerciseId, exerciseName: b.exerciseName, muscleGroup: b.muscleGroup })),
-      removed: [...this.removedTargets],
-      rows,
-    });
+    writeDraft(this.sessionId, { v: DRAFT_VERSION, unit: this.settingsService.weightUnit(), rows });
   }
 
   /** Typing saves shortly after the last keystroke. */
