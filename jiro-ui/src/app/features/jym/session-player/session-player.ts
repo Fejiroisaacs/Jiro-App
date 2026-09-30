@@ -28,7 +28,6 @@ import {
 } from './player-blocks';
 import { AuthService } from '../../../core/services/auth.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
-import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
@@ -38,6 +37,7 @@ import { RestTimer } from './rest-timer';
 import { RestRowComponent } from './rest-row';
 import { PlatesSheetComponent } from './plates-sheet';
 import { OptionsSheetComponent, SetSheetComponent } from './player-sheets';
+import { ExercisePickerComponent, PickerExercise } from './exercise-picker';
 import { SaveTemplateDialogComponent } from '../shared/save-template-dialog';
 import { ToastService } from '../../../core/services/toast.service';
 import { ConfirmService } from '../../../core/services/confirm.service';
@@ -46,7 +46,7 @@ import { ConfirmService } from '../../../core/services/confirm.service';
 @Component({
   selector: 'app-session-player',
   standalone: true,
-  imports: [FormsModule, JiroButtonComponent, JiroModalComponent, JiroIconComponent, JiroSkeletonComponent, JiroEmptyStateComponent, JymPrBadgeComponent, SaveTemplateDialogComponent, JiroMenuComponent, RestRowComponent, PlatesSheetComponent, OptionsSheetComponent, SetSheetComponent],
+  imports: [FormsModule, JiroButtonComponent, JiroIconComponent, JiroSkeletonComponent, JiroEmptyStateComponent, JymPrBadgeComponent, SaveTemplateDialogComponent, JiroMenuComponent, RestRowComponent, PlatesSheetComponent, OptionsSheetComponent, SetSheetComponent, ExercisePickerComponent],
   template: `
     <h1 class="sr-only">Active session</h1>
     <!-- Sticky bar: the clock, the options, and Finish; everything else waits in the options sheet. -->
@@ -439,67 +439,8 @@ import { ConfirmService } from '../../../core/services/confirm.service';
 
     <!-- Exercise picker -->
     @if (showExPicker()) {
-      <jiro-modal [title]="creatingExercise() ? 'New exercise' : 'Add exercise'" maxWidth="480px" (close)="showExPicker.set(false)">
-        @if (!creatingExercise()) {
-          <input class="picker-search" type="text" [(ngModel)]="exSearch" (input)="filterExercises()" placeholder="Search exercises..." aria-label="Search exercises" autofocus />
-          <div class="picker-list">
-            @for (ex of filteredExercises(); track ex.id) {
-              <button type="button" class="picker-item" (click)="pickExercise(ex)">
-                <span class="pi-name">{{ ex.name }}</span>
-                @if (ex.muscle_group) {
-                  <span class="pi-mg">{{ ex.muscle_group }}</span>
-                }
-              </button>
-            }
-            @if (filteredExercises().length === 0 && exSearch.trim()) {
-              <p class="picker-none">Nothing matches "{{ exSearch.trim() }}".</p>
-            }
-            <!-- Create shortcut: always at the bottom, name pre-filled from the search -->
-            <button type="button" class="picker-create-btn" (click)="startCreateExercise()">
-              <jiro-icon name="plus" [size]="14" />
-              @if (exSearch.trim()) {
-                <span>Create "{{ exSearch.trim() }}"</span>
-              } @else {
-                <span>New exercise</span>
-              }
-            </button>
-          </div>
-        } @else {
-          <button type="button" class="back-btn" (click)="creatingExercise.set(false)">
-            <jiro-icon name="caret-left" [size]="14" /> Back to search
-          </button>
-          <div class="create-form">
-            <label class="create-label" for="new-ex-name">Name</label>
-            <input
-              id="new-ex-name"
-              class="picker-search"
-              type="text"
-              [(ngModel)]="newExName"
-              placeholder="e.g. Romanian Deadlift"
-              (keydown.enter)="!newExSaving() && newExName.trim() && createAndPickExercise()"
-            />
-            <label class="create-label" for="new-ex-mg" style="margin-top:var(--space-sm)">Muscle group <span class="optional">(optional)</span></label>
-            <select id="new-ex-mg" class="create-select" [(ngModel)]="newExMuscleGroup">
-              <option value="">None</option>
-              @for (mg of muscleGroups; track mg) {
-                <option [value]="mg">{{ mg }}</option>
-              }
-            </select>
-            @if (newExError()) {
-              <div class="template-save-error">{{ newExError() }}</div>
-            }
-            <jiro-button
-              block
-              type="button"
-              style="margin-top:var(--space-md)"
-              [disabled]="!newExName.trim()"
-              [loading]="newExSaving()"
-              (click)="createAndPickExercise()">
-              {{ newExSaving() ? 'Creating...' : 'Create and add to session' }}
-            </jiro-button>
-          </div>
-        }
-      </jiro-modal>
+      <jym-exercise-picker [exercises]="allExercises()" (created)="allExercises.update(list => [...list, $event])"
+        (picked)="pickExercise($event)" (close)="showExPicker.set(false)" />
     }
   `,
   styles: [`
@@ -536,10 +477,6 @@ import { ConfirmService } from '../../../core/services/confirm.service';
       color: inherit; cursor: pointer; transition: background 0.15s, border-color 0.15s;
     }
     .bar-icon-btn:hover { background: color-mix(in srgb, currentColor 12%, transparent); border-color: color-mix(in srgb, currentColor 75%, transparent); }
-
-    .template-save-error {
-      font-size: var(--font-size-sm); color: var(--color-negative); margin-top: var(--space-xs);
-    }
 
     .type-notice {
       text-align: center; font-size: var(--font-size-sm); font-weight: 500;
@@ -867,63 +804,6 @@ import { ConfirmService } from '../../../core/services/confirm.service';
 
     .add-exercise-btn:hover { color: var(--color-primary); border-color: var(--color-primary); background: rgba(var(--color-primary-rgb), 0.04); }
 
-    /* Exercise picker (inside jiro-modal) */
-    .picker-search {
-      width: 100%; box-sizing: border-box;
-      padding: 10px 14px; border: 1px solid var(--border-color);
-      border-radius: var(--border-radius); background: var(--bg-canvas);
-      color: var(--text-primary); font-size: var(--font-size-md);
-      font-family: inherit;
-    }
-    .picker-search:focus { border-color: var(--color-primary); }
-
-    .picker-list { max-height: 50dvh; overflow-y: auto; margin-top: var(--space-sm); }
-
-    .picker-item {
-      display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm);
-      width: 100%; min-height: 44px; padding: var(--space-sm) var(--space-md);
-      background: none; border: none; border-radius: var(--border-radius);
-      cursor: pointer; text-align: left; font-family: inherit; transition: background 0.15s;
-    }
-    .picker-item:hover { background: var(--bg-surface-hover); }
-
-    .pi-name { font-size: var(--font-size-md); color: var(--text-primary); font-weight: 500; }
-    .pi-mg { font-size: var(--font-size-xs); color: var(--text-muted); white-space: nowrap; }
-
-    .picker-none { padding: var(--space-md); font-size: var(--font-size-sm); color: var(--text-muted); text-align: center; }
-
-    .picker-create-btn {
-      display: flex; align-items: center; gap: var(--space-xs);
-      width: 100%; min-height: 44px; padding: var(--space-sm) var(--space-md);
-      background: none; border: none; border-top: 1px solid var(--border-color);
-      color: var(--color-primary); font-size: var(--font-size-sm);
-      font-weight: 500; cursor: pointer; text-align: left;
-      font-family: inherit; margin-top: var(--space-xs);
-      transition: background 0.15s;
-    }
-    .picker-create-btn:hover { background: rgba(var(--color-primary-rgb), 0.06); }
-
-    .back-btn {
-      display: inline-flex; align-items: center; gap: 4px;
-      background: none; border: none; min-height: 44px; padding: 0; margin-bottom: var(--space-xs);
-      color: var(--text-secondary); font-size: var(--font-size-sm); font-family: inherit; cursor: pointer;
-    }
-    .back-btn:hover { color: var(--text-primary); }
-
-    .create-form { display: flex; flex-direction: column; }
-    .create-label {
-      font-size: var(--font-size-sm); font-weight: 500;
-      color: var(--text-secondary); margin-bottom: 6px; display: block;
-    }
-    .create-label .optional { color: var(--text-muted); font-weight: 400; }
-    .create-select {
-      padding: 10px 14px; border: 1px solid var(--border-color);
-      border-radius: var(--border-radius); background: var(--bg-canvas);
-      color: var(--text-primary); font-size: var(--font-size-md);
-      font-family: inherit; width: 100%;
-    }
-    .create-select:focus { border-color: var(--color-primary); }
-
     /* ── Mobile responsive ── */
     @media (max-width: 768px) {
       .session-bar {
@@ -1028,13 +908,6 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   private readonly confirmService = inject(ConfirmService);
   removingBlock = signal<number | null>(null);
 
-  // Inline exercise creation
-  creatingExercise = signal(false);
-  newExName = '';
-  newExMuscleGroup = '';
-  newExSaving = signal(false);
-  newExError = signal('');
-  readonly muscleGroups = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs', 'Glutes', 'Core', 'Cardio', 'Other'];
   bwSaving = signal(false);
   bwLogged = signal(false);
   bwValue = '';
@@ -1070,9 +943,8 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   readonly platesWeight = signal('');
   // Warm-up ramps keyed by exercise and inputs, so change detection doesn't redo the plate maths.
   private readonly rampCache = new Map<string, { key: string; ramp: { weight: number; reps: number }[] | null }>();
-  allExercises = signal<{ id: string; name: string; muscle_group: string | null }[]>([]);
-  filteredExercises = signal<{ id: string; name: string; muscle_group: string | null }[]>([]);
-  exSearch = '';
+  /** The library, for the exercise picker. */
+  allExercises = signal<PickerExercise[]>([]);
   sessionNotes = '';
 
   // Rest timer: this rest (rest-timer.ts); restSetting is how long every rest starts at.
@@ -1144,7 +1016,6 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     // Load all exercises for the picker
     this.jymService.listExercises().subscribe(exs => {
       this.allExercises.set(exs);
-      this.filteredExercises.set(exs);
     });
 
     // Load session + sets (restores mid-workout state on page refresh)
@@ -1739,53 +1610,11 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   }
 
   addExercise() {
-    this.exSearch = '';
-    this.creatingExercise.set(false);
-    this.filteredExercises.set(this.allExercises());
     this.showExPicker.set(true);
   }
 
-  startCreateExercise() {
-    this.newExName = this.exSearch.trim();
-    this.newExMuscleGroup = '';
-    this.newExError.set('');
-    this.creatingExercise.set(true);
-  }
-
-  createAndPickExercise() {
-    const name = this.newExName.trim();
-    if (!name) return;
-    this.newExSaving.set(true);
-    this.newExError.set('');
-    this.jymService.createExercise({
-      name,
-      muscle_group: this.newExMuscleGroup || undefined,
-    }).subscribe({
-      next: ex => {
-        // Add to local library so it appears in future searches this session
-        const entry = { id: ex.id, name: ex.name, muscle_group: ex.muscle_group };
-        this.allExercises.update(list => [...list, entry]);
-        this.newExSaving.set(false);
-        this.creatingExercise.set(false);
-        this.showExPicker.set(false);
-        this.pickExercise(entry);
-      },
-      error: () => {
-        this.newExSaving.set(false);
-        this.newExError.set('Could not create exercise. The name may already be taken.');
-      },
-    });
-  }
-
-  filterExercises() {
-    const q = this.exSearch.toLowerCase();
-    this.filteredExercises.set(this.allExercises().filter(e =>
-      e.name.toLowerCase().includes(q) || (e.muscle_group || '').toLowerCase().includes(q)
-    ));
-  }
-
   /** The server keeps the workout's list; a plan exercise added back comes back with its plan. */
-  pickExercise(ex: { id: string; name: string; muscle_group: string | null }) {
+  pickExercise(ex: PickerExercise) {
     this.showExPicker.set(false);
     if (this.blocks().some(b => b.exerciseId === ex.id)) return;
     this.jymService.addSessionExercise(this.sessionId, ex.id).subscribe({
