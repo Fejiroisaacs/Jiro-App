@@ -1,6 +1,6 @@
 import { Component, OnInit, OnDestroy, WritableSignal, computed, effect, inject, signal } from '@angular/core';
 
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import {
   JymService,
@@ -20,7 +20,7 @@ import { formatInstant } from '../../../core/utils/format-date';
 import { isStale } from '../stale-workout';
 import { nextSets } from '../weight-suggestion';
 import { filled, parseDecimal, parseWhole } from '../number-input';
-import { nearestLoadable, platesFor, platesPerSide, warmupRamp } from '../plates';
+import { platesFor, warmupRamp } from '../plates';
 import { DRAFT_VERSION, SessionDraft, clearDraft, readDraft, writeDraft } from '../shared/session-draft';
 import {
   ExerciseBlock, SetRow, Suggestion, blockFromEntry, buildBlocks, canLog, isShort, logLabel as logLabelText, newRow,
@@ -36,6 +36,7 @@ import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
 import { JiroMenuComponent, JiroMenuItem } from '../../../shared/components/jiro-menu/jiro-menu';
 import { RestTimer } from './rest-timer';
 import { RestRowComponent } from './rest-row';
+import { PlatesSheetComponent } from './plates-sheet';
 import { SaveTemplateDialogComponent } from '../shared/save-template-dialog';
 import { ToastService } from '../../../core/services/toast.service';
 import { ConfirmService } from '../../../core/services/confirm.service';
@@ -44,7 +45,7 @@ import { ConfirmService } from '../../../core/services/confirm.service';
 @Component({
   selector: 'app-session-player',
   standalone: true,
-  imports: [FormsModule, RouterLink, JiroButtonComponent, JiroModalComponent, JiroIconComponent, JiroSkeletonComponent, JiroEmptyStateComponent, JymPrBadgeComponent, SaveTemplateDialogComponent, JiroMenuComponent, RestRowComponent],
+  imports: [FormsModule, JiroButtonComponent, JiroModalComponent, JiroIconComponent, JiroSkeletonComponent, JiroEmptyStateComponent, JymPrBadgeComponent, SaveTemplateDialogComponent, JiroMenuComponent, RestRowComponent, PlatesSheetComponent],
   template: `
     <h1 class="sr-only">Active session</h1>
     <!-- Sticky bar: the clock, the options, and Finish; everything else waits in the options sheet. -->
@@ -490,50 +491,7 @@ import { ConfirmService } from '../../../core/services/confirm.service';
 
     <!-- Plates for one side of the bar, from the account's bar and plates -->
     @if (platesOpen()) {
-      <jiro-modal sheet title="Plates" maxWidth="420px" (close)="platesOpen.set(false)">
-        <label class="field-label" for="plates-weight">Weight ({{ settingsService.unitLabel() }})</label>
-        <input
-          id="plates-weight"
-          class="plates-input"
-          type="text"
-          inputmode="decimal"
-          enterkeyhint="done"
-          autocomplete="off"
-          [ngModel]="platesWeight()"
-          (ngModelChange)="platesWeight.set($event)"
-          (keydown.enter)="$any($event.target).blur()" />
-
-        @let r = plateResult();
-        <div class="plates-result" aria-live="polite">
-          @if (r.kind === 'plates') {
-            <div class="plate-stack" role="img" [attr.aria-label]="'Each side: ' + r.side.join(', ') + ' ' + settingsService.unitLabel()">
-              <span class="plate-sleeve" aria-hidden="true"></span>
-              @for (p of r.side; track $index) {
-                <span class="plate" aria-hidden="true" [style.height.px]="plateHeight(p)">{{ p }}</span>
-              }
-            </div>
-            <p class="plates-line">Each side: {{ r.side.join(', ') }}</p>
-          } @else if (r.kind === 'bar') {
-            <p class="plates-line">Just the bar.</p>
-          } @else if (r.kind === 'light') {
-            <p class="plates-line">That's lighter than the bar.</p>
-          } @else if (r.kind === 'near') {
-            <p class="plates-line">Your plates can't make exactly {{ platesWeight() }} {{ settingsService.unitLabel() }}. The closest you can load:</p>
-            <div class="near-chips">
-              @for (w of r.near; track w) {
-                <button type="button" class="near-chip" (click)="platesWeight.set('' + w)">{{ w }} {{ settingsService.unitLabel() }}</button>
-              }
-            </div>
-          } @else {
-            <p class="plates-line plates-muted">Type a weight to see the plates for each side.</p>
-          }
-        </div>
-
-        <p class="plates-bar">
-          On a {{ currentPlates().bar }} {{ settingsService.unitLabel() }} bar.
-          <a class="plates-link" routerLink="/settings" fragment="workouts" (click)="platesOpen.set(false)">Change bar and plates</a>
-        </p>
-      </jiro-modal>
+      <jym-plates-sheet [weight]="platesWeight()" (close)="platesOpen.set(false)" />
     }
 
 
@@ -973,40 +931,6 @@ import { ConfirmService } from '../../../core/services/confirm.service';
     }
     .plates-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
 
-    /* Plates sheet */
-    .plates-input {
-      width: 100%; box-sizing: border-box; min-height: 48px; padding: 10px 12px;
-      border: 1px solid var(--border-color); border-radius: var(--border-radius);
-      background: var(--bg-surface); color: var(--text-primary);
-      font-size: var(--font-size-lg); font-weight: 600; font-family: inherit; font-variant-numeric: tabular-nums;
-    }
-    .plates-input:focus { border-color: var(--color-primary); }
-    .plates-result { min-height: 132px; padding: var(--space-md) 0 var(--space-sm); }
-    .plate-stack {
-      position: relative; display: flex; align-items: center; gap: 4px;
-      height: 88px; padding-left: var(--space-lg);
-    }
-    .plate-sleeve {
-      position: absolute; left: 0; right: 0; top: 50%; height: 8px; transform: translateY(-50%);
-      background: var(--border-color); border-radius: var(--border-radius-pill);
-    }
-    .plate {
-      position: relative; display: inline-flex; align-items: center; justify-content: center;
-      min-width: 32px; padding: 0 4px; border-radius: var(--border-radius-sm);
-      background: var(--text-primary); color: var(--bg-surface);
-      font-size: var(--font-size-xs); font-weight: 700; font-variant-numeric: tabular-nums;
-    }
-    .plates-line { font-size: var(--font-size-md); font-weight: 600; margin-top: var(--space-sm); font-variant-numeric: tabular-nums; }
-    .plates-muted { color: var(--text-secondary); font-weight: 400; }
-    .near-chips { display: flex; gap: var(--space-sm); margin-top: var(--space-sm); }
-    .near-chip {
-      min-height: 44px; padding: 0 var(--space-md);
-      border: 1px solid var(--color-primary); border-radius: var(--border-radius-pill);
-      background: none; color: var(--color-primary);
-      font-family: inherit; font-size: var(--font-size-sm); font-weight: 600; cursor: pointer;
-    }
-    .plates-bar { font-size: var(--font-size-sm); color: var(--text-secondary); border-top: 1px solid var(--border-color); padding-top: var(--space-sm); }
-    .plates-link { display: inline-flex; align-items: center; min-height: 44px; color: var(--color-primary); font-weight: 600; }
     .opt-actions--plain { border-top: none; padding-top: 0; }
 
     .spinner-sm {
@@ -1244,21 +1168,10 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   /** Set when the workout was opened after hours with nothing logged; "Keep going" clears it. */
   readonly stale = signal<{ started: string; lastSet: string | null; lastSetTime: string; lastSetAt: string | null } | null>(null);
 
-  // Plates: the account's bar and plate sizes for the unit in use.
+  // The account's bar and plate sizes for the unit in use (warm-up ramps); the sheet opens at platesWeight.
   readonly currentPlates = computed(() => platesFor(this.settingsService.weightUnit(), this.settingsService.plates()));
   readonly platesOpen = signal(false);
   readonly platesWeight = signal('');
-  readonly plateResult = computed(() => {
-    const weight = parseDecimal(this.platesWeight());
-    const set = this.currentPlates();
-    const none = { side: [] as number[], near: [] as number[] };
-    if (weight === null || weight <= 0) return { kind: 'none', ...none };
-    if (weight < set.bar) return { kind: 'light', ...none };
-    const side = platesPerSide(weight, set);
-    if (side) return { kind: side.length ? 'plates' : 'bar', ...none, side };
-    const { below, above } = nearestLoadable(weight, set);
-    return { kind: 'near', ...none, near: [below, above].filter((w): w is number => w !== null) };
-  });
   // Warm-up ramps keyed by exercise and inputs, so change detection doesn't redo the plate maths.
   private readonly rampCache = new Map<string, { key: string; ramp: { weight: number; reps: number }[] | null }>();
   allExercises = signal<{ id: string; name: string; muscle_group: string | null }[]>([]);
@@ -1864,12 +1777,6 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     const weight = workingWeight(block);
     this.platesWeight.set(weight === null ? '' : String(weight));
     this.platesOpen.set(true);
-  }
-
-  /** A plate drawn taller the heavier it is, against the heaviest size on hand. */
-  plateHeight(plate: number): number {
-    const heaviest = Math.max(...this.currentPlates().sizes);
-    return Math.round(32 + 52 * (plate / heaviest));
   }
 
   /**
