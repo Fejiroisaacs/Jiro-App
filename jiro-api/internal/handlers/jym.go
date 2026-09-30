@@ -989,6 +989,34 @@ func (h *JymHandler) AddSessionExercise(c *gin.Context) {
 	c.JSON(http.StatusOK, ex)
 }
 
+// ReorderSessionExercises sets a workout's order.
+// PUT /jym/sessions/:id/exercises/order
+func (h *JymHandler) ReorderSessionExercises(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	sessionID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid session ID"}})
+		return
+	}
+	var req models.ReorderSessionExercisesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()}})
+		return
+	}
+	if err := h.jymService.ReorderSessionExercises(c.Request.Context(), userID, sessionID, req.ExerciseIDs); err != nil {
+		switch err {
+		case services.ErrSessionNotFound:
+			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Session not found"}})
+		case services.ErrExerciseOrder:
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()}})
+		default:
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to save the order"}})
+		}
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
 // GetSessionReport is a workout's summary, built by the same rules as every session list.
 // GET /jym/sessions/:id/summary
 func (h *JymHandler) GetSessionReport(c *gin.Context) {

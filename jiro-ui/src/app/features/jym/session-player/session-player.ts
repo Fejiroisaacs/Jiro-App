@@ -30,6 +30,7 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
+import { JiroMenuComponent, JiroMenuItem } from '../../../shared/components/jiro-menu/jiro-menu';
 import { SaveTemplateDialogComponent } from '../shared/save-template-dialog';
 import { ToastService } from '../../../core/services/toast.service';
 import { ConfirmService } from '../../../core/services/confirm.service';
@@ -38,7 +39,7 @@ import { ConfirmService } from '../../../core/services/confirm.service';
 @Component({
   selector: 'app-session-player',
   standalone: true,
-  imports: [FormsModule, RouterLink, JiroButtonComponent, JiroModalComponent, JiroIconComponent, JiroSkeletonComponent, JiroEmptyStateComponent, JymPrBadgeComponent, SaveTemplateDialogComponent],
+  imports: [FormsModule, RouterLink, JiroButtonComponent, JiroModalComponent, JiroIconComponent, JiroSkeletonComponent, JiroEmptyStateComponent, JymPrBadgeComponent, SaveTemplateDialogComponent, JiroMenuComponent],
   template: `
     <h1 class="sr-only">Active session</h1>
     <!-- Sticky bar: the clock, the options, and Finish; everything else waits in the options sheet. -->
@@ -198,18 +199,11 @@ import { ConfirmService } from '../../../core/services/confirm.service';
 }
             </div>
             <div class="block-actions">
-              <button
-                type="button"
-                class="del-btn"
-                [attr.aria-label]="'Remove ' + block.exerciseName"
-                [disabled]="removingBlock() === bi"
-                (click)="$event.stopPropagation(); removeBlock(bi)">
-                @if (removingBlock() === bi) {
-                  <span class="spinner-sm"></span>
-                } @else {
-                  <jiro-icon name="trash" [size]="16" />
-                }
-              </button>
+              @if (removingBlock() === bi) {
+                <span class="block-busy" role="status" aria-label="Removing"><span class="spinner-sm"></span></span>
+              } @else {
+                <jiro-menu touch [items]="blockActions(bi)" [label]="'More actions for ' + block.exerciseName" (select)="onBlockAction(bi, $event)" />
+              }
               <jiro-icon name="caret-down" [size]="16" class="chevron" [class.open]="!isCollapsed(bi)" />
             </div>
           </div>
@@ -841,7 +835,7 @@ import { ConfirmService } from '../../../core/services/confirm.service';
     .block-header.block-open { border-bottom: 1px solid var(--border-color); }
 
     .block-actions { display: flex; align-items: center; gap: var(--space-sm); flex-shrink: 0; }
-    .block-actions .del-btn { border: none; background: transparent; }
+    .block-busy { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; color: var(--text-muted); }
 
     .overload-hint {
       display: flex; align-items: center; gap: 6px;
@@ -1059,15 +1053,6 @@ import { ConfirmService } from '../../../core/services/confirm.service';
     .plates-bar { font-size: var(--font-size-sm); color: var(--text-secondary); border-top: 1px solid var(--border-color); padding-top: var(--space-sm); }
     .plates-link { display: inline-flex; align-items: center; min-height: 44px; color: var(--color-primary); font-weight: 600; }
     .opt-actions--plain { border-top: none; padding-top: 0; }
-
-    .del-btn {
-      width: 44px; height: 44px; border-radius: var(--border-radius-sm);
-      background: none; color: var(--text-muted); border: 1px solid var(--border-color);
-      cursor: pointer; display: flex; align-items: center; justify-content: center;
-      transition: all 0.15s;
-    }
-
-    .del-btn:hover { color: var(--color-danger); border-color: var(--color-danger); }
 
     .spinner-sm {
       width: 14px; height: 14px;
@@ -1362,6 +1347,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   });
 
   private draftReady = false;
+  private orderSave: Promise<unknown> = Promise.resolve();
   private closed = false;
   private draftTimer: ReturnType<typeof setTimeout> | null = null;
   // Structural changes (added, removed, logged) reach the draft; typing goes through saveDraftSoon().
@@ -1727,6 +1713,38 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
       },
       error: () => this.toast.error('Could not remove the set.'),
     });
+  }
+
+  /** The exercise's menu: move it up or down one place, or remove it. */
+  blockActions(bi: number): JiroMenuItem[] {
+    const last = this.blocks().length - 1;
+    return bi === 0 && bi === last ? BLOCK_ACTIONS.only
+      : bi === 0 ? BLOCK_ACTIONS.first
+      : bi === last ? BLOCK_ACTIONS.last
+      : BLOCK_ACTIONS.middle;
+  }
+
+  onBlockAction(bi: number, action: string) {
+    if (action === 'up') this.moveBlock(bi, -1);
+    else if (action === 'down') this.moveBlock(bi, 1);
+    else if (action === 'remove') this.removeBlock(bi);
+  }
+
+  /** Moves an exercise one place. Orders are saved one at a time; if one fails, the server's order comes back. */
+  moveBlock(bi: number, step: -1 | 1) {
+    const bs = [...this.blocks()];
+    const to = bi + step;
+    if (to < 0 || to >= bs.length) return;
+    [bs[bi], bs[to]] = [bs[to], bs[bi]];
+    this.blocks.set(bs);
+    const order = bs.map(b => b.exerciseId);
+    this.orderSave = this.orderSave.then(() => firstValueFrom(this.jymService.reorderSessionExercises(this.sessionId, order)).catch(() => {
+      this.toast.error('Could not save the new order.');
+      this.jymService.getSession(this.sessionId).subscribe(s => {
+        const pos = new Map((s.exercises ?? []).map((x, i) => [x.exercise_id, i]));
+        this.blocks.update(list => [...list].sort((a, b) => (pos.get(a.exerciseId) ?? list.length) - (pos.get(b.exerciseId) ?? list.length)));
+      });
+    }));
   }
 
   async removeBlock(blockIndex: number) {
@@ -2509,6 +2527,16 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
 
 /** Recent sets fetched per exercise for the "last time" suggestion. */
 const SUGGESTION_SETS = 60;
+
+const MOVE_UP: JiroMenuItem = { id: 'up', label: 'Move up', icon: 'caret-up' };
+const MOVE_DOWN: JiroMenuItem = { id: 'down', label: 'Move down', icon: 'caret-down' };
+const REMOVE: JiroMenuItem = { id: 'remove', label: 'Remove exercise', icon: 'trash', danger: true };
+const BLOCK_ACTIONS = {
+  only: [REMOVE],
+  first: [MOVE_DOWN, REMOVE],
+  last: [MOVE_UP, REMOVE],
+  middle: [MOVE_UP, MOVE_DOWN, REMOVE],
+};
 
 /** Sets (or, with no value, removes) one key of a Map held in a signal. */
 function setKey<T>(sig: WritableSignal<Map<string, T>>, key: string, value?: T) {

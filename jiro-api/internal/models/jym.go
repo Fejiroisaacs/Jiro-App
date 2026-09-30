@@ -363,6 +363,11 @@ type AddSessionExerciseRequest struct {
 	ExerciseID uuid.UUID `json:"exercise_id" binding:"required"`
 }
 
+// ReorderSessionExercisesRequest names each of the workout's exercises once, in the new order.
+type ReorderSessionExercisesRequest struct {
+	ExerciseIDs []uuid.UUID `json:"exercise_ids" binding:"required,max=100"`
+}
+
 type SessionWithSets struct {
 	Session
 	RoutineName *string                  `json:"routine_name"`

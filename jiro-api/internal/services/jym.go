@@ -32,6 +32,7 @@ var (
 
 	ErrInvalidSessionType  = errors.New("session type must be normal, deload or test")
 	ErrSessionEnded        = errors.New("session has already ended")
+	ErrExerciseOrder       = errors.New("the order must name each of the workout's exercises once")
 	ErrDuplicateRoutine    = errors.New("routine listed more than once")
 	ErrRoutineNotInSeries  = errors.New("routine is not a day of the series' split")
 	ErrInvalidSeriesLength = errors.New("a series runs 1 to 52 weeks or 1 to 200 sessions")
@@ -919,6 +920,61 @@ func (s *JymService) AddSessionExercise(ctx context.Context, userID, sessionID, 
 		}
 	}
 	return nil, ErrExerciseNotFound
+}
+
+// ReorderSessionExercises sets a workout's order; the list must name each of its exercises exactly once.
+func (s *JymService) ReorderSessionExercises(ctx context.Context, userID, sessionID uuid.UUID, exerciseIDs []uuid.UUID) error {
+	var owner uuid.UUID
+	if err := s.db.QueryRow(ctx, `SELECT user_id FROM sessions WHERE id = $1`, sessionID).Scan(&owner); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrSessionNotFound
+		}
+		return err
+	}
+	if owner != userID {
+		return ErrSessionNotFound
+	}
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	rows, err := tx.Query(ctx, `SELECT exercise_id FROM session_exercises WHERE session_id = $1 FOR UPDATE`, sessionID)
+	if err != nil {
+		return err
+	}
+	current := map[uuid.UUID]bool{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return err
+		}
+		current[id] = true
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	seen := map[uuid.UUID]bool{}
+	for _, id := range exerciseIDs {
+		if !current[id] || seen[id] {
+			return ErrExerciseOrder
+		}
+		seen[id] = true
+	}
+	if len(seen) != len(current) {
+		return ErrExerciseOrder
+	}
+	if _, err := tx.Exec(ctx,
+		`UPDATE session_exercises se SET position = u.ord
+		 FROM unnest($2::uuid[]) WITH ORDINALITY AS u(id, ord)
+		 WHERE se.session_id = $1 AND se.exercise_id = u.id`,
+		sessionID, exerciseIDs,
+	); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 // ─── Sessions ─────────────────────────────────────────────────────────────────

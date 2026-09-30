@@ -458,6 +458,11 @@ export class JymService {
     return this.http.post<SessionExercise>(`${API_URL}/sessions/${sessionId}/exercises`, { exercise_id: exerciseId });
   }
 
+  /** Sets a workout's order; the list names each of its exercises once. */
+  reorderSessionExercises(sessionId: string, exerciseIds: string[]): Observable<void> {
+    return this.http.put<void>(`${API_URL}/sessions/${sessionId}/exercises/order`, { exercise_ids: exerciseIds });
+  }
+
   /** Removes an entire exercise block from a session — every logged set for it, in one call. */
   deleteSessionExercise(sessionId: string, exerciseId: string): Observable<void> {
     return this.http.delete<void>(`${API_URL}/sessions/${sessionId}/exercises/${exerciseId}`);

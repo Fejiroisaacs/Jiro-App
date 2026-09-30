@@ -258,6 +258,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 				jym.PUT("/sets/:id", jymHandler.UpdateSet)
 				jym.DELETE("/sets/:id", jymHandler.DeleteSet)
 				jym.POST("/sessions/:id/exercises", jymHandler.AddSessionExercise)
+				jym.PUT("/sessions/:id/exercises/order", jymHandler.ReorderSessionExercises)
 				jym.DELETE("/sessions/:id/exercises/:exercise_id", jymHandler.DeleteSessionExercise)
 				jym.GET("/sessions/:id/summary", jymHandler.GetSessionReport)
 

@@ -231,3 +231,44 @@ func TestBackfillGivesOldWorkoutsTheirList(t *testing.T) {
 		t.Fatalf("open workout: %q", got)
 	}
 }
+
+func TestReorderNeedsEveryExerciseOnce(t *testing.T) {
+	svc, userID := testJymDB(t)
+	ctx := context.Background()
+	squat := prTestSetup(t, svc, userID, "Squat")
+	bench := prTestSetup(t, svc, userID, "Bench")
+	curl := prTestSetup(t, svc, userID, "Curl")
+	day := planDay(t, svc, userID, squat, bench)
+	sess, err := svc.StartSession(ctx, userID, &models.CreateSessionRequest{RoutineID: &day, Force: true})
+	if err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	if _, err := svc.AddSessionExercise(ctx, userID, sess.ID, curl); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	if err := svc.ReorderSessionExercises(ctx, userID, sess.ID, []uuid.UUID{curl, squat, bench}); err != nil {
+		t.Fatalf("reorder: %v", err)
+	}
+	if got := listOf(t, svc, userID, sess.ID); got != "Curl:- Squat:3x5 Bench:3x5" {
+		t.Fatalf("after reorder: %q", got)
+	}
+	// A new exercise still goes last.
+	row := prTestSetup(t, svc, userID, "Row")
+	logSet(t, svc, userID, sess.ID, row, 1, 60, 8)
+	if got := listOf(t, svc, userID, sess.ID); got != "Curl:- Squat:3x5 Bench:3x5 Row:-" {
+		t.Fatalf("after logging a new one: %q", got)
+	}
+	for name, ids := range map[string][]uuid.UUID{
+		"missing one":  {curl, squat, bench},
+		"repeated one": {curl, squat, bench, row, row},
+		"a stranger":   {curl, squat, bench, uuid.New()},
+	} {
+		if err := svc.ReorderSessionExercises(ctx, userID, sess.ID, ids); err != ErrExerciseOrder {
+			t.Fatalf("%s: got %v, want ErrExerciseOrder", name, err)
+		}
+	}
+	_, other := testJymDB(t)
+	if err := svc.ReorderSessionExercises(ctx, other, sess.ID, []uuid.UUID{curl, squat, bench, row}); err != ErrSessionNotFound {
+		t.Fatalf("another user: got %v, want ErrSessionNotFound", err)
+	}
+}
