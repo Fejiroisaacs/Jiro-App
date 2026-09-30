@@ -37,6 +37,7 @@ import { JiroMenuComponent, JiroMenuItem } from '../../../shared/components/jiro
 import { RestTimer } from './rest-timer';
 import { RestRowComponent } from './rest-row';
 import { PlatesSheetComponent } from './plates-sheet';
+import { OptionsSheetComponent, SetSheetComponent } from './player-sheets';
 import { SaveTemplateDialogComponent } from '../shared/save-template-dialog';
 import { ToastService } from '../../../core/services/toast.service';
 import { ConfirmService } from '../../../core/services/confirm.service';
@@ -45,7 +46,7 @@ import { ConfirmService } from '../../../core/services/confirm.service';
 @Component({
   selector: 'app-session-player',
   standalone: true,
-  imports: [FormsModule, JiroButtonComponent, JiroModalComponent, JiroIconComponent, JiroSkeletonComponent, JiroEmptyStateComponent, JymPrBadgeComponent, SaveTemplateDialogComponent, JiroMenuComponent, RestRowComponent, PlatesSheetComponent],
+  imports: [FormsModule, JiroButtonComponent, JiroModalComponent, JiroIconComponent, JiroSkeletonComponent, JiroEmptyStateComponent, JymPrBadgeComponent, SaveTemplateDialogComponent, JiroMenuComponent, RestRowComponent, PlatesSheetComponent, OptionsSheetComponent, SetSheetComponent],
   template: `
     <h1 class="sr-only">Active session</h1>
     <!-- Sticky bar: the clock, the options, and Finish; everything else waits in the options sheet. -->
@@ -413,56 +414,11 @@ import { ConfirmService } from '../../../core/services/confirm.service';
 
     <!-- Workout options: type, units, rest, and leaving -->
     @if (showOptions()) {
-      <jiro-modal sheet title="Workout options" maxWidth="440px" (close)="showOptions.set(false)">
-        <div class="opt-group" role="group" aria-labelledby="opt-type-label">
-          <span class="opt-label" id="opt-type-label">Type</span>
-          <div class="seg">
-            @for (t of sessionTypes; track t.value) {
-              <button type="button" class="seg-btn" [class.active]="sessionType() === t.value" [attr.aria-pressed]="sessionType() === t.value" (click)="setSessionType(t.value)">{{ t.label }}</button>
-            }
-          </div>
-          <p class="opt-help">{{ typeHelp() }}</p>
-        </div>
-
-        <div class="opt-group" role="group" aria-labelledby="opt-unit-label">
-          <span class="opt-label" id="opt-unit-label">Units</span>
-          <div class="seg">
-            @for (u of units; track u) {
-              <button type="button" class="seg-btn" [class.active]="settingsService.weightUnit() === u" [attr.aria-pressed]="settingsService.weightUnit() === u" (click)="toggleUnit(u)">{{ u }}</button>
-            }
-          </div>
-          <p class="opt-help">Your account's unit, the same one as in Settings.</p>
-        </div>
-
-        @if (!fix) {
-        <div class="opt-group" role="group" aria-labelledby="opt-rest-label">
-          <span class="opt-label" id="opt-rest-label">Rest timer</span>
-          <div class="seg">
-            @for (d of restPresets; track d) {
-              <button type="button" class="seg-btn" [class.active]="restSetting() === d" [attr.aria-pressed]="restSetting() === d" (click)="setRestDefault(d)">{{ restPresetLabel(d) }}</button>
-            }
-          </div>
-          <p class="opt-help">Starts after each logged set. Remembered for next time.</p>
-        </div>
-        }
-
-        <div class="opt-actions">
-          <button type="button" class="opt-row" (click)="showOptions.set(false); showTemplateSave.set(true)">
-            <jiro-icon name="floppy-disk" [size]="18" />
-            <span class="opt-row-text">Save as template</span>
-          </button>
-          @if (!fix) {
-          <button type="button" class="opt-row" (click)="exitSession()">
-            <jiro-icon name="sign-out" [size]="18" />
-            <span class="opt-row-text">Leave for now<small>The workout stays open. Resume it from Jym.</small></span>
-          </button>
-          <button type="button" class="opt-row opt-row--danger" [disabled]="discarding()" (click)="discardSession()">
-            <jiro-icon name="trash" [size]="18" />
-            <span class="opt-row-text">{{ discarding() ? 'Discarding...' : 'Discard workout' }}</span>
-          </button>
-          }
-        </div>
-      </jiro-modal>
+      <jym-options-sheet
+        [sessionType]="sessionType()" [restSetting]="restSetting()" [fix]="fix" [discarding]="discarding()"
+        (type)="setSessionType($event)" (unit)="toggleUnit($event)" (rest)="setRestDefault($event)"
+        (saveTemplate)="showOptions.set(false); showTemplateSave.set(true)"
+        (leave)="exitSession()" (discard)="discardSession()" (close)="showOptions.set(false)" />
     }
 
     @if (showTemplateSave()) {
@@ -471,22 +427,8 @@ import { ConfirmService } from '../../../core/services/confirm.service';
 
     <!-- One set: warm-up or working, and remove -->
     @if (setSheetRow(); as ref) {
-      <jiro-modal sheet [title]="'Set ' + ref.row.setNumber" maxWidth="400px" (close)="setSheet.set(null)">
-        <p class="sheet-sub">{{ ref.summary }}</p>
-        <div class="opt-actions opt-actions--plain">
-          <button type="button" class="opt-row" (click)="toggleWarmupFromSheet()">
-            <jiro-icon name="fire" [size]="18" />
-            <span class="opt-row-text">
-              {{ ref.row.isWarmup ? 'Make it a working set' : 'Mark as warm-up' }}
-              <small>{{ ref.row.isWarmup ? 'It counts for volume and records again.' : "Warm-ups don't count for volume or records." }}</small>
-            </span>
-          </button>
-          <button type="button" class="opt-row opt-row--danger" (click)="removeSetFromSheet()">
-            <jiro-icon name="trash" [size]="18" />
-            <span class="opt-row-text">Remove set</span>
-          </button>
-        </div>
-      </jiro-modal>
+      <jym-set-sheet [setNumber]="ref.row.setNumber" [summary]="ref.summary" [isWarmup]="ref.row.isWarmup"
+        (toggleWarmup)="toggleWarmupFromSheet()" (remove)="removeSetFromSheet()" (close)="setSheet.set(null)" />
     }
 
     <!-- Plates for one side of the bar, from the account's bar and plates -->
@@ -598,39 +540,6 @@ import { ConfirmService } from '../../../core/services/confirm.service';
     .template-save-error {
       font-size: var(--font-size-sm); color: var(--color-negative); margin-top: var(--space-xs);
     }
-
-    /* Workout options sheet */
-    .opt-group { margin-bottom: var(--space-lg); }
-    .opt-label { display: block; font-size: var(--font-size-sm); font-weight: 600; margin-bottom: var(--space-xs); }
-    .opt-help { font-size: var(--font-size-xs); color: var(--text-secondary); margin-top: var(--space-xs); line-height: 1.5; }
-
-    .seg {
-      display: flex; border: 1px solid var(--border-color); border-radius: var(--border-radius);
-      overflow: hidden; background: var(--bg-surface);
-    }
-    .seg-btn {
-      flex: 1; min-height: 44px; padding: 0 var(--space-xs);
-      background: none; border: none; color: var(--text-primary);
-      font-size: var(--font-size-sm); font-family: inherit; cursor: pointer; white-space: nowrap;
-    }
-    .seg-btn + .seg-btn { border-left: 1px solid var(--border-color); }
-    .seg-btn:hover:not(.active) { background: var(--bg-surface-hover); }
-    .seg-btn.active { background: var(--color-primary); color: var(--text-on-primary); font-weight: 600; }
-
-    .opt-actions { border-top: 1px solid var(--border-color); padding-top: var(--space-sm); display: flex; flex-direction: column; }
-    .opt-row {
-      display: flex; align-items: center; gap: var(--space-md); width: 100%;
-      min-height: 52px; padding: var(--space-sm) var(--space-xs);
-      background: none; border: none; border-radius: var(--border-radius);
-      color: var(--text-primary); font-size: var(--font-size-md); font-family: inherit;
-      text-align: left; cursor: pointer;
-    }
-    .opt-row:hover:not(:disabled) { background: var(--bg-surface-hover); }
-    .opt-row:disabled { opacity: 0.6; cursor: not-allowed; }
-    .opt-row jiro-icon { color: var(--text-secondary); flex-shrink: 0; }
-    .opt-row-text { display: flex; flex-direction: column; gap: 2px; }
-    .opt-row-text small { font-size: var(--font-size-xs); color: var(--text-secondary); }
-    .opt-row--danger, .opt-row--danger jiro-icon { color: var(--color-negative); }
 
     .type-notice {
       text-align: center; font-size: var(--font-size-sm); font-weight: 500;
@@ -908,7 +817,6 @@ import { ConfirmService } from '../../../core/services/confirm.service';
     .edit-btn--save { background: var(--color-primary); border-color: var(--color-primary); color: var(--text-on-primary); }
     .edit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    .sheet-sub { font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-sm); }
 
     /* Warm-up prompt: shown above the rows until a set is logged. */
     .warmup-prompt {
@@ -931,7 +839,6 @@ import { ConfirmService } from '../../../core/services/confirm.service';
     }
     .plates-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
 
-    .opt-actions--plain { border-top: none; padding-top: 0; }
 
     .spinner-sm {
       width: 14px; height: 14px;
@@ -1121,17 +1028,6 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   private readonly confirmService = inject(ConfirmService);
   removingBlock = signal<number | null>(null);
 
-  readonly sessionTypes = [
-    { value: 'normal', label: 'Normal' },
-    { value: 'deload', label: 'Deload' },
-    { value: 'test', label: 'Test' },
-  ];
-  readonly units = ['lbs', 'kg'];
-  readonly typeHelp = computed(() => ({
-    deload: "A lighter workout. It doesn't set records or change next time's suggestion.",
-    test: "A max attempt. Records count, but next time's suggestion ignores it.",
-  } as Record<string, string>)[this.sessionType()] ?? "Counts for records and next time's suggestion.");
-
   // Inline exercise creation
   creatingExercise = signal(false);
   newExName = '';
@@ -1181,7 +1077,6 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
 
   // Rest timer: this rest (rest-timer.ts); restSetting is how long every rest starts at.
   readonly rest = new RestTimer();
-  readonly restPresets = [60, 90, 120, 180, 300];
   private readonly restChoice = signal<number | null>(null);
   readonly restSetting = computed(() => this.restChoice() ?? this.settingsService.restSeconds());
 
@@ -1327,12 +1222,6 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
         this.toast.error('Could not save the rest timer.');
       },
     });
-  }
-
-  restPresetLabel(seconds: number): string {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return s ? `${m}:${String(s).padStart(2, '0')}` : `${m}m`;
   }
 
   private startTimer() {
@@ -1746,7 +1635,6 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     setTimeout(() => document.getElementById('add-set-' + exerciseId)?.focus({ preventScroll: true }));
   }
 
-  /** The weight an exercise works at next: the first unlogged working row, typed or ghosted, else the last logged. */
   /** Warm-up sets to offer: before anything is logged or marked warm-up, and only above the bar. */
   warmupRampFor(block: ExerciseBlock): { weight: number; reps: number }[] | null {
     if (block.sets.some(s => s.saved || s.isWarmup)) return null;

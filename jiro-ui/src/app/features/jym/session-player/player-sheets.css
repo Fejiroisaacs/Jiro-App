@@ -1,0 +1,35 @@
+/* The player's bottom sheets share one look: labelled groups, segmented choices and full-width action rows. */
+.opt-group { margin-bottom: var(--space-lg); }
+.opt-label { display: block; font-size: var(--font-size-sm); font-weight: 600; margin-bottom: var(--space-xs); }
+.opt-help { font-size: var(--font-size-xs); color: var(--text-secondary); margin-top: var(--space-xs); line-height: 1.5; }
+
+.seg {
+  display: flex; border: 1px solid var(--border-color); border-radius: var(--border-radius);
+  overflow: hidden; background: var(--bg-surface);
+}
+.seg-btn {
+  flex: 1; min-height: 44px; padding: 0 var(--space-xs);
+  background: none; border: none; color: var(--text-primary);
+  font-size: var(--font-size-sm); font-family: inherit; cursor: pointer; white-space: nowrap;
+}
+.seg-btn + .seg-btn { border-left: 1px solid var(--border-color); }
+.seg-btn:hover:not(.active) { background: var(--bg-surface-hover); }
+.seg-btn.active { background: var(--color-primary); color: var(--text-on-primary); font-weight: 600; }
+
+.opt-actions { border-top: 1px solid var(--border-color); padding-top: var(--space-sm); display: flex; flex-direction: column; }
+.opt-row {
+  display: flex; align-items: center; gap: var(--space-md); width: 100%;
+  min-height: 52px; padding: var(--space-sm) var(--space-xs);
+  background: none; border: none; border-radius: var(--border-radius);
+  color: var(--text-primary); font-size: var(--font-size-md); font-family: inherit;
+  text-align: left; cursor: pointer;
+}
+.opt-row:hover:not(:disabled) { background: var(--bg-surface-hover); }
+.opt-row:disabled { opacity: 0.6; cursor: not-allowed; }
+.opt-row jiro-icon { color: var(--text-secondary); flex-shrink: 0; }
+.opt-row-text { display: flex; flex-direction: column; gap: 2px; }
+.opt-row-text small { font-size: var(--font-size-xs); color: var(--text-secondary); }
+.opt-row--danger, .opt-row--danger jiro-icon { color: var(--color-negative); }
+.opt-actions--plain { border-top: none; padding-top: 0; }
+
+.sheet-sub { font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-sm); }
