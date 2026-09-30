@@ -27,7 +27,9 @@ Jym is the gym tracking module of the Fejiro app. This document describes every 
 ### Exercises
 A personal exercise dictionary. Each exercise has a **name**, optional **muscle group**, and optional **notes**. Exercise names are unique per user.
 
-- Create, edit, and delete exercises from the library (`/jym/exercises`).
+- Create, edit, and delete exercises from the library (`/jym/exercises`). Setting the muscle group to None or emptying the notes clears them.
+- The muscle-group filter ignores case and spacing, so "Chest" also finds "chest ".
+- An exercise with no record yet (warm-ups only) shows when it was last trained, counted in calendar days in your timezone.
 - Renaming an exercise automatically updates the name across all historical sessions — no data is lost because sets reference the exercise by ID, not by name.
 - Deleting an exercise permanently removes all sets ever logged with it (cascading delete) — the library warns you before confirming.
 
@@ -35,7 +37,12 @@ A personal exercise dictionary. Each exercise has a **name**, optional **muscle 
 A **split** is a named training plan (e.g. "PPL", "Upper/Lower"). It contains one or more **routines** (e.g. "Push Day", "Pull Day"). Each routine has an ordered list of exercises with target sets and reps.
 
 - Build splits at `/jym/splits/:id` using the drag-and-drop routine builder.
-- Reorder exercises within a routine or move them between routines by dragging.
+- Reorder exercises within a routine or move them between routines by dragging. On a phone the board scrolls sideways as you drag toward its edge.
+- Saves run one after another, so quick edits in a row all stick.
+- **Add day** suggests the number after the last day. Tap a day's name to rename it; the arrows move it earlier or later (swapping day numbers with its neighbour).
+- **Share** makes a link that lasts 30 days, or shows the live one if there is one; each live link is listed with Copy and Revoke (`GET /jym/splits/:id/shares`).
+- Importing a split, from a share link or Discover, then **Open it**, takes you to your copy. Importing the same split again opens that copy instead of making another (`splits.source_split_id`, migration 000038). Delete the copy to import it fresh.
+- Discover's tag filter ignores case. Its pager stays on later pages, and a page past the end steps back and turns Next off.
 - Multiple splits can exist simultaneously; only one is active at a time via a series.
 
 ### Split Series
@@ -145,6 +152,20 @@ At `/jym/sessions/:id/summary`, built by the server (`GET /jym/sessions/:id/summ
 - **Last time**: the lift's best set from its latest finished normal workout before this one, with the change in estimated 1RM. A record needs no change shown, and a deload isn't compared.
 - The share card ranks its top lifts by estimated 1RM, bodyweight lifts after them by reps.
 
+### Fixing a Workout
+**Edit workout** (on the summary, and in history's detail) opens a finished workout in the player at `/jym/sessions/:id/edit`:
+- The bar says "Editing" and the workout's date, with **Done**. There's no clock, rest timer or draft, and Workout options keeps only the type, units and Save as template.
+- Sets can be added, changed and deleted. An added set is sent with `fix: true` and the server times it inside the workout: a second after its last set, never past its end. So records are rated in the workout's own time: a heavier set added to last week's workout becomes the record then, and a later equal set isn't one.
+- **Done** returns to the summary, first asking about typed sets that weren't ticked, like Finish.
+- Without `fix`, logging into a finished workout is still refused (`SESSION_ENDED`), so a phone that missed the finish is sent to the summary.
+
+### Logging a Past Workout
+**Log past workout** (in history's header and empty state, and on the Jym home before your first workout) and **Log a workout** (on a past day's page) open a sheet:
+- **Started** and **Finished** (default 6 to 7 PM on the day), and the workout: Freestyle, a day of one of your splits, or a template.
+- The workout is created finished (`started_at` and `ended_at` on `POST /jym/sessions`), then opens for fixing so you can add the sets.
+- The end is after the start, at most 24 hours later, not in the future, and within the last year. A logged past workout isn't an open one, so it never blocks starting.
+- A split day joins the split's active series only if the workout falls on or after the series' start.
+
 ---
 
 ## Session History
@@ -187,7 +208,7 @@ At `/jym/prs`: a grid of cards showing your **all-time best set** for every exer
 - Estimated 1RM
 - Date achieved
 
-PR cards are sorted by estimated 1RM descending (your biggest lifts first). Warm-up sets are excluded from PR tracking.
+PR cards are sorted by estimated 1RM descending (your biggest lifts first). Warm-up sets are excluded from PR tracking. Muscle groups are grouped ignoring case and spacing, and shown title-cased.
 
 ---
 

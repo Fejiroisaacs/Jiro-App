@@ -14,6 +14,7 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
+import { LogPastDialogComponent } from '../shared/log-past-dialog';
 import { suggestDeload } from '../deload-rule';
 import { formatDay, formatInstant } from '../../../core/utils/format-date';
 import { isStale } from '../stale-workout';
@@ -29,7 +30,7 @@ const DELOAD_SNOOZE_DAYS = 7;
   standalone: true,
   imports: [
     RouterLink, DecimalPipe, JiroButtonComponent, JiroModalComponent, JiroIconComponent,
-    JiroPageHeaderComponent, JiroEmptyStateComponent, JiroSkeletonComponent,
+    JiroPageHeaderComponent, JiroEmptyStateComponent, JiroSkeletonComponent, LogPastDialogComponent,
   ],
   template: `
     <div class="jym-dash">
@@ -191,7 +192,14 @@ const DELOAD_SNOOZE_DAYS = 7;
 }
         </div>
       </div>
+} @else if (!loading() && !loadError() && inProgressSessions().length === 0) {
+        <jiro-empty-state compact heading="No workouts yet" message="Start one above, or log a workout you did without the app.">
+          <jiro-button size="lg" variant="secondary" type="button" (click)="showLogPast.set(true)">Log past workout</jiro-button>
+        </jiro-empty-state>
 }
+      @if (showLogPast()) {
+        <jym-log-past-dialog (close)="showLogPast.set(false)" />
+      }
 
       <!-- Active Series -->
       @if (activeSeries().length > 0) {
@@ -670,6 +678,7 @@ export class JymDashboardComponent implements OnInit {
   loading = signal(true);
   templatesLoading = signal(true);
   loadError = signal(false);
+  showLogPast = signal(false);
 
   hasCompletedSessions = computed(() => this.allSessions().some(s => !!s.ended_at));
 
