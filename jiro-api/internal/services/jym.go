@@ -797,6 +797,130 @@ func (s *JymService) listRoutineItems(ctx context.Context, routineID uuid.UUID) 
 	return result, rows.Err()
 }
 
+// ─── A workout's own exercise list ────────────────────────────────────────────
+
+// listSessionExercises is a workout's list in order.
+func listSessionExercises(ctx context.Context, q querier, sessionID uuid.UUID) ([]models.SessionExercise, error) {
+	rows, err := q.Query(ctx,
+		`SELECT se.exercise_id, e.name, e.muscle_group, se.position, se.target_sets, se.target_reps
+		 FROM session_exercises se JOIN exercises e ON e.id = se.exercise_id
+		 WHERE se.session_id = $1
+		 ORDER BY se.position, se.exercise_id`,
+		sessionID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	list := []models.SessionExercise{}
+	for rows.Next() {
+		var x models.SessionExercise
+		if err := rows.Scan(&x.ExerciseID, &x.ExerciseName, &x.MuscleGroup, &x.Position, &x.TargetSets, &x.TargetReps); err != nil {
+			return nil, err
+		}
+		list = append(list, x)
+	}
+	return list, rows.Err()
+}
+
+// seedSessionExercises gives a new workout its list: the given exercises in order (Repeat), else the routine's items.
+// Targets come from the routine wherever an exercise is in it; an exercise that isn't the user's is ErrExerciseNotFound.
+func seedSessionExercises(ctx context.Context, tx pgx.Tx, userID, sessionID uuid.UUID, routineID *uuid.UUID, exerciseIDs []uuid.UUID) error {
+	if len(exerciseIDs) > 0 {
+		distinct := map[uuid.UUID]bool{}
+		for _, id := range exerciseIDs {
+			distinct[id] = true
+		}
+		tag, err := tx.Exec(ctx,
+			`INSERT INTO session_exercises (session_id, exercise_id, position, target_sets, target_reps)
+			 SELECT $1, d.id, ROW_NUMBER() OVER (ORDER BY d.ord), ri.target_sets, ri.target_reps
+			 FROM (SELECT DISTINCT ON (u.id) u.id, u.ord
+			       FROM unnest($2::uuid[]) WITH ORDINALITY AS u(id, ord) ORDER BY u.id, u.ord) d
+			 JOIN exercises e ON e.id = d.id AND e.user_id = $3
+			 LEFT JOIN LATERAL (SELECT target_sets, target_reps FROM routine_items
+			                    WHERE routine_id = $4 AND exercise_id = d.id
+			                    ORDER BY order_index, id LIMIT 1) ri ON TRUE`,
+			sessionID, exerciseIDs, userID, routineID,
+		)
+		if err != nil {
+			return err
+		}
+		if int(tag.RowsAffected()) != len(distinct) {
+			return ErrExerciseNotFound
+		}
+		return nil
+	}
+	if routineID == nil {
+		return nil
+	}
+	_, err := tx.Exec(ctx,
+		`INSERT INTO session_exercises (session_id, exercise_id, position, target_sets, target_reps)
+		 SELECT $1, fi.exercise_id, ROW_NUMBER() OVER (ORDER BY fi.order_index, fi.id), fi.target_sets, fi.target_reps
+		 FROM (SELECT DISTINCT ON (exercise_id) exercise_id, target_sets, target_reps, order_index, id
+		       FROM routine_items WHERE routine_id = $2 ORDER BY exercise_id, order_index, id) fi`,
+		sessionID, *routineID,
+	)
+	return err
+}
+
+// ensureSessionExercise puts an exercise on a workout's list, last, with its routine's targets if it has them.
+func ensureSessionExercise(ctx context.Context, tx pgx.Tx, sessionID, exerciseID uuid.UUID) error {
+	_, err := tx.Exec(ctx,
+		`INSERT INTO session_exercises (session_id, exercise_id, position, target_sets, target_reps)
+		 SELECT s.id, $2,
+		        COALESCE((SELECT MAX(x.position) FROM session_exercises x WHERE x.session_id = s.id), 0) + 1,
+		        ri.target_sets, ri.target_reps
+		 FROM sessions s
+		 LEFT JOIN LATERAL (SELECT target_sets, target_reps FROM routine_items
+		                    WHERE routine_id = s.routine_id AND exercise_id = $2
+		                    ORDER BY order_index, id LIMIT 1) ri ON TRUE
+		 WHERE s.id = $1
+		 ON CONFLICT (session_id, exercise_id) DO NOTHING`,
+		sessionID, exerciseID,
+	)
+	return err
+}
+
+// AddSessionExercise puts an exercise on a workout's list, last; one already there stays where it is.
+func (s *JymService) AddSessionExercise(ctx context.Context, userID, sessionID, exerciseID uuid.UUID) (*models.SessionExercise, error) {
+	var owner uuid.UUID
+	if err := s.db.QueryRow(ctx, `SELECT user_id FROM sessions WHERE id = $1`, sessionID).Scan(&owner); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSessionNotFound
+		}
+		return nil, err
+	}
+	if owner != userID {
+		return nil, ErrSessionNotFound
+	}
+	if owned, err := s.ownsExercise(ctx, exerciseID, userID); err != nil {
+		return nil, err
+	} else if !owned {
+		return nil, ErrExerciseNotFound
+	}
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	if err := ensureSessionExercise(ctx, tx, sessionID, exerciseID); err != nil {
+		return nil, err
+	}
+	list, err := listSessionExercises(ctx, tx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	for i := range list {
+		if list[i].ExerciseID == exerciseID {
+			return &list[i], nil
+		}
+	}
+	return nil, ErrExerciseNotFound
+}
+
 // ─── Sessions ─────────────────────────────────────────────────────────────────
 
 // Exercise, routine and series ids arrive in request bodies and the reads that
@@ -912,14 +1036,29 @@ func (s *JymService) StartSession(ctx context.Context, userID uuid.UUID, req *mo
 		}
 	}
 
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
 	sess := &models.StartSessionResponse{}
-	err := s.db.QueryRow(ctx,
+	err = tx.QueryRow(ctx,
 		`INSERT INTO sessions (user_id, routine_id, series_id, session_type, started_at, ended_at)
 		 VALUES ($1, $2, $3, $4, COALESCE($5, NOW()), $6)
 		 RETURNING id, user_id, routine_id, series_id, session_type, started_at, ended_at, notes`,
 		userID, req.RoutineID, seriesID, sessionType, req.StartedAt, req.EndedAt,
 	).Scan(&sess.ID, &sess.UserID, &sess.RoutineID, &sess.SeriesID, &sess.SessionType, &sess.StartedAt, &sess.EndedAt, &sess.Notes)
 	if err != nil {
+		return nil, err
+	}
+	// The workout keeps its own list, so a later edit to the routine doesn't change it.
+	if err := seedSessionExercises(ctx, tx, userID, sess.ID, req.RoutineID, req.ExerciseIDs); err != nil {
+		return nil, err
+	}
+	if sess.Exercises, err = listSessionExercises(ctx, tx, sess.ID); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
 
@@ -1160,6 +1299,9 @@ func (s *JymService) GetSession(ctx context.Context, userID, sessionID uuid.UUID
 		if items != nil {
 			sess.Targets = items
 		}
+	}
+	if sess.Exercises, err = listSessionExercises(ctx, s.db, sessionID); err != nil {
+		return nil, err
 	}
 	return sess, nil
 }
@@ -1422,6 +1564,12 @@ func (s *JymService) DeleteSessionExercise(ctx context.Context, userID, sessionI
 			return err
 		}
 	}
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM session_exercises WHERE session_id = $1 AND exercise_id = $2`,
+		sessionID, exerciseID,
+	); err != nil {
+		return err
+	}
 	return tx.Commit(ctx)
 }
 
@@ -1668,6 +1816,9 @@ func (s *JymService) LogSet(ctx context.Context, userID, sessionID uuid.UUID, re
 	).Scan(&set.ID, &set.SessionID, &set.ExerciseID, &set.SetNumber, &set.Weight,
 		&set.RepsPerformed, &set.RPE, &set.IsPR, &set.IsWarmup, &set.ExerciseNote, &set.CreatedAt)
 	if err != nil {
+		return nil, err
+	}
+	if err := ensureSessionExercise(ctx, tx, sessionID, req.ExerciseID); err != nil {
 		return nil, err
 	}
 	if _, err := rerateExercisePRs(ctx, tx, userID, req.ExerciseID); err != nil {
