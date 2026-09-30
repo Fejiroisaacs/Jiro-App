@@ -98,14 +98,14 @@ import { formatInstant } from '../../../core/utils/format-date';
 }
 
       <!-- Pagination -->
-      @if (!loading() && splits().length > 0) {
+      @if (!loading() && (splits().length > 0 || page() > 1)) {
 <div class="pagination">
-        <button class="page-btn" [disabled]="page() <= 1" (click)="changePage(-1)">
+        <button class="page-btn" type="button" [disabled]="page() <= 1" (click)="changePage(-1)">
           <jiro-icon name="caret-left" [size]="14" />
           Prev
         </button>
         <span class="page-label text-secondary">Page {{ page() }}</span>
-        <button class="page-btn" [disabled]="splits().length < pageSize" (click)="changePage(1)">
+        <button class="page-btn" type="button" [disabled]="splits().length < pageSize || atEnd()" (click)="changePage(1)">
           Next
           <jiro-icon name="caret-right" [size]="14" />
         </button>
@@ -189,8 +189,8 @@ import { formatInstant } from '../../../core/utils/format-date';
 
     .page-btn {
       display: flex; align-items: center; gap: 6px;
-      padding: 8px 16px; border: 1px solid var(--border-color);
-      border-radius: var(--border-radius); background: var(--bg-surface);
+      min-height: 44px; padding: 8px 16px; border: 1px solid var(--border-color);
+      border-radius: var(--border-radius); background: var(--bg-surface); font-family: inherit;
       color: var(--text-primary); font-size: var(--font-size-sm);
       cursor: pointer; transition: all 0.15s;
     }
@@ -208,6 +208,8 @@ export class DiscoverComponent implements OnInit {
   loading = signal(false);
   searched = signal(false);
   page = signal(1);
+  /** The page after this one came back empty. */
+  atEnd = signal(false);
 
   readonly pageSize = 20;
 
@@ -225,10 +227,12 @@ export class DiscoverComponent implements OnInit {
 
   search() {
     this.page.set(1);
+    this.atEnd.set(false);
     this.doSearch();
   }
 
   changePage(delta: number) {
+    if (delta < 0) this.atEnd.set(false);
     this.page.update(p => p + delta);
     this.doSearch();
   }
@@ -242,6 +246,12 @@ export class DiscoverComponent implements OnInit {
       this.page(),
     ).subscribe({
       next: results => {
+        if (results.length === 0 && this.page() > 1) {
+          this.atEnd.set(true);
+          this.page.update(p => p - 1);
+          this.doSearch();
+          return;
+        }
         this.splits.set(results);
         this.loading.set(false);
         this.searched.set(true);

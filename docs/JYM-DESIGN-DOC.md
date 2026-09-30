@@ -21,7 +21,6 @@ CREATE TABLE exercises (
     user_id UUID REFERENCES users(id) NOT NULL,
     name VARCHAR(100) NOT NULL,           -- "Squat"
     muscle_group VARCHAR(50),             -- "Legs", "Chest"
-    media_url VARCHAR(512),               -- R2 link to demo video
     notes TEXT,                           -- "Keep back straight"
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

@@ -9,6 +9,12 @@ import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { formatInstant } from '../../../core/utils/format-date';
 
+/** A muscle group as one label whatever its case or spacing: " chest" and "Chest" are "Chest". */
+function muscleGroupLabel(mg: string | null): string {
+  const words = (mg ?? '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+  return words.length ? words.map(w => w[0].toUpperCase() + w.slice(1)).join(' ') : 'Other';
+}
+
 @Component({
   selector: 'app-pr-wall',
   standalone: true,
@@ -195,7 +201,7 @@ export class PrWallComponent implements OnInit {
   groupedPRs = computed(() => {
     const groups = new Map<string, ExercisePR[]>();
     for (const pr of this.prs()) {
-      const mg = pr.muscle_group || 'Other';
+      const mg = muscleGroupLabel(pr.muscle_group);
       if (!groups.has(mg)) groups.set(mg, []);
       groups.get(mg)!.push(pr);
     }
@@ -205,7 +211,7 @@ export class PrWallComponent implements OnInit {
   });
 
   muscleGroupCount = computed(() => {
-    const mgs = new Set(this.prs().map(p => p.muscle_group || 'Other'));
+    const mgs = new Set(this.prs().map(p => muscleGroupLabel(p.muscle_group)));
     return mgs.size;
   });
 

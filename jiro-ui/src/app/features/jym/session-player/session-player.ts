@@ -2138,7 +2138,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
   saveExerciseNote(bi: number) {
     const block = this.blocks()[bi];
     if (!block) return;
-    const note = block.exerciseNote || undefined;
+    const note = (block.exerciseNote || '').trim();
     const savedIds = block.sets.filter(s => s.saved && s.id).map(s => s.id!);
     let warned = false;
     for (const id of savedIds) {

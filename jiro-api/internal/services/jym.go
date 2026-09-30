@@ -112,7 +112,7 @@ func (s *JymService) ListExercises(ctx context.Context, userID uuid.UUID, search
 	}
 	if muscleGroup != "" {
 		args = append(args, muscleGroup)
-		query += ` AND e.muscle_group = $` + intStr(len(args))
+		query += ` AND LOWER(TRIM(e.muscle_group)) = LOWER(TRIM($` + intStr(len(args)) + `))`
 	}
 	query += ` ORDER BY e.name ASC`
 
@@ -199,8 +199,8 @@ func (s *JymService) UpdateExercise(ctx context.Context, userID, exerciseID uuid
 	err := s.db.QueryRow(ctx,
 		`UPDATE exercises SET
 		   name         = COALESCE($3, name),
-		   muscle_group = COALESCE($4, muscle_group),
-		   notes        = COALESCE($5, notes),
+		   muscle_group = CASE WHEN $4::TEXT IS NULL THEN muscle_group ELSE NULLIF(TRIM($4), '') END,
+		   notes        = CASE WHEN $5::TEXT IS NULL THEN notes ELSE NULLIF(TRIM($5), '') END,
 		   updated_at   = NOW()
 		 WHERE id = $1 AND user_id = $2
 		 RETURNING id, user_id, name, muscle_group, notes, created_at, updated_at`,
@@ -442,7 +442,7 @@ func (s *JymService) ListPublicSplits(ctx context.Context, search, tag, muscleGr
 		LEFT JOIN routines r ON r.split_id = s.id
 		WHERE s.visibility = 'public'
 		  AND ($1 = '' OR s.name ILIKE '%' || $1 || '%')
-		  AND ($2 = '' OR s.tags && ARRAY[$2]::TEXT[])
+		  AND ($2 = '' OR EXISTS (SELECT 1 FROM unnest(s.tags) t WHERE LOWER(TRIM(t)) = LOWER(TRIM($2))))
 		  AND ($3 = '' OR EXISTS (
 		        SELECT 1 FROM routines r2
 		        JOIN routine_items ri ON ri.routine_id = r2.id
@@ -1697,7 +1697,7 @@ func (s *JymService) UpdateSet(ctx context.Context, userID, setID uuid.UUID, req
 		   reps_performed = COALESCE($4, reps_performed),
 		   rpe            = COALESCE($5, rpe),
 		   is_warmup      = COALESCE($6, is_warmup),
-		   exercise_note  = COALESCE($7, exercise_note)
+		   exercise_note  = CASE WHEN $7::TEXT IS NULL THEN exercise_note ELSE NULLIF(TRIM($7), '') END
 		 WHERE id = $1
 		   AND session_id IN (SELECT id FROM sessions WHERE user_id = $2)
 		 RETURNING id, session_id, exercise_id, set_number, weight, reps_performed, rpe, is_pr, is_warmup, exercise_note, created_at`,
