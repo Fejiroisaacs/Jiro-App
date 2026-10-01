@@ -208,17 +208,17 @@ import { ConfirmService } from '../../../core/services/confirm.service';
     /* Sticky bar */
 
     .session-bar {
-          position: sticky; top: var(--topbar-height, 0px); z-index: var(--z-sticky);
-          background: var(--color-primary); color: var(--text-on-primary);
-          box-shadow: 0 2px 12px rgba(var(--shadow-rgb), 0.25);
-          margin: calc(-1 * var(--space-xl));
-          margin-bottom: var(--space-xl);
-        }
+      position: sticky; top: var(--topbar-height, 0px); z-index: var(--z-sticky);
+      background: var(--color-primary); color: var(--text-on-primary);
+      box-shadow: 0 2px 12px rgba(var(--shadow-rgb), 0.25);
+      margin: calc(-1 * var(--space-xl));
+      margin-bottom: var(--space-xl);
+    }
 
     .session-bar-row {
-          display: flex; align-items: center; justify-content: space-between; gap: var(--space-md);
-          padding: var(--space-sm) var(--space-xl);
-        }
+      display: flex; align-items: center; justify-content: space-between; gap: var(--space-md);
+      padding: var(--space-sm) var(--space-xl);
+    }
 
     .session-bar-left { display: flex; align-items: center; gap: var(--space-md); min-width: 0; }
 
@@ -233,19 +233,19 @@ import { ConfirmService } from '../../../core/services/confirm.service';
     /* On the coloured bar: the icon takes the bar's text colour, as the ghost button does. */
 
     .bar-icon-btn {
-          display: inline-flex; align-items: center; justify-content: center;
-          width: 44px; height: 44px; border-radius: var(--border-radius);
-          border: 1px solid color-mix(in srgb, currentColor 40%, transparent); background: none;
-          color: inherit; cursor: pointer; transition: background 0.15s, border-color 0.15s;
-        }
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 44px; height: 44px; border-radius: var(--border-radius);
+      border: 1px solid color-mix(in srgb, currentColor 40%, transparent); background: none;
+      color: inherit; cursor: pointer; transition: background 0.15s, border-color 0.15s;
+    }
 
     .bar-icon-btn:hover { background: color-mix(in srgb, currentColor 12%, transparent); border-color: color-mix(in srgb, currentColor 75%, transparent); }
 
     .type-notice {
-          text-align: center; font-size: var(--font-size-sm); font-weight: 500;
-          padding: var(--space-xs) var(--space-md); margin-bottom: var(--space-md);
-          border-radius: var(--border-radius);
-        }
+      text-align: center; font-size: var(--font-size-sm); font-weight: 500;
+      padding: var(--space-xs) var(--space-md); margin-bottom: var(--space-md);
+      border-radius: var(--border-radius);
+    }
 
     .deload-notice { background: rgba(var(--color-danger-rgb), 0.1); color: var(--color-danger); border: 1px solid rgba(var(--color-danger-rgb), 0.2); }
 
@@ -256,40 +256,40 @@ import { ConfirmService } from '../../../core/services/confirm.service';
     .player-body { max-width: 700px; overflow-x: hidden; padding-bottom: calc(var(--space-xl) + env(safe-area-inset-bottom)); }
 
     .stale-banner {
-          max-width: 700px; margin-bottom: var(--space-md); padding: var(--space-md);
-          background: rgba(var(--color-warning-rgb), 0.08); border: 1px solid rgba(var(--color-warning-rgb), 0.35);
-          border-radius: var(--border-radius);
-        }
+      max-width: 700px; margin-bottom: var(--space-md); padding: var(--space-md);
+      background: rgba(var(--color-warning-rgb), 0.08); border: 1px solid rgba(var(--color-warning-rgb), 0.35);
+      border-radius: var(--border-radius);
+    }
 
     .stale-text { font-size: var(--font-size-sm); line-height: 1.5; margin-bottom: var(--space-sm); }
 
     .stale-actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
 
     .empty-session-error {
-          max-width: 700px; margin-bottom: var(--space-md); padding: var(--space-sm) var(--space-md);
-          font-size: var(--font-size-sm); color: var(--color-negative);
-          background: rgba(var(--color-danger-rgb), 0.08); border: 1px solid rgba(var(--color-danger-rgb), 0.25);
-          border-radius: var(--border-radius);
-        }
+      max-width: 700px; margin-bottom: var(--space-md); padding: var(--space-sm) var(--space-md);
+      font-size: var(--font-size-sm); color: var(--color-negative);
+      background: rgba(var(--color-danger-rgb), 0.08); border: 1px solid rgba(var(--color-danger-rgb), 0.25);
+      border-radius: var(--border-radius);
+    }
 
     .notes-panel { margin-bottom: var(--space-md); }
 
     .field-label {
-          display: block;
-          font-size: var(--font-size-sm); font-weight: 500;
-          color: var(--text-secondary);
-          margin-bottom: var(--space-xs);
-        }
+      display: block;
+      font-size: var(--font-size-sm); font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: var(--space-xs);
+    }
 
     .notes-input {
-          width: 100%; box-sizing: border-box;
-          padding: var(--space-sm) var(--space-md);
-          border: 1px solid var(--border-color); border-radius: var(--border-radius);
-          background: var(--bg-surface); color: var(--text-primary);
-          font-size: var(--font-size-sm); font-family: inherit;
-          resize: vertical; line-height: 1.5;
-          transition: border-color 0.15s;
-        }
+      width: 100%; box-sizing: border-box;
+      padding: var(--space-sm) var(--space-md);
+      border: 1px solid var(--border-color); border-radius: var(--border-radius);
+      background: var(--bg-surface); color: var(--text-primary);
+      font-size: var(--font-size-sm); font-family: inherit;
+      resize: vertical; line-height: 1.5;
+      transition: border-color 0.15s;
+    }
 
     .notes-input:focus { border-color: var(--color-primary); }
 
@@ -298,43 +298,43 @@ import { ConfirmService } from '../../../core/services/confirm.service';
     /* Body weight panel */
 
     .bw-panel {
-          display: flex; align-items: center; gap: var(--space-md);
-          background: var(--bg-surface); border: 1px solid var(--border-color);
-          border-radius: var(--border-radius); padding: var(--space-sm) var(--space-md);
-          margin-bottom: var(--space-lg);
-        }
+      display: flex; align-items: center; gap: var(--space-md);
+      background: var(--bg-surface); border: 1px solid var(--border-color);
+      border-radius: var(--border-radius); padding: var(--space-sm) var(--space-md);
+      margin-bottom: var(--space-lg);
+    }
 
     .bw-label {
-          font-size: var(--font-size-sm); font-weight: 500;
-          color: var(--text-secondary); white-space: nowrap;
-        }
+      font-size: var(--font-size-sm); font-weight: 500;
+      color: var(--text-secondary); white-space: nowrap;
+    }
 
     .bw-row { display: flex; align-items: center; gap: var(--space-xs); }
 
     .bw-input {
-          width: 96px; min-height: 44px; padding: 6px 10px;
-          border: 1px solid var(--border-color); border-radius: var(--border-radius);
-          background: var(--bg-canvas); color: var(--text-primary);
-          font-size: var(--font-size-sm); font-family: inherit;
-        }
+      width: 96px; min-height: 44px; padding: 6px 10px;
+      border: 1px solid var(--border-color); border-radius: var(--border-radius);
+      background: var(--bg-canvas); color: var(--text-primary);
+      font-size: var(--font-size-sm); font-family: inherit;
+    }
 
     .bw-input:focus { border-color: var(--color-primary); }
 
     .bw-save-btn {
-          min-height: 44px; min-width: 64px; padding: 6px 14px; background: var(--color-primary); color: var(--text-on-primary); font-family: inherit;
-          border: none; border-radius: var(--border-radius);
-          font-size: var(--font-size-sm); font-weight: 500; cursor: pointer;
-          transition: opacity 0.15s;
-        }
+      min-height: 44px; min-width: 64px; padding: 6px 14px; background: var(--color-primary); color: var(--text-on-primary); font-family: inherit;
+      border: none; border-radius: var(--border-radius);
+      font-size: var(--font-size-sm); font-weight: 500; cursor: pointer;
+      transition: opacity 0.15s;
+    }
 
     .bw-save-btn:hover:not(:disabled) { opacity: 0.85; }
 
     .bw-save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
     .bw-logged {
-          display: inline-flex; align-items: center; gap: 4px;
-          font-size: var(--font-size-sm); color: var(--color-accent); font-weight: 500;
-        }
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: var(--font-size-sm); color: var(--color-accent); font-weight: 500;
+    }
 
     .loading-blocks { display: flex; flex-direction: column; gap: var(--space-xl); }
 
@@ -357,12 +357,12 @@ import { ConfirmService } from '../../../core/services/confirm.service';
     /* Warm-up prompt: shown above the rows until a set is logged. */
 
     .add-exercise-btn {
-          width: 100%; padding: var(--space-md);
-          background: none; border: 2px dashed var(--border-color);
-          border-radius: var(--border-radius); color: var(--text-muted);
-          font-size: var(--font-size-sm); font-weight: 500; cursor: pointer;
-          transition: all 0.15s; font-family: inherit; margin-top: var(--space-sm);
-        }
+      width: 100%; padding: var(--space-md);
+      background: none; border: 2px dashed var(--border-color);
+      border-radius: var(--border-radius); color: var(--text-muted);
+      font-size: var(--font-size-sm); font-weight: 500; cursor: pointer;
+      transition: all 0.15s; font-family: inherit; margin-top: var(--space-sm);
+    }
 
     .add-exercise-btn:hover { color: var(--color-primary); border-color: var(--color-primary); background: rgba(var(--color-primary-rgb), 0.04); }
 
@@ -390,8 +390,9 @@ import { ConfirmService } from '../../../core/services/confirm.service';
 
 
     .fc-count {
-          font-size: var(--font-size-xs); color: var(--text-secondary); white-space: nowrap;
-        }
+      font-size: var(--font-size-xs); color: var(--text-secondary); white-space: nowrap;
+    }
+
   `]
 })
 export class SessionPlayerComponent implements OnInit, OnDestroy {
