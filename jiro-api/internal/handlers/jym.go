@@ -88,8 +88,9 @@ func (h *JymHandler) GetExercise(c *gin.Context) {
 	var limit *int
 	if l := c.Query("limit"); l != "" {
 		n, perr := strconv.Atoi(l)
-		if perr != nil || n < 1 || n > 500 {
-			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_LIMIT", Message: "limit must be 1 to 500"}})
+		// 0 returns the header alone, for pages that load the sets another way.
+		if perr != nil || n < 0 || n > 500 {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_LIMIT", Message: "limit must be 0 to 500"}})
 			return
 		}
 		limit = &n
@@ -183,6 +184,99 @@ func (h *JymHandler) GetExerciseFormChecks(c *gin.Context) {
 	}
 	h.signFormChecks(c.Request.Context(), checks)
 	c.JSON(http.StatusOK, checks)
+}
+
+// exerciseParam reads :id, answering 400 itself when it isn't a uuid.
+func exerciseParam(c *gin.Context) (uuid.UUID, bool) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid exercise ID"}})
+		return uuid.Nil, false
+	}
+	return id, true
+}
+
+// exerciseReadError answers a failed exercise read: 404 for a missing or unowned exercise, else 500.
+func exerciseReadError(c *gin.Context, err error, what string) {
+	if errors.Is(err, services.ErrExerciseNotFound) {
+		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Exercise not found"}})
+		return
+	}
+	c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to load " + what}})
+}
+
+func (h *JymHandler) GetExerciseStats(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	exerciseID, ok := exerciseParam(c)
+	if !ok {
+		return
+	}
+	stats, err := h.jymService.GetExerciseStats(c.Request.Context(), userID, exerciseID)
+	if err != nil {
+		exerciseReadError(c, err, "exercise stats")
+		return
+	}
+	c.JSON(http.StatusOK, stats)
+}
+
+func (h *JymHandler) GetRepsAtWeight(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	exerciseID, ok := exerciseParam(c)
+	if !ok {
+		return
+	}
+	weight, err := strconv.ParseFloat(c.Query("weight"), 64)
+	if err != nil || weight < 0 || weight > 2000 {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_WEIGHT", Message: "weight must be a number from 0 to 2000"}})
+		return
+	}
+	list, err := h.jymService.GetRepsAtWeight(c.Request.Context(), userID, exerciseID, weight)
+	if err != nil {
+		exerciseReadError(c, err, "reps at weight")
+		return
+	}
+	c.JSON(http.StatusOK, list)
+}
+
+func (h *JymHandler) ListExerciseWorkouts(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	exerciseID, ok := exerciseParam(c)
+	if !ok {
+		return
+	}
+	limit := 10
+	if l := c.Query("limit"); l != "" {
+		n, perr := strconv.Atoi(l)
+		if perr != nil || n < 1 || n > 50 {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_LIMIT", Message: "limit must be 1 to 50"}})
+			return
+		}
+		limit = n
+	}
+	var before *time.Time
+	beforeID := uuid.Nil
+	if b := c.Query("before"); b != "" {
+		t, perr := time.Parse(time.RFC3339Nano, b)
+		if perr != nil {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_CURSOR", Message: "before must be an RFC 3339 time"}})
+			return
+		}
+		before = &t
+	}
+	if b := c.Query("before_id"); b != "" {
+		id, perr := uuid.Parse(b)
+		if perr != nil {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_CURSOR", Message: "before_id must be a session id"}})
+			return
+		}
+		beforeID = id
+	}
+	list, err := h.jymService.ListExerciseWorkouts(c.Request.Context(), userID, exerciseID, before, beforeID, limit)
+	if err != nil {
+		exerciseReadError(c, err, "workouts")
+		return
+	}
+	c.JSON(http.StatusOK, list)
 }
 
 // ─── Splits ───────────────────────────────────────────────────────────────────

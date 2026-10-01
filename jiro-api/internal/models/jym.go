@@ -45,6 +45,60 @@ type ExerciseWithHistory struct {
 	History    []SetHistory `json:"history"`
 }
 
+// ExerciseStatsWorkout is one workout's numbers for one exercise, over its working sets.
+type ExerciseStatsWorkout struct {
+	SessionID   uuid.UUID  `json:"session_id"`
+	StartedAt   time.Time  `json:"started_at"`
+	EndedAt     *time.Time `json:"ended_at"`
+	SessionType string     `json:"session_type"`
+	WorkingSets int        `json:"working_sets"`
+	MaxWeight   float64    `json:"max_weight"`
+	MaxReps     int        `json:"max_reps"`
+	BestE1RM    float64    `json:"best_e1rm"`
+	// The set with the best estimated 1RM; nil with no working sets.
+	BestSet *SetRef `json:"best_set"`
+	Volume  float64 `json:"volume"`
+	HasPR   bool    `json:"has_pr"`
+	Note    *string `json:"note"`
+}
+
+// ExerciseStats is an exercise's whole history, one row per workout, oldest first.
+type ExerciseStats struct {
+	Workouts []ExerciseStatsWorkout `json:"workouts"`
+	// Working weights outside deloads, heaviest first.
+	Weights []float64 `json:"weights"`
+}
+
+// RepsAtWeight is one workout's working-set reps at a given weight.
+type RepsAtWeight struct {
+	SessionID uuid.UUID `json:"session_id"`
+	StartedAt time.Time `json:"started_at"`
+	Reps      []int     `json:"reps"`
+}
+
+// ExerciseWorkoutSet is one set of an exercise within a workout.
+type ExerciseWorkoutSet struct {
+	ID        uuid.UUID `json:"id"`
+	SetNumber int       `json:"set_number"`
+	Weight    float64   `json:"weight"`
+	Reps      int       `json:"reps"`
+	RPE       *int      `json:"rpe"`
+	IsWarmup  bool      `json:"is_warmup"`
+	IsPR      bool      `json:"is_pr"`
+	Est1RM    float64   `json:"est_1rm"`
+}
+
+// ExerciseWorkout is a workout that included an exercise, with that exercise's sets.
+type ExerciseWorkout struct {
+	SessionID   uuid.UUID            `json:"session_id"`
+	StartedAt   time.Time            `json:"started_at"`
+	EndedAt     *time.Time           `json:"ended_at"`
+	SessionType string               `json:"session_type"`
+	RoutineName *string              `json:"routine_name"`
+	Note        *string              `json:"note"`
+	Sets        []ExerciseWorkoutSet `json:"sets"`
+}
+
 // ExercisePR is the best (highest-weight PR) set for a single exercise.
 type ExercisePR struct {
 	ExerciseID  uuid.UUID `json:"exercise_id"`
