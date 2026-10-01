@@ -1,10 +1,10 @@
-import { Component, Injector, OnInit, afterNextRender, inject, input, signal } from '@angular/core';
+import { Component, Injector, OnInit, afterNextRender, computed, inject, input, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { CommonModule } from '@angular/common';
+import { CommonModule, Location } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { NavigationEnd, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, NavigationEnd, Router, RouterLink } from '@angular/router';
 import { filter } from 'rxjs';
-import { JymService, SessionSummary, SessionWithSets } from '../../../core/services/jym.service';
+import { Exercise, JymService, SessionListOptions, SessionSummary, SessionType, SessionWithSets } from '../../../core/services/jym.service';
 import { WorkoutLauncher } from '../shared/workout-launcher';
 import { SettingsService } from '../../../core/services/settings.service';
 import { UploadService } from '../../../core/services/upload.service';
@@ -16,16 +16,18 @@ import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-he
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
 import { LogPastDialogComponent } from '../shared/log-past-dialog';
-import { dayKey, todayKey } from '../../../core/utils/day';
+import { dayKey, isDayKey, todayKey } from '../../../core/utils/day';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
-import { formatInstant } from '../../../core/utils/format-date';
+import { formatDay, formatInstant } from '../../../core/utils/format-date';
+import { countByDay, monthBounds, shiftMonth } from '../history-month';
+import { HistoryCalendarComponent } from './history-calendar';
 
 @Component({
   selector: 'app-session-history',
   standalone: true,
   imports: [JiroSkeletonComponent, 
     CommonModule, FormsModule, RouterLink, JiroButtonComponent, JiroIconComponent,
-    JiroPageHeaderComponent, JiroEmptyStateComponent, JymPrBadgeComponent, LogPastDialogComponent,
+    JiroPageHeaderComponent, JiroEmptyStateComponent, JymPrBadgeComponent, LogPastDialogComponent, HistoryCalendarComponent,
   ],
   template: `
     <div class="session-history">
@@ -74,6 +76,44 @@ import { formatInstant } from '../../../core/utils/format-date';
         </jiro-button>
       </div>
 
+      <!-- Filters -->
+      <div class="filter-row">
+        <div class="date-field">
+          <label class="date-label" for="hist-ex">Exercise</label>
+          <select id="hist-ex" class="filter-select" (change)="setExercise($any($event.target).value)">
+            <option value="" [selected]="!exerciseFilter()">All exercises</option>
+            @for (e of exercises(); track e.id) {
+              <option [value]="e.id" [selected]="e.id === exerciseFilter()">{{ e.name }}</option>
+            }
+          </select>
+        </div>
+        <div class="date-field">
+          <label class="date-label" for="hist-type">Type</label>
+          <select id="hist-type" class="filter-select" (change)="setType($any($event.target).value)">
+            @for (t of types; track t.value) {
+              <option [value]="t.value" [selected]="t.value === (typeFilter() ?? '')">{{ t.label }}</option>
+            }
+          </select>
+        </div>
+      </div>
+      <div class="filter-actions">
+        <button type="button" class="filter-btn" [class.on]="calendarOpen()" [attr.aria-expanded]="calendarOpen()" (click)="toggleCalendar()">
+          <jiro-icon name="calendar-blank" [size]="16" />Calendar
+        </button>
+        @if (filtering()) {
+          <button type="button" class="filter-btn" (click)="clearFilters()"><jiro-icon name="x" [size]="14" />Clear filters</button>
+        }
+      </div>
+      @if (calendarOpen()) {
+        <jym-history-calendar class="history-cal" [month]="month()" [counts]="monthCounts()" [selected]="dayFilter()" [today]="today()"
+          (pick)="pickDay($event)" (monthChange)="changeMonth($event)" />
+      }
+      @if (dayFilter(); as day) {
+        <p class="day-line">Workouts on {{ dayLabel(day) }}
+          <button type="button" class="day-all" (click)="pickDay(day)">Show all days</button>
+        </p>
+      }
+
       <!-- Loading -->
       @if (loading()) {
         <div class="sessions-list" role="status" aria-label="Loading sessions">@for (i of [1, 2, 3, 4]; track i) { <jiro-skeleton height="88px" /> }</div>
@@ -89,8 +129,15 @@ import { formatInstant } from '../../../core/utils/format-date';
         </jiro-empty-state>
       }
 
+      <!-- Nothing matches the filters -->
+      @if (!loading() && !loadError() && sessions().length === 0 && filtering()) {
+        <jiro-empty-state icon="funnel-simple" [heading]="emptyFilteredText()" message="Try another exercise, type or day.">
+          <jiro-button variant="secondary" type="button" (click)="clearFilters()">Clear filters</jiro-button>
+        </jiro-empty-state>
+      }
+
       <!-- Empty -->
-      @if (!loading() && !loadError() && sessions().length === 0) {
+      @if (!loading() && !loadError() && sessions().length === 0 && !filtering()) {
         <jiro-empty-state
           icon="barbell"
           heading="No sessions yet"
@@ -337,6 +384,42 @@ import { formatInstant } from '../../../core/utils/format-date';
     }
 
 
+
+    .filter-row { display: flex; gap: var(--space-sm); margin-bottom: var(--space-sm); }
+
+    .filter-select {
+      width: 100%; min-height: 44px; padding: 6px 10px;
+      border: 1px solid var(--border-color); border-radius: var(--border-radius);
+      background: var(--bg-surface); color: var(--text-primary);
+      font-size: var(--font-size-sm); font-family: inherit;
+    }
+
+    .filter-select:focus { border-color: var(--color-primary); }
+
+    .filter-actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); margin-bottom: var(--space-md); }
+
+    .filter-btn {
+      display: inline-flex; align-items: center; gap: var(--space-xs);
+      min-height: 44px; padding: 0 var(--space-md);
+      background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--border-radius-pill);
+      color: var(--text-secondary); font: inherit; font-size: var(--font-size-sm); font-weight: 500; cursor: pointer;
+    }
+
+    .filter-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+    .filter-btn.on { border-color: var(--color-primary); color: var(--color-primary); background: rgba(var(--color-primary-rgb), 0.08); }
+
+    .history-cal { margin-bottom: var(--space-md); }
+
+    .day-line {
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-sm);
+      margin: 0 0 var(--space-sm); font-size: var(--font-size-sm); font-weight: 600;
+    }
+
+    .day-all {
+      min-height: 44px; padding: 0 var(--space-xs); background: none; border: none;
+      color: var(--color-primary); font: inherit; font-weight: 600; cursor: pointer;
+    }
 
     .sessions-list { display: flex; flex-direction: column; gap: var(--space-md); }
 
@@ -592,7 +675,32 @@ export class SessionHistoryComponent implements OnInit {
   exportFrom = '';
   exportTo = '';
 
+  /** Filters, mirrored in the URL as ?exercise=&type=&day= (and ?calendar=1 while it's open). */
+  exerciseFilter = signal<string | null>(null);
+  typeFilter = signal<SessionType | null>(null);
+  dayFilter = signal<string | null>(null);
+  calendarOpen = signal(false);
+  exercises = signal<Exercise[]>([]);
+  /** The calendar's month (YYYY-MM) and its workouts per day. */
+  month = signal('');
+  monthCounts = signal(new Map<string, number>());
+  readonly types: { value: SessionType | ''; label: string }[] = [
+    { value: '', label: 'All types' }, { value: 'normal', label: 'Regular' }, { value: 'deload', label: 'Deload' }, { value: 'test', label: 'Test' },
+  ];
+  readonly filtering = computed(() => !!(this.exerciseFilter() || this.typeFilter() || this.dayFilter()));
+  readonly today = computed(() => todayKey(this.settingsService.timezone()));
+
+  /** "No deload workouts with Bench press on Tue 14 Oct". */
+  readonly emptyFilteredText = computed(() => {
+    const type = this.typeFilter() ? this.types.find(t => t.value === this.typeFilter())!.label.toLowerCase() + ' ' : '';
+    const ex = this.exercises().find(e => e.id === this.exerciseFilter());
+    const day = this.dayFilter();
+    return `No ${type}workouts${ex ? ' with ' + ex.name : ''}${day ? ' on ' + this.dayLabel(day) : ''}`;
+  });
+
   private readonly launcher = inject(WorkoutLauncher);
+  private readonly route = inject(ActivatedRoute);
+  private readonly location = inject(Location);
 
   constructor(
     private jymService: JymService,
@@ -605,20 +713,117 @@ export class SessionHistoryComponent implements OnInit {
     // the page is already open on that exact URL.
     this.router.events
       .pipe(filter(e => e instanceof NavigationEnd), takeUntilDestroyed())
-      .subscribe(() => { if (!this.loading()) this.focusSessionFromUrl(); });
+      .subscribe(() => {
+        // A link into the open page (e.g. an exercise's "See all workouts") carries new filters.
+        if (this.readFiltersFromUrl()) { this.load(); this.loadMonth(); return; }
+        if (!this.loading()) this.focusSessionFromUrl();
+      });
   }
 
   ngOnInit() {
+    this.readFiltersFromUrl();
     this.load();
+    this.loadMonth();
+    this.jymService.listExercises().subscribe({
+      next: list => this.exercises.set([...list].sort((a, b) => a.name.localeCompare(b.name))),
+      error: () => {},
+    });
+  }
+
+  /** Takes the filters from the URL; true when they changed. */
+  private readFiltersFromUrl(): boolean {
+    const q = this.router.parseUrl(this.router.url).queryParamMap;
+    const exercise = q.get('exercise') || null;
+    const type = (['normal', 'deload', 'test'] as const).find(t => t === q.get('type')) ?? null;
+    const day = isDayKey(q.get('day')) ? q.get('day') : null;
+    const calendar = q.get('calendar') === '1' || !!day;
+    const changed = exercise !== this.exerciseFilter() || type !== this.typeFilter() || day !== this.dayFilter() || calendar !== this.calendarOpen();
+    this.exerciseFilter.set(exercise);
+    this.typeFilter.set(type);
+    this.dayFilter.set(day);
+    this.calendarOpen.set(calendar);
+    if (!this.month() || (day && day.slice(0, 7) !== this.month())) this.month.set((day ?? this.today()).slice(0, 7));
+    return changed;
+  }
+
+  /** Mirrors the filters into the URL without a navigation (which would scroll to the top). */
+  private writeFiltersToUrl() {
+    const tree = this.router.createUrlTree([], {
+      relativeTo: this.route,
+      queryParams: {
+        exercise: this.exerciseFilter(), type: this.typeFilter(), day: this.dayFilter(),
+        calendar: this.calendarOpen() ? '1' : null, session: null,
+      },
+      queryParamsHandling: 'merge',
+    });
+    this.location.replaceState(this.router.serializeUrl(tree));
+  }
+
+  private filters(): SessionListOptions {
+    return { exerciseId: this.exerciseFilter(), type: this.typeFilter() };
+  }
+
+  private applyFilters() {
+    this.writeFiltersToUrl();
+    this.selectedId.set(null);
+    this.detail.set(null);
+    this.load();
+    this.loadMonth();
+  }
+
+  setExercise(id: string) { this.exerciseFilter.set(id || null); this.applyFilters(); }
+
+  setType(type: string) { this.typeFilter.set((type || null) as SessionType | null); this.applyFilters(); }
+
+  /** Picks a day from the calendar; the same day again shows every day. */
+  pickDay(day: string) {
+    this.dayFilter.set(this.dayFilter() === day ? null : day);
+    this.applyFilters();
+  }
+
+  toggleCalendar() {
+    this.calendarOpen.update(v => !v);
+    this.writeFiltersToUrl();
+    this.loadMonth();
+  }
+
+  changeMonth(delta: number) {
+    this.month.set(shiftMonth(this.month(), delta));
+    this.loadMonth();
+  }
+
+  clearFilters() {
+    this.exerciseFilter.set(null);
+    this.typeFilter.set(null);
+    this.dayFilter.set(null);
+    this.applyFilters();
+  }
+
+  dayLabel(day: string): string {
+    return formatDay(day, { weekday: true });
+  }
+
+  /** The calendar month's workouts per day, with the exercise and type filters. */
+  private loadMonth() {
+    if (!this.calendarOpen()) return;
+    const month = this.month();
+    const { from, to } = monthBounds(month);
+    this.jymService.listSessions({ from, to, ...this.filters() }).subscribe({
+      next: list => { if (this.month() === month) this.monthCounts.set(countByDay(list, this.settingsService.timezone())); },
+      error: () => this.toast.error('Could not load the calendar.'),
+    });
   }
 
   load() {
     this.loading.set(true);
     this.loadError.set(false);
-    this.jymService.listSessions({ limit: HISTORY_PAGE }).subscribe({
+    const day = this.dayFilter();
+    const request = day ? { from: day, to: day, ...this.filters() } : { limit: HISTORY_PAGE, ...this.filters() };
+    this.jymService.listSessions(request).subscribe({
       next: s => {
         this.sessions.set(s);
-        this.hasMore.set(s.length === HISTORY_PAGE);
+        // One day comes whole; a page may have more behind it.
+        this.hasMore.set(!day && s.length === HISTORY_PAGE);
         this.loading.set(false);
         this.focusSessionFromUrl();
       },
@@ -631,7 +836,7 @@ export class SessionHistoryComponent implements OnInit {
     const last = this.sessions().at(-1);
     if (!last || this.loadingMore()) return;
     this.loadingMore.set(true);
-    this.jymService.listSessions({ before: last.started_at, beforeId: last.id, limit: HISTORY_PAGE }).subscribe({
+    this.jymService.listSessions({ before: last.started_at, beforeId: last.id, limit: HISTORY_PAGE, ...this.filters() }).subscribe({
       next: page => {
         // A session opened on its own from ?session= may already be in the list.
         const seen = new Set(this.sessions().map(x => x.id));

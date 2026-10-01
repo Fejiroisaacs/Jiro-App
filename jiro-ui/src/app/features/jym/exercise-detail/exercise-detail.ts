@@ -208,6 +208,9 @@ type SectionTab = 'history' | 'form' | 'notes';
               <jiro-button variant="secondary" type="button" [loading]="workoutsLoading()" (click)="loadWorkouts()">Show older workouts</jiro-button>
             </div>
           }
+          @if (hasHistory()) {
+            <a class="all-link" routerLink="/jym/track" [queryParams]="{ tab: 'sessions', exercise: exercise()!.id }">See all workouts with {{ exercise()!.name }}</a>
+          }
           @if (workoutsError()) {
             <p class="text-secondary load-error" role="alert">Could not load the workouts. <button type="button" class="retry" (click)="loadWorkouts()">Try again</button></p>
           }
@@ -527,6 +530,11 @@ type SectionTab = 'history' | 'form' | 'notes';
     .load-more { display: flex; justify-content: center; margin-top: var(--space-lg); }
 
     .load-error { margin-top: var(--space-md); font-size: var(--font-size-sm); }
+
+    .all-link {
+      display: inline-flex; align-items: center; min-height: 44px; margin-top: var(--space-sm);
+      font-size: var(--font-size-sm); font-weight: 600; color: var(--color-primary);
+    }
 
     .retry {
       min-height: 44px; padding: 0 var(--space-xs); background: none; border: none;

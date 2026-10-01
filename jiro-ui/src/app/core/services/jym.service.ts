@@ -272,6 +272,18 @@ export interface SessionSummary extends Session {
   last_set_at: string | null;
 }
 
+export type SessionType = 'normal' | 'deload' | 'test';
+
+export interface SessionListOptions {
+  from?: string;
+  to?: string;
+  before?: string;
+  beforeId?: string;
+  limit?: number;
+  exerciseId?: string | null;
+  type?: SessionType | null;
+}
+
 export interface SessionSet {
   id: string;
   session_id: string;
@@ -483,11 +495,17 @@ export class JymService {
     return this.http.post<StartSessionResponse>(`${API_URL}/sessions`, req);
   }
 
-  /** Newest 50 by default. `from` (YYYY-MM-DD) returns every session since that day plus unfinished ones; `before` pages back. */
-  listSessions(opts: { from?: string; before?: string; beforeId?: string; limit?: number } = {}): Observable<SessionSummary[]> {
+  /**
+   * Newest 50 by default. `from` (YYYY-MM-DD) returns every session since that day plus unfinished ones, or with `to`
+   * the sessions started on those days; `before` pages back. `exerciseId` and `type` narrow any of them.
+   */
+  listSessions(opts: SessionListOptions = {}): Observable<SessionSummary[]> {
     let params = new HttpParams();
     // tz is the API's fallback when the account has no timezone.
     if (opts.from) params = params.set('from', opts.from).set('tz', this.settings.timezone());
+    if (opts.to) params = params.set('to', opts.to);
+    if (opts.exerciseId) params = params.set('exercise_id', opts.exerciseId);
+    if (opts.type) params = params.set('type', opts.type);
     if (opts.before) params = params.set('before', opts.before);
     if (opts.beforeId) params = params.set('before_id', opts.beforeId);
     if (opts.limit) params = params.set('limit', String(opts.limit));
