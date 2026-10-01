@@ -42,6 +42,58 @@ export interface ExerciseWithHistory extends Exercise {
   history: SetHistory[];
 }
 
+/** One workout's numbers for an exercise, over its working sets; weights in kg. */
+export interface ExerciseStatsWorkout {
+  session_id: string;
+  started_at: string;
+  ended_at: string | null;
+  session_type: string;
+  working_sets: number;
+  max_weight: number;
+  max_reps: number;
+  best_e1rm: number;
+  /** The set with the best estimated 1RM; null with no working sets. */
+  best_set: SetRef | null;
+  volume: number;
+  has_pr: boolean;
+  note: string | null;
+}
+
+/** An exercise's whole history, one row per workout, oldest first. */
+export interface ExerciseStats {
+  workouts: ExerciseStatsWorkout[];
+  /** Working weights outside deloads, heaviest first. */
+  weights: number[];
+}
+
+export interface RepsAtWeight {
+  session_id: string;
+  started_at: string;
+  reps: number[];
+}
+
+export interface ExerciseWorkoutSet {
+  id: string;
+  set_number: number;
+  weight: number;
+  reps: number;
+  rpe: number | null;
+  is_warmup: boolean;
+  is_pr: boolean;
+  est_1rm: number;
+}
+
+/** A workout that included an exercise, with that exercise's sets. */
+export interface ExerciseWorkout {
+  session_id: string;
+  started_at: string;
+  ended_at: string | null;
+  session_type: string;
+  routine_name: string | null;
+  note: string | null;
+  sets: ExerciseWorkoutSet[];
+}
+
 export interface ExercisePR {
   exercise_id: string;
   name: string;
@@ -344,8 +396,27 @@ export class JymService {
 
   /** Every logged set by default; `limit` keeps only the latest ones. */
   getExercise(id: string, opts: { limit?: number } = {}): Observable<ExerciseWithHistory> {
-    const params = opts.limit ? new HttpParams().set('limit', String(opts.limit)) : undefined;
+    // limit 0 is the header alone.
+    const params = opts.limit !== undefined ? new HttpParams().set('limit', String(opts.limit)) : undefined;
     return this.http.get<ExerciseWithHistory>(`${API_URL}/exercises/${id}`, { params });
+  }
+
+  getExerciseStats(id: string): Observable<ExerciseStats> {
+    return this.http.get<ExerciseStats>(`${API_URL}/exercises/${id}/stats`);
+  }
+
+  /** Working-set reps at one weight (kg), per workout, outside deloads. */
+  getRepsAtWeight(id: string, weight: number): Observable<RepsAtWeight[]> {
+    return this.http.get<RepsAtWeight[]>(`${API_URL}/exercises/${id}/reps-at`, { params: new HttpParams().set('weight', String(weight)) });
+  }
+
+  /** Workouts with this exercise, newest first; `before`/`beforeId` continue after a page's last one. */
+  listExerciseWorkouts(id: string, opts: { before?: string; beforeId?: string; limit?: number } = {}): Observable<ExerciseWorkout[]> {
+    let params = new HttpParams();
+    if (opts.before) params = params.set('before', opts.before);
+    if (opts.beforeId) params = params.set('before_id', opts.beforeId);
+    if (opts.limit) params = params.set('limit', String(opts.limit));
+    return this.http.get<ExerciseWorkout[]>(`${API_URL}/exercises/${id}/workouts`, { params });
   }
 
   createExercise(req: CreateExerciseRequest): Observable<Exercise> {
