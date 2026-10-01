@@ -653,11 +653,28 @@ func (h *JymHandler) StartSession(c *gin.Context) {
 	c.JSON(http.StatusCreated, sess)
 }
 
-// ListSessions serves ?from=YYYY-MM-DD (every session from that day, plus unfinished ones) or a cursor page
-// (?before=<started_at>&before_id=<id>&limit=), newest first.
+// ListSessions serves ?from=YYYY-MM-DD (every session from that day, plus unfinished ones), ?from=&to= (the
+// sessions started on those days), or a cursor page (?before=<started_at>&before_id=<id>&limit=), newest first.
+// ?exercise_id= and ?type= narrow any of them.
 func (h *JymHandler) ListSessions(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 	ctx := c.Request.Context()
+	var filter models.SessionFilter
+	if e := c.Query("exercise_id"); e != "" {
+		id, perr := uuid.Parse(e)
+		if perr != nil {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "exercise_id must be an exercise id"}})
+			return
+		}
+		filter.ExerciseID = &id
+	}
+	if t := c.Query("type"); t != "" {
+		if t != "normal" && t != "deload" && t != "test" {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_TYPE", Message: "type must be normal, deload or test"}})
+			return
+		}
+		filter.Type = &t
+	}
 	var sessions []models.SessionSummary
 	var err error
 	if from := c.Query("from"); from != "" {
@@ -667,7 +684,16 @@ func (h *JymHandler) ListSessions(c *gin.Context) {
 			return
 		}
 		// tz is only a fallback for a user with no timezone setting, as on GET /day.
-		sessions, err = h.jymService.ListSessionsSince(ctx, userID, day, c.Query("tz"))
+		if to := c.Query("to"); to != "" {
+			last, perr := time.Parse("2006-01-02", to)
+			if perr != nil || last.Before(day) || last.Sub(day) > 62*24*time.Hour {
+				c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_DATE", Message: "to must be YYYY-MM-DD, on or after from, at most 62 days later"}})
+				return
+			}
+			sessions, err = h.jymService.ListSessionsInDays(ctx, userID, day, last, c.Query("tz"), filter)
+		} else {
+			sessions, err = h.jymService.ListSessionsSince(ctx, userID, day, c.Query("tz"), filter)
+		}
 	} else {
 		limit := 50
 		if l := c.Query("limit"); l != "" {
@@ -696,7 +722,7 @@ func (h *JymHandler) ListSessions(c *gin.Context) {
 			}
 			beforeID = id
 		}
-		sessions, err = h.jymService.ListSessions(ctx, userID, before, beforeID, limit)
+		sessions, err = h.jymService.ListSessionsFiltered(ctx, userID, filter, before, beforeID, limit)
 	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to list sessions"}})

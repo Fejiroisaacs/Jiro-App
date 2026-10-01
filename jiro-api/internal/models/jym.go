@@ -449,6 +449,14 @@ type CreateSessionRequest struct {
 	ExerciseIDs []uuid.UUID `json:"exercise_ids" binding:"omitempty,max=100"`
 }
 
+// SessionFilter narrows a session list; nil fields don't filter.
+type SessionFilter struct {
+	// Only workouts with a set of this exercise.
+	ExerciseID *uuid.UUID
+	// normal, deload or test.
+	Type *string
+}
+
 type UpdateSessionRequest struct {
 	EndedAt     *time.Time `json:"ended_at"`
 	Notes       *string    `json:"notes"`

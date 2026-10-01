@@ -1182,14 +1182,25 @@ const sessionPageSelect = `WITH page AS (%s)
 		 GROUP BY s.id, r.name
 		 ORDER BY s.started_at DESC, s.id DESC`
 
+// sessionFilterSQL limits a list's sessions to the filter; its two values bind at $n and $n+1.
+func sessionFilterSQL(n int) string {
+	return fmt.Sprintf(` AND ($%[1]d::uuid IS NULL OR EXISTS (SELECT 1 FROM session_sets f WHERE f.session_id = sessions.id AND f.exercise_id = $%[1]d::uuid))
+		 AND ($%[2]d::text IS NULL OR session_type = $%[2]d::text)`, n, n+1)
+}
+
 // ListSessions returns one page of sessions, newest first; before and beforeID continue after a page's last row.
 func (s *JymService) ListSessions(ctx context.Context, userID uuid.UUID, before *time.Time, beforeID uuid.UUID, limit int) ([]models.SessionSummary, error) {
+	return s.ListSessionsFiltered(ctx, userID, models.SessionFilter{}, before, beforeID, limit)
+}
+
+// ListSessionsFiltered is ListSessions limited to workouts with an exercise and/or of a type.
+func (s *JymService) ListSessionsFiltered(ctx context.Context, userID uuid.UUID, f models.SessionFilter, before *time.Time, beforeID uuid.UUID, limit int) ([]models.SessionSummary, error) {
 	rows, err := s.db.Query(ctx, fmt.Sprintf(sessionPageSelect,
 		`SELECT id FROM sessions
-		 WHERE user_id = $1 AND ($2::timestamptz IS NULL OR (started_at, id) < ($2::timestamptz, $3::uuid))
+		 WHERE user_id = $1 AND ($2::timestamptz IS NULL OR (started_at, id) < ($2::timestamptz, $3::uuid))`+sessionFilterSQL(5)+`
 		 ORDER BY started_at DESC, id DESC
 		 LIMIT $4`),
-		userID, before, beforeID, limit,
+		userID, before, beforeID, limit, f.ExerciseID, f.Type,
 	)
 	if err != nil {
 		return nil, err
@@ -1198,7 +1209,7 @@ func (s *JymService) ListSessions(ctx context.Context, userID uuid.UUID, before 
 }
 
 // ListSessionsSince returns every session from the start of the user's calendar day, plus any still in progress.
-func (s *JymService) ListSessionsSince(ctx context.Context, userID uuid.UUID, day time.Time, tzHint string) ([]models.SessionSummary, error) {
+func (s *JymService) ListSessionsSince(ctx context.Context, userID uuid.UUID, day time.Time, tzHint string, f models.SessionFilter) ([]models.SessionSummary, error) {
 	loc, err := userLocation(ctx, s.db, userID, tzHint)
 	if err != nil {
 		return nil, err
@@ -1206,10 +1217,31 @@ func (s *JymService) ListSessionsSince(ctx context.Context, userID uuid.UUID, da
 	start := time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, loc)
 	rows, err := s.db.Query(ctx, fmt.Sprintf(sessionPageSelect,
 		`SELECT id FROM sessions
-		 WHERE user_id = $1 AND (started_at >= $2 OR ended_at IS NULL)
+		 WHERE user_id = $1 AND (started_at >= $2 OR ended_at IS NULL)`+sessionFilterSQL(3)+`
 		 ORDER BY started_at DESC, id DESC
 		 LIMIT 1000`),
-		userID, start,
+		userID, start, f.ExerciseID, f.Type,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return scanSessionSummaries(rows)
+}
+
+// ListSessionsInDays returns the sessions started on the user's calendar days from..to (inclusive), newest first.
+func (s *JymService) ListSessionsInDays(ctx context.Context, userID uuid.UUID, from, to time.Time, tzHint string, f models.SessionFilter) ([]models.SessionSummary, error) {
+	loc, err := userLocation(ctx, s.db, userID, tzHint)
+	if err != nil {
+		return nil, err
+	}
+	start := time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, loc)
+	end := time.Date(to.Year(), to.Month(), to.Day()+1, 0, 0, 0, 0, loc)
+	rows, err := s.db.Query(ctx, fmt.Sprintf(sessionPageSelect,
+		`SELECT id FROM sessions
+		 WHERE user_id = $1 AND started_at >= $2 AND started_at < $3`+sessionFilterSQL(4)+`
+		 ORDER BY started_at DESC, id DESC
+		 LIMIT 1000`),
+		userID, start, end, f.ExerciseID, f.Type,
 	)
 	if err != nil {
 		return nil, err

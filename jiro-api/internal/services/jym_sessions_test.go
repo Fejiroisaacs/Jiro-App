@@ -59,7 +59,7 @@ func TestListSessionsSinceKeepsUnfinishedOnes(t *testing.T) {
 	}
 
 	since := time.Now().AddDate(0, 0, -112)
-	got, err := svc.ListSessionsSince(ctx, userID, since, "UTC")
+	got, err := svc.ListSessionsSince(ctx, userID, since, "UTC", models.SessionFilter{})
 	if err != nil {
 		t.Fatalf("list since: %v", err)
 	}
@@ -298,5 +298,103 @@ func TestSeriesNextDayAdvancesWrapsAndStartsLink(t *testing.T) {
 	}
 	if after.SeriesID != nil {
 		t.Fatalf("a workout was linked to an ended series")
+	}
+}
+
+func TestListSessionsFiltersByExerciseAndType(t *testing.T) {
+	svc, userID := testJymDB(t)
+	ctx := context.Background()
+	squat := prTestSetup(t, svc, userID, "Squat")
+	curl := prTestSetup(t, svc, userID, "Curl")
+	var squats []uuid.UUID
+	for i := 0; i < 5; i++ {
+		id := startSession(t, svc, userID, "")
+		logSet(t, svc, userID, id, squat, 1, 100, 5)
+		finishSession(t, svc, userID, id)
+		squats = append(squats, id)
+	}
+	curls := startSession(t, svc, userID, "")
+	logSet(t, svc, userID, curls, curl, 1, 20, 10)
+	finishSession(t, svc, userID, curls)
+	deload := startSession(t, svc, userID, "deload")
+	logSet(t, svc, userID, deload, squat, 1, 60, 5)
+	finishSession(t, svc, userID, deload)
+
+	// Squat workouts, paged two at a time: all six (five normal, one deload), none twice, no curls.
+	f := models.SessionFilter{ExerciseID: &squat}
+	seen := map[uuid.UUID]bool{}
+	var before *time.Time
+	beforeID := uuid.Nil
+	for page := 0; page < 5; page++ {
+		list, err := svc.ListSessionsFiltered(ctx, userID, f, before, beforeID, 2)
+		if err != nil {
+			t.Fatalf("page %d: %v", page, err)
+		}
+		if len(list) == 0 {
+			break
+		}
+		for _, s := range list {
+			if seen[s.ID] {
+				t.Fatalf("%v listed twice", s.ID)
+			}
+			seen[s.ID] = true
+		}
+		last := list[len(list)-1]
+		before, beforeID = &last.StartedAt, last.ID
+	}
+	if len(seen) != 6 || seen[curls] || !seen[deload] {
+		t.Fatalf("squat filter saw %d sessions (curls %v, deload %v); want 6, no curls", len(seen), seen[curls], seen[deload])
+	}
+
+	kind := "deload"
+	got, err := svc.ListSessionsFiltered(ctx, userID, models.SessionFilter{ExerciseID: &squat, Type: &kind}, nil, uuid.Nil, 50)
+	if err != nil {
+		t.Fatalf("deload filter: %v", err)
+	}
+	if len(got) != 1 || got[0].ID != deload {
+		t.Fatalf("squat deloads = %v, want only the deload", sessionIDs(got))
+	}
+}
+
+func TestListSessionsInDaysUsesTheUsersZone(t *testing.T) {
+	svc, userID := testJymDB(t)
+	ctx := context.Background()
+	if _, err := svc.db.Exec(ctx, `UPDATE users SET settings = COALESCE(settings, '{}'::jsonb) || '{"timezone":"America/New_York"}' WHERE id = $1`, userID); err != nil {
+		t.Fatalf("zone: %v", err)
+	}
+	ny, _ := time.LoadLocation("America/New_York")
+	place := func(at time.Time) uuid.UUID {
+		id := startSession(t, svc, userID, "")
+		if _, err := svc.db.Exec(ctx, `UPDATE sessions SET started_at = $2, ended_at = $2::timestamptz + INTERVAL '1 hour' WHERE id = $1`, id, at); err != nil {
+			t.Fatalf("place: %v", err)
+		}
+		return id
+	}
+	// 11 pm on 30 Sep in New York is already 1 Oct in UTC; 1 am on 1 Oct there is October.
+	lateSep := place(time.Date(2026, 9, 30, 23, 0, 0, 0, ny))
+	earlyOct := place(time.Date(2026, 10, 1, 1, 0, 0, 0, ny))
+	firstSep := place(time.Date(2026, 9, 1, 0, 30, 0, 0, ny))
+
+	sep, err := svc.ListSessionsInDays(ctx, userID, time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC), time.Date(2026, 9, 30, 0, 0, 0, 0, time.UTC), "UTC", models.SessionFilter{})
+	if err != nil {
+		t.Fatalf("september: %v", err)
+	}
+	ids := map[uuid.UUID]bool{}
+	for _, s := range sep {
+		ids[s.ID] = true
+	}
+	if len(sep) != 2 || !ids[lateSep] || !ids[firstSep] || ids[earlyOct] {
+		t.Fatalf("september = %v; want the late 30th and the 1st, not 1 Oct", sessionIDs(sep))
+	}
+
+	// Another user's exercise id finds nothing here.
+	_, stranger := testJymDB(t)
+	theirs := prTestSetup(t, svc, stranger, "Theirs")
+	none, err := svc.ListSessionsInDays(ctx, userID, time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC), time.Date(2026, 10, 31, 0, 0, 0, 0, time.UTC), "UTC", models.SessionFilter{ExerciseID: &theirs})
+	if err != nil {
+		t.Fatalf("stranger filter: %v", err)
+	}
+	if len(none) != 0 {
+		t.Fatalf("another user's exercise matched %d sessions", len(none))
 	}
 }
