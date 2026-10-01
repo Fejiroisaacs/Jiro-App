@@ -37,16 +37,17 @@ import { GUIDE } from '../shared';
       </guide-section>
 
       <guide-section id="check-an-exercise" title="Check an exercise's progress"
-        lead="Each exercise has its own page with your best lifts, a chart and every set you have logged.">
+        lead="Each exercise has its own page with your best lifts, a chart and every workout it was in.">
         <guide-steps>
           <li>In <a routerLink="/jym/exercises">Exercises</a>, select an exercise.</li>
           <li>The top shows your <strong>Best weight</strong> and <strong>Est. 1RM</strong>, the most you could likely lift once, worked out from your weight and reps.</li>
           <li>Switch the chart between <strong>Est. 1RM</strong>, <strong>Volume</strong>, <strong>Max weight</strong> and <strong>Reps &#64; Weight</strong>. For Reps &#64; Weight, choose a weight from the list.</li>
-          <li>Below the chart, <strong>Set history</strong> lists every set. Select a column heading to sort by it.</li>
+          <li>Choose <strong>3M</strong>, <strong>1Y</strong> or <strong>All</strong> to set how far back the chart goes. Workouts sit at their real dates, so a break from training shows as a gap.</li>
+          <li>Below the chart, <strong>Workouts</strong> lists every workout with this exercise, newest first, with its sets. Select one to open its summary, and <strong>Show older workouts</strong> to go further back. <strong>See all workouts with</strong> the exercise opens them in Track.</li>
           <li><strong>Form progression</strong> shows the form check clips you added during workouts, and <strong>Notes</strong> shows the notes you wrote for this exercise.</li>
         </guide-steps>
         <guide-shot guide="jym" name="exercise-detail" [width]="1600" [height]="1422"
-          alt="The Bench Press page: Best weight 175.0 lbs and Est. 1RM 210.1 lbs, a note, the Est. 1RM chart rising from 17 Aug to 21 Sep, and the Set history, Form progression and Notes tabs." />
+          alt="The Bench Press page: Best weight 175.0 lbs and Est. 1RM 210.1 lbs, a note, the Est. 1RM chart with 3M, 1Y and All, rising from August to late September, and the Workouts, Form progression and Notes tabs." />
         <guide-tip>If your top weight has stayed the same, or dropped, over your last three sessions of an exercise, its page says so and suggests what to try.</guide-tip>
       </guide-section>
 
@@ -166,6 +167,7 @@ import { GUIDE } from '../shared';
         lead="Every finished workout is listed in Track, newest first.">
         <guide-steps>
           <li>Open <a routerLink="/jym/track">Track</a>. Each workout shows its date, day, sets, time and volume.</li>
+          <li>To narrow the list, choose an <strong>Exercise</strong> or a <strong>Type</strong> (Regular, Deload or Test). <strong>Calendar</strong> shows a month with a dot on each day you trained: select a day to list just that day, and select it again to list every day. <strong>Clear filters</strong> shows everything again.</li>
           <li>Select a workout to see every set, with PR badges, warm-ups, RPE and exercise notes, plus its notes and any form check clips. <strong>View summary</strong> opens its summary, and <strong>See this day</strong> opens everything else you logged that day.</li>
           <li>On a summary, <strong>Edit workout</strong> opens the workout to add a set you forgot, or change or remove one. Select <strong>Done</strong> when you're finished. Records are worked out as of that workout's date.</li>
           <li><strong>Edit times</strong> fixes when the workout started or finished, as long as the times still include every set you logged. <strong>Repeat workout</strong> starts it again with the same exercises.</li>
@@ -173,7 +175,7 @@ import { GUIDE } from '../shared';
           <li>To download your workouts as a spreadsheet, optionally choose <strong>From</strong> and <strong>To</strong> dates, then select <strong>Export CSV</strong>.</li>
         </guide-steps>
         <guide-shot guide="jym" name="track-sessions" [width]="1600" [height]="1600"
-          alt="Track, Sessions: date fields and Export CSV above a list of workouts, with the Push workout of Mon 21 Sep open to show its sets, and on Bench Press a set marked Warm-up and a PR." />
+          alt="Track, Sessions: Export CSV, then the Exercise and Type filters and a Calendar button above the list of workouts, with the Push workout of Sat 26 Sep open to show its sets, and on Bench Press a set marked Warm-up and a PR." />
       </guide-section>
 
       <guide-section id="see-your-personal-records" title="See your personal records"

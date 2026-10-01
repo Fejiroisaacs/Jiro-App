@@ -10,11 +10,11 @@ Jym is the gym tracking module of Jiro. This document describes how each user-fa
 |---|---|
 | `/jym` | Hub: in progress, up next, series, heatmap, muscle tracker, splits, templates |
 | `/jym/exercises` | Exercise library; `?tab=prs` for the PR wall |
-| `/jym/exercises/:id` | Exercise detail with 1RM chart |
+| `/jym/exercises/:id` | Exercise detail: charts by date, its workouts, form checks and notes |
 | `/jym/plan` | Splits; `?tab=series` and `?tab=templates` |
 | `/jym/splits/:id` | Split builder |
 | `/jym/series/:id` | Series detail with progression charts |
-| `/jym/track` | Session history; `?tab=bodyweight` for the body weight log |
+| `/jym/track` | Session history (filters in `?exercise=&type=&day=`, `?calendar=1`); `?tab=bodyweight` for the body weight log |
 | `/jym/session/:id` | Live session player |
 | `/jym/sessions/:id/summary` | Workout summary |
 | `/jym/sessions/:id/edit` | Fixing a finished workout |
@@ -184,18 +184,29 @@ Sessions at `/jym/track?tab=sessions`, 50 at a time with "Show older sessions", 
 
 Click a session to see its sets by exercise (with RPE and the exercise note), its notes and form-check clips, and links to **View summary** (or **Resume workout** for an open one) and **See this day**. An open workout is marked "In progress".
 
+### Filters and Calendar
+- **Exercise** keeps the workouts with a set of that exercise; **Type** keeps Regular, Deload or Test workouts. Both apply on the server (`GET /jym/sessions?exercise_id=&type=`), so "Show older sessions" keeps paging through the filtered list.
+- **Calendar** opens a month, Monday first, with a dot on each day that has a workout, counted on your timezone's day (an 11:30 pm workout is on that day, not the next). It follows the Exercise and Type filters, and days after today can't be picked.
+- Select a day to list only its workouts; select it again to list every day. **Clear filters** resets all three.
+- The filters live in the URL (`?exercise=&type=&day=`, and `?calendar=1` while the calendar is open), so a reload keeps them and links can open history already filtered: an exercise's **See all workouts with ...**, and the Jym home's **Open calendar**.
+- With nothing matching, the empty state names the filter ("No deload workouts with Bench Press").
+
 ---
 
-## Exercise Detail & 1RM Chart
+## Exercise Detail & Charts
 
 At `/jym/exercises/:id`:
 
 - **Header**: exercise name, muscle group, best weight ever and the best estimated 1RM, from working sets outside deloads.
-- **1RM Line Chart**: estimated 1RM (see How Jym counts) plotted per session over time. Uses the best set from each session.
-- **History Table**: every logged set with its date, weight × reps, estimated 1RM, and whether it was a PR at the time.
+- **Charts**: **Est. 1RM** (the best set's, see How Jym counts), **Volume** and **Max weight**, one point per workout from `GET /jym/exercises/:id/stats`. Deloads and workouts with only warm-ups are left out.
+  - Points sit at their real dates on a date axis with month ticks, so a break shows as a gap.
+  - **3M**, **1Y** and **All** set the range; the page opens on 1Y when the history goes back more than a year, otherwise All. The Est. 1RM tooltip names the set behind each point.
+- **Reps @ Weight**: the reps of each working set at one weight, per workout, outside deloads. Its data is fetched when it's picked (`GET /jym/exercises/:id/reps-at?weight=`).
+- **Workouts**: every workout with this exercise, newest first, ten at a time (`GET /jym/exercises/:id/workouts`). Each shows its date, day, type, the exercise note and its sets (warm-ups marked W, RPE, estimated 1RM, PR badges), and links to its summary, or to the player while it's open. **See all workouts with ...** opens them in history.
+- **Form progression** shows the form-check clips; **Notes** lists the exercise notes, one per workout, newest first.
 
 ### Plateau & Decline Detection
-Computed from finished normal workouts, never warm-ups (`plateau-rule.ts`, covered by `npm run test:unit`):
+Computed from the stats rows of finished normal workouts with a working set (`plateau-rule.ts`, covered by `npm run test:unit`):
 - Each workout is measured by its best set's estimated 1RM, or by reps when the sets compared are all bodyweight.
 - The best of the last 3 workouts is set against the best of the up to 3 before them (so it needs 4 or more).
 - **No banner** when the recent best is higher: 100×5 → 100×6 → 100×7 is progress.
@@ -232,6 +243,7 @@ A GitHub-style contribution grid showing the last 16 weeks of workout activity.
 - Each cell is one day. Colour intensity indicates how many sessions were logged that day.
 - Darker = more sessions; empty = rest day.
 - Hover a cell to see the date.
+- **Open calendar** below it opens history's month calendar. The cells themselves stay unlinked: at about 12 px they are too small to tap reliably.
 
 ### Muscle Group Frequency Tracker
 Below the heatmap, a list of every muscle group you have trained, sorted by most recently trained.
