@@ -281,6 +281,13 @@ type SplitShare struct {
 	ExpiresAt *time.Time `json:"expires_at"`
 }
 
+// ShareLink is one live link to a split; ExpiresAt is null for links made before links expired.
+type ShareLink struct {
+	ShareID   string     `json:"share_id"`
+	URL       string     `json:"url"`
+	ExpiresAt *time.Time `json:"expires_at"`
+}
+
 type CreateShareResponse struct {
 	ShareID   string    `json:"share_id"`
 	URL       string    `json:"url"`
@@ -338,7 +345,27 @@ type SessionSummary struct {
 // StartSessionResponse includes the created session and routine targets (if routine_id given).
 type StartSessionResponse struct {
 	Session
-	Targets []RoutineItemWithExercise `json:"targets"`
+	Targets   []RoutineItemWithExercise `json:"targets"`
+	Exercises []SessionExercise         `json:"exercises"`
+}
+
+// SessionExercise is one exercise in a workout's own list; targets are the plan's when it started, null outside it.
+type SessionExercise struct {
+	ExerciseID   uuid.UUID `json:"exercise_id"`
+	ExerciseName string    `json:"exercise_name"`
+	MuscleGroup  *string   `json:"muscle_group"`
+	Position     int       `json:"position"`
+	TargetSets   *int      `json:"target_sets"`
+	TargetReps   *int      `json:"target_reps"`
+}
+
+type AddSessionExerciseRequest struct {
+	ExerciseID uuid.UUID `json:"exercise_id" binding:"required"`
+}
+
+// ReorderSessionExercisesRequest names each of the workout's exercises once, in the new order.
+type ReorderSessionExercisesRequest struct {
+	ExerciseIDs []uuid.UUID `json:"exercise_ids" binding:"required,max=100"`
 }
 
 type SessionWithSets struct {
@@ -346,8 +373,10 @@ type SessionWithSets struct {
 	RoutineName *string                  `json:"routine_name"`
 	Sets        []SessionSetWithExercise `json:"sets"`
 	Attachments []SessionAttachment      `json:"attachments"`
-	// Targets is the routine's plan when the session has one, so any device can show what isn't logged yet.
+	// Targets is the routine's live plan, kept for app versions from before Exercises.
 	Targets []RoutineItemWithExercise `json:"targets"`
+	// Exercises is the workout's own list, in order, with the plan it started with.
+	Exercises []SessionExercise `json:"exercises"`
 }
 
 // CreateSessionRequest optionally names the session type up front, so a
@@ -359,6 +388,11 @@ type CreateSessionRequest struct {
 	SessionType *string    `json:"session_type" binding:"omitempty,oneof=normal deload test"`
 	// Force starts even while another session is unfinished; without it that is a SessionInProgressError.
 	Force bool `json:"force"`
+	// StartedAt and EndedAt (both or neither) log a past workout: it is created finished.
+	StartedAt *time.Time `json:"started_at"`
+	EndedAt   *time.Time `json:"ended_at"`
+	// ExerciseIDs sets the workout's list and order (Repeat); omitted, it's the routine's items.
+	ExerciseIDs []uuid.UUID `json:"exercise_ids" binding:"omitempty,max=100"`
 }
 
 type UpdateSessionRequest struct {
@@ -459,6 +493,8 @@ type CreateSetRequest struct {
 	RPE           *int      `json:"rpe" binding:"omitempty,min=1,max=10"`
 	IsWarmup      *bool     `json:"is_warmup"`
 	ExerciseNote  *string   `json:"exercise_note"`
+	// Fix adds the set to a finished workout (editing it afterwards); without it a finished one refuses.
+	Fix bool `json:"fix"`
 }
 
 type UpdateSetRequest struct {

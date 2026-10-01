@@ -252,16 +252,29 @@ export interface ExerciseFormCheck extends SessionAttachment {
   session_date: string;
 }
 
+/** One exercise in a workout's own list; targets are the plan's when it started, null outside it. */
+export interface SessionExercise {
+  exercise_id: string;
+  exercise_name: string;
+  muscle_group: string | null;
+  position: number;
+  target_sets: number | null;
+  target_reps: number | null;
+}
+
 export interface SessionWithSets extends Session {
   routine_name: string | null;
   sets: SessionSet[];
   attachments: SessionAttachment[];
-  /** The routine's plan when the session has one. */
+  /** The routine's live plan, kept for older app versions; the player reads `exercises`. */
   targets: RoutineItem[];
+  /** The workout's own list, in order. */
+  exercises: SessionExercise[];
 }
 
 export interface StartSessionResponse extends Session {
   targets: RoutineItem[];
+  exercises: SessionExercise[];
 }
 
 // ─── Requests ─────────────────────────────────────────────────────────────────
@@ -275,11 +288,19 @@ export interface UpdateRoutineRequest { name?: string; day_order?: number; }
 export interface ReplaceItemEntry { exercise_id: string; target_sets: number; target_reps: number; }
 export interface RoutineItemsEntry { routine_id: string; items: ReplaceItemEntry[]; }
 export interface RoutineItemsResult { routine_id: string; items: RoutineItem[]; }
-export interface CreateSessionRequest { routine_id?: string; series_id?: string; session_type?: 'normal' | 'deload' | 'test'; /** Start even though another workout is open. */ force?: boolean; }
+export interface CreateSessionRequest {
+  routine_id?: string; series_id?: string; session_type?: 'normal' | 'deload' | 'test';
+  /** Start even though another workout is open. */ force?: boolean;
+  /** Both together log a past workout, created finished. */ started_at?: string; ended_at?: string;
+  /** The workout's exercises in order (Repeat); omitted, the routine's items. */ exercise_ids?: string[];
+}
 export interface UpdateSessionRequest { ended_at?: string; notes?: string; session_type?: string; }
 /** A finished workout's new start or end; a field left out keeps its value. */
 export interface UpdateSessionTimesRequest { started_at?: string; ended_at?: string; }
-export interface CreateSetRequest { exercise_id: string; set_number: number; weight: number; reps_performed: number; rpe?: number; is_warmup?: boolean; exercise_note?: string; }
+export interface CreateSetRequest {
+  exercise_id: string; set_number: number; weight: number; reps_performed: number; rpe?: number; is_warmup?: boolean; exercise_note?: string;
+  /** Adds the set to a finished workout; the server times it inside that workout. */ fix?: boolean;
+}
 export interface UpdateSetRequest { weight?: number; reps_performed?: number; rpe?: number; is_warmup?: boolean; exercise_note?: string; }
 export interface CreateSeriesRequest { split_id: string; name: string; duration_type: 'weeks' | 'sessions' | 'open'; target_weeks?: number; target_sessions?: number; }
 export interface UpdateSeriesRequest { name?: string; ended_at?: string; }
@@ -432,6 +453,16 @@ export class JymService {
     return this.http.delete<void>(`${API_URL}/sets/${id}`);
   }
 
+  /** Puts an exercise on a workout's list, last; one already there stays where it is. */
+  addSessionExercise(sessionId: string, exerciseId: string): Observable<SessionExercise> {
+    return this.http.post<SessionExercise>(`${API_URL}/sessions/${sessionId}/exercises`, { exercise_id: exerciseId });
+  }
+
+  /** Sets a workout's order; the list names each of its exercises once. */
+  reorderSessionExercises(sessionId: string, exerciseIds: string[]): Observable<void> {
+    return this.http.put<void>(`${API_URL}/sessions/${sessionId}/exercises/order`, { exercise_ids: exerciseIds });
+  }
+
   /** Removes an entire exercise block from a session — every logged set for it, in one call. */
   deleteSessionExercise(sessionId: string, exerciseId: string): Observable<void> {
     return this.http.delete<void>(`${API_URL}/sessions/${sessionId}/exercises/${exerciseId}`);
@@ -488,6 +519,11 @@ export class JymService {
   // Split shares
   createShare(splitId: string): Observable<{ share_id: string; url: string; expires_at: string }> {
     return this.http.post<{ share_id: string; url: string; expires_at: string }>(`${API_URL}/splits/${splitId}/share`, {});
+  }
+
+  /** The split's live share links, newest first; expires_at is null for old links that never expire. */
+  listShares(splitId: string): Observable<{ share_id: string; url: string; expires_at: string | null }[]> {
+    return this.http.get<{ share_id: string; url: string; expires_at: string | null }[]>(`${API_URL}/splits/${splitId}/shares`);
   }
 
   revokeShare(shareId: string): Observable<void> {

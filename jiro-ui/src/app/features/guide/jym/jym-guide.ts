@@ -55,10 +55,11 @@ import { GUIDE } from '../shared';
         <guide-steps>
           <li>Open <a routerLink="/jym/plan">Plan</a> and select <strong>New split</strong>.</li>
           <li>Enter a <strong>Split name</strong>, and optionally a description and tags, then select <strong>Create split</strong>.</li>
-          <li>Select <strong>Build</strong> on the split, then <strong>Add day</strong>. Give the day a <strong>Day name</strong> such as Push, check the <strong>Day order</strong>, and select <strong>Add day</strong>.</li>
+          <li>Select <strong>Build</strong> on the split, then <strong>Add day</strong>. Give the day a <strong>Day name</strong> such as Push, check the <strong>Day order</strong> (it starts after your last day), and select <strong>Add day</strong>.</li>
           <li>Under a day, select <strong>+ Add exercise</strong>, search, and pick an exercise.</li>
           <li>Set the <strong>Sets</strong> and <strong>Reps</strong> targets, then select <strong>Add</strong> followed by the exercise's name.</li>
-          <li>To change the order, drag an exercise by the dotted handle on its left. Drag it onto another day to move it there.</li>
+          <li>To change the order, drag an exercise by the dotted handle on its left. Drag it onto another day to move it there. On a phone, the days scroll along as you drag toward the edge.</li>
+          <li>To rename a day, select its name, type the new one and press Enter. To reorder days, use the arrows beside its name to move it earlier or later.</li>
           <li>To change an exercise's targets, select its sets and reps, such as <strong>4×6</strong>, enter the new <strong>Sets</strong> and <strong>Reps</strong>, and select <strong>Save</strong>.</li>
         </guide-steps>
         <guide-shot guide="jym" name="split-builder" [width]="1600" [height]="869"
@@ -90,6 +91,7 @@ import { GUIDE } from '../shared';
           <li>The rest timer opens under the bar at the top. Select <strong>+30s</strong> for a longer rest this time, or <strong>Skip</strong>. It beeps when your rest is over.</li>
           <li>Select a set's number to mark it as a warm-up or to remove it. To fix a logged set, select its weight or reps, change them and select <strong>Save</strong>.</li>
           <li>Use <strong>+ Add set</strong> for another set and <strong>+ Add exercise</strong> for another exercise.</li>
+          <li>To change the order, open an exercise's menu (three dots) and select <strong>Move up</strong> or <strong>Move down</strong>. <strong>Remove exercise</strong> is there too.</li>
         </guide-steps>
         <guide-shot guide="jym" name="session-sets" [width]="1400" [height]="1268"
           alt="Bench Press during a workout: a note saying last time was 175 lbs for 5, 5, 5, 5 and to try 180 lbs, a warm-up set of 95 lbs marked with a flame, four logged sets of 175 lbs with the 6-rep set marked PR, a sixth row ready to log 175 lbs for 5, and a Plates button." />
@@ -129,7 +131,7 @@ import { GUIDE } from '../shared';
         </guide-steps>
         <guide-tip>To stop without finishing, open <strong>Workout options</strong>. <strong>Leave for now</strong> keeps the workout open so you can resume it later, and <strong>Discard workout</strong> deletes it.</guide-tip>
         <p>Forgot to finish? After 3 hours with no new set, Jym offers to finish the workout at your last set, so it doesn't run on for days. The offer shows in the workout, on the Jym home page, and when you start your next one.</p>
-        <p>A finished workout is closed for new sets. If you open its old workout link, Jym shows its summary instead.</p>
+        <p>If you open a finished workout's old link, Jym shows its summary instead. To add a set you forgot, select <strong>Edit workout</strong> on the summary.</p>
       </guide-section>
 
       <guide-section id="save-and-reuse-a-template" title="Save and reuse a template"
@@ -165,7 +167,9 @@ import { GUIDE } from '../shared';
         <guide-steps>
           <li>Open <a routerLink="/jym/track">Track</a>. Each workout shows its date, day, sets, time and volume.</li>
           <li>Select a workout to see every set, with PR badges, warm-ups, RPE and exercise notes, plus its notes and any form check clips. <strong>View summary</strong> opens its summary, and <strong>See this day</strong> opens everything else you logged that day.</li>
-          <li>On a summary, <strong>Edit times</strong> fixes when the workout started or finished, as long as the times still include every set you logged. <strong>Repeat workout</strong> starts it again with the same exercises.</li>
+          <li>On a summary, <strong>Edit workout</strong> opens the workout to add a set you forgot, or change or remove one. Select <strong>Done</strong> when you're finished. Records are worked out as of that workout's date.</li>
+          <li><strong>Edit times</strong> fixes when the workout started or finished, as long as the times still include every set you logged. <strong>Repeat workout</strong> starts it again with the same exercises.</li>
+          <li>Trained without the app? Select <strong>Log past workout</strong>, or <strong>Log a workout</strong> on a past day's page. Choose when it <strong>Started</strong> and <strong>Finished</strong> and which workout it was, select <strong>Add sets</strong>, and enter your sets.</li>
           <li>To download your workouts as a spreadsheet, optionally choose <strong>From</strong> and <strong>To</strong> dates, then select <strong>Export CSV</strong>.</li>
         </guide-steps>
         <guide-shot guide="jym" name="track-sessions" [width]="1600" [height]="1600"
@@ -200,6 +204,7 @@ import { GUIDE } from '../shared';
         <guide-steps>
           <li>Open the split from <a routerLink="/jym/plan">Plan</a> with <strong>Build</strong>, and select <strong>Share</strong>.</li>
           <li>Select <strong>Copy</strong> and send the link. Anyone can view it. Someone signed in to Jiro can select <strong>Import to my account</strong> to copy it into their splits.</li>
+          <li>A link lasts 30 days. Selecting <strong>Share</strong> again shows the same link while it lasts, and the split's page lists it whenever you come back.</li>
           <li>To stop the link working, select <strong>Revoke link</strong>.</li>
         </guide-steps>
         <h3>Use Discover</h3>
@@ -207,9 +212,9 @@ import { GUIDE } from '../shared';
           <li>To list your split for everyone, select <strong>Public</strong> on its page. <strong>Private</strong> takes it off the list.</li>
           <li>To find other people's splits, select <strong>Discover</strong> in <a routerLink="/jym/plan">Plan</a>, or open <a routerLink="/jym/discover">Discover</a>.</li>
           <li>Search by name, or filter by tag, and select <strong>Search</strong>.</li>
-          <li>Open a split to see its days and exercises, then select <strong>Add to my splits</strong>.</li>
+          <li>Open a split to see its days and exercises, then select <strong>Add to my splits</strong>, and <strong>Open it</strong> to go to your copy.</li>
         </guide-steps>
-        <guide-tip>When you copy a split, its exercises are matched to ones in your library with the same name, and any you do not have are created for you.</guide-tip>
+        <guide-tip>When you copy a split, its exercises are matched to ones in your library with the same name, and any you do not have are created for you. Copying the same split again opens the copy you already have.</guide-tip>
       </guide-section>
 
       <guide-section id="switch-between-kg-and-lbs" title="Switch between kg and lbs"

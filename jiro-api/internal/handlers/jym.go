@@ -527,6 +527,11 @@ func (h *JymHandler) StartSession(c *gin.Context) {
 			}})
 			return
 		}
+		var timesErr *services.SessionTimesError
+		if errors.As(err, &timesErr) {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: timesErr.Reason}})
+			return
+		}
 		if err == services.ErrRoutineNotInSeries {
 			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "ROUTINE_NOT_IN_SERIES", Message: "That day is not part of the series' split"}})
 			return
@@ -537,6 +542,10 @@ func (h *JymHandler) StartSession(c *gin.Context) {
 		}
 		if err == services.ErrSeriesNotFound {
 			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Series not found"}})
+			return
+		}
+		if err == services.ErrExerciseNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Exercise not found"}})
 			return
 		}
 		if err == services.ErrInvalidSessionType {
@@ -951,6 +960,63 @@ func (h *JymHandler) DeleteSessionExercise(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Exercise removed"})
 }
 
+// AddSessionExercise puts an exercise on a workout's list.
+// POST /jym/sessions/:id/exercises
+func (h *JymHandler) AddSessionExercise(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	sessionID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid session ID"}})
+		return
+	}
+	var req models.AddSessionExerciseRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()}})
+		return
+	}
+	ex, err := h.jymService.AddSessionExercise(c.Request.Context(), userID, sessionID, req.ExerciseID)
+	if err != nil {
+		switch err {
+		case services.ErrSessionNotFound:
+			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Session not found"}})
+		case services.ErrExerciseNotFound:
+			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Exercise not found"}})
+		default:
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to add exercise"}})
+		}
+		return
+	}
+	c.JSON(http.StatusOK, ex)
+}
+
+// ReorderSessionExercises sets a workout's order.
+// PUT /jym/sessions/:id/exercises/order
+func (h *JymHandler) ReorderSessionExercises(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	sessionID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid session ID"}})
+		return
+	}
+	var req models.ReorderSessionExercisesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()}})
+		return
+	}
+	if err := h.jymService.ReorderSessionExercises(c.Request.Context(), userID, sessionID, req.ExerciseIDs); err != nil {
+		switch err {
+		case services.ErrSessionNotFound:
+			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Session not found"}})
+		case services.ErrExerciseOrder:
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()}})
+		default:
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to save the order"}})
+		}
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
 // GetSessionReport is a workout's summary, built by the same rules as every session list.
 // GET /jym/sessions/:id/summary
 func (h *JymHandler) GetSessionReport(c *gin.Context) {
@@ -1031,6 +1097,26 @@ func (h *JymHandler) CreateShare(c *gin.Context) {
 	}
 	analytics.TrackEvent(h.db, userID, "split.share", nil)
 	c.JSON(http.StatusCreated, resp)
+}
+
+// ListShares handles GET /jym/splits/:split_id/shares: the split's live links.
+func (h *JymHandler) ListShares(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	splitID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid split ID"}})
+		return
+	}
+	links, err := h.jymService.ListShares(c.Request.Context(), userID, splitID, h.appBaseURL)
+	if err != nil {
+		if err == services.ErrSplitNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Split not found"}})
+			return
+		}
+		respondInternal(c, err, "failed to list shares")
+		return
+	}
+	c.JSON(http.StatusOK, links)
 }
 
 func (h *JymHandler) RevokeShare(c *gin.Context) {

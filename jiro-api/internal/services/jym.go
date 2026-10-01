@@ -32,6 +32,7 @@ var (
 
 	ErrInvalidSessionType  = errors.New("session type must be normal, deload or test")
 	ErrSessionEnded        = errors.New("session has already ended")
+	ErrExerciseOrder       = errors.New("the order must name each of the workout's exercises once")
 	ErrDuplicateRoutine    = errors.New("routine listed more than once")
 	ErrRoutineNotInSeries  = errors.New("routine is not a day of the series' split")
 	ErrInvalidSeriesLength = errors.New("a series runs 1 to 52 weeks or 1 to 200 sessions")
@@ -112,7 +113,7 @@ func (s *JymService) ListExercises(ctx context.Context, userID uuid.UUID, search
 	}
 	if muscleGroup != "" {
 		args = append(args, muscleGroup)
-		query += ` AND e.muscle_group = $` + intStr(len(args))
+		query += ` AND LOWER(TRIM(e.muscle_group)) = LOWER(TRIM($` + intStr(len(args)) + `))`
 	}
 	query += ` ORDER BY e.name ASC`
 
@@ -199,8 +200,8 @@ func (s *JymService) UpdateExercise(ctx context.Context, userID, exerciseID uuid
 	err := s.db.QueryRow(ctx,
 		`UPDATE exercises SET
 		   name         = COALESCE($3, name),
-		   muscle_group = COALESCE($4, muscle_group),
-		   notes        = COALESCE($5, notes),
+		   muscle_group = CASE WHEN $4::TEXT IS NULL THEN muscle_group ELSE NULLIF(TRIM($4), '') END,
+		   notes        = CASE WHEN $5::TEXT IS NULL THEN notes ELSE NULLIF(TRIM($5), '') END,
 		   updated_at   = NOW()
 		 WHERE id = $1 AND user_id = $2
 		 RETURNING id, user_id, name, muscle_group, notes, created_at, updated_at`,
@@ -442,7 +443,7 @@ func (s *JymService) ListPublicSplits(ctx context.Context, search, tag, muscleGr
 		LEFT JOIN routines r ON r.split_id = s.id
 		WHERE s.visibility = 'public'
 		  AND ($1 = '' OR s.name ILIKE '%' || $1 || '%')
-		  AND ($2 = '' OR s.tags && ARRAY[$2]::TEXT[])
+		  AND ($2 = '' OR EXISTS (SELECT 1 FROM unnest(s.tags) t WHERE LOWER(TRIM(t)) = LOWER(TRIM($2))))
 		  AND ($3 = '' OR EXISTS (
 		        SELECT 1 FROM routines r2
 		        JOIN routine_items ri ON ri.routine_id = r2.id
@@ -797,6 +798,185 @@ func (s *JymService) listRoutineItems(ctx context.Context, routineID uuid.UUID) 
 	return result, rows.Err()
 }
 
+// ─── A workout's own exercise list ────────────────────────────────────────────
+
+// listSessionExercises is a workout's list in order.
+func listSessionExercises(ctx context.Context, q querier, sessionID uuid.UUID) ([]models.SessionExercise, error) {
+	rows, err := q.Query(ctx,
+		`SELECT se.exercise_id, e.name, e.muscle_group, se.position, se.target_sets, se.target_reps
+		 FROM session_exercises se JOIN exercises e ON e.id = se.exercise_id
+		 WHERE se.session_id = $1
+		 ORDER BY se.position, se.exercise_id`,
+		sessionID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	list := []models.SessionExercise{}
+	for rows.Next() {
+		var x models.SessionExercise
+		if err := rows.Scan(&x.ExerciseID, &x.ExerciseName, &x.MuscleGroup, &x.Position, &x.TargetSets, &x.TargetReps); err != nil {
+			return nil, err
+		}
+		list = append(list, x)
+	}
+	return list, rows.Err()
+}
+
+// seedSessionExercises gives a new workout its list: the given exercises in order (Repeat), else the routine's items.
+// Targets come from the routine wherever an exercise is in it; an exercise that isn't the user's is ErrExerciseNotFound.
+func seedSessionExercises(ctx context.Context, tx pgx.Tx, userID, sessionID uuid.UUID, routineID *uuid.UUID, exerciseIDs []uuid.UUID) error {
+	if len(exerciseIDs) > 0 {
+		distinct := map[uuid.UUID]bool{}
+		for _, id := range exerciseIDs {
+			distinct[id] = true
+		}
+		tag, err := tx.Exec(ctx,
+			`INSERT INTO session_exercises (session_id, exercise_id, position, target_sets, target_reps)
+			 SELECT $1, d.id, ROW_NUMBER() OVER (ORDER BY d.ord), ri.target_sets, ri.target_reps
+			 FROM (SELECT DISTINCT ON (u.id) u.id, u.ord
+			       FROM unnest($2::uuid[]) WITH ORDINALITY AS u(id, ord) ORDER BY u.id, u.ord) d
+			 JOIN exercises e ON e.id = d.id AND e.user_id = $3
+			 LEFT JOIN LATERAL (SELECT target_sets, target_reps FROM routine_items
+			                    WHERE routine_id = $4 AND exercise_id = d.id
+			                    ORDER BY order_index, id LIMIT 1) ri ON TRUE`,
+			sessionID, exerciseIDs, userID, routineID,
+		)
+		if err != nil {
+			return err
+		}
+		if int(tag.RowsAffected()) != len(distinct) {
+			return ErrExerciseNotFound
+		}
+		return nil
+	}
+	if routineID == nil {
+		return nil
+	}
+	_, err := tx.Exec(ctx,
+		`INSERT INTO session_exercises (session_id, exercise_id, position, target_sets, target_reps)
+		 SELECT $1, fi.exercise_id, ROW_NUMBER() OVER (ORDER BY fi.order_index, fi.id), fi.target_sets, fi.target_reps
+		 FROM (SELECT DISTINCT ON (exercise_id) exercise_id, target_sets, target_reps, order_index, id
+		       FROM routine_items WHERE routine_id = $2 ORDER BY exercise_id, order_index, id) fi`,
+		sessionID, *routineID,
+	)
+	return err
+}
+
+// ensureSessionExercise puts an exercise on a workout's list, last, with its routine's targets if it has them.
+func ensureSessionExercise(ctx context.Context, tx pgx.Tx, sessionID, exerciseID uuid.UUID) error {
+	_, err := tx.Exec(ctx,
+		`INSERT INTO session_exercises (session_id, exercise_id, position, target_sets, target_reps)
+		 SELECT s.id, $2,
+		        COALESCE((SELECT MAX(x.position) FROM session_exercises x WHERE x.session_id = s.id), 0) + 1,
+		        ri.target_sets, ri.target_reps
+		 FROM sessions s
+		 LEFT JOIN LATERAL (SELECT target_sets, target_reps FROM routine_items
+		                    WHERE routine_id = s.routine_id AND exercise_id = $2
+		                    ORDER BY order_index, id LIMIT 1) ri ON TRUE
+		 WHERE s.id = $1
+		 ON CONFLICT (session_id, exercise_id) DO NOTHING`,
+		sessionID, exerciseID,
+	)
+	return err
+}
+
+// AddSessionExercise puts an exercise on a workout's list, last; one already there stays where it is.
+func (s *JymService) AddSessionExercise(ctx context.Context, userID, sessionID, exerciseID uuid.UUID) (*models.SessionExercise, error) {
+	var owner uuid.UUID
+	if err := s.db.QueryRow(ctx, `SELECT user_id FROM sessions WHERE id = $1`, sessionID).Scan(&owner); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSessionNotFound
+		}
+		return nil, err
+	}
+	if owner != userID {
+		return nil, ErrSessionNotFound
+	}
+	if owned, err := s.ownsExercise(ctx, exerciseID, userID); err != nil {
+		return nil, err
+	} else if !owned {
+		return nil, ErrExerciseNotFound
+	}
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	if err := ensureSessionExercise(ctx, tx, sessionID, exerciseID); err != nil {
+		return nil, err
+	}
+	list, err := listSessionExercises(ctx, tx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	for i := range list {
+		if list[i].ExerciseID == exerciseID {
+			return &list[i], nil
+		}
+	}
+	return nil, ErrExerciseNotFound
+}
+
+// ReorderSessionExercises sets a workout's order; the list must name each of its exercises exactly once.
+func (s *JymService) ReorderSessionExercises(ctx context.Context, userID, sessionID uuid.UUID, exerciseIDs []uuid.UUID) error {
+	var owner uuid.UUID
+	if err := s.db.QueryRow(ctx, `SELECT user_id FROM sessions WHERE id = $1`, sessionID).Scan(&owner); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrSessionNotFound
+		}
+		return err
+	}
+	if owner != userID {
+		return ErrSessionNotFound
+	}
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	rows, err := tx.Query(ctx, `SELECT exercise_id FROM session_exercises WHERE session_id = $1 FOR UPDATE`, sessionID)
+	if err != nil {
+		return err
+	}
+	current := map[uuid.UUID]bool{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return err
+		}
+		current[id] = true
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	seen := map[uuid.UUID]bool{}
+	for _, id := range exerciseIDs {
+		if !current[id] || seen[id] {
+			return ErrExerciseOrder
+		}
+		seen[id] = true
+	}
+	if len(seen) != len(current) {
+		return ErrExerciseOrder
+	}
+	if _, err := tx.Exec(ctx,
+		`UPDATE session_exercises se SET position = u.ord
+		 FROM unnest($2::uuid[]) WITH ORDINALITY AS u(id, ord)
+		 WHERE se.session_id = $1 AND se.exercise_id = u.id`,
+		sessionID, exerciseIDs,
+	); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
 // ─── Sessions ─────────────────────────────────────────────────────────────────
 
 // Exercise, routine and series ids arrive in request bodies and the reads that
@@ -840,6 +1020,12 @@ func (s *JymService) StartSession(ctx context.Context, userID uuid.UUID, req *mo
 	if !validSessionTypes[sessionType] {
 		return nil, ErrInvalidSessionType
 	}
+	past := req.StartedAt != nil || req.EndedAt != nil
+	if past {
+		if err := checkPastWorkout(req.StartedAt, req.EndedAt); err != nil {
+			return nil, err
+		}
+	}
 
 	if req.RoutineID != nil {
 		if owned, err := s.ownsRoutine(ctx, *req.RoutineID, userID); err != nil {
@@ -849,14 +1035,16 @@ func (s *JymService) StartSession(ctx context.Context, userID uuid.UUID, req *mo
 		}
 	}
 	seriesID := req.SeriesID
-	// A day of a split with an active series belongs to that series, whichever Start button was used.
+	// A day of a split with an active series belongs to that series, whichever Start button was used;
+	// a past workout only if it falls inside the series.
 	if req.RoutineID != nil && seriesID == nil {
 		var active uuid.UUID
 		err := s.db.QueryRow(ctx,
 			`SELECT sr.id FROM split_series sr JOIN routines r ON r.split_id = sr.split_id
 			 WHERE r.id = $1 AND sr.user_id = $2 AND sr.ended_at IS NULL
+			   AND ($3::timestamptz IS NULL OR sr.started_at <= $3)
 			 ORDER BY sr.started_at DESC LIMIT 1`,
-			*req.RoutineID, userID,
+			*req.RoutineID, userID, req.StartedAt,
 		).Scan(&active)
 		if err == nil {
 			seriesID = &active
@@ -884,7 +1072,8 @@ func (s *JymService) StartSession(ctx context.Context, userID uuid.UUID, req *mo
 			return nil, ErrRoutineNotInSeries
 		}
 	}
-	if !req.Force {
+	// A past workout is created finished, so it never competes with the open one.
+	if !req.Force && !past {
 		open := &SessionInProgressError{}
 		err := s.db.QueryRow(ctx,
 			`SELECT s.id, r.name, s.started_at,
@@ -903,14 +1092,29 @@ func (s *JymService) StartSession(ctx context.Context, userID uuid.UUID, req *mo
 		}
 	}
 
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
 	sess := &models.StartSessionResponse{}
-	err := s.db.QueryRow(ctx,
-		`INSERT INTO sessions (user_id, routine_id, series_id, session_type)
-		 VALUES ($1, $2, $3, $4)
+	err = tx.QueryRow(ctx,
+		`INSERT INTO sessions (user_id, routine_id, series_id, session_type, started_at, ended_at)
+		 VALUES ($1, $2, $3, $4, COALESCE($5, NOW()), $6)
 		 RETURNING id, user_id, routine_id, series_id, session_type, started_at, ended_at, notes`,
-		userID, req.RoutineID, seriesID, sessionType,
+		userID, req.RoutineID, seriesID, sessionType, req.StartedAt, req.EndedAt,
 	).Scan(&sess.ID, &sess.UserID, &sess.RoutineID, &sess.SeriesID, &sess.SessionType, &sess.StartedAt, &sess.EndedAt, &sess.Notes)
 	if err != nil {
+		return nil, err
+	}
+	// The workout keeps its own list, so a later edit to the routine doesn't change it.
+	if err := seedSessionExercises(ctx, tx, userID, sess.ID, req.RoutineID, req.ExerciseIDs); err != nil {
+		return nil, err
+	}
+	if sess.Exercises, err = listSessionExercises(ctx, tx, sess.ID); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
 
@@ -944,6 +1148,26 @@ func (s *JymService) StartSession(ctx context.Context, userID uuid.UUID, req *mo
 	}
 
 	return sess, nil
+}
+
+// oldestPastWorkout is how far back a past workout can be logged.
+const oldestPastWorkout = 366 * 24 * time.Hour
+
+// checkPastWorkout holds a logged-afterwards workout to the same times rules as an edit, and to the last year.
+func checkPastWorkout(start, end *time.Time) error {
+	switch {
+	case start == nil || end == nil:
+		return &SessionTimesError{"Give both a start and a finish time."}
+	case !end.After(*start):
+		return &SessionTimesError{"The end must be after the start."}
+	case end.After(time.Now().Add(5 * time.Minute)):
+		return &SessionTimesError{"The end can't be in the future."}
+	case end.Sub(*start) > maxSessionLength:
+		return &SessionTimesError{"A workout can't be longer than 24 hours."}
+	case start.Before(time.Now().Add(-oldestPastWorkout)):
+		return &SessionTimesError{"A past workout can go back a year at most."}
+	}
+	return nil
 }
 
 // sessionPageSelect aggregates only the sessions its page CTE picks, newest first.
@@ -1131,6 +1355,9 @@ func (s *JymService) GetSession(ctx context.Context, userID, sessionID uuid.UUID
 		if items != nil {
 			sess.Targets = items
 		}
+	}
+	if sess.Exercises, err = listSessionExercises(ctx, s.db, sessionID); err != nil {
+		return nil, err
 	}
 	return sess, nil
 }
@@ -1393,6 +1620,12 @@ func (s *JymService) DeleteSessionExercise(ctx context.Context, userID, sessionI
 			return err
 		}
 	}
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM session_exercises WHERE session_id = $1 AND exercise_id = $2`,
+		sessionID, exerciseID,
+	); err != nil {
+		return err
+	}
 	return tx.Commit(ctx)
 }
 
@@ -1592,7 +1825,7 @@ func (s *JymService) RerateAllPRs(ctx context.Context) (exercises, changed int, 
 }
 
 func (s *JymService) LogSet(ctx context.Context, userID, sessionID uuid.UUID, req *models.CreateSetRequest) (*models.SessionSet, error) {
-	// Verify session ownership, and that it is still live
+	// Verify session ownership, and that it is still live unless the set is fixed into a finished one
 	var ownerID uuid.UUID
 	var endedAt *time.Time
 	if err := s.db.QueryRow(ctx, `SELECT user_id, ended_at FROM sessions WHERE id = $1`, sessionID).Scan(&ownerID, &endedAt); err != nil {
@@ -1604,7 +1837,7 @@ func (s *JymService) LogSet(ctx context.Context, userID, sessionID uuid.UUID, re
 	if ownerID != userID {
 		return nil, ErrNotOwner
 	}
-	if endedAt != nil {
+	if endedAt != nil && !req.Fix {
 		return nil, ErrSessionEnded
 	}
 
@@ -1624,15 +1857,24 @@ func (s *JymService) LogSet(ctx context.Context, userID, sessionID uuid.UUID, re
 	}
 	defer tx.Rollback(ctx)
 
+	// A set fixed into a finished workout is timed just after its last set (never past its end), so PR order,
+	// set order and the workout's times stay in the workout's own time; a live set is timed now.
 	set := &models.SessionSet{}
 	err = tx.QueryRow(ctx,
-		`INSERT INTO session_sets (session_id, exercise_id, set_number, weight, reps_performed, rpe, is_warmup, exercise_note)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		`INSERT INTO session_sets (session_id, exercise_id, set_number, weight, reps_performed, rpe, is_warmup, exercise_note, created_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE((
+		   SELECT LEAST(s.ended_at, GREATEST(s.started_at, COALESCE(MAX(x.created_at), s.started_at)) + interval '1 second')
+		   FROM sessions s LEFT JOIN session_sets x ON x.session_id = s.id
+		   WHERE s.id = $1 AND s.ended_at IS NOT NULL
+		   GROUP BY s.id), NOW()))
 		 RETURNING id, session_id, exercise_id, set_number, weight, reps_performed, rpe, is_pr, is_warmup, exercise_note, created_at`,
 		sessionID, req.ExerciseID, req.SetNumber, weight, req.RepsPerformed, req.RPE, isWarmup, req.ExerciseNote,
 	).Scan(&set.ID, &set.SessionID, &set.ExerciseID, &set.SetNumber, &set.Weight,
 		&set.RepsPerformed, &set.RPE, &set.IsPR, &set.IsWarmup, &set.ExerciseNote, &set.CreatedAt)
 	if err != nil {
+		return nil, err
+	}
+	if err := ensureSessionExercise(ctx, tx, sessionID, req.ExerciseID); err != nil {
 		return nil, err
 	}
 	if _, err := rerateExercisePRs(ctx, tx, userID, req.ExerciseID); err != nil {
@@ -1662,7 +1904,7 @@ func (s *JymService) UpdateSet(ctx context.Context, userID, setID uuid.UUID, req
 		   reps_performed = COALESCE($4, reps_performed),
 		   rpe            = COALESCE($5, rpe),
 		   is_warmup      = COALESCE($6, is_warmup),
-		   exercise_note  = COALESCE($7, exercise_note)
+		   exercise_note  = CASE WHEN $7::TEXT IS NULL THEN exercise_note ELSE NULLIF(TRIM($7), '') END
 		 WHERE id = $1
 		   AND session_id IN (SELECT id FROM sessions WHERE user_id = $2)
 		 RETURNING id, session_id, exercise_id, set_number, weight, reps_performed, rpe, is_pr, is_warmup, exercise_note, created_at`,
@@ -2249,12 +2491,21 @@ func (s *JymService) CreateShare(ctx context.Context, userID, splitID uuid.UUID,
 		return nil, ErrSplitNotFound
 	}
 
+	// Share again hands back the live link (with a day or more left) instead of minting one per click.
 	var shareID uuid.UUID
 	var expiresAt time.Time
 	err = s.db.QueryRow(ctx,
-		`INSERT INTO split_shares (split_id, created_by, expires_at) VALUES ($1, $2, $3) RETURNING id, expires_at`,
-		splitID, userID, time.Now().Add(SplitShareTTL),
+		`SELECT id, expires_at FROM split_shares
+		 WHERE split_id = $1 AND created_by = $2 AND expires_at > NOW() + interval '1 day'
+		 ORDER BY created_at DESC LIMIT 1`,
+		splitID, userID,
 	).Scan(&shareID, &expiresAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		err = s.db.QueryRow(ctx,
+			`INSERT INTO split_shares (split_id, created_by, expires_at) VALUES ($1, $2, $3) RETURNING id, expires_at`,
+			splitID, userID, time.Now().Add(SplitShareTTL),
+		).Scan(&shareID, &expiresAt)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -2264,6 +2515,40 @@ func (s *JymService) CreateShare(ctx context.Context, userID, splitID uuid.UUID,
 		URL:       appBaseURL + "/jym/share/" + shareID.String(),
 		ExpiresAt: expiresAt,
 	}, nil
+}
+
+// ListShares returns the live links to one of the user's splits, newest first.
+func (s *JymService) ListShares(ctx context.Context, userID, splitID uuid.UUID, appBaseURL string) ([]models.ShareLink, error) {
+	var ownerID uuid.UUID
+	err := s.db.QueryRow(ctx, `SELECT user_id FROM splits WHERE id = $1`, splitID).Scan(&ownerID)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && ownerID != userID) {
+		return nil, ErrSplitNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.db.Query(ctx,
+		`SELECT id, expires_at FROM split_shares
+		 WHERE split_id = $1 AND created_by = $2 AND (expires_at IS NULL OR expires_at > NOW())
+		 ORDER BY created_at DESC`,
+		splitID, userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	links := []models.ShareLink{}
+	for rows.Next() {
+		var link models.ShareLink
+		var id uuid.UUID
+		if err := rows.Scan(&id, &link.ExpiresAt); err != nil {
+			return nil, err
+		}
+		link.ShareID = id.String()
+		link.URL = appBaseURL + "/jym/share/" + link.ShareID
+		links = append(links, link)
+	}
+	return links, rows.Err()
 }
 
 // RevokeShare deletes a share the user owns.
@@ -2385,11 +2670,23 @@ func (s *JymService) ImportShare(ctx context.Context, importerID, shareID uuid.U
 }
 
 // copySplit deep-copies split splitID into importerID's account and returns the new split ID.
+// Importing the same split again returns the copy made the first time.
 func (s *JymService) copySplit(ctx context.Context, importerID, splitID uuid.UUID) (uuid.UUID, error) {
+	var existing uuid.UUID
+	err := s.db.QueryRow(ctx,
+		`SELECT id FROM splits WHERE user_id = $1 AND source_split_id = $2`, importerID, splitID,
+	).Scan(&existing)
+	if err == nil {
+		return existing, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil, err
+	}
+
 	// Load original split
 	var origName string
 	var origDesc *string
-	err := s.db.QueryRow(ctx,
+	err = s.db.QueryRow(ctx,
 		`SELECT name, description FROM splits WHERE id = $1`, splitID,
 	).Scan(&origName, &origDesc)
 	if err != nil {
@@ -2489,8 +2786,8 @@ func (s *JymService) copySplit(ctx context.Context, importerID, splitID uuid.UUI
 
 	var newSplitID uuid.UUID
 	err = tx.QueryRow(ctx,
-		`INSERT INTO splits (user_id, name, description) VALUES ($1, $2, $3) RETURNING id`,
-		importerID, origName, origDesc,
+		`INSERT INTO splits (user_id, name, description, source_split_id) VALUES ($1, $2, $3, $4) RETURNING id`,
+		importerID, origName, origDesc, splitID,
 	).Scan(&newSplitID)
 	if err != nil {
 		return uuid.Nil, err

@@ -14,6 +14,7 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { JiroMenuComponent, JiroMenuItem } from '../../../shared/components/jiro-menu/jiro-menu';
 import { formatDay } from '../../../core/utils/format-date';
+import { dayKey, todayKey } from '../../../core/utils/day';
 
 const MUSCLE_GROUPS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs', 'Glutes', 'Core', 'Cardio'];
 
@@ -92,6 +93,8 @@ const ROW_ACTIONS: JiroMenuItem[] = [
                     <span class="best-set">{{ weight(pr.weight) }} {{ unit() }} &times; {{ pr.reps }}</span>
                     <span class="best-meta">est. 1RM {{ weight(pr.est_1rm) }} {{ unit() }} &middot; last trained {{ ago(ex.last_performed_at ?? pr.date) }}</span>
                   </span>
+                } @else if (ex.last_performed_at) {
+                  <span class="ex-best ex-best--none">Last trained {{ ago(ex.last_performed_at) }}</span>
                 } @else {
                   <span class="ex-best ex-best--none">No sets logged yet</span>
                 }
@@ -382,13 +385,10 @@ export class ExerciseLibraryComponent implements OnInit {
     return Number.isInteger(v) ? String(v) : v.toFixed(1);
   }
 
-  /** Relative day for a PR date, counted in UTC days like the rest of Jym. */
+  /** Relative day for an instant, counted in calendar days in your timezone. */
   ago(iso: string): string {
-    const d = new Date(iso);
-    const now = new Date();
-    const day = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
-    const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-    const days = Math.round((today - day) / 86400000);
+    const tz = this.settings.timezone();
+    const days = Math.round((Date.parse(todayKey(tz)) - Date.parse(dayKey(iso, tz))) / 86400000);
     if (days <= 0) return 'today';
     if (days === 1) return 'yesterday';
     if (days < 14) return `${days} days ago`;
@@ -461,8 +461,8 @@ export class ExerciseLibraryComponent implements OnInit {
     this.editSaving.set(true);
     this.jym.updateExercise(ex.id, {
       name: this.editName.trim(),
-      muscle_group: this.editMg || undefined,
-      notes: this.editNotes.trim() || undefined,
+      muscle_group: this.editMg || '',
+      notes: this.editNotes.trim(),
     }).subscribe({
       next: updated => {
         this.exercises.update(list => list.map(e => e.id === updated.id ? updated : e));

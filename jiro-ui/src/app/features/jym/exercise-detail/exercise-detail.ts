@@ -807,6 +807,7 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
     this.uploadService.deleteSessionAttachment(id).subscribe({
       next: () => {
         this.formChecks.update(list => list.filter(c => c.id !== id));
+        this.formPage.update(p => Math.min(p, this.formTotalPages() - 1));
         this.deletingFormCheck.update(s => { const n = new Set(s); n.delete(id); return n; });
         this.toast.success('Clip deleted');
       },

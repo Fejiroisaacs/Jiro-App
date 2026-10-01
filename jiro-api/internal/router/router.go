@@ -257,6 +257,8 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 				jym.POST("/sessions/:id/sets", jymHandler.LogSet)
 				jym.PUT("/sets/:id", jymHandler.UpdateSet)
 				jym.DELETE("/sets/:id", jymHandler.DeleteSet)
+				jym.POST("/sessions/:id/exercises", jymHandler.AddSessionExercise)
+				jym.PUT("/sessions/:id/exercises/order", jymHandler.ReorderSessionExercises)
 				jym.DELETE("/sessions/:id/exercises/:exercise_id", jymHandler.DeleteSessionExercise)
 				jym.GET("/sessions/:id/summary", jymHandler.GetSessionReport)
 
@@ -274,6 +276,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 
 				// Split shares (auth required for create/revoke/import)
 				jym.POST("/splits/:split_id/share", jymHandler.CreateShare)
+				jym.GET("/splits/:id/shares", jymHandler.ListShares)
 				jym.DELETE("/shares/:share_id", jymHandler.RevokeShare)
 				jym.POST("/shares/:share_id/import", jymHandler.ImportShare)
 

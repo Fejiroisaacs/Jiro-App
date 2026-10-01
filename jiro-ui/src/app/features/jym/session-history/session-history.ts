@@ -15,6 +15,7 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
+import { LogPastDialogComponent } from '../shared/log-past-dialog';
 import { dayKey, todayKey } from '../../../core/utils/day';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { formatInstant } from '../../../core/utils/format-date';
@@ -24,19 +25,26 @@ import { formatInstant } from '../../../core/utils/format-date';
   standalone: true,
   imports: [JiroSkeletonComponent, 
     CommonModule, FormsModule, RouterLink, JiroButtonComponent, JiroIconComponent,
-    JiroPageHeaderComponent, JiroEmptyStateComponent, JymPrBadgeComponent,
+    JiroPageHeaderComponent, JiroEmptyStateComponent, JymPrBadgeComponent, LogPastDialogComponent,
   ],
   template: `
     <div class="session-history">
       <!-- Header -->
       @if (!embedded()) {
         <jiro-page-header heading="Session history" subtitle="Your logged workouts">
-          <jiro-button actions type="button" (click)="startNew()">New session</jiro-button>
+          <div actions class="header-buttons">
+            <jiro-button variant="secondary" type="button" (click)="showLogPast.set(true)">Log past workout</jiro-button>
+            <jiro-button type="button" (click)="startNew()">New session</jiro-button>
+          </div>
         </jiro-page-header>
       } @else {
         <div class="header-actions">
+          <jiro-button variant="secondary" type="button" (click)="showLogPast.set(true)">Log past workout</jiro-button>
           <jiro-button type="button" (click)="startNew()">New session</jiro-button>
         </div>
+      }
+      @if (showLogPast()) {
+        <jym-log-past-dialog (close)="showLogPast.set(false)" />
       }
 
       <!-- Export row -->
@@ -86,8 +94,9 @@ import { formatInstant } from '../../../core/utils/format-date';
         <jiro-empty-state
           icon="barbell"
           heading="No sessions yet"
-          message="Start your first workout to see it here.">
+          message="Start your first workout to see it here, or log one you did earlier.">
           <jiro-button type="button" (click)="startNew()">Start a workout</jiro-button>
+          <jiro-button variant="secondary" type="button" (click)="showLogPast.set(true)">Log past workout</jiro-button>
         </jiro-empty-state>
       }
 
@@ -190,6 +199,7 @@ import { formatInstant } from '../../../core/utils/format-date';
               <div class="detail-links">
                 @if (detail()!.ended_at) {
                   <a class="day-link" [routerLink]="['/jym/sessions', detail()!.id, 'summary']" [state]="{ back: backUrl(detail()!.id) }" (click)="$event.stopPropagation()">View summary</a>
+                  <a class="day-link" [routerLink]="['/jym/sessions', detail()!.id, 'edit']" [state]="{ back: backUrl(detail()!.id) }" (click)="$event.stopPropagation()">Edit workout</a>
                 } @else {
                   <a class="day-link" [routerLink]="['/jym/session', detail()!.id]" (click)="$event.stopPropagation()">Resume workout</a>
                 }
@@ -266,8 +276,8 @@ import { formatInstant } from '../../../core/utils/format-date';
 
     .page-header h1 { font-size: var(--font-size-2xl); font-weight: 700; }
 
-    .header-actions {
-      display: flex; flex-direction: column; align-items: flex-end;
+    .header-actions, .header-buttons {
+      display: flex; flex-wrap: wrap; justify-content: flex-end;
       gap: var(--space-sm); flex-shrink: 0;
     }
 
@@ -573,6 +583,7 @@ export class SessionHistoryComponent implements OnInit {
   loadError = signal(false);
   hasMore = signal(false);
   loadingMore = signal(false);
+  showLogPast = signal(false);
   selectedId = signal<string | null>(null);
   detail = signal<SessionWithSets | null>(null);
   detailLoading = signal(false);
@@ -814,7 +825,7 @@ const HISTORY_PAGE = 50;
 
 /** A list row for a session fetched on its own, counted like the list: working sets, and lifts with a record. */
 function summaryFromDetail(d: SessionWithSets): SessionSummary {
-  const { sets, attachments: _attachments, targets: _targets, ...session } = d;
+  const { sets, attachments: _attachments, targets: _targets, exercises: _exercises, ...session } = d;
   const working = sets.filter(x => !x.is_warmup);
   const times = sets.map(x => x.created_at).sort((a, b) => Date.parse(a) - Date.parse(b));
   return {

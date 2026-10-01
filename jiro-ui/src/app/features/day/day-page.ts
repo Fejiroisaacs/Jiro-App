@@ -1,4 +1,5 @@
-import { Component, ElementRef, Injector, afterNextRender, computed, inject, viewChild } from '@angular/core';
+import { LogPastDialogComponent } from '../jym/shared/log-past-dialog';
+import { Component, ElementRef, Injector, afterNextRender, computed, inject, signal, viewChild } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Subject, combineLatest, of } from 'rxjs';
@@ -27,7 +28,7 @@ const SLOT_LABELS: Record<string, string> = { breakfast: 'Breakfast', lunch: 'Lu
 @Component({
   selector: 'app-day-page',
   standalone: true,
-  imports: [RouterLink, JiroButtonComponent, JiroIconComponent, JiroMarkComponent, JiroSkeletonComponent],
+  imports: [RouterLink, JiroButtonComponent, JiroIconComponent, JiroMarkComponent, JiroSkeletonComponent, LogPastDialogComponent],
   template: `
     <div class="day">
       <header class="day-head">
@@ -106,11 +107,21 @@ const SLOT_LABELS: Record<string, string> = { breakfast: 'Breakfast', lunch: 'Lu
                       </li>
                     }
                   </ul>
+                  @if (!isToday()) {
+                    <button type="button" class="add add-btn" (click)="showLogPast.set(true)">Log another workout</button>
+                  }
                 } @else {
                   <p class="quiet">
                     No workout
-                    @if (isToday()) { <a class="add" routerLink="/jym">Start a workout</a> }
+                    @if (isToday()) {
+                      <a class="add" routerLink="/jym">Start a workout</a>
+                    } @else {
+                      <button type="button" class="add add-btn" (click)="showLogPast.set(true)">Log a workout</button>
+                    }
                   </p>
+                }
+                @if (showLogPast()) {
+                  <jym-log-past-dialog [day]="key()" (close)="showLogPast.set(false)" />
                 }
                 @if (d.jym.body_weight; as bw) {
                   <a class="row row--inline" routerLink="/jym/track" [queryParams]="{ tab: 'bodyweight' }">
@@ -382,6 +393,7 @@ const SLOT_LABELS: Record<string, string> = { breakfast: 'Breakfast', lunch: 'Lu
       font-weight: 600;
       color: var(--color-primary-text);
     }
+    .add-btn { padding: 0; border: none; background: none; font-family: inherit; font-size: inherit; cursor: pointer; text-decoration: underline; }
 
     .sub-title {
       margin: var(--space-md) 0 var(--space-xs);
@@ -464,6 +476,7 @@ export class DayPageComponent {
   readonly key = computed(() => this.state().key);
   readonly day = computed(() => { const s = this.state(); return s.status === 'ready' ? s.day : null; });
   readonly isToday = computed(() => this.key() >= this.today());
+  readonly showLogPast = signal(false);
   readonly relative = computed(() => relativeDayName(this.key(), this.today()));
   readonly label = computed(() => longDayLabel(this.key(), this.today()));
   readonly prevKey = computed(() => addDays(this.key(), -1));

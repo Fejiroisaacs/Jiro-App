@@ -1,4 +1,4 @@
-import { Component, ElementRef, HostListener, inject, input, output, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, HostListener, booleanAttribute, inject, input, output, signal, viewChild } from '@angular/core';
 import { JiroIconComponent } from '../jiro-icon/jiro-icon';
 import { IconName } from '../../icons/icons.generated';
 
@@ -26,7 +26,7 @@ let menuSeq = 0;
   standalone: true,
   imports: [JiroIconComponent],
   template: `
-    <div class="jm" [class.jm--up]="direction() === 'up'" (click)="$event.stopPropagation(); $event.preventDefault()">
+    <div class="jm" [class.jm--up]="direction() === 'up'" [class.jm--touch]="touch()" (click)="$event.stopPropagation(); $event.preventDefault()">
       <button
         #trigger
         type="button"
@@ -111,6 +111,8 @@ let menuSeq = 0;
     }
     .jm-item:hover, .jm-item:focus-visible { background: var(--bg-surface-hover); outline-offset: -2px; }
     .jm-item--danger { color: var(--color-negative); }
+    .jm--touch .jm-trigger { width: 44px; height: 44px; }
+    .jm--touch .jm-item { min-height: 44px; }
   `]
 })
 export class JiroMenuComponent {
@@ -118,6 +120,8 @@ export class JiroMenuComponent {
   /** Accessible name of the trigger, e.g. "More actions for Bench Press". */
   label = input<string>('More actions');
   direction = input<'down' | 'up'>('down');
+  /** 44 px trigger and items, for screens used on a phone mid-task. */
+  touch = input(false, { transform: booleanAttribute });
   select = output<string>();
 
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
