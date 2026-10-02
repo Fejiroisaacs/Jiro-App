@@ -172,6 +172,8 @@ export interface PlanDetails {
   rest_seconds: number | null;
   /** A cue, up to 140 characters. */
   notes: string | null;
+  /** Adjacent items with the same number are one superset (supersets.ts). */
+  superset_group: number | null;
 }
 
 export interface RoutineItem extends PlanDetails {
@@ -373,6 +375,7 @@ export interface CreateSessionRequest {
   /** Start even though another workout is open. */ force?: boolean;
   /** Both together log a past workout, created finished. */ started_at?: string; ended_at?: string;
   /** The workout's exercises in order (Repeat); omitted, the routine's items. */ exercise_ids?: string[];
+  /** One per exercise_ids entry (null for none): keeps a repeated workout's supersets. */ superset_groups?: (number | null)[];
 }
 export interface UpdateSessionRequest { ended_at?: string; notes?: string; session_type?: string; }
 /** A finished workout's new start or end; a field left out keeps its value. */

@@ -16,6 +16,7 @@ import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-serie
 import { SettingsService } from '../../../core/services/settings.service';
 import { formatInstant } from '../../../core/utils/format-date';
 import { REST_CHOICES, planText, restText } from '../plan-text';
+import { groupLabels, linkedWithNext, normalizeItems, toggleLink } from '../supersets';
 
 @Component({
   selector: 'app-split-detail',
@@ -178,16 +179,22 @@ import { REST_CHOICES, planText, restText } from '../plan-text';
             [cdkDropListConnectedTo]="getConnectedLists()"
             class="exercise-list"
             (cdkDropListDropped)="onDrop($event, ri)">
+            @let labels = supersetLabels(routine.items);
             @for (item of routine.items; track item; let ii = $index) {
 <div
              
               cdkDrag
-              class="exercise-item">
+              class="exercise-item"
+              [class.in-superset]="!!labels[ii]"
+              [class.joined-next]="linked(routine.items, ii)">
               <div class="drag-handle" cdkDragHandle>
                 <jiro-icon name="dots-six-vertical" [size]="14" />
               </div>
               <div class="item-info">
-                <span class="item-name">{{ item.exercise_name }}</span>
+                <span class="item-name">
+                  @if (labels[ii]) { <span class="ss-label">{{ labels[ii] }}</span> }
+                  {{ item.exercise_name }}
+                </span>
                 @if (item.muscle_group) {
 <span class="item-muscle">{{ item.muscle_group }}</span>
 }
@@ -198,6 +205,15 @@ import { REST_CHOICES, planText, restText } from '../plan-text';
                   <span class="item-note">{{ item.notes }}</span>
                 }
               </div>
+              @if (ii < routine.items.length - 1) {
+                <button class="icon-btn link-btn" type="button" (click)="toggleSuperset(ri, ii)"
+                  [class.on]="linked(routine.items, ii)"
+                  [attr.aria-pressed]="linked(routine.items, ii)"
+                  [attr.aria-label]="(linked(routine.items, ii) ? 'Unlink ' : 'Superset ') + item.exercise_name + (linked(routine.items, ii) ? ' from ' : ' with ') + routine.items[ii + 1].exercise_name"
+                  [title]="linked(routine.items, ii) ? 'Unlink from the next exercise' : 'Superset with the next exercise'">
+                  <jiro-icon name="link" [size]="14" />
+                </button>
+              }
               <button class="icon-btn" type="button" (click)="removeItem(ri, ii)" title="Remove exercise"
                 [attr.aria-label]="'Remove ' + item.exercise_name + ' from ' + routine.name">
                 <jiro-icon name="x" [size]="12" />
@@ -608,6 +624,20 @@ import { REST_CHOICES, planText, restText } from '../plan-text';
 
     .target-text:hover { border-color: var(--color-primary); }
 
+    .exercise-item.in-superset { border-left: 3px solid var(--color-primary); }
+
+    .exercise-item.joined-next { margin-bottom: -4px; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+
+    .exercise-item.joined-next + .exercise-item { border-top-left-radius: 0; border-top-right-radius: 0; }
+
+    .ss-label {
+      display: inline-block; margin-right: 4px; padding: 0 6px; border-radius: var(--border-radius-pill);
+      background: var(--color-primary); color: var(--text-on-primary);
+      font-size: var(--font-size-xs); font-weight: 700; font-variant-numeric: tabular-nums;
+    }
+
+    .link-btn.on { color: var(--color-primary); background: rgba(var(--color-primary-rgb), 0.12); }
+
     .item-note {
       font-size: var(--font-size-xs); color: var(--text-secondary); font-style: italic;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -1012,8 +1042,9 @@ export class SplitDetailComponent implements OnInit {
 
     if (event.previousContainer === event.container) {
       if (event.previousIndex === event.currentIndex) return;
-      const items = [...lists[currIdx].items];
-      moveItemInArray(items, event.previousIndex, event.currentIndex);
+      const moved = [...lists[currIdx].items];
+      moveItemInArray(moved, event.previousIndex, event.currentIndex);
+      const items = normalizeItems(moved);
       this.routines.update(rs => rs.map((r, i) => i === currIdx ? { ...r, items } : r));
       this.persistItems(currIdx);
       return;
@@ -1022,11 +1053,12 @@ export class SplitDetailComponent implements OnInit {
     // Save both days in one request so the exercise can't end up on both or neither.
     const prevItems = [...lists[prevIdx].items];
     const currItems = [...lists[currIdx].items];
+    // An exercise moved to another day leaves its superset behind.
     const [moved] = prevItems.splice(event.previousIndex, 1);
-    currItems.splice(event.currentIndex, 0, moved);
+    currItems.splice(event.currentIndex, 0, { ...moved, superset_group: null });
     this.routines.update(rs => rs.map((r, i) => {
-      if (i === prevIdx) return { ...r, items: prevItems };
-      if (i === currIdx) return { ...r, items: currItems };
+      if (i === prevIdx) return { ...r, items: normalizeItems(prevItems) };
+      if (i === currIdx) return { ...r, items: normalizeItems(currItems) };
       return r;
     }));
 
@@ -1075,6 +1107,23 @@ export class SplitDetailComponent implements OnInit {
   validRange(): boolean {
     const max = this.editRepsMax;
     return max === null || max === undefined || (Number.isInteger(max) && max >= this.editReps && max <= 100);
+  }
+
+  /** A1, A2, B1 for superset members, null for the rest. */
+  supersetLabels(items: RoutineItem[]): (string | null)[] {
+    return groupLabels(items.map(it => it.superset_group));
+  }
+
+  linked(items: RoutineItem[], i: number): boolean {
+    return linkedWithNext(items.map(it => it.superset_group), i);
+  }
+
+  /** Links an exercise with the next one in a superset, or unlinks them. */
+  toggleSuperset(ri: number, ii: number) {
+    const items = this.routines()[ri].items;
+    const groups = toggleLink(items.map(it => it.superset_group), ii);
+    this.routines.update(rs => rs.map((r, i) => i !== ri ? r : { ...r, items: r.items.map((it, j) => ({ ...it, superset_group: groups[j] })) }));
+    this.persistItems(ri);
   }
 
   /** The chip's spoken text: the plan in words, and the cue. */
@@ -1172,6 +1221,7 @@ export class SplitDetailComponent implements OnInit {
       target_rpe: null,
       rest_seconds: null,
       notes: null,
+      superset_group: null,
       order_index: routine.items.length,
       exercise_name: ex.name,
       muscle_group: ex.muscle_group,
@@ -1216,7 +1266,7 @@ export class SplitDetailComponent implements OnInit {
 
   removeItem(routineIndex: number, itemIndex: number) {
     const routine = this.routines()[routineIndex];
-    const updatedItems = routine.items.filter((_, i) => i !== itemIndex);
+    const updatedItems = normalizeItems(routine.items.filter((_, i) => i !== itemIndex));
     this.routines.update(rs => rs.map((r, i) => i === routineIndex ? { ...r, items: updatedItems } : r));
     this.persistItems(routineIndex);
   }
@@ -1241,6 +1291,7 @@ function toEntries(items: RoutineItem[]): ReplaceItemEntry[] {
     target_rpe: item.target_rpe,
     rest_seconds: item.rest_seconds,
     notes: item.notes,
+    superset_group: item.superset_group,
     detailed: true,
   }));
 }
