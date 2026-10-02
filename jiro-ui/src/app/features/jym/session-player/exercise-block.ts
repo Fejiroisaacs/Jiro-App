@@ -20,7 +20,7 @@ import { SetRowComponent } from './set-row';
               <!-- The header toggles on click; the name button is its keyboard handle (its click bubbles up). -->
               <div class="block-header" [class.block-open]="!store.isCollapsed(bi)" (click)="store.toggleBlock(bi)">
                 <div class="block-title">
-                  <h2><button type="button" class="block-toggle" [attr.aria-expanded]="!store.isCollapsed(bi)" [attr.aria-controls]="'block-body-' + bi">{{ block.exerciseName }}</button></h2>
+                  <h2><button type="button" class="block-toggle" [attr.aria-expanded]="!store.isCollapsed(bi)" [attr.aria-controls]="'block-body-' + bi">@if (store.labels()[bi]; as label) {<span class="ss-label">{{ label }}</span>}{{ block.exerciseName }}</button></h2>
                   @if (block.muscleGroup) {
     <span class="mg-tag">{{ block.muscleGroup }}</span>
     }
@@ -190,6 +190,12 @@ import { SetRowComponent } from './set-row';
     .block-toggle:focus-visible { outline: none; }
 
     .block-title { display: flex; flex-wrap: wrap; align-items: center; gap: 2px var(--space-sm); flex: 1; min-width: 0; }
+
+    .ss-label {
+      display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: var(--border-radius-pill);
+      background: var(--color-primary); color: var(--text-on-primary);
+      font-family: var(--font-family); font-size: var(--font-size-xs); font-weight: 700; vertical-align: middle;
+    }
 
     .plan-note { margin: 0; padding: 6px var(--space-lg); font-size: var(--font-size-sm); color: var(--text-secondary); font-style: italic; border-bottom: 1px solid var(--border-color); }
 

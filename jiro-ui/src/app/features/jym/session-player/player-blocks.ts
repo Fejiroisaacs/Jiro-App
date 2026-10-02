@@ -37,6 +37,8 @@ export interface ExerciseBlock {
   plan?: BlockPlan;
   /** repeat when the advice is to hold the weight, trend-up otherwise. */
   suggestionIcon?: 'trend-up' | 'repeat';
+  /** Its superset in the workout's list (supersets.ts); null outside one. */
+  group?: number | null;
 }
 
 /** A plan entry in the player; reps is the bottom of the range when repsMax is set. */
@@ -85,7 +87,7 @@ export function blockFromEntry(x: SessionExercise): ExerciseBlock {
   const rows = plan
     ? Array.from({ length: plan.sets }, (_, i) => newRow(i + 1, { ghostReps: String(plan.reps) }))
     : [newRow(1)];
-  return { ...emptyBlock(x.exercise_id, x.exercise_name, x.muscle_group, rows), ...(plan ? { plan } : {}) };
+  return { ...emptyBlock(x.exercise_id, x.exercise_name, x.muscle_group, rows), ...(plan ? { plan } : {}), group: x.superset_group ?? null };
 }
 
 /** Logged sets as saved rows, one block per exercise in the order the sets come; `display` shows stored kg. */
@@ -130,6 +132,7 @@ export function buildBlocks(
     if (!b) return blockFromEntry(x);
     const plan = planOf(x);
     if (plan) b.plan = plan;
+    b.group = x.superset_group ?? null;
     const last = b.sets.filter(s => !s.isWarmup).at(-1);
     for (let n = b.sets.length + 1; plan && n <= plan.sets; n++) {
       b.sets.push(newRow(n, { ghostWeight: last?.weight ?? '', ghostReps: String(plan.reps) }));

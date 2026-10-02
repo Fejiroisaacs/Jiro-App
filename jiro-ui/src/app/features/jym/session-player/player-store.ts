@@ -26,6 +26,7 @@ import {
   rampSummary, rpeInvalid, suggestionFrom, workingWeight,
 } from './player-blocks';
 import { RestTimer } from './rest-timer';
+import { groupLabels, linkedWithNext, membersOf, normalizeGroups, roundStep, segments, toggleLink } from '../supersets';
 import { PickerExercise } from './exercise-picker';
 
 /**
@@ -46,6 +47,13 @@ export class PlayerStore {
   onEnded: () => void = () => {};
 
   removingBlock = signal<number | null>(null);
+  /** The row a superset round points to next ("exerciseId-setNumber"), highlighted briefly. */
+  readonly nextUp = signal<string | null>(null);
+  private nextUpTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Each block's superset group, its label (A1, A2) and the runs to draw. */
+  readonly groups = computed(() => this.blocks().map(b => b.group ?? null));
+  readonly labels = computed(() => groupLabels(this.groups()));
+  readonly segments = computed(() => segments(this.groups()));
 
   blocks = signal<ExerciseBlock[]>([]);
   /** Collapsed exercises by id, so removing one never shifts which are closed. */
@@ -186,7 +194,7 @@ export class PlayerStore {
               ...s, saving: false, saved: true, isPR: saved.is_pr, id: saved.id, weightKg: saved.weight,
             } : s),
           } : b));
-          if (startRest && !this.fix) this.startRestTimer(block.plan?.rest ?? undefined);
+          if (startRest && !this.fix) this.afterLogged(blockIndex, row.isWarmup);
           resolve(true);
         },
         error: err => {
@@ -224,36 +232,79 @@ export class PlayerStore {
     });
   }
 
-  /** The exercise's menu: move it up or down one place, or remove it. */
+  /** The exercise's menu: move it up or down one place, superset it with the next one (or unlink), or remove it. */
   blockActions(bi: number): JiroMenuItem[] {
     const last = this.blocks().length - 1;
-    return bi === 0 && bi === last ? BLOCK_ACTIONS.only
-      : bi === 0 ? BLOCK_ACTIONS.first
-      : bi === last ? BLOCK_ACTIONS.last
-      : BLOCK_ACTIONS.middle;
+    const link = linkedWithNext(this.groups(), bi) ? [UNLINK_NEXT] : bi < last ? [LINK_NEXT] : [];
+    return [...(bi > 0 ? [MOVE_UP] : []), ...(bi < last ? [MOVE_DOWN] : []), ...link, REMOVE];
   }
 
   onBlockAction(bi: number, action: string) {
     if (action === 'up') this.moveBlock(bi, -1);
     else if (action === 'down') this.moveBlock(bi, 1);
+    else if (action === 'link') this.applyLayout(this.blocks(), toggleLink(this.groups(), bi));
     else if (action === 'remove') this.removeBlock(bi);
   }
 
-  /** Moves an exercise one place. Orders are saved one at a time; if one fails, the server's order comes back. */
+  /** Moves an exercise one place; moved out of its superset, it leaves it. */
   private moveBlock(bi: number, step: -1 | 1) {
     const bs = [...this.blocks()];
     const to = bi + step;
     if (to < 0 || to >= bs.length) return;
     [bs[bi], bs[to]] = [bs[to], bs[bi]];
+    this.applyLayout(bs, normalizeGroups(bs.map(b => b.group ?? null)));
+  }
+
+  /** Shows the order and supersets at once, then saves them; saves run one at a time, and a failure brings the server's back. */
+  private applyLayout(blocks: ExerciseBlock[], groups: (number | null)[]) {
+    const bs = blocks.map((b, i) => (b.group ?? null) === groups[i] ? b : { ...b, group: groups[i] });
     this.blocks.set(bs);
     const order = bs.map(b => b.exerciseId);
-    this.orderSave = this.orderSave.then(() => firstValueFrom(this.jymService.reorderSessionExercises(this.sessionId, order)).catch(() => {
+    this.orderSave = this.orderSave.then(() => firstValueFrom(this.jymService.reorderSessionExercises(this.sessionId, order, groups)).catch(() => {
       this.toast.error('Could not save the new order.');
       this.jymService.getSession(this.sessionId).subscribe(s => {
-        const pos = new Map((s.exercises ?? []).map((x, i) => [x.exercise_id, i]));
-        this.blocks.update(list => [...list].sort((a, b) => (pos.get(a.exerciseId) ?? list.length) - (pos.get(b.exerciseId) ?? list.length)));
+        const list = s.exercises ?? [];
+        const pos = new Map(list.map((x, i) => [x.exercise_id, i]));
+        const grp = new Map(list.map(x => [x.exercise_id, x.superset_group ?? null]));
+        this.blocks.update(cur => [...cur]
+          .sort((a, b) => (pos.get(a.exerciseId) ?? cur.length) - (pos.get(b.exerciseId) ?? cur.length))
+          .map(b => ({ ...b, group: grp.get(b.exerciseId) ?? null })));
       });
     }));
+  }
+
+  /**
+   * After a set is logged: outside a superset (or for a warm-up), rest as planned. In one, a working set
+   * leads to the next member with sets to do, without rest; after the round, rest for the group's longest
+   * planned rest, then back to the first member.
+   */
+  private afterLogged(bi: number, warmup: boolean) {
+    const blocks = this.blocks();
+    const step = warmup ? { rest: true, next: null } : roundStep(this.groups(), bi, j => blocks[j].sets.some(s => !s.saved && !s.isWarmup));
+    if (step.rest) this.startRestTimer(this.restFor(bi, warmup));
+    if (step.next !== null) this.pointTo(step.next);
+  }
+
+  /** Seconds to rest after exercise bi: its plan's, or in a superset the longest of its members'; undefined is your usual. */
+  private restFor(bi: number, warmup: boolean): number | undefined {
+    const blocks = this.blocks();
+    const members = warmup ? [bi] : membersOf(this.groups(), bi);
+    const planned = members.map(i => blocks[i].plan?.rest).filter((r): r is number => r != null);
+    return planned.length ? Math.max(...planned) : undefined;
+  }
+
+  /** Scrolls to exercise bi's next working row and marks it for a moment. */
+  private pointTo(bi: number) {
+    const block = this.blocks()[bi];
+    const row = block?.sets.find(s => !s.saved && !s.isWarmup);
+    if (!row) return;
+    const key = `${block.exerciseId}-${row.setNumber}`;
+    this.nextUp.set(key);
+    if (this.nextUpTimer) clearTimeout(this.nextUpTimer);
+    this.nextUpTimer = setTimeout(() => this.nextUp.set(null), 2500);
+    if (typeof document === 'undefined') return;
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    setTimeout(() => document.querySelector(`[data-set="${key}"]`)?.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' }), 0);
   }
 
   private async removeBlock(blockIndex: number) {
@@ -273,7 +324,12 @@ export class PlayerStore {
       next: () => {
         this.deleteStaleFormChecks(block.exerciseId);
         this.collapsedBlocks.update(set => { const next = new Set(set); next.delete(block.exerciseId); return next; });
-        this.blocks.update(bs => bs.filter((_, bi) => bi !== blockIndex));
+        // A partner left alone is no longer a superset (the server does the same).
+        this.blocks.update(bs => {
+          const left = bs.filter((_, bi) => bi !== blockIndex);
+          const groups = normalizeGroups(left.map(b => b.group ?? null));
+          return left.map((b, i) => (b.group ?? null) === groups[i] ? b : { ...b, group: groups[i] });
+        });
         this.removingBlock.set(null);
         this.toast.success(`${block.exerciseName} removed`);
       },
@@ -776,12 +832,8 @@ const SUGGESTION_SETS = 60;
 const MOVE_UP: JiroMenuItem = { id: 'up', label: 'Move up', icon: 'caret-up' };
 const MOVE_DOWN: JiroMenuItem = { id: 'down', label: 'Move down', icon: 'caret-down' };
 const REMOVE: JiroMenuItem = { id: 'remove', label: 'Remove exercise', icon: 'trash', danger: true };
-const BLOCK_ACTIONS = {
-  only: [REMOVE],
-  first: [MOVE_DOWN, REMOVE],
-  last: [MOVE_UP, REMOVE],
-  middle: [MOVE_UP, MOVE_DOWN, REMOVE],
-};
+const LINK_NEXT: JiroMenuItem = { id: 'link', label: 'Superset with next', icon: 'link' };
+const UNLINK_NEXT: JiroMenuItem = { id: 'link', label: 'Unlink from next', icon: 'link' };
 
 /** Sets (or, with no value, removes) one key of a Map held in a signal. */
 function setKey<T>(sig: WritableSignal<Map<string, T>>, key: string, value?: T) {

@@ -59,3 +59,36 @@ export function groupLabels(groups: readonly Group[]): (string | null)[] {
     return `${String.fromCharCode(64 + g)}${n}`;
   });
 }
+
+/** Runs of the list for display: a superset's members together, everything else one by one. */
+export function segments(groups: readonly Group[]): { group: Group; indices: number[] }[] {
+  const out: { group: Group; indices: number[] }[] = [];
+  groups.forEach((g, i) => {
+    const last = out.at(-1);
+    if (g != null && last && last.group === g) last.indices.push(i);
+    else out.push({ group: g, indices: [i] });
+  });
+  return out;
+}
+
+/**
+ * What logging a working set of exercise i leads to. In a superset: the next member that still has sets to do,
+ * with no rest; after the round (no later member has work) rest, then back to the first member with work.
+ * Outside one: rest, and nothing to point to.
+ */
+export function roundStep(groups: readonly Group[], i: number, hasWork: (j: number) => boolean): { rest: boolean; next: number | null } {
+  const g = groups[i];
+  if (g == null) return { rest: true, next: null };
+  let start = i;
+  while (start > 0 && groups[start - 1] === g) start--;
+  let end = i;
+  while (end + 1 < groups.length && groups[end + 1] === g) end++;
+  for (let j = i + 1; j <= end; j++) if (hasWork(j)) return { rest: false, next: j };
+  for (let j = start; j <= end; j++) if (hasWork(j)) return { rest: true, next: j };
+  return { rest: true, next: null };
+}
+
+/** The indices in i's superset (i alone outside one). */
+export function membersOf(groups: readonly Group[], i: number): number[] {
+  return segments(groups).find(s => s.indices.includes(i))?.indices ?? [i];
+}

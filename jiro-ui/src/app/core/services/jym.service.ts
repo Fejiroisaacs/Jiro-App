@@ -567,8 +567,10 @@ export class JymService {
   }
 
   /** Sets a workout's order; the list names each of its exercises once. */
-  reorderSessionExercises(sessionId: string, exerciseIds: string[]): Observable<void> {
-    return this.http.put<void>(`${API_URL}/sessions/${sessionId}/exercises/order`, { exercise_ids: exerciseIds });
+  /** Saves the order, and the supersets with it when `groups` (one per exercise, null for none) is given. */
+  reorderSessionExercises(sessionId: string, exerciseIds: string[], groups?: (number | null)[]): Observable<void> {
+    return this.http.put<void>(`${API_URL}/sessions/${sessionId}/exercises/order`,
+      groups ? { exercise_ids: exerciseIds, superset_groups: groups } : { exercise_ids: exerciseIds });
   }
 
   /** Removes an entire exercise block from a session — every logged set for it, in one call. */
