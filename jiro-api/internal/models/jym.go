@@ -192,6 +192,15 @@ type RoutineWithItems struct {
 	Items []RoutineItemWithExercise `json:"items"`
 }
 
+// PlanDetails is what a plan item says beyond sets × reps; nil is unset.
+type PlanDetails struct {
+	// With TargetReps, a rep range: TargetReps to TargetRepsMax.
+	TargetRepsMax *int    `json:"target_reps_max" binding:"omitempty,min=1,max=1000"`
+	TargetRPE     *int    `json:"target_rpe" binding:"omitempty,min=6,max=10"`
+	RestSeconds   *int    `json:"rest_seconds" binding:"omitempty,min=15,max=600"`
+	Notes         *string `json:"notes" binding:"omitempty,max=140"`
+}
+
 type RoutineItem struct {
 	ID         uuid.UUID `json:"id"`
 	RoutineID  uuid.UUID `json:"routine_id"`
@@ -199,6 +208,7 @@ type RoutineItem struct {
 	TargetSets int       `json:"target_sets"`
 	TargetReps int       `json:"target_reps"`
 	OrderIndex int       `json:"order_index"`
+	PlanDetails
 }
 
 type RoutineItemWithExercise struct {
@@ -222,6 +232,9 @@ type ReplaceItemEntry struct {
 	ExerciseID uuid.UUID `json:"exercise_id" binding:"required"`
 	TargetSets int       `json:"target_sets" binding:"min=0,max=50"`
 	TargetReps int       `json:"target_reps" binding:"min=0,max=1000"`
+	PlanDetails
+	// Detailed says the entry carries PlanDetails; without it (an older app) the item keeps the ones it had.
+	Detailed bool `json:"detailed"`
 }
 
 // RoutineItemsEntry is one day's full, ordered item list inside a split-wide save.
@@ -353,6 +366,7 @@ type ShareExercisePreview struct {
 	MuscleGroup *string `json:"muscle_group"`
 	TargetSets  int     `json:"target_sets"`
 	TargetReps  int     `json:"target_reps"`
+	PlanDetails
 }
 
 type ShareRoutinePreview struct {
@@ -411,6 +425,7 @@ type SessionExercise struct {
 	Position     int       `json:"position"`
 	TargetSets   *int      `json:"target_sets"`
 	TargetReps   *int      `json:"target_reps"`
+	PlanDetails
 }
 
 type AddSessionExerciseRequest struct {

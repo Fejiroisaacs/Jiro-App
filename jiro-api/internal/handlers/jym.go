@@ -519,6 +519,10 @@ func (h *JymHandler) ReplaceRoutineItems(c *gin.Context) {
 			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Exercise not found"}})
 			return
 		}
+		if errors.Is(err, services.ErrInvalidPlan) {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()}})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to update routine items"}})
 		return
 	}
@@ -549,6 +553,8 @@ func (h *JymHandler) ReplaceSplitItems(c *gin.Context) {
 			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Exercise not found"}})
 		case services.ErrDuplicateRoutine:
 			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: "Each routine may appear only once"}})
+		case services.ErrInvalidPlan:
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()}})
 		default:
 			c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to update routine items"}})
 		}

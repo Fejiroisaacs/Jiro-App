@@ -135,6 +135,7 @@ type exportRoutineItem struct {
 	TargetSets   int       `json:"target_sets"`
 	TargetReps   int       `json:"target_reps"`
 	OrderIndex   int       `json:"order_index"`
+	models.PlanDetails
 }
 
 type exportSeries struct {
@@ -651,6 +652,7 @@ func newExportRoutine(r models.RoutineWithItems) exportRoutine {
 			TargetSets:   it.TargetSets,
 			TargetReps:   it.TargetReps,
 			OrderIndex:   it.OrderIndex,
+			PlanDetails:  it.PlanDetails,
 		})
 	}
 	return out
