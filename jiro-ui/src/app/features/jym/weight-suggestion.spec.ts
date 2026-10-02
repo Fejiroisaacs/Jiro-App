@@ -19,7 +19,7 @@ function workout(id: string, day: number, sets: [number, number, (number | null)
   }));
 }
 
-const opts = (plan: { sets: number; reps: number } | null = null) => ({
+const opts = (plan: { sets: number; reps: number; repsMax?: number } | null = null) => ({
   excludeSessionId: 'today',
   plan,
   unit: 'kg',
@@ -41,6 +41,22 @@ test('a plan that was met adds a plate at the planned reps', () => {
 test('a plan that was missed holds the weight', () => {
   const got = nextSets(workout('a', 1, [[100, 8], [100, 8], [100, 6]]), opts({ sets: 3, reps: 8 }));
   assert.deepEqual([got?.move, got?.weight, got?.reps, got?.reason], ['hold', 100, 8, 'plan']);
+});
+
+test('a range adds a plate once every set reaches its top, then aims at its bottom', () => {
+  const got = nextSets(workout('a', 1, [[100, 12], [100, 12], [100, 12]]), opts({ sets: 3, reps: 8, repsMax: 12 }));
+  assert.deepEqual([got?.move, got?.weight, got?.reps], ['up', 102.5, 8]);
+});
+
+test("below the top of a range it holds and aims one rep past last time's best", () => {
+  // Best at the top weight was 10, so 11 today.
+  const got = nextSets(workout('a', 1, [[100, 10], [100, 9], [100, 8]]), opts({ sets: 3, reps: 8, repsMax: 12 }));
+  assert.deepEqual([got?.move, got?.weight, got?.reps, got?.reason], ['hold', 100, 11, 'plan']);
+  // Never past the top, never below the bottom.
+  const top = nextSets(workout('b', 1, [[100, 12], [100, 12], [100, 9]]), opts({ sets: 3, reps: 8, repsMax: 12 }));
+  assert.equal(top?.reps, 12);
+  const low = nextSets(workout('c', 1, [[100, 5], [100, 5], [100, 5]]), opts({ sets: 3, reps: 8, repsMax: 12 }));
+  assert.equal(low?.reps, 8);
 });
 
 test('deload, test and today are never last time', () => {

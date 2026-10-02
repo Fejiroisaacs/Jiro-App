@@ -161,8 +161,20 @@ import { ConfirmService } from '../../../core/services/confirm.service';
         }
 
         <!-- Exercise blocks -->
-        @for (block of store.blocks(); track block.exerciseId; let bi = $index) {
-          <jym-exercise-block [block]="block" [bi]="bi" />
+        @for (seg of store.segments(); track store.blocks()[seg.indices[0]].exerciseId) {
+          @if (seg.group !== null) {
+            <section class="ss-group" [attr.aria-label]="supersetTitle(seg)">
+              <div class="ss-head">
+                <span class="ss-title">{{ supersetTitle(seg) }}</span>
+                <span class="ss-hint">No rest between these; rest after the round.</span>
+              </div>
+              @for (bi of seg.indices; track store.blocks()[bi].exerciseId) {
+                <jym-exercise-block [block]="store.blocks()[bi]" [bi]="bi" />
+              }
+            </section>
+          } @else {
+            <jym-exercise-block [block]="store.blocks()[seg.indices[0]]" [bi]="seg.indices[0]" />
+          }
         }
 
         <!-- Add exercise -->
@@ -356,6 +368,18 @@ import { ConfirmService } from '../../../core/services/confirm.service';
 
     /* Warm-up prompt: shown above the rows until a set is logged. */
 
+    .ss-group {
+      display: flex; flex-direction: column; gap: var(--space-sm);
+      border: 2px solid rgba(var(--color-primary-rgb), 0.35); border-radius: var(--border-radius);
+      padding: var(--space-sm); background: rgba(var(--color-primary-rgb), 0.04);
+    }
+
+    .ss-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px var(--space-sm); padding: 0 var(--space-xs); }
+
+    .ss-title { font-weight: 700; color: var(--color-primary); }
+
+    .ss-hint { font-size: var(--font-size-xs); color: var(--text-secondary); }
+
     .add-exercise-btn {
       width: 100%; padding: var(--space-md);
       background: none; border: 2px dashed var(--border-color);
@@ -396,6 +420,11 @@ import { ConfirmService } from '../../../core/services/confirm.service';
   `]
 })
 export class SessionPlayerComponent implements OnInit, OnDestroy {
+  /** "Superset A", or "Circuit A" for three or more. */
+  supersetTitle(seg: { group: number | null; indices: number[] }): string {
+    return `${seg.indices.length >= 3 ? 'Circuit' : 'Superset'} ${String.fromCharCode(64 + (seg.group ?? 1))}`;
+  }
+
   /** This workout's exercises, sets, draft, rest timer and form checks. */
   readonly store = inject(PlayerStore);
   loading = signal(true);

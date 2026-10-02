@@ -45,6 +45,60 @@ type ExerciseWithHistory struct {
 	History    []SetHistory `json:"history"`
 }
 
+// ExerciseStatsWorkout is one workout's numbers for one exercise, over its working sets.
+type ExerciseStatsWorkout struct {
+	SessionID   uuid.UUID  `json:"session_id"`
+	StartedAt   time.Time  `json:"started_at"`
+	EndedAt     *time.Time `json:"ended_at"`
+	SessionType string     `json:"session_type"`
+	WorkingSets int        `json:"working_sets"`
+	MaxWeight   float64    `json:"max_weight"`
+	MaxReps     int        `json:"max_reps"`
+	BestE1RM    float64    `json:"best_e1rm"`
+	// The set with the best estimated 1RM; nil with no working sets.
+	BestSet *SetRef `json:"best_set"`
+	Volume  float64 `json:"volume"`
+	HasPR   bool    `json:"has_pr"`
+	Note    *string `json:"note"`
+}
+
+// ExerciseStats is an exercise's whole history, one row per workout, oldest first.
+type ExerciseStats struct {
+	Workouts []ExerciseStatsWorkout `json:"workouts"`
+	// Working weights outside deloads, heaviest first.
+	Weights []float64 `json:"weights"`
+}
+
+// RepsAtWeight is one workout's working-set reps at a given weight.
+type RepsAtWeight struct {
+	SessionID uuid.UUID `json:"session_id"`
+	StartedAt time.Time `json:"started_at"`
+	Reps      []int     `json:"reps"`
+}
+
+// ExerciseWorkoutSet is one set of an exercise within a workout.
+type ExerciseWorkoutSet struct {
+	ID        uuid.UUID `json:"id"`
+	SetNumber int       `json:"set_number"`
+	Weight    float64   `json:"weight"`
+	Reps      int       `json:"reps"`
+	RPE       *int      `json:"rpe"`
+	IsWarmup  bool      `json:"is_warmup"`
+	IsPR      bool      `json:"is_pr"`
+	Est1RM    float64   `json:"est_1rm"`
+}
+
+// ExerciseWorkout is a workout that included an exercise, with that exercise's sets.
+type ExerciseWorkout struct {
+	SessionID   uuid.UUID            `json:"session_id"`
+	StartedAt   time.Time            `json:"started_at"`
+	EndedAt     *time.Time           `json:"ended_at"`
+	SessionType string               `json:"session_type"`
+	RoutineName *string              `json:"routine_name"`
+	Note        *string              `json:"note"`
+	Sets        []ExerciseWorkoutSet `json:"sets"`
+}
+
 // ExercisePR is the best (highest-weight PR) set for a single exercise.
 type ExercisePR struct {
 	ExerciseID  uuid.UUID `json:"exercise_id"`
@@ -138,6 +192,17 @@ type RoutineWithItems struct {
 	Items []RoutineItemWithExercise `json:"items"`
 }
 
+// PlanDetails is what a plan item says beyond sets × reps; nil is unset.
+type PlanDetails struct {
+	// With TargetReps, a rep range: TargetReps to TargetRepsMax.
+	TargetRepsMax *int    `json:"target_reps_max" binding:"omitempty,min=1,max=1000"`
+	TargetRPE     *int    `json:"target_rpe" binding:"omitempty,min=6,max=10"`
+	RestSeconds   *int    `json:"rest_seconds" binding:"omitempty,min=15,max=600"`
+	Notes         *string `json:"notes" binding:"omitempty,max=140"`
+	// Adjacent items with the same number are one superset; numbered 1, 2, 3 in order once saved.
+	SupersetGroup *int `json:"superset_group" binding:"omitempty,min=1,max=100"`
+}
+
 type RoutineItem struct {
 	ID         uuid.UUID `json:"id"`
 	RoutineID  uuid.UUID `json:"routine_id"`
@@ -145,6 +210,7 @@ type RoutineItem struct {
 	TargetSets int       `json:"target_sets"`
 	TargetReps int       `json:"target_reps"`
 	OrderIndex int       `json:"order_index"`
+	PlanDetails
 }
 
 type RoutineItemWithExercise struct {
@@ -168,6 +234,9 @@ type ReplaceItemEntry struct {
 	ExerciseID uuid.UUID `json:"exercise_id" binding:"required"`
 	TargetSets int       `json:"target_sets" binding:"min=0,max=50"`
 	TargetReps int       `json:"target_reps" binding:"min=0,max=1000"`
+	PlanDetails
+	// Detailed says the entry carries PlanDetails; without it (an older app) the item keeps the ones it had.
+	Detailed bool `json:"detailed"`
 }
 
 // RoutineItemsEntry is one day's full, ordered item list inside a split-wide save.
@@ -299,6 +368,7 @@ type ShareExercisePreview struct {
 	MuscleGroup *string `json:"muscle_group"`
 	TargetSets  int     `json:"target_sets"`
 	TargetReps  int     `json:"target_reps"`
+	PlanDetails
 }
 
 type ShareRoutinePreview struct {
@@ -357,6 +427,7 @@ type SessionExercise struct {
 	Position     int       `json:"position"`
 	TargetSets   *int      `json:"target_sets"`
 	TargetReps   *int      `json:"target_reps"`
+	PlanDetails
 }
 
 type AddSessionExerciseRequest struct {
@@ -366,6 +437,8 @@ type AddSessionExerciseRequest struct {
 // ReorderSessionExercisesRequest names each of the workout's exercises once, in the new order.
 type ReorderSessionExercisesRequest struct {
 	ExerciseIDs []uuid.UUID `json:"exercise_ids" binding:"required,max=100"`
+	// SupersetGroups, one per ExerciseIDs entry (null for none), sets the supersets too; omitted, they stay.
+	SupersetGroups []*int `json:"superset_groups" binding:"omitempty,max=100"`
 }
 
 type SessionWithSets struct {
@@ -393,6 +466,16 @@ type CreateSessionRequest struct {
 	EndedAt   *time.Time `json:"ended_at"`
 	// ExerciseIDs sets the workout's list and order (Repeat); omitted, it's the routine's items.
 	ExerciseIDs []uuid.UUID `json:"exercise_ids" binding:"omitempty,max=100"`
+	// SupersetGroups, one per ExerciseIDs entry (null for none), keeps a repeated workout's supersets.
+	SupersetGroups []*int `json:"superset_groups" binding:"omitempty,max=100"`
+}
+
+// SessionFilter narrows a session list; nil fields don't filter.
+type SessionFilter struct {
+	// Only workouts with a set of this exercise.
+	ExerciseID *uuid.UUID
+	// normal, deload or test.
+	Type *string
 }
 
 type UpdateSessionRequest struct {

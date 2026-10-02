@@ -55,7 +55,8 @@ export function nextSets(
     excludeSessionId: string;
     /** This workout's start, ISO; later workouts are never last time. */
     before?: string;
-    plan: { sets: number; reps: number } | null;
+    /** reps is the bottom of the range when repsMax is set. */
+    plan: { sets: number; reps: number; repsMax?: number | null } | null;
     unit: string;
     toDisplay: (kg: number) => number;
   },
@@ -86,10 +87,13 @@ export function nextSets(
     return { last, move: 'reps', weight: 0, reps: Math.max(...working.map(s => s.reps)) + 1, reason: null };
   }
   if (opts.plan) {
-    const met = atTop.filter(s => s.reps >= opts.plan!.reps).length >= opts.plan.sets;
+    // With a range, the weight goes up once every set reaches its top, and today aims one rep past last time's best.
+    const goal = opts.plan.repsMax && opts.plan.repsMax > opts.plan.reps ? opts.plan.repsMax : opts.plan.reps;
+    const met = atTop.filter(s => s.reps >= goal).length >= opts.plan.sets;
+    const aim = goal > opts.plan.reps ? Math.min(goal, Math.max(opts.plan.reps, best.reps + 1)) : opts.plan.reps;
     return met
       ? { last, move: 'up', weight: nextPlateWeight(top, opts.unit), reps: opts.plan.reps, reason: null }
-      : { last, move: 'hold', weight: top, reps: opts.plan.reps, reason: 'plan' };
+      : { last, move: 'hold', weight: top, reps: aim, reason: 'plan' };
   }
   if (best.rpe != null && best.rpe >= 9) {
     return { last, move: 'hold', weight: top, reps: best.reps + 1, reason: 'rpe' };

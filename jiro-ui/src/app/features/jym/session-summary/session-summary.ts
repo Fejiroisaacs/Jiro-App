@@ -1059,13 +1059,23 @@ export class SessionSummaryComponent implements OnInit {
     if (r) this.router.navigate(['/jym/session', r.id]);
   }
 
-  /** A normal workout of the same routine and exercises, done in the same order. */
+  /** A normal workout of the same routine and exercises, done in the same order, with the same supersets. */
   repeat(): void {
     const r = this.report();
     if (!r) return;
-    this.launcher.start({
+    const ids = r.exercises.map(e => e.exercise_id);
+    const start = (groups?: (number | null)[]) => this.launcher.start({
       ...(r.routine_id ? { routine_id: r.routine_id } : {}),
-      exercise_ids: r.exercises.map(e => e.exercise_id),
+      exercise_ids: ids,
+      ...(groups && groups.some(g => g !== null) ? { superset_groups: groups } : {}),
+    });
+    // The workout's own list says which exercises were supersets; without it, repeat without them.
+    this.jymService.getSession(r.id).subscribe({
+      next: s => {
+        const byId = new Map((s.exercises ?? []).map(x => [x.exercise_id, x.superset_group ?? null]));
+        start(ids.map(id => byId.get(id) ?? null));
+      },
+      error: () => start(),
     });
   }
 

@@ -15,6 +15,8 @@ import { ToastService } from '../../../core/services/toast.service';
 import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-series-modal';
 import { SettingsService } from '../../../core/services/settings.service';
 import { formatInstant } from '../../../core/utils/format-date';
+import { REST_CHOICES, planText, restText } from '../plan-text';
+import { groupLabels, linkedWithNext, normalizeItems, toggleLink } from '../supersets';
 
 @Component({
   selector: 'app-split-detail',
@@ -177,25 +179,41 @@ import { formatInstant } from '../../../core/utils/format-date';
             [cdkDropListConnectedTo]="getConnectedLists()"
             class="exercise-list"
             (cdkDropListDropped)="onDrop($event, ri)">
+            @let labels = supersetLabels(routine.items);
             @for (item of routine.items; track item; let ii = $index) {
 <div
              
               cdkDrag
-              class="exercise-item">
+              class="exercise-item"
+              [class.in-superset]="!!labels[ii]"
+              [class.joined-next]="linked(routine.items, ii)">
               <div class="drag-handle" cdkDragHandle>
                 <jiro-icon name="dots-six-vertical" [size]="14" />
               </div>
               <div class="item-info">
-                <span class="item-name">{{ item.exercise_name }}</span>
+                <span class="item-name">
+                  @if (labels[ii]) { <span class="ss-label">{{ labels[ii] }}</span> }
+                  {{ item.exercise_name }}
+                </span>
                 @if (item.muscle_group) {
 <span class="item-muscle">{{ item.muscle_group }}</span>
 }
-              </div>
-              <div class="item-targets">
                 <button type="button" class="target-text" (click)="openTargetEdit(ri, ii)"
-                  [attr.aria-label]="'Edit target for ' + item.exercise_name + ': ' + item.target_sets + ' sets of ' + item.target_reps + ' reps'"
-                  title="Edit sets and reps">{{ item.target_sets }}×{{ item.target_reps }}</button>
+                  [attr.aria-label]="'Edit the plan for ' + item.exercise_name + ': ' + planLabel(item)"
+                  title="Edit the plan">{{ planText(item) }}</button>
+                @if (item.notes) {
+                  <span class="item-note">{{ item.notes }}</span>
+                }
               </div>
+              @if (ii < routine.items.length - 1) {
+                <button class="icon-btn link-btn" type="button" (click)="toggleSuperset(ri, ii)"
+                  [class.on]="linked(routine.items, ii)"
+                  [attr.aria-pressed]="linked(routine.items, ii)"
+                  [attr.aria-label]="(linked(routine.items, ii) ? 'Unlink ' : 'Superset ') + item.exercise_name + (linked(routine.items, ii) ? ' from ' : ' with ') + routine.items[ii + 1].exercise_name"
+                  [title]="linked(routine.items, ii) ? 'Unlink from the next exercise' : 'Superset with the next exercise'">
+                  <jiro-icon name="link" [size]="14" />
+                </button>
+              }
               <button class="icon-btn" type="button" (click)="removeItem(ri, ii)" title="Remove exercise"
                 [attr.aria-label]="'Remove ' + item.exercise_name + ' from ' + routine.name">
                 <jiro-icon name="x" [size]="12" />
@@ -341,21 +359,49 @@ import { formatInstant } from '../../../core/utils/format-date';
 
     <!-- Edit Target Modal -->
     @if (targetEdit(); as te) {
-<jiro-modal [title]="'Target for ' + te.name" maxWidth="360px" (close)="targetEdit.set(null)">
-      <form class="simple-form" (ngSubmit)="saveTargetEdit()">
-        <div class="target-row">
+<jiro-modal [title]="'Plan for ' + te.name" maxWidth="400px" (close)="targetEdit.set(null)">
+      <form class="simple-form plan-form" (ngSubmit)="saveTargetEdit()">
+        <div class="target-row three">
           <div class="form-group">
             <label class="form-label" for="edit-target-sets">Sets</label>
-            <input id="edit-target-sets" class="form-input" type="number" [(ngModel)]="editSets" name="editSets" min="1" max="20" required />
+            <input id="edit-target-sets" class="form-input" type="number" inputmode="numeric" [(ngModel)]="editSets" name="editSets" min="1" max="20" required />
           </div>
           <div class="form-group">
             <label class="form-label" for="edit-target-reps">Reps</label>
-            <input id="edit-target-reps" class="form-input" type="number" [(ngModel)]="editReps" name="editReps" min="1" max="100" required />
+            <input id="edit-target-reps" class="form-input" type="number" inputmode="numeric" [(ngModel)]="editReps" name="editReps" min="1" max="100" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="edit-target-max">Up to</label>
+            <input id="edit-target-max" class="form-input" type="number" inputmode="numeric" [(ngModel)]="editRepsMax" name="editRepsMax" min="1" max="100" placeholder="Optional" />
           </div>
         </div>
+        @if (!validRange()) {
+          <p class="plan-error" role="alert">Up to must be at least {{ editReps }}.</p>
+        }
+        <div class="target-row">
+          <div class="form-group">
+            <label class="form-label" for="edit-target-rpe">RPE</label>
+            <select id="edit-target-rpe" class="form-input" [(ngModel)]="editRpe" name="editRpe">
+              <option [ngValue]="null">None</option>
+              @for (r of rpeChoices; track r) { <option [ngValue]="r">{{ r }}</option> }
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="edit-target-rest">Rest</label>
+            <select id="edit-target-rest" class="form-input" [(ngModel)]="editRest" name="editRest">
+              <option [ngValue]="null">Your usual</option>
+              @for (r of restChoices; track r) { <option [ngValue]="r">{{ restText(r) }}</option> }
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="edit-target-note">Note</label>
+          <input id="edit-target-note" class="form-input" type="text" [(ngModel)]="editNote" name="editNote" maxlength="140" placeholder="A cue, such as pause at the bottom" />
+        </div>
+        <p class="plan-hint">With a range, add weight once every set reaches the top.</p>
         <div class="form-actions">
           <jiro-button variant="secondary" type="button" (click)="targetEdit.set(null)">Cancel</jiro-button>
-          <jiro-button variant="primary" type="submit" [disabled]="!validTarget(editSets, 20) || !validTarget(editReps, 100)">Save</jiro-button>
+          <jiro-button variant="primary" type="submit" [disabled]="!validTarget(editSets, 20) || !validTarget(editReps, 100) || !validRange()">Save</jiro-button>
         </div>
       </form>
     </jiro-modal>
@@ -562,10 +608,9 @@ import { formatInstant } from '../../../core/utils/format-date';
 
     .item-muscle { font-size: var(--font-size-xs); color: var(--text-muted); }
 
-    .item-targets { flex-shrink: 0; }
-
     .target-text {
-      font-family: inherit; cursor: pointer; min-height: 32px;
+      align-self: flex-start; margin-top: 2px;
+      font-family: inherit; cursor: pointer; min-height: 44px;
       background: var(--bg-canvas);
       color: var(--color-primary);
       font-size: var(--font-size-xs);
@@ -578,6 +623,25 @@ import { formatInstant } from '../../../core/utils/format-date';
     }
 
     .target-text:hover { border-color: var(--color-primary); }
+
+    .exercise-item.in-superset { border-left: 3px solid var(--color-primary); }
+
+    .exercise-item.joined-next { margin-bottom: -4px; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+
+    .exercise-item.joined-next + .exercise-item { border-top-left-radius: 0; border-top-right-radius: 0; }
+
+    .ss-label {
+      display: inline-block; margin-right: 4px; padding: 0 6px; border-radius: var(--border-radius-pill);
+      background: var(--color-primary); color: var(--text-on-primary);
+      font-size: var(--font-size-xs); font-weight: 700; font-variant-numeric: tabular-nums;
+    }
+
+    .link-btn.on { color: var(--color-primary); background: rgba(var(--color-primary-rgb), 0.12); }
+
+    .item-note {
+      font-size: var(--font-size-xs); color: var(--text-secondary); font-style: italic;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
 
     .empty-list {
       font-size: var(--font-size-xs); color: var(--text-muted);
@@ -658,6 +722,14 @@ import { formatInstant } from '../../../core/utils/format-date';
 
 
     .target-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md); }
+
+    .target-row.three { grid-template-columns: 1fr 1fr 1fr; }
+
+    .plan-form .form-input { min-height: 44px; }
+
+    .plan-error { margin: 0; font-size: var(--font-size-sm); color: var(--color-danger); }
+
+    .plan-hint { margin: 0; font-size: var(--font-size-xs); color: var(--text-muted); }
 
     .create-ex-inline-btn {
       width: 100%; padding: var(--space-sm) var(--space-md);
@@ -745,6 +817,14 @@ export class SplitDetailComponent implements OnInit {
   targetEdit = signal<{ ri: number; ii: number; name: string } | null>(null);
   editSets = 3;
   editReps = 8;
+  editRepsMax: number | null = null;
+  editRpe: number | null = null;
+  editRest: number | null = null;
+  editNote = '';
+  readonly rpeChoices = [6, 7, 8, 9, 10];
+  readonly restChoices = REST_CHOICES;
+  readonly planText = planText;
+  readonly restText = restText;
 
   editName = '';
   editingTags = signal(false);
@@ -962,8 +1042,9 @@ export class SplitDetailComponent implements OnInit {
 
     if (event.previousContainer === event.container) {
       if (event.previousIndex === event.currentIndex) return;
-      const items = [...lists[currIdx].items];
-      moveItemInArray(items, event.previousIndex, event.currentIndex);
+      const moved = [...lists[currIdx].items];
+      moveItemInArray(moved, event.previousIndex, event.currentIndex);
+      const items = normalizeItems(moved);
       this.routines.update(rs => rs.map((r, i) => i === currIdx ? { ...r, items } : r));
       this.persistItems(currIdx);
       return;
@@ -972,11 +1053,12 @@ export class SplitDetailComponent implements OnInit {
     // Save both days in one request so the exercise can't end up on both or neither.
     const prevItems = [...lists[prevIdx].items];
     const currItems = [...lists[currIdx].items];
+    // An exercise moved to another day leaves its superset behind.
     const [moved] = prevItems.splice(event.previousIndex, 1);
-    currItems.splice(event.currentIndex, 0, moved);
+    currItems.splice(event.currentIndex, 0, { ...moved, superset_group: null });
     this.routines.update(rs => rs.map((r, i) => {
-      if (i === prevIdx) return { ...r, items: prevItems };
-      if (i === currIdx) return { ...r, items: currItems };
+      if (i === prevIdx) return { ...r, items: normalizeItems(prevItems) };
+      if (i === currIdx) return { ...r, items: normalizeItems(currItems) };
       return r;
     }));
 
@@ -1010,6 +1092,10 @@ export class SplitDetailComponent implements OnInit {
     if (!item) return;
     this.editSets = item.target_sets;
     this.editReps = item.target_reps;
+    this.editRepsMax = item.target_reps_max;
+    this.editRpe = item.target_rpe;
+    this.editRest = item.rest_seconds;
+    this.editNote = item.notes ?? '';
     this.targetEdit.set({ ri, ii, name: item.exercise_name });
   }
 
@@ -1017,14 +1103,48 @@ export class SplitDetailComponent implements OnInit {
     return Number.isInteger(v) && v >= 1 && v <= max;
   }
 
+  /** "Up to" is optional; when given it can't end below the reps. */
+  validRange(): boolean {
+    const max = this.editRepsMax;
+    return max === null || max === undefined || (Number.isInteger(max) && max >= this.editReps && max <= 100);
+  }
+
+  /** A1, A2, B1 for superset members, null for the rest. */
+  supersetLabels(items: RoutineItem[]): (string | null)[] {
+    return groupLabels(items.map(it => it.superset_group));
+  }
+
+  linked(items: RoutineItem[], i: number): boolean {
+    return linkedWithNext(items.map(it => it.superset_group), i);
+  }
+
+  /** Links an exercise with the next one in a superset, or unlinks them. */
+  toggleSuperset(ri: number, ii: number) {
+    const items = this.routines()[ri].items;
+    const groups = toggleLink(items.map(it => it.superset_group), ii);
+    this.routines.update(rs => rs.map((r, i) => i !== ri ? r : { ...r, items: r.items.map((it, j) => ({ ...it, superset_group: groups[j] })) }));
+    this.persistItems(ri);
+  }
+
+  /** The chip's spoken text: the plan in words, and the cue. */
+  planLabel(item: RoutineItem): string {
+    return planText(item, 'long') + (item.notes ? `. ${item.notes}` : '');
+  }
+
   saveTargetEdit() {
     const te = this.targetEdit();
-    if (!te || !this.validTarget(this.editSets, 20) || !this.validTarget(this.editReps, 100)) return;
+    if (!te || !this.validTarget(this.editSets, 20) || !this.validTarget(this.editReps, 100) || !this.validRange()) return;
     const sets = this.editSets;
     const reps = this.editReps;
+    const details = {
+      target_reps_max: this.editRepsMax && this.editRepsMax > reps ? this.editRepsMax : null,
+      target_rpe: this.editRpe,
+      rest_seconds: this.editRest,
+      notes: this.editNote.trim() || null,
+    };
     this.routines.update(rs => rs.map((r, i) => i !== te.ri ? r : {
       ...r,
-      items: r.items.map((it, j) => j !== te.ii ? it : { ...it, target_sets: sets, target_reps: reps }),
+      items: r.items.map((it, j) => j !== te.ii ? it : { ...it, target_sets: sets, target_reps: reps, ...details }),
     }));
     this.targetEdit.set(null);
     this.persistItems(te.ri);
@@ -1097,6 +1217,11 @@ export class SplitDetailComponent implements OnInit {
       exercise_id: ex.id,
       target_sets: this.pickerSets,
       target_reps: this.pickerReps,
+      target_reps_max: null,
+      target_rpe: null,
+      rest_seconds: null,
+      notes: null,
+      superset_group: null,
       order_index: routine.items.length,
       exercise_name: ex.name,
       muscle_group: ex.muscle_group,
@@ -1141,7 +1266,7 @@ export class SplitDetailComponent implements OnInit {
 
   removeItem(routineIndex: number, itemIndex: number) {
     const routine = this.routines()[routineIndex];
-    const updatedItems = routine.items.filter((_, i) => i !== itemIndex);
+    const updatedItems = normalizeItems(routine.items.filter((_, i) => i !== itemIndex));
     this.routines.update(rs => rs.map((r, i) => i === routineIndex ? { ...r, items: updatedItems } : r));
     this.persistItems(routineIndex);
   }
@@ -1156,10 +1281,17 @@ export class SplitDetailComponent implements OnInit {
   }
 }
 
+/** Every field of each item, or a save (a drag included) would drop it. */
 function toEntries(items: RoutineItem[]): ReplaceItemEntry[] {
   return items.map(item => ({
     exercise_id: item.exercise_id,
     target_sets: item.target_sets,
     target_reps: item.target_reps,
+    target_reps_max: item.target_reps_max,
+    target_rpe: item.target_rpe,
+    rest_seconds: item.rest_seconds,
+    notes: item.notes,
+    superset_group: item.superset_group,
+    detailed: true,
   }));
 }

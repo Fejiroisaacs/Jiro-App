@@ -1,31 +1,37 @@
 import { Component, DestroyRef, OnInit, OnDestroy, AfterViewInit, ViewChild, ElementRef, inject, signal, computed } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { forkJoin } from 'rxjs';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
-import { JymService, ExerciseWithHistory, SetHistory, ExerciseFormCheck } from '../../../core/services/jym.service';
+import {
+  JymService, Exercise, ExerciseStats, ExerciseStatsWorkout, ExerciseWorkout, ExerciseFormCheck, RepsAtWeight,
+} from '../../../core/services/jym.service';
 import { SettingsService } from '../../../core/services/settings.service';
 import { chartTones } from '../../../shared/chart-theme';
 import { UploadService } from '../../../core/services/upload.service';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
+import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
 import { formatInstant } from '../../../core/utils/format-date';
 import { detectPlateau, type PlateauStatus } from '../plateau-rule';
+import {
+  defaultRange, inRange, monthTickLabel, monthTicks, notesOf, statsSeries, type StatsMeasure, type StatsPoint, type StatsRange,
+} from '../exercise-stats';
 
 Chart.register(...registerables);
 
 type ChartType = '1rm' | 'volume' | 'maxweight' | 'repsatweight';
 type SectionTab = 'history' | 'form' | 'notes';
-type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
 
 @Component({
   selector: 'app-exercise-detail',
   standalone: true,
-  imports: [CommonModule, JiroIconComponent, JiroSkeletonComponent, JiroPageHeaderComponent, JymPrBadgeComponent],
+  imports: [CommonModule, RouterLink, JiroIconComponent, JiroSkeletonComponent, JiroPageHeaderComponent, JiroButtonComponent, JymPrBadgeComponent],
   template: `
     <div class="exercise-detail">
       <!-- Loading -->
@@ -48,7 +54,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
 <span class="mg-badge">{{ exercise()!.muscle_group }}</span>
 }
           </div>
-          @if (exercise()!.history.length > 0) {
+          @if (hasHistory()) {
 <div class="pr-stats">
             <div class="stat">
               <span class="stat-label">Best weight</span>
@@ -87,7 +93,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
 }
 
         <!-- Chart section, shown whenever there is any history -->
-        @if (exercise()!.history.length > 0) {
+        @if (hasHistory()) {
 <div class="chart-section">
 
           <!-- Tab chips -->
@@ -98,11 +104,19 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
             <button class="chart-tab" [class.active]="selectedChart() === 'repsatweight'" (click)="switchChart('repsatweight')">Reps @ Weight</button>
           </div>
 
+          <!-- Range -->
+          <div class="range-chips" role="group" aria-label="Chart range">
+            @for (r of ranges; track r.value) {
+              <button type="button" class="range-chip" [class.active]="range() === r.value" [attr.aria-pressed]="range() === r.value"
+                (click)="setRange(r.value)">{{ r.label }}</button>
+            }
+          </div>
+
           <!-- Weight selector (Reps @ Weight only) -->
           @if (selectedChart() === 'repsatweight' && uniqueWeights().length > 0) {
 <div class="weight-selector-row">
             <label class="ws-label">Weight</label>
-            <select class="weight-select" (change)="onWeightChange($event)">
+            <select class="weight-select" aria-label="Weight" (change)="onWeightChange($event)">
               @for (w of uniqueWeights(); track w) {
 <option [value]="w" [selected]="w === selectedWeight()">
                 {{ settingsService.toDisplay(w) | number:'1.1-1' }} {{ settingsService.unitLabel() }}
@@ -116,7 +130,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
           <div class="chart-wrapper">
             @if (chartEmpty()) {
 <div class="chart-empty">
-              <p class="text-secondary">Not enough data to display this chart.</p>
+              <p class="text-secondary">{{ chartEmptyText() }}</p>
             </div>
 }
             <canvas #chartCanvas [hidden]="chartEmpty()"></canvas>
@@ -128,8 +142,8 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
         <div class="section-panel">
         <div class="section-tabs-bar">
           <button class="section-tab" [class.active]="activeSection() === 'history'" (click)="setSection('history')">
-            Set history
-            <span class="tab-count">{{ exercise()!.history.length }}</span>
+            Workouts
+            <span class="tab-count">{{ stats()?.workouts?.length ?? 0 }}</span>
           </button>
           <button class="section-tab" [class.active]="activeSection() === 'form'" (click)="setSection('form')">
             Form progression
@@ -145,71 +159,61 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
           </button>
         </div>
 
-        <!-- ── History tab ─────────────────────────────────────────── -->
+        <!-- ── Workouts tab ────────────────────────────────────────── -->
         @if (activeSection() === 'history') {
 <div class="tab-panel">
-          @if (exercise()!.history.length === 0) {
+          @if (!hasHistory()) {
 <div class="no-history">
             <p class="text-secondary">No sets logged yet. Start a session and log this exercise.</p>
           </div>
 }
 
-          @if (exercise()!.history.length > 0) {
-<div class="table-scroll">
-<table class="history-table">
-            <thead>
-              <tr>
-                <th class="th-sort" (click)="sortBy('date')">
-                  Date
-                  <jiro-icon name="caret-down" [size]="10" class="sort-chevron" [class.col-active]="sortCol() === 'date'" [class.dir-asc]="sortCol() === 'date' && sortDir() === 'asc'" />
-                </th>
-                <th class="th-sort" (click)="sortBy('weight')">
-                  Weight
-                  <jiro-icon name="caret-down" [size]="10" class="sort-chevron" [class.col-active]="sortCol() === 'weight'" [class.dir-asc]="sortCol() === 'weight' && sortDir() === 'asc'" />
-                </th>
-                <th class="th-sort" (click)="sortBy('reps')">
-                  Reps
-                  <jiro-icon name="caret-down" [size]="10" class="sort-chevron" [class.col-active]="sortCol() === 'reps'" [class.dir-asc]="sortCol() === 'reps' && sortDir() === 'asc'" />
-                </th>
-                <th class="th-sort" (click)="sortBy('est_1rm')">
-                  Est. 1RM
-                  <jiro-icon name="caret-down" [size]="10" class="sort-chevron" [class.col-active]="sortCol() === 'est_1rm'" [class.dir-asc]="sortCol() === 'est_1rm' && sortDir() === 'asc'" />
-                </th>
-                <th><span class="sr-only">Personal record</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (entry of pagedHistory(); track entry) {
-<tr [class.is-pr]="entry.is_pr">
-                <td class="date-cell">{{ formatDate(entry.date) }}</td>
-                <td class="weight-cell">{{ settingsService.toDisplay(entry.weight) | number:'1.1-1' }} {{ settingsService.unitLabel() }}</td>
-                <td>{{ entry.reps }} reps @if (entry.is_warmup) {<span class="warmup-note">Warm-up</span>}</td>
-                <td class="orm-cell">{{ settingsService.toDisplay(entry.est_1rm) | number:'1.1-1' }} {{ settingsService.unitLabel() }}</td>
-                <td class="pr-cell">
-                  @if (entry.is_pr) {
-<jym-pr-badge />
+          @if (workoutsLoading() && workouts().length === 0) {
+            <div class="wk-list" role="status" aria-label="Loading workouts">
+              @for (i of [1, 2, 3]; track i) { <jiro-skeleton height="96px" /> }
+            </div>
+          }
+
+          @if (workouts().length > 0) {
+<ol class="wk-list">
+            @for (w of workouts(); track w.session_id) {
+<li class="wk">
+              <a class="wk-head" [routerLink]="workoutLink(w)" [state]="{ back: '/jym/exercises/' + exercise()!.id }">
+                <span class="wk-date">{{ formatDate(w.started_at, true) }}</span>
+                <span class="wk-day">{{ w.routine_name || 'Freestyle' }}</span>
+                @if (w.session_type === 'deload') { <span class="type-badge deload">Deload</span> }
+                @if (w.session_type === 'test') { <span class="type-badge test">Test</span> }
+                @if (!w.ended_at) { <span class="type-badge open">In progress</span> }
+                <span class="wk-go">{{ w.ended_at ? 'Summary' : 'Resume' }}<jiro-icon name="caret-right" [size]="12" /></span>
+              </a>
+              @if (w.note) { <p class="wk-note">{{ w.note }}</p> }
+              <ul class="wk-sets">
+                @for (set of w.sets; track set.id) {
+<li class="wk-set" [class.is-warmup]="set.is_warmup">
+                  <span class="ws-num">{{ set.is_warmup ? 'W' : set.set_number }}</span>
+                  <span class="ws-load">{{ settingsService.toDisplay(set.weight) | number:'1.0-1' }} {{ settingsService.unitLabel() }} × {{ set.reps }}</span>
+                  @if (set.rpe != null) { <span class="ws-rpe">RPE {{ set.rpe }}</span> }
+                  @if (!set.is_warmup) { <span class="ws-orm">e1RM {{ settingsService.toDisplay(set.est_1rm) | number:'1.0-1' }}</span> }
+                  @if (set.is_pr) { <jym-pr-badge /> }
+                </li>
 }
-                </td>
-              </tr>
+              </ul>
+            </li>
 }
-            </tbody>
-          </table>
-</div>
+          </ol>
 }
 
-          @if (historyTotalPages() > 1) {
-<div class="pagination">
-            <button class="page-btn" type="button" aria-label="Previous page of history" title="Previous page"
-              [disabled]="historyPage() === 0" (click)="historyPage.set(historyPage() - 1)">
-              <jiro-icon name="caret-left" [size]="14" />
-            </button>
-            <span class="page-info">{{ historyPage() + 1 }} / {{ historyTotalPages() }}</span>
-            <button class="page-btn" type="button" aria-label="Next page of history" title="Next page"
-              [disabled]="historyPage() === historyTotalPages() - 1" (click)="historyPage.set(historyPage() + 1)">
-              <jiro-icon name="caret-right" [size]="14" />
-            </button>
-          </div>
-}
+          @if (workoutsMore()) {
+            <div class="load-more">
+              <jiro-button variant="secondary" type="button" [loading]="workoutsLoading()" (click)="loadWorkouts()">Show older workouts</jiro-button>
+            </div>
+          }
+          @if (hasHistory()) {
+            <a class="all-link" routerLink="/jym/track" [queryParams]="{ tab: 'sessions', exercise: exercise()!.id }">See all workouts with {{ exercise()!.name }}</a>
+          }
+          @if (workoutsError()) {
+            <p class="text-secondary load-error" role="alert">Could not load the workouts. <button type="button" class="retry" (click)="loadWorkouts()">Try again</button></p>
+          }
         </div>
 }
 
@@ -296,10 +300,10 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
 }
           @if (sessionNotes().length > 0) {
 <div class="notes-list">
-            @for (n of sessionNotes(); track n) {
+            @for (n of sessionNotes(); track n.session_id) {
 <div class="notes-item">
-              <span class="notes-item-date">{{ formatDate(n.date) }}</span>
-              <p class="notes-item-text">{{ n.exercise_note }}</p>
+              <span class="notes-item-date">{{ formatDate(n.started_at) }}</span>
+              <p class="notes-item-text">{{ n.note }}</p>
             </div>
 }
           </div>
@@ -370,8 +374,8 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
       margin-bottom: var(--space-md);
     }
 
-    .chart-tab {
-      padding: 6px 14px;
+    .chart-tab, .range-chip {
+      min-height: 44px; padding: 6px 14px;
       border: 1px solid var(--border-color);
       border-radius: var(--border-radius-pill);
       background: none;
@@ -381,14 +385,16 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
       transition: all 0.15s;
     }
 
-    .chart-tab:hover { border-color: var(--color-primary); color: var(--color-primary); }
+    .chart-tab:hover, .range-chip:hover { border-color: var(--color-primary); color: var(--color-primary); }
 
-    .chart-tab.active {
+    .chart-tab.active, .range-chip.active {
       background: var(--color-primary);
       border-color: var(--color-primary);
       color: var(--text-on-primary);
       font-weight: 500;
     }
+
+    .range-chips { display: flex; gap: var(--space-xs); margin-bottom: var(--space-md); }
 
     /* ── Weight selector ── */
     .weight-selector-row {
@@ -399,7 +405,7 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
     .ws-label { font-size: var(--font-size-sm); color: var(--text-secondary); font-weight: 500; }
 
     .weight-select {
-      padding: 6px 10px; border: 1px solid var(--border-color);
+      min-height: 44px; padding: 6px 10px; border: 1px solid var(--border-color);
       border-radius: var(--border-radius); background: var(--bg-surface);
       color: var(--text-primary); font-size: var(--font-size-sm);
  cursor: pointer; font-family: inherit;
@@ -475,59 +481,65 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
       border: 1px dashed var(--border-color); border-radius: var(--border-radius);
     }
 
-    /* the table scrolls inside its own box, never the page */
-    .table-scroll { position: relative; overflow-x: auto; max-width: 100%; }
+    .wk-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-md); }
 
-    .history-table {
-      width: 100%; border-collapse: collapse;
+    .wk {
       background: var(--bg-surface); border: 1px solid var(--border-color);
       border-radius: var(--border-radius); overflow: hidden;
     }
 
-    .history-table th {
-      padding: var(--space-sm) var(--space-md); text-align: left;
-      font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 0.5px;
-      color: var(--text-muted); background: var(--bg-canvas);
+    .wk-head {
+      display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-xs) var(--space-sm);
+      min-height: 44px; padding: var(--space-xs) var(--space-md);
+      color: var(--text-primary); text-decoration: none;
       border-bottom: 1px solid var(--border-color);
     }
 
-    .th-sort {
-      cursor: pointer; user-select: none;
-      white-space: nowrap;
+    .wk-head:hover { background: var(--bg-canvas); }
+
+    .wk-date { font-weight: 600; font-size: var(--font-size-sm); }
+
+    .wk-day { font-size: var(--font-size-sm); color: var(--text-secondary); }
+
+    .wk-go {
+      margin-left: auto; display: inline-flex; align-items: center; gap: 2px;
+      font-size: var(--font-size-sm); font-weight: 600; color: var(--color-primary);
     }
 
-    .th-sort:hover { color: var(--text-primary); }
+    .type-badge { font-size: var(--font-size-xs); font-weight: 600; padding: 2px 8px; border-radius: var(--border-radius-pill); }
+    .type-badge.deload { background: rgba(var(--color-danger-rgb), 0.1); color: var(--color-danger); }
+    .type-badge.test { background: rgba(var(--color-primary-rgb), 0.12); color: var(--color-primary); }
+    .type-badge.open { background: rgba(var(--color-accent-rgb), 0.14); color: var(--color-accent); }
 
-    .sort-chevron {
-      margin-left: 3px; vertical-align: middle;
-      opacity: 0.25; transition: transform 0.15s, opacity 0.15s;
-      color: var(--text-muted);
+    .wk-note { margin: var(--space-sm) var(--space-md) 0; font-size: var(--font-size-sm); color: var(--text-secondary); font-style: italic; }
+
+    .wk-sets { list-style: none; margin: 0; padding: var(--space-sm) var(--space-md); display: flex; flex-direction: column; gap: 4px; }
+
+    .wk-set { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-sm); font-size: var(--font-size-sm); }
+
+    .ws-num { min-width: 20px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+    .ws-load { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+    .wk-set.is-warmup .ws-load { font-weight: 400; color: var(--text-secondary); }
+
+    .ws-rpe { font-size: var(--font-size-xs); color: var(--text-muted); }
+
+    .ws-orm { font-size: var(--font-size-xs); color: var(--color-primary); }
+
+    .load-more { display: flex; justify-content: center; margin-top: var(--space-lg); }
+
+    .load-error { margin-top: var(--space-md); font-size: var(--font-size-sm); }
+
+    .all-link {
+      display: inline-flex; align-items: center; min-height: 44px; margin-top: var(--space-sm);
+      font-size: var(--font-size-sm); font-weight: 600; color: var(--color-primary);
     }
 
-    .sort-chevron.col-active { opacity: 1; color: var(--color-primary); }
-
-    .sort-chevron.dir-asc { transform: rotate(180deg); }
-
-    .history-table td {
-      padding: var(--space-sm) var(--space-md);
-      border-bottom: 1px solid var(--border-color);
-      font-size: var(--font-size-sm);
+    .retry {
+      min-height: 44px; padding: 0 var(--space-xs); background: none; border: none;
+      color: var(--color-primary); font: inherit; font-weight: 600; cursor: pointer;
     }
-
-    .history-table tr:last-child td { border-bottom: none; }
-
-    .history-table tr.is-pr { background: rgba(var(--color-primary-rgb), 0.04); }
-
-    .date-cell { color: var(--text-secondary); }
-
-    .weight-cell { font-weight: 600; }
-    .warmup-note { margin-left: var(--space-xs); font-size: var(--font-size-xs); color: var(--text-muted); }
-
-    .orm-cell { color: var(--color-primary); font-weight: 500; }
-
-    .pr-cell { text-align: center; }
-
-    jym-pr-badge { display: block; margin: auto; width: fit-content; }
 
     /* ── Pagination ── */
     .pagination {
@@ -622,30 +634,34 @@ type SortCol = 'date' | 'weight' | 'reps' | 'est_1rm';
     @media (max-width: 600px) {
       .section-tab { padding: var(--space-sm) var(--space-md); }
       .fc-grid { grid-template-columns: 1fr 1fr; }
-      .history-table th, .history-table td { padding: var(--space-sm) var(--space-xs); }
-      .history-table th:first-child, .history-table td:first-child { padding-left: var(--space-sm); }
     }
   `]
 })
 export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('chartCanvas') canvasRef!: ElementRef<HTMLCanvasElement>;
 
-  exercise = signal<ExerciseWithHistory | null>(null);
+  /** The header: name, muscle group, notes and best numbers (sent without the set list). */
+  exercise = signal<(Exercise & { best_weight: number; est_1rm: number }) | null>(null);
+  stats = signal<ExerciseStats | null>(null);
   loading = signal(true);
   selectedChart = signal<ChartType>('1rm');
   selectedWeight = signal<number | null>(null);
-  uniqueWeights = signal<number[]>([]);
   chartEmpty = signal(false);
+  range = signal<StatsRange>('all');
+  readonly ranges: { value: StatsRange; label: string }[] = [
+    { value: '3m', label: '3M' }, { value: '1y', label: '1Y' }, { value: 'all', label: 'All' },
+  ];
 
   activeSection = signal<SectionTab>('history');
 
-  sortCol = signal<SortCol>('date');
-  sortDir = signal<'asc' | 'desc'>('desc');
+  /** Workouts with this exercise, newest first, a page at a time. */
+  workouts = signal<ExerciseWorkout[]>([]);
+  workoutsLoading = signal(false);
+  workoutsMore = signal(false);
+  workoutsError = signal(false);
+  readonly WORKOUT_PAGE = 10;
 
-  readonly HISTORY_PAGE_SIZE = 25;
   readonly FORM_PAGE_SIZE = 3;
-
-  historyPage = signal(0);
   formPage = signal(0);
 
   formChecks = signal<ExerciseFormCheck[]>([]);
@@ -653,6 +669,9 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
   deletingFormCheck = signal<Set<string>>(new Set());
   private readonly confirmService = inject(ConfirmService);
   private readonly toast = inject(ToastService);
+
+  hasHistory = computed(() => (this.stats()?.workouts.length ?? 0) > 0);
+  uniqueWeights = computed(() => this.stats()?.weights ?? []);
 
   groupedFormChecks = computed(() => {
     const checks = this.formChecks();
@@ -676,33 +695,6 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
     return result;
   });
 
-  sortedHistory = computed(() => {
-    const ex = this.exercise();
-    if (!ex) return [];
-    const col = this.sortCol();
-    const dir = this.sortDir();
-    const copy = [...ex.history];
-    copy.sort((a, b) => {
-      let cmp = 0;
-      if      (col === 'date')    cmp = new Date(a.date).getTime() - new Date(b.date).getTime();
-      else if (col === 'weight')  cmp = a.weight - b.weight;
-      else if (col === 'reps')    cmp = a.reps - b.reps;
-      else if (col === 'est_1rm') cmp = a.est_1rm - b.est_1rm;
-      return dir === 'asc' ? cmp : -cmp;
-    });
-    return copy;
-  });
-
-  pagedHistory = computed(() => {
-    const start = this.historyPage() * this.HISTORY_PAGE_SIZE;
-    return this.sortedHistory().slice(start, start + this.HISTORY_PAGE_SIZE);
-  });
-
-  historyTotalPages = computed(() => {
-    const len = this.sortedHistory().length;
-    return len === 0 ? 1 : Math.ceil(len / this.HISTORY_PAGE_SIZE);
-  });
-
   pagedFormGroups = computed(() => {
     const groups = this.groupedFormChecks();
     const start = this.formPage() * this.FORM_PAGE_SIZE;
@@ -715,23 +707,24 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
     return Math.ceil(groups.length / this.FORM_PAGE_SIZE);
   });
 
-  sessionNotes = computed(() => {
-    const history = this.exercise()?.history ?? [];
-    const seen = new Set<string>();
-    return history.filter(h => {
-      if (!h.exercise_note || seen.has(h.session_id)) return false;
-      seen.add(h.session_id);
-      return true;
-    });
-  });
+  sessionNotes = computed(() => notesOf(this.stats()?.workouts ?? []));
 
-  plateauStatus = computed<PlateauStatus>(() => detectPlateau(this.exercise()?.history ?? []));
+  plateauStatus = computed<PlateauStatus>(() => detectPlateau(this.stats()?.workouts ?? []));
+
+  /** Says why a chart is empty: nothing in this range, or nothing at all. */
+  chartEmptyText = computed(() => {
+    const r = this.range();
+    if (r === 'all') return 'Not enough data to display this chart.';
+    return `No workouts in the last ${r === '3m' ? '3 months' : 'year'}. Try All.`;
+  });
 
   private chart: Chart | null = null;
   private currentId = '';
   private readonly destroyRef = inject(DestroyRef);
   private dataLoaded = false;
   private viewReady = false;
+  /** Reps @ Weight data by weight, fetched when that chart is shown. */
+  private repsAt = new Map<number, RepsAtWeight[]>();
 
   constructor(
     private jymService: JymService,
@@ -749,26 +742,33 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
   private load(id: string) {
     this.currentId = id;
     this.exercise.set(null);
+    this.stats.set(null);
     this.loading.set(true);
     this.formChecks.set([]);
     this.formChecksLoading.set(true);
     this.selectedWeight.set(null);
-    this.historyPage.set(0);
+    this.workouts.set([]);
+    this.workoutsMore.set(false);
+    this.workoutsError.set(false);
+    this.repsAt.clear();
     this.formPage.set(0);
     this.dataLoaded = false;
     this.chart?.destroy();
     this.chart = null;
-    this.jymService.getExercise(id).subscribe({
-      next: ex => {
+    forkJoin([this.jymService.getExercise(id, { limit: 0 }), this.jymService.getExerciseStats(id)]).subscribe({
+      next: ([ex, stats]) => {
         if (id !== this.currentId) return;
-        this.exercise.set(ex);
+        const { history: _history, ...header } = ex;
+        this.exercise.set(header);
+        this.stats.set(stats);
+        this.range.set(defaultRange(stats.workouts, Date.now()));
         this.loading.set(false);
-        this.uniqueWeights.set(this.getUniqueWeights());
         this.dataLoaded = true;
         setTimeout(() => this.maybeDrawChart(), 0);
       },
       error: () => { if (id === this.currentId) this.loading.set(false); },
     });
+    this.loadWorkouts();
     this.jymService.listExerciseFormChecks(id).subscribe({
       next: checks => {
         if (id !== this.currentId) return;
@@ -777,6 +777,33 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
       },
       error: () => { if (id === this.currentId) this.formChecksLoading.set(false); },
     });
+  }
+
+  /** The next page of workouts, continuing after the oldest one loaded. */
+  loadWorkouts() {
+    if (this.workoutsLoading()) return;
+    const id = this.currentId;
+    const last = this.workouts().at(-1);
+    this.workoutsLoading.set(true);
+    this.workoutsError.set(false);
+    this.jymService.listExerciseWorkouts(id, { before: last?.started_at, beforeId: last?.session_id, limit: this.WORKOUT_PAGE }).subscribe({
+      next: page => {
+        if (id !== this.currentId) return;
+        this.workouts.update(list => [...list, ...page]);
+        this.workoutsMore.set(page.length === this.WORKOUT_PAGE);
+        this.workoutsLoading.set(false);
+      },
+      error: () => {
+        if (id !== this.currentId) return;
+        this.workoutsLoading.set(false);
+        this.workoutsError.set(true);
+      },
+    });
+  }
+
+  /** A finished workout opens its summary; one still going opens the player. */
+  workoutLink(w: ExerciseWorkout): unknown[] {
+    return w.ended_at ? ['/jym/sessions', w.session_id, 'summary'] : ['/jym/session', w.session_id];
   }
 
   ngAfterViewInit() {
@@ -790,10 +817,8 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
 
   setSection(s: SectionTab) {
     this.activeSection.set(s);
-    this.historyPage.set(0);
     this.formPage.set(0);
   }
-
 
   async deleteFormCheck(id: string) {
     const ok = await this.confirmService.confirm({
@@ -818,21 +843,16 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
     });
   }
 
-  sortBy(col: SortCol) {
-    if (this.sortCol() === col) {
-      this.sortDir.set(this.sortDir() === 'asc' ? 'desc' : 'asc');
-    } else {
-      this.sortCol.set(col);
-      this.sortDir.set('desc');
-    }
-    this.historyPage.set(0);
-  }
-
   switchChart(type: ChartType) {
     this.selectedChart.set(type);
     if (type === 'repsatweight' && this.selectedWeight() === null && this.uniqueWeights().length > 0) {
       this.selectedWeight.set(this.uniqueWeights()[0]);
     }
+    setTimeout(() => this.maybeDrawChart(), 0);
+  }
+
+  setRange(r: StatsRange) {
+    this.range.set(r);
     setTimeout(() => this.maybeDrawChart(), 0);
   }
 
@@ -849,69 +869,69 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
 
     const unit = this.settingsService.unitLabel();
     switch (this.selectedChart()) {
-      case '1rm':          this.draw1rmChart(unit);          break;
-      case 'volume':       this.drawVolumeChart(unit);       break;
-      case 'maxweight':    this.drawMaxWeightChart(unit);    break;
+      case '1rm':          this.drawLine('e1rm', unit);      break;
+      case 'volume':       this.drawLine('volume', unit);    break;
+      case 'maxweight':    this.drawLine('maxweight', unit); break;
       case 'repsatweight': this.drawRepsAtWeightChart();     break;
     }
   }
 
   // ── Chart builders ───────────────────────────────────────────────────────────
 
-  private draw1rmChart(unit: string) {
-    const data = this.get1rmData();
-    if (data.length === 0) { this.chartEmpty.set(true); return; }
+  private drawLine(measure: StatsMeasure, unit: string) {
+    const now = Date.now();
+    const points = statsSeries(this.stats()?.workouts ?? [], measure, this.range(), now);
+    if (points.length === 0) { this.chartEmpty.set(true); return; }
     this.chartEmpty.set(false);
 
-    const labels = data.map(d => this.formatDate(d.date));
-    const values = data.map(d => Math.round(this.settingsService.toDisplay(d.est_1rm) * 10) / 10);
-    this.chart = new Chart(this.canvasRef.nativeElement,
-      this.lineConfig(labels, values, `Est. 1RM (${unit})`, chartTones().primary,
-        'Estimated 1RM Progress', `Est. 1RM (${unit})`, unit));
+    const tone = chartTones();
+    const shown = points.map(p => ({ ...p, y: Math.round(this.settingsService.toDisplay(p.y) * 10) / 10 }));
+    const spec = {
+      e1rm:      { color: tone.primary, title: 'Estimated 1RM progress', axis: `Est. 1RM (${unit})`, unit },
+      volume:    { color: tone.warning, title: 'Total session volume', axis: `Volume (${unit}×reps)`, unit: `${unit}×reps` },
+      maxweight: { color: tone.accent,  title: 'Heaviest set per session', axis: `Weight (${unit})`, unit },
+    }[measure];
+    this.chart = new Chart(this.canvasRef.nativeElement, this.lineConfig(shown, spec, this.rangeMin(now), now));
   }
 
-  private drawVolumeChart(unit: string) {
-    const data = this.getVolumeData();
-    if (data.length === 0) { this.chartEmpty.set(true); return; }
-    this.chartEmpty.set(false);
-
-    const labels = data.map(d => this.formatDate(d.date));
-    const values = data.map(d => Math.round(this.settingsService.toDisplay(d.volume) * 10) / 10);
-    this.chart = new Chart(this.canvasRef.nativeElement,
-      this.lineConfig(labels, values, `Volume (${unit}×reps)`, chartTones().warning,
-        'Total session volume', `Volume (${unit}×reps)`, `${unit}×reps`));
-  }
-
-  private drawMaxWeightChart(unit: string) {
-    const data = this.getMaxWeightData();
-    if (data.length === 0) { this.chartEmpty.set(true); return; }
-    this.chartEmpty.set(false);
-
-    const labels = data.map(d => this.formatDate(d.date));
-    const values = data.map(d => Math.round(this.settingsService.toDisplay(d.weight) * 10) / 10);
-    this.chart = new Chart(this.canvasRef.nativeElement,
-      this.lineConfig(labels, values, `Max weight (${unit})`, chartTones().accent,
-        'Heaviest set per session', `Weight (${unit})`, unit));
+  /** The axis starts at the range's start, so a break from training shows as a gap. */
+  private rangeMin(now: number): number | undefined {
+    const r = this.range();
+    return r === 'all' ? undefined : now - (r === '3m' ? 91 : 365) * 86_400_000;
   }
 
   private drawRepsAtWeightChart() {
     const weight = this.selectedWeight();
     if (weight === null) { this.chartEmpty.set(true); return; }
+    const cached = this.repsAt.get(weight);
+    if (!cached) {
+      const id = this.currentId;
+      this.jymService.getRepsAtWeight(id, weight).subscribe({
+        next: list => {
+          if (id !== this.currentId) return;
+          this.repsAt.set(weight, list);
+          if (this.selectedChart() === 'repsatweight' && this.selectedWeight() === weight) this.maybeDrawChart();
+        },
+        error: () => this.toast.error('Could not load reps at that weight.'),
+      });
+      return;
+    }
 
-    const sessions = this.getRepsAtWeightData(weight);
+    const sessions = inRange(cached.map(r => ({ ...r, session_type: 'normal', working_sets: r.reps.length, max_weight: weight, best_e1rm: 0, volume: 0, note: null })),
+      this.range(), Date.now());
     if (sessions.length === 0) { this.chartEmpty.set(true); return; }
     this.chartEmpty.set(false);
 
     const unit = this.settingsService.unitLabel();
     const displayWeight = Math.round(this.settingsService.toDisplay(weight) * 10) / 10;
-    const labels = sessions.map(s => this.formatDate(s.date));
-    const maxSets = Math.max(...sessions.map(s => s.repsArr.length));
+    const labels = sessions.map(s => this.formatDate(s.started_at));
+    const maxSets = Math.max(...sessions.map(s => s.reps.length));
     const tone = chartTones();
     const barColors = [tone.primary, tone.warning, tone.accent, tone.secondary];
 
     const datasets = Array.from({ length: maxSets }, (_, i) => ({
       label: `Set ${i + 1}`,
-      data: sessions.map(s => s.repsArr[i] ?? null) as (number | null)[],
+      data: sessions.map(s => s.reps[i] ?? null) as (number | null)[],
       backgroundColor: barColors[i % barColors.length],
       borderRadius: 4,
       borderSkipped: false as const,
@@ -953,23 +973,27 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
     this.chart = new Chart(this.canvasRef.nativeElement, config);
   }
 
+  /** A line over a date-scaled axis: workouts sit at their real distance apart. */
   private lineConfig(
-    labels: string[], values: number[], label: string, color: string,
-    chartTitle: string, yAxisLabel: string, tooltipUnit: string,
-  ): ChartConfiguration {
+    points: StatsPoint[], spec: { color: string; title: string; axis: string; unit: string }, min: number | undefined, max: number,
+  ): ChartConfiguration<'line', StatsPoint[]> {
     const tone = chartTones();
+    const workouts = new Map((this.stats()?.workouts ?? []).map(w => [w.session_id, w]));
+    // All runs from the first workout to today; a lone workout gets a week either side.
+    const lo = min ?? (points.length === 1 ? points[0].x - 7 * 86_400_000 : points[0].x);
+    const hi = points.length === 1 && min === undefined ? Math.max(max, points[0].x + 7 * 86_400_000) : max;
+    const ticks = monthTicks(lo, hi);
     return {
       type: 'line',
       data: {
-        labels,
         datasets: [{
-          label,
-          data: values,
-          borderColor: color,
-          backgroundColor: `${color}1a`,
+          label: spec.axis,
+          data: points,
+          borderColor: spec.color,
+          backgroundColor: `${spec.color}1a`,
           fill: true,
           tension: 0.3,
-          pointBackgroundColor: color,
+          pointBackgroundColor: spec.color,
           pointRadius: 4,
           pointHoverRadius: 6,
         }],
@@ -980,22 +1004,32 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
         plugins: {
           title: {
             display: true,
-            text: chartTitle,
+            text: spec.title,
             font: { size: 13, weight: 'bold' },
             color: tone.tick,
             padding: { top: 0, bottom: 10 },
           },
           legend: { display: false },
-          tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.y} ${tooltipUnit}` } },
+          tooltip: {
+            callbacks: {
+              title: items => items.length ? this.formatDate(new Date(items[0].parsed.x ?? 0).toISOString(), true) : '',
+              label: ctx => ` ${ctx.parsed.y} ${spec.unit}${this.bestSetText(workouts.get((ctx.raw as StatsPoint).sessionId))}`,
+            },
+          },
         },
         scales: {
           x: {
+            type: 'linear',
+            min: lo,
+            max: hi,
+            // Ticks on month starts, not wherever round milliseconds fall.
+            afterBuildTicks: axis => { axis.ticks = ticks.map(value => ({ value })); },
             title: { display: true, text: 'Date', font: { size: 11 }, color: tone.muted },
             grid: { color: tone.grid },
-            ticks: { font: { size: 11 } },
+            ticks: { font: { size: 11 }, color: tone.tick, maxRotation: 0, callback: v => monthTickLabel(Number(v), Number(v) === ticks[0]) },
           },
           y: {
-            title: { display: true, text: yAxisLabel, font: { size: 11 }, color: tone.muted },
+            title: { display: true, text: spec.axis, font: { size: 11 }, color: tone.muted },
             grid: { color: tone.grid },
             ticks: { font: { size: 11 }, callback: v => `${v}` },
           },
@@ -1004,65 +1038,15 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
     };
   }
 
-  // ── Data computations ────────────────────────────────────────────────────────
-
-  private get1rmData(): SetHistory[] {
-    const bySession = new Map<string, SetHistory>();
-    for (const h of this.exercise()!.history) {
-      if (h.session_type === 'deload' || h.is_warmup) continue;
-      if (!bySession.has(h.session_id) || h.est_1rm > bySession.get(h.session_id)!.est_1rm) {
-        bySession.set(h.session_id, h);
-      }
-    }
-    return Array.from(bySession.values())
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  /** " (100 kg × 5)" after an e1RM point's value; nothing for the other charts' points. */
+  private bestSetText(w: ExerciseStatsWorkout | undefined): string {
+    if (!w?.best_set || this.selectedChart() !== '1rm') return '';
+    const weight = Math.round(this.settingsService.toDisplay(w.best_set.weight) * 10) / 10;
+    return ` (${weight} ${this.settingsService.unitLabel()} × ${w.best_set.reps})`;
   }
 
-  private getVolumeData(): { date: string; volume: number }[] {
-    const bySession = new Map<string, { date: string; volume: number }>();
-    for (const h of this.exercise()!.history) {
-      if (h.session_type === 'deload' || h.is_warmup) continue;
-      if (!bySession.has(h.session_id)) bySession.set(h.session_id, { date: h.date, volume: 0 });
-      bySession.get(h.session_id)!.volume += h.weight * h.reps;
-    }
-    return Array.from(bySession.values())
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }
-
-  private getMaxWeightData(): SetHistory[] {
-    const bySession = new Map<string, SetHistory>();
-    for (const h of this.exercise()!.history) {
-      if (h.session_type === 'deload' || h.is_warmup) continue;
-      if (!bySession.has(h.session_id) || h.weight > bySession.get(h.session_id)!.weight) {
-        bySession.set(h.session_id, h);
-      }
-    }
-    return Array.from(bySession.values())
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }
-
-  private getRepsAtWeightData(weight: number): { date: string; repsArr: number[] }[] {
-    const bySession = new Map<string, { date: string; repsArr: number[] }>();
-    for (const h of this.exercise()!.history) {
-      if (h.session_type === 'deload' || h.is_warmup) continue;
-      if (Math.abs(h.weight - weight) > 0.01) continue;
-      if (!bySession.has(h.session_id)) bySession.set(h.session_id, { date: h.date, repsArr: [] });
-      bySession.get(h.session_id)!.repsArr.push(h.reps);
-    }
-    return Array.from(bySession.values())
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }
-
-  private getUniqueWeights(): number[] {
-    const weights = new Set<number>();
-    for (const h of (this.exercise()?.history ?? [])) {
-      if (h.session_type !== 'deload' && !h.is_warmup) weights.add(h.weight);
-    }
-    return Array.from(weights).sort((a, b) => b - a);
-  }
-
-  formatDate(instant: string): string {
-    return formatInstant(instant, this.settingsService.timezone());
+  formatDate(instant: string, weekday = false): string {
+    return formatInstant(instant, this.settingsService.timezone(), { weekday });
   }
 
   goBack() { this.router.navigate(['/jym/exercises']); }

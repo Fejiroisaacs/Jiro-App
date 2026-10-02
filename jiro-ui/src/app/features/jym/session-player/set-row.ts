@@ -16,7 +16,8 @@ import { PlayerStore } from './player-store';
     @let bi = blockIndex();
     @let row = rowInput();
     @let si = setIndex();
-    <div class="set-row" [class.set-done]="row.saved" [class.set-warmup]="row.isWarmup" [class.set-short]="store.isShort(block, row)" [class.set-editing]="row.editing">
+    <div class="set-row" [class.set-done]="row.saved" [class.set-warmup]="row.isWarmup" [class.set-short]="store.isShort(block, row)" [class.set-editing]="row.editing"
+      [attr.data-set]="block.exerciseId + '-' + row.setNumber" [class.next-up]="store.nextUp() === block.exerciseId + '-' + row.setNumber">
       <button
         type="button"
         class="set-num-btn"
@@ -73,7 +74,9 @@ import { PlayerStore } from './player-store';
         inputmode="numeric"
         enterkeyhint="done"
         autocomplete="off"
-        [attr.aria-label]="'Set ' + row.setNumber + ' RPE, 1 to 10'"
+        [attr.aria-label]="'Set ' + row.setNumber + ' RPE, 1 to 10' + (block.plan?.rpe && !row.isWarmup ? ', plan ' + block.plan?.rpe : '')"
+        [attr.placeholder]="block.plan?.rpe && !row.isWarmup && !row.saved ? block.plan?.rpe : null"
+        [class.has-ghost]="!!block.plan?.rpe && !row.isWarmup && !row.saved"
         [class.input-error]="store.filled(row.rpe) && store.rpeInvalid(row.rpe)"
         [(ngModel)]="row.rpe"
         (ngModelChange)="store.saveDraftSoon()"
@@ -138,6 +141,8 @@ import { PlayerStore } from './player-store';
     .set-row.set-done { background: rgba(var(--color-primary-rgb), 0.04); }
 
     .set-row.set-warmup { background: rgba(var(--color-warning-rgb), 0.08); }
+
+    .set-row.next-up { box-shadow: inset 3px 0 0 var(--color-primary); background: rgba(var(--color-primary-rgb), 0.08); transition: background 0.3s; }
 
     .set-row.set-short .reps-input { color: var(--color-warning); font-weight: 600; }
 

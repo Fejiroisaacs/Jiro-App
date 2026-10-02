@@ -4,7 +4,7 @@ import { SettingsService } from '../../../core/services/settings.service';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JiroMenuComponent } from '../../../shared/components/jiro-menu/jiro-menu';
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
-import { ExerciseBlock } from './player-blocks';
+import { ExerciseBlock, planTag } from './player-blocks';
 import { PlayerStore } from './player-store';
 import { SetRowComponent } from './set-row';
 
@@ -20,12 +20,12 @@ import { SetRowComponent } from './set-row';
               <!-- The header toggles on click; the name button is its keyboard handle (its click bubbles up). -->
               <div class="block-header" [class.block-open]="!store.isCollapsed(bi)" (click)="store.toggleBlock(bi)">
                 <div class="block-title">
-                  <h2><button type="button" class="block-toggle" [attr.aria-expanded]="!store.isCollapsed(bi)" [attr.aria-controls]="'block-body-' + bi">{{ block.exerciseName }}</button></h2>
+                  <h2><button type="button" class="block-toggle" [attr.aria-expanded]="!store.isCollapsed(bi)" [attr.aria-controls]="'block-body-' + bi">@if (store.labels()[bi]; as label) {<span class="ss-label">{{ label }}</span>}{{ block.exerciseName }}</button></h2>
                   @if (block.muscleGroup) {
     <span class="mg-tag">{{ block.muscleGroup }}</span>
     }
                   @if (block.plan) {
-                    <span class="plan-tag">Plan {{ block.plan.sets }} × {{ block.plan.reps }}</span>
+                    <span class="plan-tag">{{ planTag(block.plan) }}</span>
                   }
                   @if (store.isCollapsed(bi) && store.savedCount(bi) > 0) {
     <span class="sets-done-tag">{{ store.savedCount(bi) }} sets</span>
@@ -42,6 +42,9 @@ import { SetRowComponent } from './set-row';
               </div>
 
               <div [id]="'block-body-' + bi">
+              @if (!store.isCollapsed(bi) && block.plan?.note) {
+                <p class="plan-note">{{ block.plan!.note }}</p>
+              }
               @if (!store.isCollapsed(bi)) {
 
                 <!-- Last time, and what to aim for today -->
@@ -187,6 +190,14 @@ import { SetRowComponent } from './set-row';
     .block-toggle:focus-visible { outline: none; }
 
     .block-title { display: flex; flex-wrap: wrap; align-items: center; gap: 2px var(--space-sm); flex: 1; min-width: 0; }
+
+    .ss-label {
+      display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: var(--border-radius-pill);
+      background: var(--color-primary); color: var(--text-on-primary);
+      font-family: var(--font-family); font-size: var(--font-size-xs); font-weight: 700; vertical-align: middle;
+    }
+
+    .plan-note { margin: 0; padding: 6px var(--space-lg); font-size: var(--font-size-sm); color: var(--text-secondary); font-style: italic; border-bottom: 1px solid var(--border-color); }
 
     .plan-tag { font-size: var(--font-size-xs); color: var(--text-secondary); font-weight: 500; white-space: nowrap; }
 
@@ -357,4 +368,5 @@ export class ExerciseBlockComponent {
   readonly blockInput = input.required<ExerciseBlock>({ alias: 'block' });
   /** Its place in the workout, which the store's methods take. */
   readonly index = input.required<number>({ alias: 'bi' });
+  readonly planTag = planTag;
 }

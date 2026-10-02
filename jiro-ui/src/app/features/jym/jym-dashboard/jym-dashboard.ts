@@ -159,6 +159,7 @@ const DELOAD_SNOOZE_DAYS = 7;
                 <span class="legend-label text-secondary">More</span>
               </div>
             </div>
+            <a class="heat-link" routerLink="/jym/track" [queryParams]="{ tab: 'sessions', calendar: '1' }">Open calendar</a>
           </div>
 
           <!-- Muscle Group Tracker -->
@@ -577,6 +578,11 @@ const DELOAD_SNOOZE_DAYS = 7;
 
     /* Heatmap */
     .heatmap-wrap { overflow-x: auto; }
+
+    .heat-link {
+      display: inline-flex; align-items: center; min-height: 44px;
+      font-size: var(--font-size-sm); font-weight: 600; color: var(--color-primary);
+    }
 
     .heatmap-grid {
       display: grid;

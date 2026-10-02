@@ -37,16 +37,17 @@ import { GUIDE } from '../shared';
       </guide-section>
 
       <guide-section id="check-an-exercise" title="Check an exercise's progress"
-        lead="Each exercise has its own page with your best lifts, a chart and every set you have logged.">
+        lead="Each exercise has its own page with your best lifts, a chart and every workout it was in.">
         <guide-steps>
           <li>In <a routerLink="/jym/exercises">Exercises</a>, select an exercise.</li>
           <li>The top shows your <strong>Best weight</strong> and <strong>Est. 1RM</strong>, the most you could likely lift once, worked out from your weight and reps.</li>
           <li>Switch the chart between <strong>Est. 1RM</strong>, <strong>Volume</strong>, <strong>Max weight</strong> and <strong>Reps &#64; Weight</strong>. For Reps &#64; Weight, choose a weight from the list.</li>
-          <li>Below the chart, <strong>Set history</strong> lists every set. Select a column heading to sort by it.</li>
+          <li>Choose <strong>3M</strong>, <strong>1Y</strong> or <strong>All</strong> to set how far back the chart goes. Workouts sit at their real dates, so a break from training shows as a gap.</li>
+          <li>Below the chart, <strong>Workouts</strong> lists every workout with this exercise, newest first, with its sets. Select one to open its summary, and <strong>Show older workouts</strong> to go further back. <strong>See all workouts with</strong> the exercise opens them in Track.</li>
           <li><strong>Form progression</strong> shows the form check clips you added during workouts, and <strong>Notes</strong> shows the notes you wrote for this exercise.</li>
         </guide-steps>
         <guide-shot guide="jym" name="exercise-detail" [width]="1600" [height]="1422"
-          alt="The Bench Press page: Best weight 175.0 lbs and Est. 1RM 210.1 lbs, a note, the Est. 1RM chart rising from 17 Aug to 21 Sep, and the Set history, Form progression and Notes tabs." />
+          alt="The Bench Press page: Best weight 175.0 lbs and Est. 1RM 210.1 lbs, a note, the Est. 1RM chart with 3M, 1Y and All, rising from August to late September, and the Workouts, Form progression and Notes tabs." />
         <guide-tip>If your top weight has stayed the same, or dropped, over your last three sessions of an exercise, its page says so and suggests what to try.</guide-tip>
       </guide-section>
 
@@ -60,10 +61,11 @@ import { GUIDE } from '../shared';
           <li>Set the <strong>Sets</strong> and <strong>Reps</strong> targets, then select <strong>Add</strong> followed by the exercise's name.</li>
           <li>To change the order, drag an exercise by the dotted handle on its left. Drag it onto another day to move it there. On a phone, the days scroll along as you drag toward the edge.</li>
           <li>To rename a day, select its name, type the new one and press Enter. To reorder days, use the arrows beside its name to move it earlier or later.</li>
-          <li>To change an exercise's targets, select its sets and reps, such as <strong>4×6</strong>, enter the new <strong>Sets</strong> and <strong>Reps</strong>, and select <strong>Save</strong>.</li>
+          <li>To change an exercise's plan, select its sets and reps, such as <strong>4×6</strong>. Set the <strong>Sets</strong> and <strong>Reps</strong>, and optionally <strong>Up to</strong> for a rep range such as 8 to 12, an <strong>RPE</strong> from 6 to 10, a <strong>Rest</strong> just for this exercise, and a <strong>Note</strong> such as a cue. Select <strong>Save</strong>.</li>
+          <li>To pair exercises into a superset, select the link button on the first of two exercises next to each other. They're labelled A1 and A2; linking a third makes a circuit. Select the link again to split them.</li>
         </guide-steps>
-        <guide-shot guide="jym" name="split-builder" [width]="1600" [height]="869"
-          alt="The Push Pull Legs split: three day columns, Push, Pull and Legs, each listing exercises with targets such as 4×6, and buttons for Start series, Share and Add day." />
+        <guide-shot guide="jym" name="split-builder" [width]="1600" [height]="1300"
+          alt="The Push Pull Legs split: day columns listing exercises with their plans, such as 4×6 · RPE 8 · 3:00 with a note under it, Lateral Raise and Tricep Pushdown linked as A1 and A2, and buttons for Start series, Share and Add day." />
         <guide-shot guide="jym" name="add-exercise" [width]="960" [height]="798"
           alt="The Add exercise window: a search for raise found Lateral Raise, with Sets 3, Reps 8 and an Add Lateral Raise button." />
         <guide-tip>Remove an exercise from a day with its x button. Use the pencil beside the split's name to rename it.</guide-tip>
@@ -84,14 +86,15 @@ import { GUIDE } from '../shared';
         lead="The workout screen has a row for every set, and it times your rest between them.">
         <guide-steps>
           <li>A workout started from a split day or template already lists its exercises, with one row for each target set. In a freestyle session, select <strong>+ Add exercise</strong> first.</li>
-          <li>The faint numbers in an empty row are today's aim, worked out from your last workout. A note above the rows shows what you lifted last time and what to try. For an exercise you have never logged, the row shows only the target reps.</li>
+          <li>The faint numbers in an empty row are today's aim, worked out from your last workout. A note above the rows shows what you lifted last time and what to try. With a rep range, add weight once every set reaches the top of the range. For an exercise you have never logged, the row shows only the target reps.</li>
           <li>Type the <strong>Weight</strong> and <strong>Reps</strong> you did, or leave the aim as it is. A number keypad opens for each box.</li>
           <li>Optionally, enter an <strong>RPE</strong> from 1 to 10 for how hard the set felt.</li>
           <li>Select the tick to log what the row shows, so repeating a set is one tap. If it beats your best for that exercise, it gets a <strong>PR</strong> badge. Warm-up sets never get one.</li>
-          <li>The rest timer opens under the bar at the top. Select <strong>+30s</strong> for a longer rest this time, or <strong>Skip</strong>. It beeps when your rest is over.</li>
+          <li>The rest timer opens under the bar at the top, for the exercise's planned rest or your usual one. Select <strong>+30s</strong> for a longer rest this time, or <strong>Skip</strong>. It beeps when your rest is over.</li>
           <li>Select a set's number to mark it as a warm-up or to remove it. To fix a logged set, select its weight or reps, change them and select <strong>Save</strong>.</li>
           <li>Use <strong>+ Add set</strong> for another set and <strong>+ Add exercise</strong> for another exercise.</li>
           <li>To change the order, open an exercise's menu (three dots) and select <strong>Move up</strong> or <strong>Move down</strong>. <strong>Remove exercise</strong> is there too.</li>
+          <li>In a superset, do one set of each exercise in turn: after A1 there is no rest and A2's next set is marked; after the last one, the rest starts. To pair exercises during a workout, select <strong>Superset with next</strong> in the first one's menu, or <strong>Unlink from next</strong> to split them.</li>
         </guide-steps>
         <guide-shot guide="jym" name="session-sets" [width]="1400" [height]="1268"
           alt="Bench Press during a workout: a note saying last time was 175 lbs for 5, 5, 5, 5 and to try 180 lbs, a warm-up set of 95 lbs marked with a flame, four logged sets of 175 lbs with the 6-rep set marked PR, a sixth row ready to log 175 lbs for 5, and a Plates button." />
@@ -166,6 +169,7 @@ import { GUIDE } from '../shared';
         lead="Every finished workout is listed in Track, newest first.">
         <guide-steps>
           <li>Open <a routerLink="/jym/track">Track</a>. Each workout shows its date, day, sets, time and volume.</li>
+          <li>To narrow the list, choose an <strong>Exercise</strong> or a <strong>Type</strong> (Regular, Deload or Test). <strong>Calendar</strong> shows a month with a dot on each day you trained: select a day to list just that day, and select it again to list every day. <strong>Clear filters</strong> shows everything again.</li>
           <li>Select a workout to see every set, with PR badges, warm-ups, RPE and exercise notes, plus its notes and any form check clips. <strong>View summary</strong> opens its summary, and <strong>See this day</strong> opens everything else you logged that day.</li>
           <li>On a summary, <strong>Edit workout</strong> opens the workout to add a set you forgot, or change or remove one. Select <strong>Done</strong> when you're finished. Records are worked out as of that workout's date.</li>
           <li><strong>Edit times</strong> fixes when the workout started or finished, as long as the times still include every set you logged. <strong>Repeat workout</strong> starts it again with the same exercises.</li>
@@ -173,7 +177,7 @@ import { GUIDE } from '../shared';
           <li>To download your workouts as a spreadsheet, optionally choose <strong>From</strong> and <strong>To</strong> dates, then select <strong>Export CSV</strong>.</li>
         </guide-steps>
         <guide-shot guide="jym" name="track-sessions" [width]="1600" [height]="1600"
-          alt="Track, Sessions: date fields and Export CSV above a list of workouts, with the Push workout of Mon 21 Sep open to show its sets, and on Bench Press a set marked Warm-up and a PR." />
+          alt="Track, Sessions: Export CSV, then the Exercise and Type filters and a Calendar button above the list of workouts, with the Push workout of Sat 26 Sep open to show its sets, and on Bench Press a set marked Warm-up and a PR." />
       </guide-section>
 
       <guide-section id="see-your-personal-records" title="See your personal records"

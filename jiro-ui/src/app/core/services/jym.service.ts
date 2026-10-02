@@ -42,6 +42,58 @@ export interface ExerciseWithHistory extends Exercise {
   history: SetHistory[];
 }
 
+/** One workout's numbers for an exercise, over its working sets; weights in kg. */
+export interface ExerciseStatsWorkout {
+  session_id: string;
+  started_at: string;
+  ended_at: string | null;
+  session_type: string;
+  working_sets: number;
+  max_weight: number;
+  max_reps: number;
+  best_e1rm: number;
+  /** The set with the best estimated 1RM; null with no working sets. */
+  best_set: SetRef | null;
+  volume: number;
+  has_pr: boolean;
+  note: string | null;
+}
+
+/** An exercise's whole history, one row per workout, oldest first. */
+export interface ExerciseStats {
+  workouts: ExerciseStatsWorkout[];
+  /** Working weights outside deloads, heaviest first. */
+  weights: number[];
+}
+
+export interface RepsAtWeight {
+  session_id: string;
+  started_at: string;
+  reps: number[];
+}
+
+export interface ExerciseWorkoutSet {
+  id: string;
+  set_number: number;
+  weight: number;
+  reps: number;
+  rpe: number | null;
+  is_warmup: boolean;
+  is_pr: boolean;
+  est_1rm: number;
+}
+
+/** A workout that included an exercise, with that exercise's sets. */
+export interface ExerciseWorkout {
+  session_id: string;
+  started_at: string;
+  ended_at: string | null;
+  session_type: string;
+  routine_name: string | null;
+  note: string | null;
+  sets: ExerciseWorkoutSet[];
+}
+
 export interface ExercisePR {
   exercise_id: string;
   name: string;
@@ -110,7 +162,21 @@ export interface PublicSplitDetail {
   routines: ShareRoutinePreview[];
 }
 
-export interface RoutineItem {
+/** What a plan item says beyond sets × reps; null is unset. */
+export interface PlanDetails {
+  /** With target_reps, a rep range: target_reps to this. */
+  target_reps_max: number | null;
+  /** 6 to 10. */
+  target_rpe: number | null;
+  /** 15 to 600. */
+  rest_seconds: number | null;
+  /** A cue, up to 140 characters. */
+  notes: string | null;
+  /** Adjacent items with the same number are one superset (supersets.ts). */
+  superset_group: number | null;
+}
+
+export interface RoutineItem extends PlanDetails {
   id: string;
   routine_id: string;
   exercise_id: string;
@@ -220,6 +286,18 @@ export interface SessionSummary extends Session {
   last_set_at: string | null;
 }
 
+export type SessionType = 'normal' | 'deload' | 'test';
+
+export interface SessionListOptions {
+  from?: string;
+  to?: string;
+  before?: string;
+  beforeId?: string;
+  limit?: number;
+  exerciseId?: string | null;
+  type?: SessionType | null;
+}
+
 export interface SessionSet {
   id: string;
   session_id: string;
@@ -253,7 +331,7 @@ export interface ExerciseFormCheck extends SessionAttachment {
 }
 
 /** One exercise in a workout's own list; targets are the plan's when it started, null outside it. */
-export interface SessionExercise {
+export interface SessionExercise extends PlanDetails {
   exercise_id: string;
   exercise_name: string;
   muscle_group: string | null;
@@ -285,7 +363,11 @@ export interface CreateSplitRequest { name: string; description?: string; tags?:
 export interface UpdateSplitRequest { name?: string; description?: string; visibility?: string; tags?: string[]; }
 export interface CreateRoutineRequest { name: string; day_order?: number; }
 export interface UpdateRoutineRequest { name?: string; day_order?: number; }
-export interface ReplaceItemEntry { exercise_id: string; target_sets: number; target_reps: number; }
+export interface ReplaceItemEntry extends PlanDetails {
+  exercise_id: string; target_sets: number; target_reps: number;
+  /** Says the entry carries the details; the server keeps them for entries without it (an older app). */
+  detailed: true;
+}
 export interface RoutineItemsEntry { routine_id: string; items: ReplaceItemEntry[]; }
 export interface RoutineItemsResult { routine_id: string; items: RoutineItem[]; }
 export interface CreateSessionRequest {
@@ -293,6 +375,7 @@ export interface CreateSessionRequest {
   /** Start even though another workout is open. */ force?: boolean;
   /** Both together log a past workout, created finished. */ started_at?: string; ended_at?: string;
   /** The workout's exercises in order (Repeat); omitted, the routine's items. */ exercise_ids?: string[];
+  /** One per exercise_ids entry (null for none): keeps a repeated workout's supersets. */ superset_groups?: (number | null)[];
 }
 export interface UpdateSessionRequest { ended_at?: string; notes?: string; session_type?: string; }
 /** A finished workout's new start or end; a field left out keeps its value. */
@@ -307,7 +390,7 @@ export interface UpdateSeriesRequest { name?: string; ended_at?: string; }
 
 // ─── Shares ───────────────────────────────────────────────────────────────────
 
-export interface ShareExercisePreview {
+export interface ShareExercisePreview extends PlanDetails {
   name: string;
   muscle_group: string | null;
   target_sets: number;
@@ -344,8 +427,27 @@ export class JymService {
 
   /** Every logged set by default; `limit` keeps only the latest ones. */
   getExercise(id: string, opts: { limit?: number } = {}): Observable<ExerciseWithHistory> {
-    const params = opts.limit ? new HttpParams().set('limit', String(opts.limit)) : undefined;
+    // limit 0 is the header alone.
+    const params = opts.limit !== undefined ? new HttpParams().set('limit', String(opts.limit)) : undefined;
     return this.http.get<ExerciseWithHistory>(`${API_URL}/exercises/${id}`, { params });
+  }
+
+  getExerciseStats(id: string): Observable<ExerciseStats> {
+    return this.http.get<ExerciseStats>(`${API_URL}/exercises/${id}/stats`);
+  }
+
+  /** Working-set reps at one weight (kg), per workout, outside deloads. */
+  getRepsAtWeight(id: string, weight: number): Observable<RepsAtWeight[]> {
+    return this.http.get<RepsAtWeight[]>(`${API_URL}/exercises/${id}/reps-at`, { params: new HttpParams().set('weight', String(weight)) });
+  }
+
+  /** Workouts with this exercise, newest first; `before`/`beforeId` continue after a page's last one. */
+  listExerciseWorkouts(id: string, opts: { before?: string; beforeId?: string; limit?: number } = {}): Observable<ExerciseWorkout[]> {
+    let params = new HttpParams();
+    if (opts.before) params = params.set('before', opts.before);
+    if (opts.beforeId) params = params.set('before_id', opts.beforeId);
+    if (opts.limit) params = params.set('limit', String(opts.limit));
+    return this.http.get<ExerciseWorkout[]>(`${API_URL}/exercises/${id}/workouts`, { params });
   }
 
   createExercise(req: CreateExerciseRequest): Observable<Exercise> {
@@ -412,11 +514,17 @@ export class JymService {
     return this.http.post<StartSessionResponse>(`${API_URL}/sessions`, req);
   }
 
-  /** Newest 50 by default. `from` (YYYY-MM-DD) returns every session since that day plus unfinished ones; `before` pages back. */
-  listSessions(opts: { from?: string; before?: string; beforeId?: string; limit?: number } = {}): Observable<SessionSummary[]> {
+  /**
+   * Newest 50 by default. `from` (YYYY-MM-DD) returns every session since that day plus unfinished ones, or with `to`
+   * the sessions started on those days; `before` pages back. `exerciseId` and `type` narrow any of them.
+   */
+  listSessions(opts: SessionListOptions = {}): Observable<SessionSummary[]> {
     let params = new HttpParams();
     // tz is the API's fallback when the account has no timezone.
     if (opts.from) params = params.set('from', opts.from).set('tz', this.settings.timezone());
+    if (opts.to) params = params.set('to', opts.to);
+    if (opts.exerciseId) params = params.set('exercise_id', opts.exerciseId);
+    if (opts.type) params = params.set('type', opts.type);
     if (opts.before) params = params.set('before', opts.before);
     if (opts.beforeId) params = params.set('before_id', opts.beforeId);
     if (opts.limit) params = params.set('limit', String(opts.limit));
@@ -459,8 +567,10 @@ export class JymService {
   }
 
   /** Sets a workout's order; the list names each of its exercises once. */
-  reorderSessionExercises(sessionId: string, exerciseIds: string[]): Observable<void> {
-    return this.http.put<void>(`${API_URL}/sessions/${sessionId}/exercises/order`, { exercise_ids: exerciseIds });
+  /** Saves the order, and the supersets with it when `groups` (one per exercise, null for none) is given. */
+  reorderSessionExercises(sessionId: string, exerciseIds: string[], groups?: (number | null)[]): Observable<void> {
+    return this.http.put<void>(`${API_URL}/sessions/${sessionId}/exercises/order`,
+      groups ? { exercise_ids: exerciseIds, superset_groups: groups } : { exercise_ids: exerciseIds });
   }
 
   /** Removes an entire exercise block from a session — every logged set for it, in one call. */

@@ -359,7 +359,7 @@ func (s *JymService) GetSplitWithRoutines(ctx context.Context, userID, splitID u
 	if len(sp.Routines) > 0 {
 		itemRows, err := s.db.Query(ctx,
 			`SELECT ri.id, ri.routine_id, ri.exercise_id, ri.target_sets, ri.target_reps, ri.order_index,
-			        e.name, e.muscle_group
+			        e.name, e.muscle_group, ri.target_reps_max, ri.target_rpe, ri.rest_seconds, ri.notes, ri.superset_group
 			 FROM routine_items ri
 			 JOIN exercises e ON ri.exercise_id = e.id
 			 WHERE ri.routine_id IN (
@@ -385,6 +385,7 @@ func (s *JymService) GetSplitWithRoutines(ctx context.Context, userID, splitID u
 				&item.ID, &item.RoutineID, &item.ExerciseID,
 				&item.TargetSets, &item.TargetReps, &item.OrderIndex,
 				&item.ExerciseName, &item.MuscleGroup,
+				&item.TargetRepsMax, &item.TargetRPE, &item.RestSeconds, &item.Notes, &item.SupersetGroup,
 			); err != nil {
 				return nil, err
 			}
@@ -494,7 +495,8 @@ func (s *JymService) GetPublicSplit(ctx context.Context, splitID uuid.UUID) (*mo
 	rows, err := s.db.Query(ctx, `
 		SELECT r.id, r.name, r.day_order,
 		       e.name, e.muscle_group,
-		       COALESCE(ri.target_sets, 0), COALESCE(ri.target_reps, 0)
+		       COALESCE(ri.target_sets, 0), COALESCE(ri.target_reps, 0),
+		       ri.target_reps_max, ri.target_rpe, ri.rest_seconds, ri.notes, ri.superset_group
 		FROM routines r
 		LEFT JOIN routine_items ri ON ri.routine_id = r.id
 		LEFT JOIN exercises e ON e.id = ri.exercise_id
@@ -516,8 +518,10 @@ func (s *JymService) GetPublicSplit(ctx context.Context, splitID uuid.UUID) (*mo
 		var exName *string
 		var mg *string
 		var tSets, tReps int
+		var plan models.PlanDetails
 
-		if err := rows.Scan(&rID, &rName, &dayOrder, &exName, &mg, &tSets, &tReps); err != nil {
+		if err := rows.Scan(&rID, &rName, &dayOrder, &exName, &mg, &tSets, &tReps,
+			&plan.TargetRepsMax, &plan.TargetRPE, &plan.RestSeconds, &plan.Notes, &plan.SupersetGroup); err != nil {
 			return nil, err
 		}
 		if _, ok := routineMap[rID]; !ok {
@@ -534,6 +538,7 @@ func (s *JymService) GetPublicSplit(ctx context.Context, splitID uuid.UUID) (*mo
 				MuscleGroup: mg,
 				TargetSets:  tSets,
 				TargetReps:  tReps,
+				PlanDetails: plan,
 			})
 		}
 	}
@@ -744,10 +749,23 @@ func (s *JymService) checkItemExercises(ctx context.Context, userID uuid.UUID, i
 }
 
 // replaceItemsTx swaps a routine's items for the list, in order; zero targets default to 3 sets of 8.
+// An entry without Detailed (an older app) keeps its exercise's PlanDetails from before.
 func replaceItemsTx(ctx context.Context, tx pgx.Tx, routineID uuid.UUID, items []models.ReplaceItemEntry) error {
+	before, err := routinePlanDetails(ctx, tx, routineID)
+	if err != nil {
+		return err
+	}
 	if _, err := tx.Exec(ctx, `DELETE FROM routine_items WHERE routine_id = $1`, routineID); err != nil {
 		return err
 	}
+	groups := make([]*int, len(items))
+	for i, item := range items {
+		groups[i] = item.SupersetGroup
+		if !item.Detailed {
+			groups[i] = before[item.ExerciseID].SupersetGroup
+		}
+	}
+	groups = normalizeGroups(groups)
 	for i, item := range items {
 		sets := item.TargetSets
 		if sets == 0 {
@@ -757,10 +775,20 @@ func replaceItemsTx(ctx context.Context, tx pgx.Tx, routineID uuid.UUID, items [
 		if reps == 0 {
 			reps = 8
 		}
+		plan := item.PlanDetails
+		if !item.Detailed {
+			plan = before[item.ExerciseID]
+		}
+		plan, err := cleanPlan(plan, reps)
+		if err != nil {
+			return err
+		}
+		plan.SupersetGroup = groups[i]
 		if _, err := tx.Exec(ctx,
-			`INSERT INTO routine_items (routine_id, exercise_id, target_sets, target_reps, order_index)
-			 VALUES ($1, $2, $3, $4, $5)`,
-			routineID, item.ExerciseID, sets, reps, i,
+			`INSERT INTO routine_items (routine_id, exercise_id, target_sets, target_reps, order_index,
+			                            target_reps_max, target_rpe, rest_seconds, notes, superset_group)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+			append([]any{routineID, item.ExerciseID, sets, reps, i}, planArgs(plan)...)...,
 		); err != nil {
 			return err
 		}
@@ -771,7 +799,7 @@ func replaceItemsTx(ctx context.Context, tx pgx.Tx, routineID uuid.UUID, items [
 func (s *JymService) listRoutineItems(ctx context.Context, routineID uuid.UUID) ([]models.RoutineItemWithExercise, error) {
 	rows, err := s.db.Query(ctx,
 		`SELECT ri.id, ri.routine_id, ri.exercise_id, ri.target_sets, ri.target_reps, ri.order_index,
-		        e.name, e.muscle_group
+		        e.name, e.muscle_group, ri.target_reps_max, ri.target_rpe, ri.rest_seconds, ri.notes, ri.superset_group
 		 FROM routine_items ri
 		 JOIN exercises e ON ri.exercise_id = e.id
 		 WHERE ri.routine_id = $1
@@ -790,6 +818,7 @@ func (s *JymService) listRoutineItems(ctx context.Context, routineID uuid.UUID) 
 			&item.ID, &item.RoutineID, &item.ExerciseID,
 			&item.TargetSets, &item.TargetReps, &item.OrderIndex,
 			&item.ExerciseName, &item.MuscleGroup,
+			&item.TargetRepsMax, &item.TargetRPE, &item.RestSeconds, &item.Notes, &item.SupersetGroup,
 		); err != nil {
 			return nil, err
 		}
@@ -803,7 +832,7 @@ func (s *JymService) listRoutineItems(ctx context.Context, routineID uuid.UUID) 
 // listSessionExercises is a workout's list in order.
 func listSessionExercises(ctx context.Context, q querier, sessionID uuid.UUID) ([]models.SessionExercise, error) {
 	rows, err := q.Query(ctx,
-		`SELECT se.exercise_id, e.name, e.muscle_group, se.position, se.target_sets, se.target_reps
+		`SELECT se.exercise_id, e.name, e.muscle_group, se.position, se.target_sets, se.target_reps, `+planColumns("se")+`
 		 FROM session_exercises se JOIN exercises e ON e.id = se.exercise_id
 		 WHERE se.session_id = $1
 		 ORDER BY se.position, se.exercise_id`,
@@ -816,7 +845,8 @@ func listSessionExercises(ctx context.Context, q querier, sessionID uuid.UUID) (
 	list := []models.SessionExercise{}
 	for rows.Next() {
 		var x models.SessionExercise
-		if err := rows.Scan(&x.ExerciseID, &x.ExerciseName, &x.MuscleGroup, &x.Position, &x.TargetSets, &x.TargetReps); err != nil {
+		if err := rows.Scan(append([]any{&x.ExerciseID, &x.ExerciseName, &x.MuscleGroup, &x.Position, &x.TargetSets, &x.TargetReps},
+			planDest(&x.PlanDetails)...)...); err != nil {
 			return nil, err
 		}
 		list = append(list, x)
@@ -826,22 +856,24 @@ func listSessionExercises(ctx context.Context, q querier, sessionID uuid.UUID) (
 
 // seedSessionExercises gives a new workout its list: the given exercises in order (Repeat), else the routine's items.
 // Targets come from the routine wherever an exercise is in it; an exercise that isn't the user's is ErrExerciseNotFound.
-func seedSessionExercises(ctx context.Context, tx pgx.Tx, userID, sessionID uuid.UUID, routineID *uuid.UUID, exerciseIDs []uuid.UUID) error {
+func seedSessionExercises(ctx context.Context, tx pgx.Tx, userID, sessionID uuid.UUID, routineID *uuid.UUID, exerciseIDs []uuid.UUID, groups []*int) error {
 	if len(exerciseIDs) > 0 {
 		distinct := map[uuid.UUID]bool{}
 		for _, id := range exerciseIDs {
 			distinct[id] = true
 		}
 		tag, err := tx.Exec(ctx,
-			`INSERT INTO session_exercises (session_id, exercise_id, position, target_sets, target_reps)
-			 SELECT $1, d.id, ROW_NUMBER() OVER (ORDER BY d.ord), ri.target_sets, ri.target_reps
-			 FROM (SELECT DISTINCT ON (u.id) u.id, u.ord
-			       FROM unnest($2::uuid[]) WITH ORDINALITY AS u(id, ord) ORDER BY u.id, u.ord) d
+			`INSERT INTO session_exercises (session_id, exercise_id, position, target_sets, target_reps,
+			                                target_reps_max, target_rpe, rest_seconds, notes, superset_group)
+			 SELECT $1, d.id, ROW_NUMBER() OVER (ORDER BY d.ord), ri.target_sets, ri.target_reps, ri.target_reps_max, ri.target_rpe, ri.rest_seconds, ri.notes,
+			        CASE WHEN $5 THEN d.grp ELSE ri.superset_group END
+			 FROM (SELECT DISTINCT ON (u.id) u.id, u.grp, u.ord
+			       FROM unnest($2::uuid[], $6::int[]) WITH ORDINALITY AS u(id, grp, ord) ORDER BY u.id, u.ord) d
 			 JOIN exercises e ON e.id = d.id AND e.user_id = $3
-			 LEFT JOIN LATERAL (SELECT target_sets, target_reps FROM routine_items
+			 LEFT JOIN LATERAL (SELECT target_sets, target_reps, target_reps_max, target_rpe, rest_seconds, notes, superset_group FROM routine_items
 			                    WHERE routine_id = $4 AND exercise_id = d.id
 			                    ORDER BY order_index, id LIMIT 1) ri ON TRUE`,
-			sessionID, exerciseIDs, userID, routineID,
+			sessionID, exerciseIDs, userID, routineID, len(groups) > 0, groups,
 		)
 		if err != nil {
 			return err
@@ -855,9 +887,12 @@ func seedSessionExercises(ctx context.Context, tx pgx.Tx, userID, sessionID uuid
 		return nil
 	}
 	_, err := tx.Exec(ctx,
-		`INSERT INTO session_exercises (session_id, exercise_id, position, target_sets, target_reps)
-		 SELECT $1, fi.exercise_id, ROW_NUMBER() OVER (ORDER BY fi.order_index, fi.id), fi.target_sets, fi.target_reps
-		 FROM (SELECT DISTINCT ON (exercise_id) exercise_id, target_sets, target_reps, order_index, id
+		`INSERT INTO session_exercises (session_id, exercise_id, position, target_sets, target_reps,
+		                                target_reps_max, target_rpe, rest_seconds, notes, superset_group)
+		 SELECT $1, fi.exercise_id, ROW_NUMBER() OVER (ORDER BY fi.order_index, fi.id), fi.target_sets, fi.target_reps,
+		        fi.target_reps_max, fi.target_rpe, fi.rest_seconds, fi.notes, fi.superset_group
+		 FROM (SELECT DISTINCT ON (exercise_id) exercise_id, target_sets, target_reps, order_index, id,
+		              target_reps_max, target_rpe, rest_seconds, notes, superset_group
 		       FROM routine_items WHERE routine_id = $2 ORDER BY exercise_id, order_index, id) fi`,
 		sessionID, *routineID,
 	)
@@ -867,12 +902,13 @@ func seedSessionExercises(ctx context.Context, tx pgx.Tx, userID, sessionID uuid
 // ensureSessionExercise puts an exercise on a workout's list, last, with its routine's targets if it has them.
 func ensureSessionExercise(ctx context.Context, tx pgx.Tx, sessionID, exerciseID uuid.UUID) error {
 	_, err := tx.Exec(ctx,
-		`INSERT INTO session_exercises (session_id, exercise_id, position, target_sets, target_reps)
+		`INSERT INTO session_exercises (session_id, exercise_id, position, target_sets, target_reps,
+		                                target_reps_max, target_rpe, rest_seconds, notes, superset_group)
 		 SELECT s.id, $2,
 		        COALESCE((SELECT MAX(x.position) FROM session_exercises x WHERE x.session_id = s.id), 0) + 1,
-		        ri.target_sets, ri.target_reps
+		        ri.target_sets, ri.target_reps, ri.target_reps_max, ri.target_rpe, ri.rest_seconds, ri.notes, NULL
 		 FROM sessions s
-		 LEFT JOIN LATERAL (SELECT target_sets, target_reps FROM routine_items
+		 LEFT JOIN LATERAL (SELECT target_sets, target_reps, target_reps_max, target_rpe, rest_seconds, notes, superset_group FROM routine_items
 		                    WHERE routine_id = s.routine_id AND exercise_id = $2
 		                    ORDER BY order_index, id LIMIT 1) ri ON TRUE
 		 WHERE s.id = $1
@@ -923,7 +959,10 @@ func (s *JymService) AddSessionExercise(ctx context.Context, userID, sessionID, 
 }
 
 // ReorderSessionExercises sets a workout's order; the list must name each of its exercises exactly once.
-func (s *JymService) ReorderSessionExercises(ctx context.Context, userID, sessionID uuid.UUID, exerciseIDs []uuid.UUID) error {
+func (s *JymService) ReorderSessionExercises(ctx context.Context, userID, sessionID uuid.UUID, exerciseIDs []uuid.UUID, groups []*int) error {
+	if len(groups) > 0 && len(groups) != len(exerciseIDs) {
+		return ErrExerciseOrder
+	}
 	var owner uuid.UUID
 	if err := s.db.QueryRow(ctx, `SELECT user_id FROM sessions WHERE id = $1`, sessionID).Scan(&owner); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -967,11 +1006,15 @@ func (s *JymService) ReorderSessionExercises(ctx context.Context, userID, sessio
 		return ErrExerciseOrder
 	}
 	if _, err := tx.Exec(ctx,
-		`UPDATE session_exercises se SET position = u.ord
-		 FROM unnest($2::uuid[]) WITH ORDINALITY AS u(id, ord)
+		`UPDATE session_exercises se SET position = u.ord,
+		        superset_group = CASE WHEN $3 THEN u.grp ELSE se.superset_group END
+		 FROM unnest($2::uuid[], $4::int[]) WITH ORDINALITY AS u(id, grp, ord)
 		 WHERE se.session_id = $1 AND se.exercise_id = u.id`,
-		sessionID, exerciseIDs,
+		sessionID, exerciseIDs, len(groups) > 0, groups,
 	); err != nil {
+		return err
+	}
+	if err := normalizeSessionGroups(ctx, tx, sessionID); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)
@@ -1108,7 +1151,13 @@ func (s *JymService) StartSession(ctx context.Context, userID uuid.UUID, req *mo
 		return nil, err
 	}
 	// The workout keeps its own list, so a later edit to the routine doesn't change it.
-	if err := seedSessionExercises(ctx, tx, userID, sess.ID, req.RoutineID, req.ExerciseIDs); err != nil {
+	if len(req.SupersetGroups) > 0 && len(req.SupersetGroups) != len(req.ExerciseIDs) {
+		return nil, ErrExerciseOrder
+	}
+	if err := seedSessionExercises(ctx, tx, userID, sess.ID, req.RoutineID, req.ExerciseIDs, req.SupersetGroups); err != nil {
+		return nil, err
+	}
+	if err := normalizeSessionGroups(ctx, tx, sess.ID); err != nil {
 		return nil, err
 	}
 	if sess.Exercises, err = listSessionExercises(ctx, tx, sess.ID); err != nil {
@@ -1122,7 +1171,7 @@ func (s *JymService) StartSession(ctx context.Context, userID uuid.UUID, req *mo
 	if req.RoutineID != nil {
 		rows, err := s.db.Query(ctx,
 			`SELECT ri.id, ri.routine_id, ri.exercise_id, ri.target_sets, ri.target_reps, ri.order_index,
-			        e.name, e.muscle_group
+			        e.name, e.muscle_group, ri.target_reps_max, ri.target_rpe, ri.rest_seconds, ri.notes, ri.superset_group
 			 FROM routine_items ri
 			 JOIN exercises e ON ri.exercise_id = e.id
 			 WHERE ri.routine_id = $1
@@ -1140,6 +1189,7 @@ func (s *JymService) StartSession(ctx context.Context, userID uuid.UUID, req *mo
 				&item.ID, &item.RoutineID, &item.ExerciseID,
 				&item.TargetSets, &item.TargetReps, &item.OrderIndex,
 				&item.ExerciseName, &item.MuscleGroup,
+				&item.TargetRepsMax, &item.TargetRPE, &item.RestSeconds, &item.Notes, &item.SupersetGroup,
 			); err != nil {
 				return nil, err
 			}
@@ -1182,14 +1232,25 @@ const sessionPageSelect = `WITH page AS (%s)
 		 GROUP BY s.id, r.name
 		 ORDER BY s.started_at DESC, s.id DESC`
 
+// sessionFilterSQL limits a list's sessions to the filter; its two values bind at $n and $n+1.
+func sessionFilterSQL(n int) string {
+	return fmt.Sprintf(` AND ($%[1]d::uuid IS NULL OR EXISTS (SELECT 1 FROM session_sets f WHERE f.session_id = sessions.id AND f.exercise_id = $%[1]d::uuid))
+		 AND ($%[2]d::text IS NULL OR session_type = $%[2]d::text)`, n, n+1)
+}
+
 // ListSessions returns one page of sessions, newest first; before and beforeID continue after a page's last row.
 func (s *JymService) ListSessions(ctx context.Context, userID uuid.UUID, before *time.Time, beforeID uuid.UUID, limit int) ([]models.SessionSummary, error) {
+	return s.ListSessionsFiltered(ctx, userID, models.SessionFilter{}, before, beforeID, limit)
+}
+
+// ListSessionsFiltered is ListSessions limited to workouts with an exercise and/or of a type.
+func (s *JymService) ListSessionsFiltered(ctx context.Context, userID uuid.UUID, f models.SessionFilter, before *time.Time, beforeID uuid.UUID, limit int) ([]models.SessionSummary, error) {
 	rows, err := s.db.Query(ctx, fmt.Sprintf(sessionPageSelect,
 		`SELECT id FROM sessions
-		 WHERE user_id = $1 AND ($2::timestamptz IS NULL OR (started_at, id) < ($2::timestamptz, $3::uuid))
+		 WHERE user_id = $1 AND ($2::timestamptz IS NULL OR (started_at, id) < ($2::timestamptz, $3::uuid))`+sessionFilterSQL(5)+`
 		 ORDER BY started_at DESC, id DESC
 		 LIMIT $4`),
-		userID, before, beforeID, limit,
+		userID, before, beforeID, limit, f.ExerciseID, f.Type,
 	)
 	if err != nil {
 		return nil, err
@@ -1198,7 +1259,7 @@ func (s *JymService) ListSessions(ctx context.Context, userID uuid.UUID, before 
 }
 
 // ListSessionsSince returns every session from the start of the user's calendar day, plus any still in progress.
-func (s *JymService) ListSessionsSince(ctx context.Context, userID uuid.UUID, day time.Time, tzHint string) ([]models.SessionSummary, error) {
+func (s *JymService) ListSessionsSince(ctx context.Context, userID uuid.UUID, day time.Time, tzHint string, f models.SessionFilter) ([]models.SessionSummary, error) {
 	loc, err := userLocation(ctx, s.db, userID, tzHint)
 	if err != nil {
 		return nil, err
@@ -1206,10 +1267,31 @@ func (s *JymService) ListSessionsSince(ctx context.Context, userID uuid.UUID, da
 	start := time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, loc)
 	rows, err := s.db.Query(ctx, fmt.Sprintf(sessionPageSelect,
 		`SELECT id FROM sessions
-		 WHERE user_id = $1 AND (started_at >= $2 OR ended_at IS NULL)
+		 WHERE user_id = $1 AND (started_at >= $2 OR ended_at IS NULL)`+sessionFilterSQL(3)+`
 		 ORDER BY started_at DESC, id DESC
 		 LIMIT 1000`),
-		userID, start,
+		userID, start, f.ExerciseID, f.Type,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return scanSessionSummaries(rows)
+}
+
+// ListSessionsInDays returns the sessions started on the user's calendar days from..to (inclusive), newest first.
+func (s *JymService) ListSessionsInDays(ctx context.Context, userID uuid.UUID, from, to time.Time, tzHint string, f models.SessionFilter) ([]models.SessionSummary, error) {
+	loc, err := userLocation(ctx, s.db, userID, tzHint)
+	if err != nil {
+		return nil, err
+	}
+	start := time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, loc)
+	end := time.Date(to.Year(), to.Month(), to.Day()+1, 0, 0, 0, 0, loc)
+	rows, err := s.db.Query(ctx, fmt.Sprintf(sessionPageSelect,
+		`SELECT id FROM sessions
+		 WHERE user_id = $1 AND started_at >= $2 AND started_at < $3`+sessionFilterSQL(4)+`
+		 ORDER BY started_at DESC, id DESC
+		 LIMIT 1000`),
+		userID, start, end, f.ExerciseID, f.Type,
 	)
 	if err != nil {
 		return nil, err
@@ -1624,6 +1706,9 @@ func (s *JymService) DeleteSessionExercise(ctx context.Context, userID, sessionI
 		`DELETE FROM session_exercises WHERE session_id = $1 AND exercise_id = $2`,
 		sessionID, exerciseID,
 	); err != nil {
+		return err
+	}
+	if err := normalizeSessionGroups(ctx, tx, sessionID); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)
@@ -2593,7 +2678,8 @@ func (s *JymService) GetSharePreview(ctx context.Context, shareID uuid.UUID) (*m
 	rows, err := s.db.Query(ctx, `
 		SELECT r.id, r.name, r.day_order,
 		       e.name, e.muscle_group,
-		       COALESCE(ri.target_sets, 0), COALESCE(ri.target_reps, 0)
+		       COALESCE(ri.target_sets, 0), COALESCE(ri.target_reps, 0),
+		       ri.target_reps_max, ri.target_rpe, ri.rest_seconds, ri.notes, ri.superset_group
 		FROM routines r
 		LEFT JOIN routine_items ri ON ri.routine_id = r.id
 		LEFT JOIN exercises e ON e.id = ri.exercise_id
@@ -2615,8 +2701,10 @@ func (s *JymService) GetSharePreview(ctx context.Context, shareID uuid.UUID) (*m
 		var exName *string
 		var mg *string
 		var tSets, tReps int
+		var plan models.PlanDetails
 
-		if err := rows.Scan(&rID, &rName, &dayOrder, &exName, &mg, &tSets, &tReps); err != nil {
+		if err := rows.Scan(&rID, &rName, &dayOrder, &exName, &mg, &tSets, &tReps,
+			&plan.TargetRepsMax, &plan.TargetRPE, &plan.RestSeconds, &plan.Notes, &plan.SupersetGroup); err != nil {
 			return nil, err
 		}
 		if _, ok := routineMap[rID]; !ok {
@@ -2633,6 +2721,7 @@ func (s *JymService) GetSharePreview(ctx context.Context, shareID uuid.UUID) (*m
 				MuscleGroup: mg,
 				TargetSets:  tSets,
 				TargetReps:  tReps,
+				PlanDetails: plan,
 			})
 		}
 	}
@@ -2698,7 +2787,7 @@ func (s *JymService) copySplit(ctx context.Context, importerID, splitID uuid.UUI
 		SELECT r.id, r.name, r.day_order,
 		       e.name, e.muscle_group,
 		       COALESCE(ri.target_sets, 0), COALESCE(ri.target_reps, 0),
-		       COALESCE(ri.order_index, 0)
+		       COALESCE(ri.order_index, 0), ri.target_reps_max, ri.target_rpe, ri.rest_seconds, ri.notes, ri.superset_group
 		FROM routines r
 		LEFT JOIN routine_items ri ON ri.routine_id = r.id
 		LEFT JOIN exercises e ON e.id = ri.exercise_id
@@ -2715,6 +2804,7 @@ func (s *JymService) copySplit(ctx context.Context, importerID, splitID uuid.UUI
 		targetSets int
 		targetReps int
 		orderIdx   int
+		plan       models.PlanDetails
 	}
 	type routineData struct {
 		name     string
@@ -2732,8 +2822,10 @@ func (s *JymService) copySplit(ctx context.Context, importerID, splitID uuid.UUI
 		var exName *string
 		var mg *string
 		var tSets, tReps, orderIdx int
+		var plan models.PlanDetails
 
-		if err := rows.Scan(&rID, &rName, &dayOrder, &exName, &mg, &tSets, &tReps, &orderIdx); err != nil {
+		if err := rows.Scan(&rID, &rName, &dayOrder, &exName, &mg, &tSets, &tReps, &orderIdx,
+			&plan.TargetRepsMax, &plan.TargetRPE, &plan.RestSeconds, &plan.Notes, &plan.SupersetGroup); err != nil {
 			rows.Close()
 			return uuid.Nil, err
 		}
@@ -2743,7 +2835,7 @@ func (s *JymService) copySplit(ctx context.Context, importerID, splitID uuid.UUI
 		}
 		if exName != nil {
 			rMap[rID].items = append(rMap[rID].items, itemRow{
-				exName: *exName, mg: mg, targetSets: tSets, targetReps: tReps, orderIdx: orderIdx,
+				exName: *exName, mg: mg, targetSets: tSets, targetReps: tReps, orderIdx: orderIdx, plan: plan,
 			})
 		}
 	}
@@ -2809,9 +2901,10 @@ func (s *JymService) copySplit(ctx context.Context, importerID, splitID uuid.UUI
 				return uuid.Nil, err
 			}
 			_, err = tx.Exec(ctx,
-				`INSERT INTO routine_items (routine_id, exercise_id, target_sets, target_reps, order_index)
-				 VALUES ($1, $2, $3, $4, $5)`,
-				newRoutineID, exID, item.targetSets, item.targetReps, item.orderIdx,
+				`INSERT INTO routine_items (routine_id, exercise_id, target_sets, target_reps, order_index,
+				                            target_reps_max, target_rpe, rest_seconds, notes, superset_group)
+				 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+				append([]any{newRoutineID, exID, item.targetSets, item.targetReps, item.orderIdx}, planArgs(item.plan)...)...,
 			)
 			if err != nil {
 				return uuid.Nil, err
@@ -2837,7 +2930,7 @@ func (s *JymService) ListTemplates(ctx context.Context, userID uuid.UUID) ([]mod
 	rows, err := s.db.Query(ctx,
 		`SELECT r.id, r.user_id, r.split_id, r.name, r.day_order, r.created_at,
 		        ri.id, ri.routine_id, ri.exercise_id, ri.target_sets, ri.target_reps, ri.order_index,
-		        e.name, e.muscle_group
+		        e.name, e.muscle_group, ri.target_reps_max, ri.target_rpe, ri.rest_seconds, ri.notes, ri.superset_group
 		 FROM routines r
 		 LEFT JOIN routine_items ri ON ri.routine_id = r.id
 		 LEFT JOIN exercises e ON e.id = ri.exercise_id
@@ -2859,11 +2952,12 @@ func (s *JymService) ListTemplates(ctx context.Context, userID uuid.UUID) ([]mod
 		var targetSets, targetReps, orderIndex *int
 		var exName *string
 		var mg *string
+		var plan models.PlanDetails
 
 		if err := rows.Scan(
 			&rt.ID, &rt.UserID, &rt.SplitID, &rt.Name, &rt.DayOrder, &rt.CreatedAt,
 			&itemID, &routineID, &exerciseID, &targetSets, &targetReps, &orderIndex,
-			&exName, &mg,
+			&exName, &mg, &plan.TargetRepsMax, &plan.TargetRPE, &plan.RestSeconds, &plan.Notes, &plan.SupersetGroup,
 		); err != nil {
 			return nil, err
 		}
@@ -2881,12 +2975,13 @@ func (s *JymService) ListTemplates(ctx context.Context, userID uuid.UUID) ([]mod
 		if itemID != nil {
 			templates[idx].Items = append(templates[idx].Items, models.RoutineItemWithExercise{
 				RoutineItem: models.RoutineItem{
-					ID:         *itemID,
-					RoutineID:  *routineID,
-					ExerciseID: *exerciseID,
-					TargetSets: *targetSets,
-					TargetReps: *targetReps,
-					OrderIndex: *orderIndex,
+					ID:          *itemID,
+					RoutineID:   *routineID,
+					ExerciseID:  *exerciseID,
+					TargetSets:  *targetSets,
+					TargetReps:  *targetReps,
+					OrderIndex:  *orderIndex,
+					PlanDetails: plan,
 				},
 				ExerciseName: *exName,
 				MuscleGroup:  mg,
@@ -2924,6 +3019,7 @@ func (s *JymService) CreateTemplateFromSession(ctx context.Context, userID, sess
 		targetSets int
 		targetReps int
 		orderIdx   int
+		plan       models.PlanDetails
 	}
 	rows, err := s.db.Query(ctx,
 		`SELECT exercise_id,
@@ -2961,6 +3057,19 @@ func (s *JymService) CreateTemplateFromSession(ctx context.Context, userID, sess
 		return nil, ErrSessionNotFound // session has no sets to template from
 	}
 
+	// The workout's own plan, where it had one, beats an average of what was done.
+	planned, err := listSessionExercises(ctx, s.db, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range exercises {
+		for _, x := range planned {
+			if x.ExerciseID == exercises[i].exerciseID && x.TargetSets != nil && x.TargetReps != nil {
+				exercises[i].targetSets, exercises[i].targetReps, exercises[i].plan = *x.TargetSets, *x.TargetReps, x.PlanDetails
+			}
+		}
+	}
+
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return nil, err
@@ -2984,14 +3093,15 @@ func (s *JymService) CreateTemplateFromSession(ctx context.Context, userID, sess
 		var item models.RoutineItemWithExercise
 		var mg *string
 		if err := tx.QueryRow(ctx,
-			`INSERT INTO routine_items (routine_id, exercise_id, target_sets, target_reps, order_index)
-			 VALUES ($1, $2, $3, $4, $5)
-			 RETURNING id, routine_id, exercise_id, target_sets, target_reps, order_index`,
-			rt.ID, ex.exerciseID, ex.targetSets, ex.targetReps, ex.orderIdx,
-		).Scan(
+			`INSERT INTO routine_items (routine_id, exercise_id, target_sets, target_reps, order_index,
+			                            target_reps_max, target_rpe, rest_seconds, notes, superset_group)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+			 RETURNING id, routine_id, exercise_id, target_sets, target_reps, order_index, `+planColumns("routine_items"),
+			append([]any{rt.ID, ex.exerciseID, ex.targetSets, ex.targetReps, ex.orderIdx}, planArgs(ex.plan)...)...,
+		).Scan(append([]any{
 			&item.ID, &item.RoutineID, &item.ExerciseID,
 			&item.TargetSets, &item.TargetReps, &item.OrderIndex,
-		); err != nil {
+		}, planDest(&item.PlanDetails)...)...); err != nil {
 			return nil, err
 		}
 		// Fetch exercise name

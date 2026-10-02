@@ -2,6 +2,7 @@ import { Component, OnInit, inject, input, signal } from '@angular/core';
 
 import { Router } from '@angular/router';
 import { JymService, Routine } from '../../../core/services/jym.service';
+import { planText } from '../plan-text';
 import { WorkoutLauncher } from '../shared/workout-launcher';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
@@ -42,7 +43,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
               @for (item of t.items; track item; let last = $last) {
 <span class="ex-chip">
                 {{ item.exercise_name }}
-                <span class="ex-sets">{{ item.target_sets }}×{{ item.target_reps }}</span>
+                <span class="ex-sets">{{ planText(item) }}</span>
                 @if (!last) {
 <span class="ex-sep"> · </span>
 }
@@ -111,6 +112,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
   `]
 })
 export class JymTemplatesComponent implements OnInit {
+  readonly planText = planText;
   embedded = input(false);
   templates = signal<Routine[]>([]);
   loading = signal(true);

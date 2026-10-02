@@ -88,8 +88,9 @@ func (h *JymHandler) GetExercise(c *gin.Context) {
 	var limit *int
 	if l := c.Query("limit"); l != "" {
 		n, perr := strconv.Atoi(l)
-		if perr != nil || n < 1 || n > 500 {
-			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_LIMIT", Message: "limit must be 1 to 500"}})
+		// 0 returns the header alone, for pages that load the sets another way.
+		if perr != nil || n < 0 || n > 500 {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_LIMIT", Message: "limit must be 0 to 500"}})
 			return
 		}
 		limit = &n
@@ -183,6 +184,99 @@ func (h *JymHandler) GetExerciseFormChecks(c *gin.Context) {
 	}
 	h.signFormChecks(c.Request.Context(), checks)
 	c.JSON(http.StatusOK, checks)
+}
+
+// exerciseParam reads :id, answering 400 itself when it isn't a uuid.
+func exerciseParam(c *gin.Context) (uuid.UUID, bool) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid exercise ID"}})
+		return uuid.Nil, false
+	}
+	return id, true
+}
+
+// exerciseReadError answers a failed exercise read: 404 for a missing or unowned exercise, else 500.
+func exerciseReadError(c *gin.Context, err error, what string) {
+	if errors.Is(err, services.ErrExerciseNotFound) {
+		c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Exercise not found"}})
+		return
+	}
+	c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to load " + what}})
+}
+
+func (h *JymHandler) GetExerciseStats(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	exerciseID, ok := exerciseParam(c)
+	if !ok {
+		return
+	}
+	stats, err := h.jymService.GetExerciseStats(c.Request.Context(), userID, exerciseID)
+	if err != nil {
+		exerciseReadError(c, err, "exercise stats")
+		return
+	}
+	c.JSON(http.StatusOK, stats)
+}
+
+func (h *JymHandler) GetRepsAtWeight(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	exerciseID, ok := exerciseParam(c)
+	if !ok {
+		return
+	}
+	weight, err := strconv.ParseFloat(c.Query("weight"), 64)
+	if err != nil || weight < 0 || weight > 2000 {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_WEIGHT", Message: "weight must be a number from 0 to 2000"}})
+		return
+	}
+	list, err := h.jymService.GetRepsAtWeight(c.Request.Context(), userID, exerciseID, weight)
+	if err != nil {
+		exerciseReadError(c, err, "reps at weight")
+		return
+	}
+	c.JSON(http.StatusOK, list)
+}
+
+func (h *JymHandler) ListExerciseWorkouts(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	exerciseID, ok := exerciseParam(c)
+	if !ok {
+		return
+	}
+	limit := 10
+	if l := c.Query("limit"); l != "" {
+		n, perr := strconv.Atoi(l)
+		if perr != nil || n < 1 || n > 50 {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_LIMIT", Message: "limit must be 1 to 50"}})
+			return
+		}
+		limit = n
+	}
+	var before *time.Time
+	beforeID := uuid.Nil
+	if b := c.Query("before"); b != "" {
+		t, perr := time.Parse(time.RFC3339Nano, b)
+		if perr != nil {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_CURSOR", Message: "before must be an RFC 3339 time"}})
+			return
+		}
+		before = &t
+	}
+	if b := c.Query("before_id"); b != "" {
+		id, perr := uuid.Parse(b)
+		if perr != nil {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_CURSOR", Message: "before_id must be a session id"}})
+			return
+		}
+		beforeID = id
+	}
+	list, err := h.jymService.ListExerciseWorkouts(c.Request.Context(), userID, exerciseID, before, beforeID, limit)
+	if err != nil {
+		exerciseReadError(c, err, "workouts")
+		return
+	}
+	c.JSON(http.StatusOK, list)
 }
 
 // ─── Splits ───────────────────────────────────────────────────────────────────
@@ -425,6 +519,10 @@ func (h *JymHandler) ReplaceRoutineItems(c *gin.Context) {
 			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Exercise not found"}})
 			return
 		}
+		if errors.Is(err, services.ErrInvalidPlan) {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()}})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to update routine items"}})
 		return
 	}
@@ -455,6 +553,8 @@ func (h *JymHandler) ReplaceSplitItems(c *gin.Context) {
 			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Exercise not found"}})
 		case services.ErrDuplicateRoutine:
 			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: "Each routine may appear only once"}})
+		case services.ErrInvalidPlan:
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()}})
 		default:
 			c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to update routine items"}})
 		}
@@ -552,6 +652,10 @@ func (h *JymHandler) StartSession(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_SESSION_TYPE", Message: "Invalid session type"}})
 			return
 		}
+		if err == services.ErrExerciseOrder {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: "superset_groups must have one entry per exercise"}})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to start session"}})
 		return
 	}
@@ -559,11 +663,28 @@ func (h *JymHandler) StartSession(c *gin.Context) {
 	c.JSON(http.StatusCreated, sess)
 }
 
-// ListSessions serves ?from=YYYY-MM-DD (every session from that day, plus unfinished ones) or a cursor page
-// (?before=<started_at>&before_id=<id>&limit=), newest first.
+// ListSessions serves ?from=YYYY-MM-DD (every session from that day, plus unfinished ones), ?from=&to= (the
+// sessions started on those days), or a cursor page (?before=<started_at>&before_id=<id>&limit=), newest first.
+// ?exercise_id= and ?type= narrow any of them.
 func (h *JymHandler) ListSessions(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 	ctx := c.Request.Context()
+	var filter models.SessionFilter
+	if e := c.Query("exercise_id"); e != "" {
+		id, perr := uuid.Parse(e)
+		if perr != nil {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "exercise_id must be an exercise id"}})
+			return
+		}
+		filter.ExerciseID = &id
+	}
+	if t := c.Query("type"); t != "" {
+		if t != "normal" && t != "deload" && t != "test" {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_TYPE", Message: "type must be normal, deload or test"}})
+			return
+		}
+		filter.Type = &t
+	}
 	var sessions []models.SessionSummary
 	var err error
 	if from := c.Query("from"); from != "" {
@@ -573,7 +694,16 @@ func (h *JymHandler) ListSessions(c *gin.Context) {
 			return
 		}
 		// tz is only a fallback for a user with no timezone setting, as on GET /day.
-		sessions, err = h.jymService.ListSessionsSince(ctx, userID, day, c.Query("tz"))
+		if to := c.Query("to"); to != "" {
+			last, perr := time.Parse("2006-01-02", to)
+			if perr != nil || last.Before(day) || last.Sub(day) > 62*24*time.Hour {
+				c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_DATE", Message: "to must be YYYY-MM-DD, on or after from, at most 62 days later"}})
+				return
+			}
+			sessions, err = h.jymService.ListSessionsInDays(ctx, userID, day, last, c.Query("tz"), filter)
+		} else {
+			sessions, err = h.jymService.ListSessionsSince(ctx, userID, day, c.Query("tz"), filter)
+		}
 	} else {
 		limit := 50
 		if l := c.Query("limit"); l != "" {
@@ -602,7 +732,7 @@ func (h *JymHandler) ListSessions(c *gin.Context) {
 			}
 			beforeID = id
 		}
-		sessions, err = h.jymService.ListSessions(ctx, userID, before, beforeID, limit)
+		sessions, err = h.jymService.ListSessionsFiltered(ctx, userID, filter, before, beforeID, limit)
 	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to list sessions"}})
@@ -1003,7 +1133,7 @@ func (h *JymHandler) ReorderSessionExercises(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()}})
 		return
 	}
-	if err := h.jymService.ReorderSessionExercises(c.Request.Context(), userID, sessionID, req.ExerciseIDs); err != nil {
+	if err := h.jymService.ReorderSessionExercises(c.Request.Context(), userID, sessionID, req.ExerciseIDs, req.SupersetGroups); err != nil {
 		switch err {
 		case services.ErrSessionNotFound:
 			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Session not found"}})

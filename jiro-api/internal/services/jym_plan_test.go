@@ -246,7 +246,7 @@ func TestReorderNeedsEveryExerciseOnce(t *testing.T) {
 	if _, err := svc.AddSessionExercise(ctx, userID, sess.ID, curl); err != nil {
 		t.Fatalf("add: %v", err)
 	}
-	if err := svc.ReorderSessionExercises(ctx, userID, sess.ID, []uuid.UUID{curl, squat, bench}); err != nil {
+	if err := svc.ReorderSessionExercises(ctx, userID, sess.ID, []uuid.UUID{curl, squat, bench}, nil); err != nil {
 		t.Fatalf("reorder: %v", err)
 	}
 	if got := listOf(t, svc, userID, sess.ID); got != "Curl:- Squat:3x5 Bench:3x5" {
@@ -263,12 +263,12 @@ func TestReorderNeedsEveryExerciseOnce(t *testing.T) {
 		"repeated one": {curl, squat, bench, row, row},
 		"a stranger":   {curl, squat, bench, uuid.New()},
 	} {
-		if err := svc.ReorderSessionExercises(ctx, userID, sess.ID, ids); err != ErrExerciseOrder {
+		if err := svc.ReorderSessionExercises(ctx, userID, sess.ID, ids, nil); err != ErrExerciseOrder {
 			t.Fatalf("%s: got %v, want ErrExerciseOrder", name, err)
 		}
 	}
 	_, other := testJymDB(t)
-	if err := svc.ReorderSessionExercises(ctx, other, sess.ID, []uuid.UUID{curl, squat, bench, row}); err != ErrSessionNotFound {
+	if err := svc.ReorderSessionExercises(ctx, other, sess.ID, []uuid.UUID{curl, squat, bench, row}, nil); err != ErrSessionNotFound {
 		t.Fatalf("another user: got %v, want ErrSessionNotFound", err)
 	}
 }

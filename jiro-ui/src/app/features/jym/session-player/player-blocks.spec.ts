@@ -1,7 +1,7 @@
 // Run with: npm run test:unit
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildBlocks, canLog, isShort, logLabel, newRow, rampSummary, rpeInvalid, suggestionFrom, workingWeight, emptyBlock } from './player-blocks.ts';
+import { buildBlocks, canLog, isShort, logLabel, newRow, planTag, rampSummary, rpeInvalid, suggestionFrom, workingWeight, emptyBlock } from './player-blocks.ts';
 
 const same = (kg: number) => kg;
 const entry = (id: string, sets: number | null = null, reps: number | null = null, position = 1) =>
@@ -17,7 +17,7 @@ const shape = (blocks: ReturnType<typeof buildBlocks>) =>
 test('the list sets the order; plan exercises get their planned rows, others one row', () => {
   const blocks = buildBlocks([entry('curl'), entry('squat', 3, 5)], [], {}, same);
   assert.equal(shape(blocks), 'curl[1] squat[1~x5 2~x5 3~x5]');
-  assert.deepEqual(blocks[1].plan, { sets: 3, reps: 5 });
+  assert.deepEqual(blocks[1].plan, { sets: 3, reps: 5, repsMax: null, rpe: null, rest: null, note: null });
   assert.equal(blocks[0].plan, undefined);
 });
 
@@ -97,6 +97,24 @@ test('the working weight is the next working row, typed or ghosted, else the las
   assert.equal(workingWeight(b([newRow(1, { weight: '100', saved: true })])), 100);
   assert.equal(workingWeight(b([])), null);
   assert.equal(rampSummary([{ weight: 45, reps: 10 }, { weight: 95, reps: 5 }]), '45 × 10, 95 × 5');
+});
+
+test("a plan entry's details reach the block, and its tag reads them", () => {
+  const blocks = buildBlocks([{ ...entry('row', 3, 8), target_reps_max: 12, target_rpe: 8, rest_seconds: 90, notes: 'Brace' }], [], {}, same);
+  assert.deepEqual(blocks[0].plan, { sets: 3, reps: 8, repsMax: 12, rpe: 8, rest: 90, note: 'Brace' });
+  // Planned rows ghost the bottom of the range.
+  assert.equal(shape(blocks), 'row[1~x8 2~x8 3~x8]');
+  assert.equal(planTag(blocks[0].plan!), 'Plan 3×8-12 · RPE 8 · 1:30');
+});
+
+test('the suggestion line with a range', () => {
+  const last = [{ weight: 100, reps: 10, warmup: false }, { weight: 100, reps: 9, warmup: false }];
+  const plan = { sets: 2, reps: 8, repsMax: 12 };
+  const hold = suggestionFrom({ last, move: 'hold', weight: 100, reps: 11, reason: 'plan' }, plan, 'kg');
+  assert.equal(hold.text, 'Last time 100 kg × 10, 9. Stay at 100 kg until every set hits 12; aim for 11 today.');
+  assert.equal(hold.ghostReps, '11');
+  const up = suggestionFrom({ last, move: 'up', weight: 102.5, reps: 8, reason: null }, plan, 'kg');
+  assert.equal(up.text, 'Last time 100 kg × 10, 9. Hit 2 × 12, try 102.5 kg × 8.');
 });
 
 test('the suggestion line: up with a plan, hold after a miss, reps for bodyweight', () => {
