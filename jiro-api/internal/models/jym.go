@@ -199,6 +199,8 @@ type PlanDetails struct {
 	TargetRPE     *int    `json:"target_rpe" binding:"omitempty,min=6,max=10"`
 	RestSeconds   *int    `json:"rest_seconds" binding:"omitempty,min=15,max=600"`
 	Notes         *string `json:"notes" binding:"omitempty,max=140"`
+	// Adjacent items with the same number are one superset; numbered 1, 2, 3 in order once saved.
+	SupersetGroup *int `json:"superset_group" binding:"omitempty,min=1,max=100"`
 }
 
 type RoutineItem struct {
@@ -435,6 +437,8 @@ type AddSessionExerciseRequest struct {
 // ReorderSessionExercisesRequest names each of the workout's exercises once, in the new order.
 type ReorderSessionExercisesRequest struct {
 	ExerciseIDs []uuid.UUID `json:"exercise_ids" binding:"required,max=100"`
+	// SupersetGroups, one per ExerciseIDs entry (null for none), sets the supersets too; omitted, they stay.
+	SupersetGroups []*int `json:"superset_groups" binding:"omitempty,max=100"`
 }
 
 type SessionWithSets struct {
@@ -462,6 +466,8 @@ type CreateSessionRequest struct {
 	EndedAt   *time.Time `json:"ended_at"`
 	// ExerciseIDs sets the workout's list and order (Repeat); omitted, it's the routine's items.
 	ExerciseIDs []uuid.UUID `json:"exercise_ids" binding:"omitempty,max=100"`
+	// SupersetGroups, one per ExerciseIDs entry (null for none), keeps a repeated workout's supersets.
+	SupersetGroups []*int `json:"superset_groups" binding:"omitempty,max=100"`
 }
 
 // SessionFilter narrows a session list; nil fields don't filter.

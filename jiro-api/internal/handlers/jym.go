@@ -652,6 +652,10 @@ func (h *JymHandler) StartSession(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_SESSION_TYPE", Message: "Invalid session type"}})
 			return
 		}
+		if err == services.ErrExerciseOrder {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: "superset_groups must have one entry per exercise"}})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to start session"}})
 		return
 	}
@@ -1129,7 +1133,7 @@ func (h *JymHandler) ReorderSessionExercises(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()}})
 		return
 	}
-	if err := h.jymService.ReorderSessionExercises(c.Request.Context(), userID, sessionID, req.ExerciseIDs); err != nil {
+	if err := h.jymService.ReorderSessionExercises(c.Request.Context(), userID, sessionID, req.ExerciseIDs, req.SupersetGroups); err != nil {
 		switch err {
 		case services.ErrSessionNotFound:
 			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Session not found"}})
