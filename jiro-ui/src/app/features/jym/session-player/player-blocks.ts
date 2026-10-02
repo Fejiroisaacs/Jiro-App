@@ -1,5 +1,6 @@
 /** The player's rows and exercise blocks, built from the server's list, logged sets and this device's draft. */
 import type { SessionExercise, SessionSet } from '../../../core/services/jym.service';
+import { planText } from '../plan-text';
 import type { DraftRow } from '../shared/session-draft';
 import type { NextSets } from '../weight-suggestion';
 import { filled, parseDecimal, parseWhole } from '../number-input';
@@ -33,9 +34,36 @@ export interface ExerciseBlock {
   suggestion: string | null;
   exerciseNote: string;
   /** The plan's target for this exercise, as the workout started with it. */
-  plan?: { sets: number; reps: number };
+  plan?: BlockPlan;
   /** repeat when the advice is to hold the weight, trend-up otherwise. */
   suggestionIcon?: 'trend-up' | 'repeat';
+}
+
+/** A plan entry in the player; reps is the bottom of the range when repsMax is set. */
+export interface BlockPlan {
+  sets: number;
+  reps: number;
+  repsMax: number | null;
+  rpe: number | null;
+  /** Seconds; null rests for your usual time. */
+  rest: number | null;
+  note: string | null;
+}
+
+/** The entry's plan, or none outside the plan. */
+export function planOf(x: SessionExercise): BlockPlan | undefined {
+  if (!x.target_sets || !x.target_reps) return undefined;
+  return {
+    sets: x.target_sets, reps: x.target_reps, repsMax: x.target_reps_max ?? null,
+    rpe: x.target_rpe ?? null, rest: x.rest_seconds ?? null, note: x.notes ?? null,
+  };
+}
+
+/** "Plan 3×8-12 · RPE 8 · 2:00". */
+export function planTag(plan: BlockPlan): string {
+  return 'Plan ' + planText({
+    target_sets: plan.sets, target_reps: plan.reps, target_reps_max: plan.repsMax, target_rpe: plan.rpe, rest_seconds: plan.rest,
+  });
 }
 
 export function newRow(setNumber: number, init: Partial<SetRow> = {}): SetRow {
@@ -53,7 +81,7 @@ export function emptyBlock(exerciseId: string, exerciseName: string, muscleGroup
 
 /** A block for one entry of the list with nothing logged: its planned rows (planned reps as ghosts), else one row. */
 export function blockFromEntry(x: SessionExercise): ExerciseBlock {
-  const plan = x.target_sets && x.target_reps ? { sets: x.target_sets, reps: x.target_reps } : undefined;
+  const plan = planOf(x);
   const rows = plan
     ? Array.from({ length: plan.sets }, (_, i) => newRow(i + 1, { ghostReps: String(plan.reps) }))
     : [newRow(1)];
@@ -100,7 +128,7 @@ export function buildBlocks(
   const blocks = exercises.map(x => {
     const b = logged.get(x.exercise_id);
     if (!b) return blockFromEntry(x);
-    const plan = x.target_sets && x.target_reps ? { sets: x.target_sets, reps: x.target_reps } : undefined;
+    const plan = planOf(x);
     if (plan) b.plan = plan;
     const last = b.sets.filter(s => !s.isWarmup).at(-1);
     for (let n = b.sets.length + 1; plan && n <= plan.sets; n++) {
@@ -173,7 +201,7 @@ export interface Suggestion {
 }
 
 /** The hint line ("Last time ... Stay at ...") and the ghost values, from nextSets(). */
-export function suggestionFrom(next: NextSets, plan: { sets: number; reps: number } | undefined, unit: string): Suggestion {
+export function suggestionFrom(next: NextSets, plan: { sets: number; reps: number; repsMax?: number | null } | undefined, unit: string): Suggestion {
   const w = (x: number) => `${+x.toFixed(2)} ${unit}`;
   const working = next.last.filter(s => !s.warmup);
   const oneWeight = working.every(s => s.weight === working[0].weight);
@@ -187,7 +215,12 @@ export function suggestionFrom(next: NextSets, plan: { sets: number; reps: numbe
   if (next.move === 'reps') {
     advice = `Aim for ${next.reps} reps.`;
   } else if (next.move === 'up') {
-    advice = plan ? `Hit ${plan.sets} × ${plan.reps}, try ${w(next.weight)}.` : `Try ${w(next.weight)} × ${next.reps}.`;
+    const range = plan?.repsMax && plan.repsMax > plan.reps;
+    advice = !plan ? `Try ${w(next.weight)} × ${next.reps}.`
+      : range ? `Hit ${plan.sets} × ${plan.repsMax}, try ${w(next.weight)} × ${next.reps}.`
+        : `Hit ${plan.sets} × ${plan.reps}, try ${w(next.weight)}.`;
+  } else if (next.reason === 'plan' && plan?.repsMax && plan.repsMax > plan.reps) {
+    advice = `Stay at ${w(next.weight)} until every set hits ${plan.repsMax}; aim for ${next.reps} today.`;
   } else {
     advice = next.reason === 'plan'
       ? `Stay at ${w(next.weight)} until every set hits ${next.reps}.`

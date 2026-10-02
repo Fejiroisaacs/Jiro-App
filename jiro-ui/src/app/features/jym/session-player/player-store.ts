@@ -186,7 +186,7 @@ export class PlayerStore {
               ...s, saving: false, saved: true, isPR: saved.is_pr, id: saved.id, weightKg: saved.weight,
             } : s),
           } : b));
-          if (startRest && !this.fix) this.startRestTimer();
+          if (startRest && !this.fix) this.startRestTimer(block.plan?.rest ?? undefined);
           resolve(true);
         },
         error: err => {
