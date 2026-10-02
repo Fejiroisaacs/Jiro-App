@@ -3,6 +3,7 @@ import { ToastService } from '../../../core/services/toast.service';
 
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { JymService, SharePreview } from '../../../core/services/jym.service';
+import { planText } from '../plan-text';
 import { AuthService } from '../../../core/services/auth.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroLogoComponent } from '../../../shared/components/jiro-logo/jiro-logo';
@@ -72,7 +73,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
                     @if (ex.muscle_group) {
 <span class="ex-muscle">{{ ex.muscle_group }}</span>
 }
-                    <span class="ex-targets">{{ ex.target_sets }}×{{ ex.target_reps }}</span>
+                    <span class="ex-targets">{{ planText(ex) }}</span>
                   </span>
                 </div>
 }
@@ -224,6 +225,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
   `]
 })
 export class SharePreviewComponent implements OnInit {
+  readonly planText = planText;
   loading = signal(true);
   error = signal('');
   errorTitle = signal('Link not found');

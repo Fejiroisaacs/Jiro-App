@@ -3,6 +3,7 @@ import { ToastService } from '../../../core/services/toast.service';
 
 import { ActivatedRoute, Router } from '@angular/router';
 import { JymService, PublicSplitDetail } from '../../../core/services/jym.service';
+import { planText } from '../plan-text';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
@@ -80,7 +81,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 <span class="ex-muscle text-secondary">{{ ex.muscle_group }}</span>
 }
                 </div>
-                <span class="ex-sets">{{ ex.target_sets }}×{{ ex.target_reps }}</span>
+                <span class="ex-sets">{{ planText(ex) }}</span>
               </div>
 }
               @if (routine.exercises.length === 0) {
@@ -185,6 +186,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
   `]
 })
 export class DiscoverDetailComponent implements OnInit {
+  readonly planText = planText;
   split = signal<PublicSplitDetail | null>(null);
   loading = signal(true);
   error = signal(false);

@@ -162,7 +162,19 @@ export interface PublicSplitDetail {
   routines: ShareRoutinePreview[];
 }
 
-export interface RoutineItem {
+/** What a plan item says beyond sets × reps; null is unset. */
+export interface PlanDetails {
+  /** With target_reps, a rep range: target_reps to this. */
+  target_reps_max: number | null;
+  /** 6 to 10. */
+  target_rpe: number | null;
+  /** 15 to 600. */
+  rest_seconds: number | null;
+  /** A cue, up to 140 characters. */
+  notes: string | null;
+}
+
+export interface RoutineItem extends PlanDetails {
   id: string;
   routine_id: string;
   exercise_id: string;
@@ -317,7 +329,7 @@ export interface ExerciseFormCheck extends SessionAttachment {
 }
 
 /** One exercise in a workout's own list; targets are the plan's when it started, null outside it. */
-export interface SessionExercise {
+export interface SessionExercise extends PlanDetails {
   exercise_id: string;
   exercise_name: string;
   muscle_group: string | null;
@@ -349,7 +361,11 @@ export interface CreateSplitRequest { name: string; description?: string; tags?:
 export interface UpdateSplitRequest { name?: string; description?: string; visibility?: string; tags?: string[]; }
 export interface CreateRoutineRequest { name: string; day_order?: number; }
 export interface UpdateRoutineRequest { name?: string; day_order?: number; }
-export interface ReplaceItemEntry { exercise_id: string; target_sets: number; target_reps: number; }
+export interface ReplaceItemEntry extends PlanDetails {
+  exercise_id: string; target_sets: number; target_reps: number;
+  /** Says the entry carries the details; the server keeps them for entries without it (an older app). */
+  detailed: true;
+}
 export interface RoutineItemsEntry { routine_id: string; items: ReplaceItemEntry[]; }
 export interface RoutineItemsResult { routine_id: string; items: RoutineItem[]; }
 export interface CreateSessionRequest {
@@ -371,7 +387,7 @@ export interface UpdateSeriesRequest { name?: string; ended_at?: string; }
 
 // ─── Shares ───────────────────────────────────────────────────────────────────
 
-export interface ShareExercisePreview {
+export interface ShareExercisePreview extends PlanDetails {
   name: string;
   muscle_group: string | null;
   target_sets: number;
