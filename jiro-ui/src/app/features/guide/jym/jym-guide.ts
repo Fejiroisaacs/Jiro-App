@@ -61,10 +61,11 @@ import { GUIDE } from '../shared';
           <li>Set the <strong>Sets</strong> and <strong>Reps</strong> targets, then select <strong>Add</strong> followed by the exercise's name.</li>
           <li>To change the order, drag an exercise by the dotted handle on its left. Drag it onto another day to move it there. On a phone, the days scroll along as you drag toward the edge.</li>
           <li>To rename a day, select its name, type the new one and press Enter. To reorder days, use the arrows beside its name to move it earlier or later.</li>
-          <li>To change an exercise's targets, select its sets and reps, such as <strong>4×6</strong>, enter the new <strong>Sets</strong> and <strong>Reps</strong>, and select <strong>Save</strong>.</li>
+          <li>To change an exercise's plan, select its sets and reps, such as <strong>4×6</strong>. Set the <strong>Sets</strong> and <strong>Reps</strong>, and optionally <strong>Up to</strong> for a rep range such as 8 to 12, an <strong>RPE</strong> from 6 to 10, a <strong>Rest</strong> just for this exercise, and a <strong>Note</strong> such as a cue. Select <strong>Save</strong>.</li>
+          <li>To pair exercises into a superset, select the link button on the first of two exercises next to each other. They're labelled A1 and A2; linking a third makes a circuit. Select the link again to split them.</li>
         </guide-steps>
-        <guide-shot guide="jym" name="split-builder" [width]="1600" [height]="869"
-          alt="The Push Pull Legs split: three day columns, Push, Pull and Legs, each listing exercises with targets such as 4×6, and buttons for Start series, Share and Add day." />
+        <guide-shot guide="jym" name="split-builder" [width]="1600" [height]="1300"
+          alt="The Push Pull Legs split: day columns listing exercises with their plans, such as 4×6 · RPE 8 · 3:00 with a note under it, Lateral Raise and Tricep Pushdown linked as A1 and A2, and buttons for Start series, Share and Add day." />
         <guide-shot guide="jym" name="add-exercise" [width]="960" [height]="798"
           alt="The Add exercise window: a search for raise found Lateral Raise, with Sets 3, Reps 8 and an Add Lateral Raise button." />
         <guide-tip>Remove an exercise from a day with its x button. Use the pencil beside the split's name to rename it.</guide-tip>
@@ -85,14 +86,15 @@ import { GUIDE } from '../shared';
         lead="The workout screen has a row for every set, and it times your rest between them.">
         <guide-steps>
           <li>A workout started from a split day or template already lists its exercises, with one row for each target set. In a freestyle session, select <strong>+ Add exercise</strong> first.</li>
-          <li>The faint numbers in an empty row are today's aim, worked out from your last workout. A note above the rows shows what you lifted last time and what to try. For an exercise you have never logged, the row shows only the target reps.</li>
+          <li>The faint numbers in an empty row are today's aim, worked out from your last workout. A note above the rows shows what you lifted last time and what to try. With a rep range, add weight once every set reaches the top of the range. For an exercise you have never logged, the row shows only the target reps.</li>
           <li>Type the <strong>Weight</strong> and <strong>Reps</strong> you did, or leave the aim as it is. A number keypad opens for each box.</li>
           <li>Optionally, enter an <strong>RPE</strong> from 1 to 10 for how hard the set felt.</li>
           <li>Select the tick to log what the row shows, so repeating a set is one tap. If it beats your best for that exercise, it gets a <strong>PR</strong> badge. Warm-up sets never get one.</li>
-          <li>The rest timer opens under the bar at the top. Select <strong>+30s</strong> for a longer rest this time, or <strong>Skip</strong>. It beeps when your rest is over.</li>
+          <li>The rest timer opens under the bar at the top, for the exercise's planned rest or your usual one. Select <strong>+30s</strong> for a longer rest this time, or <strong>Skip</strong>. It beeps when your rest is over.</li>
           <li>Select a set's number to mark it as a warm-up or to remove it. To fix a logged set, select its weight or reps, change them and select <strong>Save</strong>.</li>
           <li>Use <strong>+ Add set</strong> for another set and <strong>+ Add exercise</strong> for another exercise.</li>
           <li>To change the order, open an exercise's menu (three dots) and select <strong>Move up</strong> or <strong>Move down</strong>. <strong>Remove exercise</strong> is there too.</li>
+          <li>In a superset, do one set of each exercise in turn: after A1 there is no rest and A2's next set is marked; after the last one, the rest starts. To pair exercises during a workout, select <strong>Superset with next</strong> in the first one's menu, or <strong>Unlink from next</strong> to split them.</li>
         </guide-steps>
         <guide-shot guide="jym" name="session-sets" [width]="1400" [height]="1268"
           alt="Bench Press during a workout: a note saying last time was 175 lbs for 5, 5, 5, 5 and to try 180 lbs, a warm-up set of 95 lbs marked with a flame, four logged sets of 175 lbs with the 6-rep set marked PR, a sixth row ready to log 175 lbs for 5, and a Plates button." />

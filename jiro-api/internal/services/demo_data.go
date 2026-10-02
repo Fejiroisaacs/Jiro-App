@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/models"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
@@ -34,6 +35,7 @@ type demoRoutineItem struct {
 	TargetSets int
 	TargetReps int
 	OrderIndex int
+	Plan       models.PlanDetails
 }
 
 type demoSession struct {
@@ -252,6 +254,19 @@ type demoLift struct {
 	warmupLbs           float64 // 0 = no warm-up set
 }
 
+// demoPlans shows the plan's extras: a rep range, target RPE, rest, a cue, and one superset.
+var demoPlans = func() map[string]models.PlanDetails {
+	n := func(v int) *int { return &v }
+	s := func(v string) *string { return &v }
+	return map[string]models.PlanDetails{
+		"Bench Press":     {TargetRPE: n(8), RestSeconds: n(180), Notes: s("Leave one rep in the tank.")},
+		"Barbell Row":     {TargetRepsMax: n(10), RestSeconds: n(120), Notes: s("Chest to the bar, no hip drive.")},
+		"Lateral Raise":   {TargetRepsMax: n(15), RestSeconds: n(60), SupersetGroup: n(1)},
+		"Tricep Pushdown": {TargetRepsMax: n(15), RestSeconds: n(60), SupersetGroup: n(1)},
+		"Back Squat":      {TargetRPE: n(8), RestSeconds: n(180)},
+	}
+}()
+
 func buildDemoJym(ds *demoDataset, at func(int, int, int) time.Time, date func(int) string) {
 	days := []struct {
 		name  string
@@ -300,6 +315,7 @@ func buildDemoJym(ds *demoDataset, at func(int, int, int) time.Time, date func(i
 			})
 			ds.RoutineItems = append(ds.RoutineItems, demoRoutineItem{
 				RoutineID: routineIDs[di], ExerciseID: id, TargetSets: lift.sets, TargetReps: lift.reps, OrderIndex: li,
+				Plan: demoPlans[lift.name],
 			})
 		}
 	}
@@ -879,8 +895,9 @@ func (ds *demoDataset) queue(b *pgx.Batch, userID uuid.UUID) {
 			r.ID, userID, ds.SplitID, r.Name, r.DayOrder, r.CreatedAt)
 	}
 	for _, it := range ds.RoutineItems {
-		b.Queue(`INSERT INTO routine_items (routine_id, exercise_id, target_sets, target_reps, order_index) VALUES ($1,$2,$3,$4,$5)`,
-			it.RoutineID, it.ExerciseID, it.TargetSets, it.TargetReps, it.OrderIndex)
+		b.Queue(`INSERT INTO routine_items (routine_id, exercise_id, target_sets, target_reps, order_index,
+		                                   target_reps_max, target_rpe, rest_seconds, notes, superset_group) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+			append([]any{it.RoutineID, it.ExerciseID, it.TargetSets, it.TargetReps, it.OrderIndex}, planArgs(it.Plan)...)...)
 	}
 	b.Queue(`INSERT INTO split_series (id, user_id, split_id, name, duration_type, target_weeks, started_at, created_at) VALUES ($1,$2,$3,$4,'weeks',6,$5,$5)`,
 		ds.SeriesID, userID, ds.SplitID, "Spring strength block", ds.SeriesStart)

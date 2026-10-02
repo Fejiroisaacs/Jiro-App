@@ -40,6 +40,20 @@ A **split** is a named training plan (e.g. "PPL", "Upper/Lower"). It contains on
 - **Add day** adds a day after the last one. Tap a day's name to rename it; the arrows move it earlier or later.
 - Multiple splits can exist at once; a series makes one active.
 
+### The Plan for Each Exercise
+Tap an exercise's plan chip (such as "3×8") to open its plan:
+- **Sets** and **Reps**, with an optional **Up to** for a rep range ("8-12"). A range can't end below where it starts.
+- **RPE**: how hard the sets should feel, 6 to 10 in whole numbers, like logging.
+- **Rest**: from 0:30 to 5:00, or **Your usual** (the account's rest length).
+- **Note**: a cue of up to 140 characters, such as "Pause at the bottom".
+
+The chip then reads the plan ("4×6-10 · RPE 8 · 2:00") with the note under it, and templates, Discover and share links show the same text. A workout keeps the plan it started with. Every save sends all of an exercise's plan, so a drag between days keeps it, and a save from an older copy of the app (which doesn't know these fields) leaves them as they were.
+
+### Supersets and Circuits
+- The link button between two exercises of a day makes them a **superset**, labelled A1 and A2; linking a third makes a **circuit**. Tap it again to unlink them there.
+- Members have to sit next to each other: an exercise dragged out of its superset, moved to another day or removed leaves it, and a member left on its own is ungrouped. The same rule runs in the app and the API.
+- Supersets travel with copies: share links, Discover, templates and the account export.
+
 ### Sharing and Discover
 - **Share** gives the split a link that lasts 30 days. The split's page lists its live link with Copy and Revoke.
 - **Public** lists the split in Discover, where anyone can search by name or tag.
@@ -77,7 +91,16 @@ The ⋯ button opens a sheet (a bottom sheet on a phone) with:
 - **Save as template**, **Leave for now** (the workout stays open; resume it from the Jym home) and **Discard workout** (asks first, naming the logged sets).
 
 ### Each Exercise
-Each exercise's ⋯ menu has **Move up**, **Move down** and **Remove exercise** (which asks first and deletes its logged sets). The order is saved with the workout.
+Each exercise's ⋯ menu has **Move up**, **Move down**, **Superset with next** (or **Unlink from next**) and **Remove exercise** (which asks first and deletes its logged sets). The order and supersets are saved with the workout, so another phone sees them, and Repeat keeps them.
+
+The plan shows under the name ("Plan 3×8-12 · RPE 8 · 1:30"), with its note below, and the RPE field shows the target RPE until you type one.
+
+### Supersets in the Workout
+A superset's exercises are drawn together under **Superset A** (or **Circuit A** for three or more), labelled A1, A2.
+- Logging a working set of A1 starts no rest: A2's next set scrolls into view and is marked for a moment.
+- Logging the last member ends the round: the rest is the longest planned rest among the members (or your usual), and the first member's next set is marked.
+- A finished member is skipped. Warm-ups rest as usual.
+- Moving an exercise within its superset keeps it; moving it out, or removing a partner, unlinks it.
 
 ### Logging Sets
 Each exercise block shows a set table with columns: **Set**, **Weight**, **Reps**, **RPE**, and the log button.
@@ -114,6 +137,7 @@ Every exercise with history shows one line above its sets: what you did last tim
 
 - **Last time** is the latest finished normal workout that started before this one. Deload and test days and unfinished workouts are skipped, and warm-ups are not counted.
 - **With a plan** (a routine's sets × reps), it is double progression: once enough sets at the top weight hit the planned reps, try one plate more; until then, stay at the same weight.
+- **With a rep range** (8-12), the plate goes on once every set at the top weight reaches the top of the range, and today aims for the bottom again. Until then it stays, aiming one rep past last time's best, never past the top: *Last time 100 kg × 10, 9, 8. Stay at 100 kg until every set hits 12; aim for 11 today.* A set below the bottom of the range is marked short.
 - **Freestyle**: one plate more, unless the top set was logged at RPE 9 or more; then stay and aim for one more rep.
 - **Bodyweight** lifts aim for one more rep.
 - One plate is **2.5 kg** or **5 lb**, counted from the plate grid (177.5 lb goes to 180). The rule lives in `weight-suggestion.ts` and is covered by `npm run test:unit`.
@@ -121,7 +145,7 @@ Every exercise with history shows one line above its sets: what you did last tim
 
 ### Rest Timer
 After every logged set, a rest timer opens under the sticky bar.
-- It runs for the account's rest length (90 seconds unless changed in Workout options or Settings).
+- It runs for the exercise's planned rest when it has one, otherwise the account's rest length (90 seconds unless changed in Workout options or Settings). In a superset it waits for the end of the round (see Supersets in the Workout).
 - **+30s** lengthens this rest only; the next one starts at the usual length again.
 - **Skip** ends it early. When rest is done it turns green, beeps and vibrates, then closes after 3 seconds.
 
