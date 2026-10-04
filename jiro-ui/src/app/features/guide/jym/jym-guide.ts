@@ -30,7 +30,8 @@ import { GUIDE } from '../shared';
         <guide-steps>
           <li>Open <a routerLink="/jym/exercises">Exercises</a>.</li>
           <li>Type in <strong>Search exercises...</strong>, or select a muscle group such as <strong>Chest</strong> to filter the list.</li>
-          <li>To add one, select <strong>New exercise</strong>, enter a <strong>Name</strong>, choose a <strong>Muscle group</strong>, add any <strong>Notes</strong>, then select <strong>Create exercise</strong>.</li>
+          <li>To add one, select <strong>New exercise</strong>, enter a <strong>Name</strong> and choose a <strong>Main muscle group</strong>. Under <strong>Also works</strong>, select any other muscles it trains, such as Triceps for a bench press. Add any <strong>Notes</strong>, then select <strong>Create exercise</strong>.</li>
+          <li>Filtering by a muscle also lists exercises that work it as an extra muscle. Your stats count each exercise under its main muscle group only.</li>
           <li>To rename or delete an exercise, open the menu at the end of its row and choose <strong>Edit</strong> or <strong>Delete</strong>. A new name shows in your past sessions too.</li>
         </guide-steps>
         <guide-tip>You can also create an exercise while building a split or during a workout, from the search box in <strong>Add exercise</strong>.</guide-tip>
@@ -47,7 +48,7 @@ import { GUIDE } from '../shared';
           <li><strong>Form progression</strong> shows the form check clips you added during workouts, and <strong>Notes</strong> shows the notes you wrote for this exercise.</li>
         </guide-steps>
         <guide-shot guide="jym" name="exercise-detail" [width]="1600" [height]="1422"
-          alt="The Bench Press page: Best weight 175.0 lbs and Est. 1RM 210.1 lbs, a note, the Est. 1RM chart with 3M, 1Y and All, rising from August to late September, and the Workouts, Form progression and Notes tabs." />
+          alt="The Bench Press page: Chest, with Shoulders and Triceps as the other muscles it works, Best weight 175.0 lbs and Est. 1RM 210.1 lbs, a note, the Est. 1RM chart with 3M, 1Y and All, rising from August to late September, and the Workouts, Form progression and Notes tabs." />
         <guide-tip>If your top weight has stayed the same, or dropped, over your last three sessions of an exercise, its page says so and suggests what to try.</guide-tip>
       </guide-section>
 

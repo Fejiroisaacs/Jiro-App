@@ -26,9 +26,11 @@ Jym is the gym tracking module of Jiro. This document describes how each user-fa
 ## Workout Structure
 
 ### Exercises
-A personal exercise dictionary. Each exercise has a **name**, optional **muscle group**, and optional **notes**. Exercise names are unique per user.
+A personal exercise dictionary. Each exercise has a **name**, an optional **main muscle group**, any **other muscles it works**, and optional **notes**. Exercise names are unique per user.
 
-- Create, edit, and delete exercises from the library (`/jym/exercises`), and filter it by muscle group (case doesn't matter).
+- Muscles come from one list: Chest, Back, Shoulders, Biceps, Triceps, Legs, Glutes, Core, Cardio and Other. Names stored before the list were mapped onto it ignoring case (quads, hamstrings and calves became Legs, abs became Core, anything else Other).
+- **Also works** (the secondary muscles) organises an exercise: Bench Press is Chest, and also works Shoulders and Triceps. They show as muted tags in the library and on the exercise page, and the library's muscle filter finds them (Triceps lists Bench Press too, with its Triceps tag marked). Everything that counts uses the main muscle only (see How Jym Counts).
+- Create, edit, and delete exercises from the library (`/jym/exercises`), and filter it by muscle group.
 - Each row shows the best set and when the exercise was last trained.
 - Renaming an exercise renames it across all history, since sets reference the exercise by ID.
 - Deleting an exercise removes every set logged with it; the library asks first.
@@ -301,6 +303,7 @@ One set of rules, in `jiro-api/internal/services/jym_metrics.go`, behind every l
 - **Estimated 1RM** is Epley, `weight × (1 + reps/30)`, with a single meaning the weight itself and reps capped at 10, since Epley overshoots beyond that (340 × 12 counts as 340 × 10). It is rounded to 0.1 kg.
 - **PRs** in a session count lifts with a new record, not record sets: three sets that each beat the last on one lift are one record.
 - **Templates** saved from a workout take their sets and reps from its working sets.
+- **Muscles** count by an exercise's main muscle group only: sets per muscle in a summary, "last trained" on the Jym home, the PR wall's groups, a workout's muscle tags and Discover's filter. The muscles it also works are for organising.
 
 ## How Personal Records Work
 
