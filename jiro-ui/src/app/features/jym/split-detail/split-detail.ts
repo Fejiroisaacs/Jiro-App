@@ -17,6 +17,7 @@ import { SettingsService } from '../../../core/services/settings.service';
 import { formatInstant } from '../../../core/utils/format-date';
 import { REST_CHOICES, planText, restText } from '../plan-text';
 import { groupLabels, linkedWithNext, normalizeItems, toggleLink } from '../supersets';
+import { MUSCLE_GROUPS } from '../shared/muscles';
 
 @Component({
   selector: 'app-split-detail',
@@ -861,7 +862,7 @@ export class SplitDetailComponent implements OnInit {
   newExMuscleGroup = '';
   newExSaving = signal(false);
   newExError = signal('');
-  readonly muscleGroups = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs', 'Glutes', 'Core', 'Cardio', 'Other'];
+  readonly muscleGroups = MUSCLE_GROUPS;
 
   splitId = '';
 

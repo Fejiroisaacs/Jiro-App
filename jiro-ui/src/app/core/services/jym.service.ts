@@ -13,6 +13,8 @@ export interface Exercise {
   user_id: string;
   name: string;
   muscle_group: string | null;
+  /** Other muscles it works, for organising only; every count uses muscle_group. */
+  secondary_muscles: string[];
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -357,8 +359,9 @@ export interface StartSessionResponse extends Session {
 
 // ─── Requests ─────────────────────────────────────────────────────────────────
 
-export interface CreateExerciseRequest { name: string; muscle_group?: string; notes?: string; }
-export interface UpdateExerciseRequest { name?: string; muscle_group?: string; notes?: string; }
+export interface CreateExerciseRequest { name: string; muscle_group?: string; secondary_muscles?: string[]; notes?: string; }
+/** secondary_muscles left out keeps them; [] clears them. */
+export interface UpdateExerciseRequest { name?: string; muscle_group?: string; secondary_muscles?: string[]; notes?: string; }
 export interface CreateSplitRequest { name: string; description?: string; tags?: string[]; }
 export interface UpdateSplitRequest { name?: string; description?: string; visibility?: string; tags?: string[]; }
 export interface CreateRoutineRequest { name: string; day_order?: number; }

@@ -15,8 +15,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 import { JiroMenuComponent, JiroMenuItem } from '../../../shared/components/jiro-menu/jiro-menu';
 import { formatDay } from '../../../core/utils/format-date';
 import { dayKey, todayKey } from '../../../core/utils/day';
-
-const MUSCLE_GROUPS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs', 'Glutes', 'Core', 'Cardio'];
+import { MUSCLE_GROUPS, toggleSecondary, withoutPrimary } from '../shared/muscles';
 
 const ROW_ACTIONS: JiroMenuItem[] = [
   { id: 'edit', label: 'Edit', icon: 'pencil-simple' },
@@ -87,6 +86,9 @@ const ROW_ACTIONS: JiroMenuItem[] = [
                   @if (ex.muscle_group) {
                     <span class="mg-badge">{{ ex.muscle_group }}</span>
                   }
+                  @for (m of ex.secondary_muscles; track m) {
+                    <span class="mg-also" [class.match]="m === activeMG()" [attr.aria-label]="'Also works ' + m">{{ m }}</span>
+                  }
                 </span>
                 @if (prFor(ex.id); as pr) {
                   <span class="ex-best">
@@ -114,14 +116,27 @@ const ROW_ACTIONS: JiroMenuItem[] = [
               <input id="ex-new-name" class="form-input" type="text" [(ngModel)]="newName" name="name" placeholder="e.g. Barbell Back Squat" required />
             </div>
             <div class="form-group">
-              <label class="form-label" for="ex-new-mg">Muscle group</label>
-              <select id="ex-new-mg" class="form-input" [(ngModel)]="newMG" name="mg">
+              <label class="form-label" for="ex-new-mg">Main muscle group</label>
+              <select id="ex-new-mg" class="form-input" [ngModel]="newMG" (ngModelChange)="setNewPrimary($event)" name="mg">
                 <option value="">None</option>
                 @for (mg of muscleGroups; track mg) {
                   <option [value]="mg">{{ mg }}</option>
                 }
               </select>
             </div>
+            @if (newMG) {
+              <fieldset class="also-group">
+                <legend class="form-label">Also works</legend>
+                <div class="also-chips">
+                  @for (mg of muscleGroups; track mg) {
+                    @if (mg !== newMG) {
+                      <button type="button" class="also-chip" [class.on]="newSecondary.includes(mg)" [attr.aria-pressed]="newSecondary.includes(mg)"
+                        (click)="newSecondary = toggleSecondary(newMG, newSecondary, mg)">{{ mg }}</button>
+                    }
+                  }
+                </div>
+              </fieldset>
+            }
             <div class="form-group">
               <label class="form-label" for="ex-new-notes">Notes</label>
               <textarea id="ex-new-notes" class="form-input form-textarea" [(ngModel)]="newNotes" name="notes" rows="2" placeholder="Cues, equipment notes..."></textarea>
@@ -143,14 +158,27 @@ const ROW_ACTIONS: JiroMenuItem[] = [
               <input id="ex-edit-name" class="form-input" type="text" [(ngModel)]="editName" name="ename" placeholder="Exercise name" required />
             </div>
             <div class="form-group">
-              <label class="form-label" for="ex-edit-mg">Muscle group</label>
-              <select id="ex-edit-mg" class="form-input" [(ngModel)]="editMg" name="emg">
+              <label class="form-label" for="ex-edit-mg">Main muscle group</label>
+              <select id="ex-edit-mg" class="form-input" [ngModel]="editMg" (ngModelChange)="setEditPrimary($event)" name="emg">
                 <option value="">None</option>
                 @for (mg of muscleGroups; track mg) {
                   <option [value]="mg">{{ mg }}</option>
                 }
               </select>
             </div>
+            @if (editMg) {
+              <fieldset class="also-group">
+                <legend class="form-label">Also works</legend>
+                <div class="also-chips">
+                  @for (mg of muscleGroups; track mg) {
+                    @if (mg !== editMg) {
+                      <button type="button" class="also-chip" [class.on]="editSecondary.includes(mg)" [attr.aria-pressed]="editSecondary.includes(mg)"
+                        (click)="editSecondary = toggleSecondary(editMg, editSecondary, mg)">{{ mg }}</button>
+                    }
+                  }
+                </div>
+              </fieldset>
+            }
             <div class="form-group">
               <label class="form-label" for="ex-edit-notes">Notes</label>
               <textarea id="ex-edit-notes" class="form-input form-textarea" [(ngModel)]="editNotes" name="enotes" rows="2" placeholder="Cues, equipment notes..."></textarea>
@@ -252,6 +280,28 @@ const ROW_ACTIONS: JiroMenuItem[] = [
       color: var(--text-primary);
     }
 
+    .mg-also {
+      font-size: var(--font-size-xs); color: var(--text-muted);
+      padding: 1px 8px; border: 1px solid var(--border-color); border-radius: var(--border-radius-pill);
+    }
+
+    .mg-also.match { color: var(--color-primary); border-color: var(--color-primary); }
+
+    .ex-form .form-input:not(.form-textarea) { min-height: 44px; }
+
+    .also-group { border: none; margin: 0; padding: 0; min-width: 0; }
+
+    .also-chips { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
+
+    .also-chip {
+      min-height: 44px; padding: 0 var(--space-md);
+      border: 1px solid var(--border-color); border-radius: var(--border-radius-pill);
+      background: var(--bg-surface); color: var(--text-secondary);
+      font: inherit; font-size: var(--font-size-sm); cursor: pointer;
+    }
+
+    .also-chip.on { background: var(--color-primary); border-color: var(--color-primary); color: var(--text-on-primary); font-weight: 600; }
+
     .mg-badge {
       background: var(--bg-canvas);
       color: var(--text-primary);
@@ -342,12 +392,15 @@ export class ExerciseLibraryComponent implements OnInit {
   saving = signal(false);
   newName = '';
   newMG = '';
+  newSecondary: string[] = [];
   newNotes = '';
+  readonly toggleSecondary = toggleSecondary;
 
   editingExercise = signal<Exercise | null>(null);
   editSaving = signal(false);
   editName = '';
   editMg = '';
+  editSecondary: string[] = [];
   editNotes = '';
 
   private readonly prByExercise = computed(() => new Map(this.prs().map(p => [p.exercise_id, p])));
@@ -429,18 +482,30 @@ export class ExerciseLibraryComponent implements OnInit {
     else if (action === 'delete') this.deleteExercise(ex);
   }
 
+  /** A new primary can't stay a secondary; no primary means no secondaries. */
+  setNewPrimary(mg: string) {
+    this.newMG = mg;
+    this.newSecondary = withoutPrimary(mg, this.newSecondary);
+  }
+
+  setEditPrimary(mg: string) {
+    this.editMg = mg;
+    this.editSecondary = withoutPrimary(mg, this.editSecondary);
+  }
+
   createExercise() {
     if (!this.newName.trim()) return;
     this.saving.set(true);
     this.jym.createExercise({
       name: this.newName.trim(),
       muscle_group: this.newMG || undefined,
+      secondary_muscles: this.newMG ? this.newSecondary : [],
       notes: this.newNotes.trim() || undefined,
     }).subscribe({
       next: ex => {
         this.exercises.update(list => [ex, ...list]);
         this.showCreate.set(false);
-        this.newName = ''; this.newMG = ''; this.newNotes = '';
+        this.newName = ''; this.newMG = ''; this.newSecondary = []; this.newNotes = '';
         this.saving.set(false);
         this.toast.success(`${ex.name} added`);
       },
@@ -451,6 +516,7 @@ export class ExerciseLibraryComponent implements OnInit {
   openEdit(ex: Exercise) {
     this.editName = ex.name;
     this.editMg = ex.muscle_group ?? '';
+    this.editSecondary = [...(ex.secondary_muscles ?? [])];
     this.editNotes = ex.notes ?? '';
     this.editingExercise.set(ex);
   }
@@ -462,6 +528,7 @@ export class ExerciseLibraryComponent implements OnInit {
     this.jym.updateExercise(ex.id, {
       name: this.editName.trim(),
       muscle_group: this.editMg || '',
+      secondary_muscles: this.editMg ? this.editSecondary : [],
       notes: this.editNotes.trim(),
     }).subscribe({
       next: updated => {

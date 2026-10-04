@@ -11,7 +11,7 @@ export interface PickerExercise {
   muscle_group: string | null;
 }
 
-const MUSCLE_GROUPS = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Legs', 'Glutes', 'Core', 'Cardio', 'Other'];
+import { MUSCLE_GROUPS } from '../shared/muscles';
 
 /** Add exercise: search your library, or create one (named from the search) and add it. */
 @Component({

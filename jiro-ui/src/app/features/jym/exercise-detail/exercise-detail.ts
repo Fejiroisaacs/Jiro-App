@@ -53,6 +53,9 @@ type SectionTab = 'history' | 'form' | 'notes';
             @if (exercise()!.muscle_group) {
 <span class="mg-badge">{{ exercise()!.muscle_group }}</span>
 }
+            @for (m of exercise()!.secondary_muscles; track m) {
+              <span class="mg-also" [attr.aria-label]="'Also works ' + m">{{ m }}</span>
+            }
           </div>
           @if (hasHistory()) {
 <div class="pr-stats">
@@ -348,6 +351,11 @@ type SectionTab = 'history' | 'form' | 'notes';
     .stat-label { font-size: var(--font-size-xs); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
 
     .stat-value { font-size: var(--font-size-xl); font-weight: 700; color: var(--text-primary); }
+
+    .mg-also {
+      font-size: var(--font-size-xs); color: var(--text-muted);
+      padding: 3px 10px; border: 1px solid var(--border-color); border-radius: var(--border-radius-pill);
+    }
 
     .stat-value.primary { color: var(--color-primary); }
 
