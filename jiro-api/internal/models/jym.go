@@ -13,9 +13,11 @@ type Exercise struct {
 	UserID      uuid.UUID `json:"user_id"`
 	Name        string    `json:"name"`
 	MuscleGroup *string   `json:"muscle_group"`
-	Notes       *string   `json:"notes"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	// SecondaryMuscles organise the exercise (the library filter finds them); counts use the primary only.
+	SecondaryMuscles []string  `json:"secondary_muscles"`
+	Notes            *string   `json:"notes"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 	// LastPerformedAt is only populated by ListExercises; nil on the other
 	// exercise endpoints, which never select it.
 	LastPerformedAt *time.Time `json:"last_performed_at"`
@@ -111,15 +113,18 @@ type ExercisePR struct {
 }
 
 type CreateExerciseRequest struct {
-	Name        string  `json:"name" binding:"required"`
-	MuscleGroup *string `json:"muscle_group"`
-	Notes       *string `json:"notes"`
+	Name             string   `json:"name" binding:"required"`
+	MuscleGroup      *string  `json:"muscle_group"`
+	SecondaryMuscles []string `json:"secondary_muscles" binding:"max=10"`
+	Notes            *string  `json:"notes"`
 }
 
 type UpdateExerciseRequest struct {
 	Name        *string `json:"name"`
 	MuscleGroup *string `json:"muscle_group"`
-	Notes       *string `json:"notes"`
+	// SecondaryMuscles left out (null) keeps them; [] clears them.
+	SecondaryMuscles []string `json:"secondary_muscles" binding:"max=10"`
+	Notes            *string  `json:"notes"`
 }
 
 // ─── Split ───────────────────────────────────────────────────────────────────
