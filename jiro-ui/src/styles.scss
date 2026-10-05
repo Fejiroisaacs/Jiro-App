@@ -410,6 +410,12 @@ html {
   padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
 }
 
+// body is the page's one scroller. As the containing block, it keeps absolutely placed elements (such as
+// .sr-only text far down a page) inside its own scroll, so the window never grows a second scrollbar.
+body {
+  position: relative;
+}
+
 // Global texture overlay
 body::after {
   content: "";
