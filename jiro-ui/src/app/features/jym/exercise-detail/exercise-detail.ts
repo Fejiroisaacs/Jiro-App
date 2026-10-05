@@ -20,7 +20,8 @@ import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
 import { formatInstant } from '../../../core/utils/format-date';
 import { detectPlateau, type PlateauStatus } from '../plateau-rule';
 import {
-  defaultRange, inRange, monthTickLabel, monthTicks, notesOf, statsSeries, type StatsMeasure, type StatsPoint, type StatsRange,
+  MAX_CHART_POINTS, defaultRange, inRange, latestPoints, monthTickLabel, monthTicks, notesOf, statsSeries,
+  type StatsMeasure, type StatsPoint, type StatsRange,
 } from '../exercise-stats';
 
 Chart.register(...registerables);
@@ -138,6 +139,9 @@ type SectionTab = 'history' | 'form' | 'notes';
 }
             <canvas #chartCanvas [hidden]="chartEmpty()"></canvas>
           </div>
+          @if (!chartEmpty() && chartTotal() > maxPoints) {
+            <p class="chart-cap">Showing your latest {{ maxPoints }} of {{ chartTotal() }} workouts in this range.</p>
+          }
         </div>
 }
 
@@ -430,6 +434,8 @@ type SectionTab = 'history' | 'form' | 'notes';
 
     .chart-wrapper canvas { width: 100% !important; height: 100% !important; }
 
+    .chart-cap { margin: var(--space-xs) 0 0; font-size: var(--font-size-xs); color: var(--text-muted); }
+
     .chart-empty {
       display: flex; align-items: center; justify-content: center; height: 100%;
     }
@@ -655,6 +661,9 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
   selectedChart = signal<ChartType>('1rm');
   selectedWeight = signal<number | null>(null);
   chartEmpty = signal(false);
+  /** Workouts in the range; past maxPoints the chart shows the latest only. */
+  chartTotal = signal(0);
+  readonly maxPoints = MAX_CHART_POINTS;
   range = signal<StatsRange>('all');
   readonly ranges: { value: StatsRange; label: string }[] = [
     { value: '3m', label: '3M' }, { value: '1y', label: '1Y' }, { value: 'all', label: 'All' },
@@ -888,7 +897,8 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
 
   private drawLine(measure: StatsMeasure, unit: string) {
     const now = Date.now();
-    const points = statsSeries(this.stats()?.workouts ?? [], measure, this.range(), now);
+    const { shown: points, total } = latestPoints(statsSeries(this.stats()?.workouts ?? [], measure, this.range(), now));
+    this.chartTotal.set(total);
     if (points.length === 0) { this.chartEmpty.set(true); return; }
     this.chartEmpty.set(false);
 
@@ -899,13 +909,7 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
       volume:    { color: tone.warning, title: 'Total session volume', axis: `Volume (${unit}×reps)`, unit: `${unit}×reps` },
       maxweight: { color: tone.accent,  title: 'Heaviest set per session', axis: `Weight (${unit})`, unit },
     }[measure];
-    this.chart = new Chart(this.canvasRef.nativeElement, this.lineConfig(shown, spec, this.rangeMin(now), now));
-  }
-
-  /** The axis starts at the range's start, so a break from training shows as a gap. */
-  private rangeMin(now: number): number | undefined {
-    const r = this.range();
-    return r === 'all' ? undefined : now - (r === '3m' ? 91 : 365) * 86_400_000;
+    this.chart = new Chart(this.canvasRef.nativeElement, this.lineConfig(shown, spec, now));
   }
 
   private drawRepsAtWeightChart() {
@@ -925,8 +929,9 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
       return;
     }
 
-    const sessions = inRange(cached.map(r => ({ ...r, session_type: 'normal', working_sets: r.reps.length, max_weight: weight, best_e1rm: 0, volume: 0, note: null })),
-      this.range(), Date.now());
+    const { shown: sessions, total } = latestPoints(inRange(cached.map(r => ({ ...r, session_type: 'normal', working_sets: r.reps.length, max_weight: weight, best_e1rm: 0, volume: 0, note: null })),
+      this.range(), Date.now()));
+    this.chartTotal.set(total);
     if (sessions.length === 0) { this.chartEmpty.set(true); return; }
     this.chartEmpty.set(false);
 
@@ -983,13 +988,13 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
 
   /** A line over a date-scaled axis: workouts sit at their real distance apart. */
   private lineConfig(
-    points: StatsPoint[], spec: { color: string; title: string; axis: string; unit: string }, min: number | undefined, max: number,
+    points: StatsPoint[], spec: { color: string; title: string; axis: string; unit: string }, now: number,
   ): ChartConfiguration<'line', StatsPoint[]> {
     const tone = chartTones();
     const workouts = new Map((this.stats()?.workouts ?? []).map(w => [w.session_id, w]));
-    // All runs from the first workout to today; a lone workout gets a week either side.
-    const lo = min ?? (points.length === 1 ? points[0].x - 7 * 86_400_000 : points[0].x);
-    const hi = points.length === 1 && min === undefined ? Math.max(max, points[0].x + 7 * 86_400_000) : max;
+    // From the first workout shown to today (no empty stretch before your data); a lone workout gets a week either side.
+    const lo = points.length === 1 ? points[0].x - 7 * 86_400_000 : points[0].x;
+    const hi = points.length === 1 ? Math.max(now, points[0].x + 7 * 86_400_000) : now;
     const ticks = monthTicks(lo, hi);
     return {
       type: 'line',
@@ -1000,7 +1005,8 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
           borderColor: spec.color,
           backgroundColor: `${spec.color}1a`,
           fill: true,
-          tension: 0.3,
+          // Monotone never swings above or below the points between them.
+          cubicInterpolationMode: 'monotone',
           pointBackgroundColor: spec.color,
           pointRadius: 4,
           pointHoverRadius: 6,

@@ -55,6 +55,14 @@ export function statsSeries(workouts: readonly StatsWorkout[], measure: StatsMea
     .sort((a, b) => a.x - b.x);
 }
 
+/** The most workouts a chart draws: past this the line turns to noise, so it shows the latest. */
+export const MAX_CHART_POINTS = 20;
+
+/** The latest `max` of a series in date order, and how many the range held. */
+export function latestPoints<T>(points: readonly T[], max = MAX_CHART_POINTS): { shown: T[]; total: number } {
+  return { shown: points.slice(-max), total: points.length };
+}
+
 /** Workouts with an exercise note, newest first. */
 export function notesOf<T extends StatsWorkout>(workouts: readonly T[]): T[] {
   return workouts
