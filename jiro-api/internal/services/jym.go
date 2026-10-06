@@ -82,10 +82,10 @@ func isUniqueViolation(err error) bool {
 }
 
 // exerciseColumns is an Exercise's columns, in exerciseDest's order.
-const exerciseColumns = `id, user_id, name, muscle_group, secondary_muscles, notes, created_at, updated_at`
+const exerciseColumns = `id, user_id, name, muscle_group, secondary_muscles, notes, rest_seconds, created_at, updated_at`
 
 func exerciseDest(ex *models.Exercise) []any {
-	return []any{&ex.ID, &ex.UserID, &ex.Name, &ex.MuscleGroup, &ex.SecondaryMuscles, &ex.Notes, &ex.CreatedAt, &ex.UpdatedAt}
+	return []any{&ex.ID, &ex.UserID, &ex.Name, &ex.MuscleGroup, &ex.SecondaryMuscles, &ex.Notes, &ex.RestSeconds, &ex.CreatedAt, &ex.UpdatedAt}
 }
 
 func (s *JymService) CreateExercise(ctx context.Context, userID uuid.UUID, req *models.CreateExerciseRequest) (*models.Exercise, error) {
@@ -121,7 +121,7 @@ func (s *JymService) CreateExercise(ctx context.Context, userID uuid.UUID, req *
 
 func (s *JymService) ListExercises(ctx context.Context, userID uuid.UUID, search, muscleGroup string) ([]models.Exercise, error) {
 	query := `
-		SELECT e.id, e.user_id, e.name, e.muscle_group, e.secondary_muscles, e.notes, e.created_at, e.updated_at,
+		SELECT e.id, e.user_id, e.name, e.muscle_group, e.secondary_muscles, e.notes, e.rest_seconds, e.created_at, e.updated_at,
 		       (SELECT MAX(s.started_at) FROM session_sets ss
 		        JOIN sessions s ON s.id = ss.session_id
 		        WHERE ss.exercise_id = e.id AND s.user_id = e.user_id) AS last_performed_at
@@ -259,6 +259,21 @@ func (s *JymService) UpdateExercise(ctx context.Context, userID, exerciseID uuid
 		return nil, err
 	}
 	return ex, nil
+}
+
+// SetExerciseRest sets the exercise's own rest; nil clears it.
+func (s *JymService) SetExerciseRest(ctx context.Context, userID, exerciseID uuid.UUID, seconds *int) error {
+	tag, err := s.db.Exec(ctx,
+		`UPDATE exercises SET rest_seconds = $3, updated_at = NOW() WHERE id = $1 AND user_id = $2`,
+		exerciseID, userID, seconds,
+	)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrExerciseNotFound
+	}
+	return nil
 }
 
 // DeleteExercise removes the exercise and all associated session_attachment rows,
@@ -874,7 +889,7 @@ func (s *JymService) listRoutineItems(ctx context.Context, routineID uuid.UUID) 
 // listSessionExercises is a workout's list in order.
 func listSessionExercises(ctx context.Context, q querier, sessionID uuid.UUID) ([]models.SessionExercise, error) {
 	rows, err := q.Query(ctx,
-		`SELECT se.exercise_id, e.name, e.muscle_group, se.position, se.target_sets, se.target_reps, `+planColumns("se")+`
+		`SELECT se.exercise_id, e.name, e.muscle_group, se.position, se.target_sets, se.target_reps, e.rest_seconds, `+planColumns("se")+`
 		 FROM session_exercises se JOIN exercises e ON e.id = se.exercise_id
 		 WHERE se.session_id = $1
 		 ORDER BY se.position, se.exercise_id`,
@@ -887,7 +902,7 @@ func listSessionExercises(ctx context.Context, q querier, sessionID uuid.UUID) (
 	list := []models.SessionExercise{}
 	for rows.Next() {
 		var x models.SessionExercise
-		if err := rows.Scan(append([]any{&x.ExerciseID, &x.ExerciseName, &x.MuscleGroup, &x.Position, &x.TargetSets, &x.TargetReps},
+		if err := rows.Scan(append([]any{&x.ExerciseID, &x.ExerciseName, &x.MuscleGroup, &x.Position, &x.TargetSets, &x.TargetReps, &x.ExerciseRestSeconds},
 			planDest(&x.PlanDetails)...)...); err != nil {
 			return nil, err
 		}

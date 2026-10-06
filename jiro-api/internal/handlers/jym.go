@@ -153,6 +153,30 @@ func (h *JymHandler) UpdateExercise(c *gin.Context) {
 	c.JSON(http.StatusOK, ex)
 }
 
+// PUT /jym/exercises/:id/rest
+func (h *JymHandler) SetExerciseRest(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	exerciseID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid exercise ID"}})
+		return
+	}
+	var req models.SetExerciseRestRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()}})
+		return
+	}
+	if err := h.jymService.SetExerciseRest(c.Request.Context(), userID, exerciseID, req.RestSeconds); err != nil {
+		if err == services.ErrExerciseNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Exercise not found"}})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to save the rest"}})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"rest_seconds": req.RestSeconds})
+}
+
 func (h *JymHandler) DeleteExercise(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 	exerciseID, err := uuid.Parse(c.Param("id"))

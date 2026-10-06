@@ -222,6 +222,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 				jym.GET("/exercises", jymHandler.ListExercises)
 				jym.GET("/exercises/:id", jymHandler.GetExercise)
 				jym.PUT("/exercises/:id", jymHandler.UpdateExercise)
+				jym.PUT("/exercises/:id/rest", jymHandler.SetExerciseRest)
 				jym.DELETE("/exercises/:id", jymHandler.DeleteExercise)
 				jym.GET("/exercises/:id/form-checks", jymHandler.GetExerciseFormChecks)
 				jym.GET("/exercises/:id/stats", jymHandler.GetExerciseStats)

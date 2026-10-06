@@ -103,6 +103,7 @@ type exportExercise struct {
 	MuscleGroup      *string   `json:"muscle_group"`
 	SecondaryMuscles []string  `json:"secondary_muscles"`
 	Notes            *string   `json:"notes"`
+	RestSeconds      *int      `json:"rest_seconds"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
 }
@@ -508,6 +509,7 @@ func (h *ExportHandler) gatherJym(ctx context.Context, userID uuid.UUID) (export
 			Name:             ex.Name,
 			MuscleGroup:      ex.MuscleGroup,
 			SecondaryMuscles: ex.SecondaryMuscles,
+			RestSeconds:      ex.RestSeconds,
 			Notes:            ex.Notes,
 			CreatedAt:        ex.CreatedAt,
 			UpdatedAt:        ex.UpdatedAt,
