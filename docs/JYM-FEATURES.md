@@ -90,6 +90,7 @@ The ⋯ button opens a sheet (a bottom sheet on a phone) with:
 - **Type**: Normal, Deload or Test. Deload sets are never PRs and don't count towards your best, and next time's suggestion skips deload and test workouts. Changing a workout's type re-rates its PRs.
 - **Units**: lbs or kg, the account's unit (the same setting as in Settings). Changing it converts the whole workout: logged sets are shown from their stored kg, typed sets and suggestions are converted.
 - **Rest timer**: 1m, 1:30, 2m, 3m or 5m (see Rest Timer).
+- **Keep screen on**: Off (the default) or On, kept on this device (`jiro_jym_keep_awake`). On holds a Screen Wake Lock while the workout is open, so a locked screen doesn't pause the rest timer; it is taken again when the tab comes back and released on leaving. Browsers without the API (Firefox, iOS before Safari 16.4) just keep their usual screen timeout.
 - **Save as template**, **Leave for now** (the workout stays open; resume it from the Jym home) and **Discard workout** (asks first, naming the logged sets).
 
 ### Each Exercise
@@ -147,7 +148,8 @@ Every exercise with history shows one line above its sets: what you did last tim
 
 ### Rest Timer
 After every logged set, a rest timer opens under the sticky bar.
-- It runs for the exercise's planned rest when it has one, otherwise the account's rest length (90 seconds unless changed in Workout options or Settings). In a superset it waits for the end of the round (see Supersets in the Workout).
+- It runs for the exercise's planned rest when it has one, otherwise the exercise's own rest, otherwise the account's rest length (90 seconds unless changed in Workout options or Settings). In a superset it waits for the end of the round (see Supersets in the Workout).
+- An exercise's own rest is set from its menu: **Rest timer** opens a sheet with **Usual** (the default: no rest of its own) or 1m, 1:30, 2m, 3m or 5m. It is saved on the exercise (`exercises.rest_seconds`, `PUT /jym/exercises/:id/rest`) and used in every workout; changing it while that exercise's rest runs restarts the rest at the new length. Changing the account's length only restarts a running rest that came from it.
 - **+30s** lengthens this rest only; the next one starts at the usual length again.
 - **Skip** ends it early. When rest is done it turns green, beeps and vibrates, then closes after 3 seconds.
 
