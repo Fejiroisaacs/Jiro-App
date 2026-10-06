@@ -5,7 +5,7 @@ import { Observable, firstValueFrom, forkJoin } from 'rxjs';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
-import { JymService, SplitWithRoutines, Routine, RoutineItem, Exercise, ReplaceItemEntry } from '../../../core/services/jym.service';
+import { JymService, Split, SplitWithRoutines, Routine, RoutineItem, Exercise, ReplaceItemEntry } from '../../../core/services/jym.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
@@ -13,6 +13,8 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { JymNewSeriesModalComponent } from '../shared/new-series-modal/new-series-modal';
+import { WorkoutLauncher } from '../shared/workout-launcher';
+import { JiroMenuComponent, JiroMenuItem } from '../../../shared/components/jiro-menu/jiro-menu';
 import { SettingsService } from '../../../core/services/settings.service';
 import { formatInstant } from '../../../core/utils/format-date';
 import { REST_CHOICES, planText, restText } from '../plan-text';
@@ -22,10 +24,10 @@ import { MUSCLE_GROUPS } from '../shared/muscles';
 @Component({
   selector: 'app-split-detail',
   standalone: true,
-  imports: [FormsModule, DragDropModule, CdkScrollable, JiroButtonComponent, JiroModalComponent, JiroIconComponent, JiroSkeletonComponent, JymNewSeriesModalComponent],
+  imports: [FormsModule, DragDropModule, CdkScrollable, JiroButtonComponent, JiroModalComponent, JiroIconComponent, JiroSkeletonComponent, JiroMenuComponent, JymNewSeriesModalComponent],
   template: `
-    @if (!split() && loading()) {
-      <div class="split-detail" role="status" aria-label="Loading split">
+    @if (!ready() && loading()) {
+      <div class="split-detail" role="status" [attr.aria-label]="templateMode ? 'Loading template' : 'Loading split'">
         <div class="sk-header">
           <jiro-skeleton width="90px" height="14px" />
           <jiro-skeleton width="280px" height="36px" />
@@ -41,27 +43,30 @@ import { MUSCLE_GROUPS } from '../shared/muscles';
         </div>
       </div>
     }
-    @if (split()) {
+    @if (ready()) {
 <div class="split-detail">
       <!-- Header -->
       <div class="page-header">
         <div class="header-left">
           <button class="back-btn" (click)="goBack()">
             <jiro-icon name="caret-left" [size]="16" />
-            All splits
+            {{ templateMode ? 'All templates' : 'All splits' }}
           </button>
           <div class="split-title-row">
             @if (!editingName()) {
-<h1>{{ split()!.name }}</h1>
+<h1>{{ title() }}</h1>
 }
             @if (editingName()) {
-<input class="title-input" [(ngModel)]="editName" (blur)="saveName()" (keydown.enter)="saveName()" autofocus />
+<input class="title-input" [(ngModel)]="editName" [attr.aria-label]="templateMode ? 'Template name' : 'Split name'" maxlength="100" (blur)="saveName()" (keydown.enter)="saveName()" autofocus />
 }
-            <button class="edit-btn" type="button" (click)="startEditName()" title="Rename split" aria-label="Rename split">
+            <button class="edit-btn" type="button" (click)="startEditName()" [title]="templateMode ? 'Rename template' : 'Rename split'" [attr.aria-label]="templateMode ? 'Rename template' : 'Rename split'">
               <jiro-icon name="pencil-simple" [size]="14" />
             </button>
           </div>
 
+          @if (templateMode) {
+            <p class="template-sub">A template on its own. Start it any time, or add a copy to a split as a new day.</p>
+          } @else {
           <!-- Visibility + Tags -->
           <div class="split-meta-row">
             <div class="vis-toggle">
@@ -96,7 +101,24 @@ import { MUSCLE_GROUPS } from '../shared/muscles';
 }
             </div>
           </div>
+          }
         </div>
+        @if (templateMode) {
+        <div class="header-btns">
+          <jiro-button variant="secondary" type="button" (click)="deleteTemplate()">
+            <jiro-icon name="trash" [size]="13" />
+            Delete
+          </jiro-button>
+          <jiro-button variant="secondary" type="button" (click)="openAddToSplit()">
+            <jiro-icon name="plus" [size]="13" />
+            Add to split
+          </jiro-button>
+          <jiro-button variant="primary" type="button" [loading]="launcher.starting()" (click)="startTemplate()">
+            <jiro-icon name="play:fill" [size]="11" />
+            Start
+          </jiro-button>
+        </div>
+        } @else {
         <div class="header-btns">
           <jiro-button variant="secondary" type="button" (click)="openSeriesModal()">
             <jiro-icon name="play:fill" [size]="13" />
@@ -110,6 +132,7 @@ import { MUSCLE_GROUPS } from '../shared/muscles';
             Add day
           </jiro-button>
         </div>
+        }
       </div>
 
       <!-- Share panel -->
@@ -129,7 +152,7 @@ import { MUSCLE_GROUPS } from '../shared/muscles';
 
       <!-- Loading -->
       @if (loading()) {
-        <div class="routines-board" role="status" aria-label="Loading training days">
+        <div class="routines-board" role="status" aria-label="Loading days">
           @for (i of [1, 2, 3]; track i) {
             <div class="routine-column sk-column">
               <jiro-skeleton width="50%" height="20px" />
@@ -141,11 +164,12 @@ import { MUSCLE_GROUPS } from '../shared/muscles';
 
       <!-- Routines (drag-drop columns) -->
       @if (!loading()) {
-<div class="routines-board" cdkScrollable>
+<div class="routines-board" [class.single]="templateMode" cdkScrollable>
         @for (routine of routines(); track routine.id; let ri = $index) {
 <div
          
           class="routine-column">
+          @if (!templateMode) {
           <div class="routine-header">
             <div class="routine-title">
               <span class="day-chip">Day {{ routine.day_order }}</span>
@@ -165,12 +189,10 @@ import { MUSCLE_GROUPS } from '../shared/muscles';
                 [attr.aria-label]="'Move ' + routine.name + ' later'" title="Move later">
                 <jiro-icon name="caret-right" [size]="16" />
               </button>
-              <button class="icon-btn danger" type="button" (click)="deleteRoutine(routine, ri)" title="Delete day"
-                [attr.aria-label]="'Delete training day ' + routine.name">
-                <jiro-icon name="trash" [size]="16" />
-              </button>
+              <jiro-menu touch [items]="dayActions" [label]="'More actions for ' + routine.name" (select)="onDayAction(routine, ri, $event)" />
             </div>
           </div>
+          }
 
           <!-- Exercise items (drag-drop list) -->
           <div
@@ -237,7 +259,7 @@ import { MUSCLE_GROUPS } from '../shared/muscles';
 
         @if (routines().length === 0) {
 <div class="board-empty">
-          <p class="text-secondary">No training days yet. Add your first day to start building.</p>
+          <p class="text-secondary">No days yet. Add your first day to start building.</p>
           <jiro-button variant="primary" type="button" (click)="openAddRoutine()">+ Add day</jiro-button>
         </div>
 }
@@ -248,7 +270,7 @@ import { MUSCLE_GROUPS } from '../shared/muscles';
 
     <!-- Add Routine Modal -->
     @if (showAddRoutine()) {
-<jiro-modal title="Add training day" maxWidth="400px" (close)="showAddRoutine.set(false)">
+<jiro-modal title="Add day" maxWidth="400px" (close)="showAddRoutine.set(false)">
       <form class="simple-form" (ngSubmit)="addRoutine()">
         <div class="form-group">
           <label class="form-label" for="add-day-name">Day name</label>
@@ -353,6 +375,27 @@ import { MUSCLE_GROUPS } from '../shared/muscles';
     </jiro-modal>
 }
 
+    <!-- Add a copy of this template to a split -->
+    @if (showAddToSplit()) {
+      <jiro-modal sheet title="Add to split" maxWidth="440px" (close)="showAddToSplit.set(false)">
+        <p class="sheet-sub">A copy of {{ title() }} becomes the split's last day. The template stays as it is.</p>
+        @if (splitsLoading()) {
+          <div class="split-pick-list" role="status" aria-label="Loading splits">@for (i of [1, 2]; track i) { <jiro-skeleton height="52px" /> }</div>
+        } @else if (splits().length === 0) {
+          <p class="text-secondary">No splits yet. Make one on the Plan page, then add this template to it.</p>
+        } @else {
+          <div class="split-pick-list">
+            @for (s of splits(); track s.id) {
+              <button type="button" class="split-pick-btn" [disabled]="copying()" (click)="addToSplit(s)">
+                <span class="split-pick-name">{{ s.name }}</span>
+                <span class="split-pick-days">{{ s.routine_count }} {{ s.routine_count === 1 ? 'day' : 'days' }}</span>
+              </button>
+            }
+          </div>
+        }
+      </jiro-modal>
+    }
+
     <!-- Start Series Modal -->
     @if (showSeriesModal()) {
       <jym-new-series-modal [splitId]="splitId" [defaultName]="seriesDefaultName()" (closed)="showSeriesModal.set(false)" />
@@ -422,7 +465,7 @@ import { MUSCLE_GROUPS } from '../shared/muscles';
     .header-left { display: flex; flex-direction: column; gap: var(--space-sm); }
 
     .back-btn {
-      display: flex; align-items: center; gap: var(--space-xs);
+      display: inline-flex; align-items: center; gap: var(--space-xs); min-height: 44px; align-self: flex-start;
       background: none; border: none; color: var(--text-muted);
       font-size: var(--font-size-sm); cursor: pointer; padding: 0;
     }
@@ -444,6 +487,7 @@ import { MUSCLE_GROUPS } from '../shared/muscles';
     }
 
     .edit-btn {
+      display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px;
       background: none; border: none; color: var(--text-muted);
       cursor: pointer; padding: var(--space-xs); border-radius: var(--border-radius-sm);
     }
@@ -531,6 +575,22 @@ import { MUSCLE_GROUPS } from '../shared/muscles';
     }
 
 
+    .routines-board.single { overflow-x: visible; }
+    .routines-board.single .routine-column { min-width: 0; max-width: 640px; width: 100%; flex-shrink: 1; }
+    .template-sub { font-size: var(--font-size-sm); color: var(--text-secondary); margin-top: var(--space-xs); }
+    .sheet-sub { font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: var(--space-md); }
+    .split-pick-list { display: flex; flex-direction: column; gap: var(--space-xs); }
+    .split-pick-btn {
+      display: flex; align-items: center; justify-content: space-between; gap: var(--space-md);
+      width: 100%; min-height: 52px; padding: var(--space-sm) var(--space-md);
+      background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--border-radius);
+      color: var(--text-primary); font: inherit; text-align: left; cursor: pointer;
+    }
+    .split-pick-btn:hover:not(:disabled) { background: var(--bg-surface-hover); }
+    .split-pick-btn:disabled { opacity: 0.6; cursor: wait; }
+    .split-pick-name { font-weight: 600; }
+    .split-pick-days { font-size: var(--font-size-sm); color: var(--text-secondary); white-space: nowrap; }
+
     .routine-column {
       min-width: 260px; max-width: 280px; flex-shrink: 0;
       background: var(--bg-surface); border: 1px solid var(--border-color);
@@ -611,7 +671,7 @@ import { MUSCLE_GROUPS } from '../shared/muscles';
 
     .target-text {
       align-self: flex-start; margin-top: 2px;
-      font-family: inherit; cursor: pointer; min-height: 44px;
+      font-family: inherit; cursor: pointer; min-height: 44px; min-width: 44px;
       background: var(--bg-canvas);
       color: var(--color-primary);
       font-size: var(--font-size-xs);
@@ -651,7 +711,7 @@ import { MUSCLE_GROUPS } from '../shared/muscles';
     }
 
     .add-ex-btn {
-      width: 100%; padding: var(--space-sm); background: none;
+      width: 100%; min-height: 44px; padding: var(--space-sm); background: none;
       border: none; border-top: 1px solid var(--border-color);
       color: var(--text-muted); font-size: var(--font-size-sm);
       cursor: pointer; text-align: center; transition: all 0.15s;
@@ -802,7 +862,10 @@ export class SplitDetailComponent implements OnInit {
   private readonly confirmService = inject(ConfirmService);
   private readonly toast = inject(ToastService);
   private readonly settings = inject(SettingsService);
+  readonly launcher = inject(WorkoutLauncher);
 
+  /** Editing a template (route data `template`): one day, no split around it. */
+  readonly templateMode = inject(ActivatedRoute).snapshot.data['template'] === true;
   split = signal<SplitWithRoutines | null>(null);
   routines = signal<(Routine & { items: RoutineItem[] })[]>([]);
   loading = signal(true);
@@ -813,6 +876,16 @@ export class SplitDetailComponent implements OnInit {
 
   // Series creation
   showSeriesModal = signal(false);
+
+  // A template's Add to split sheet
+  showAddToSplit = signal(false);
+  splits = signal<Split[]>([]);
+  splitsLoading = signal(false);
+  copying = signal(false);
+  readonly dayActions: JiroMenuItem[] = [
+    { id: 'template', label: 'Save as template', icon: 'floppy-disk' },
+    { id: 'delete', label: 'Delete day', icon: 'trash', danger: true },
+  ];
 
   // Editing one exercise's target sets and reps
   targetEdit = signal<{ ri: number; ii: number; name: string } | null>(null);
@@ -872,6 +945,10 @@ export class SplitDetailComponent implements OnInit {
     private router: Router,
   ) { }
 
+  /** The page has something to show: the split, or the template. */
+  readonly ready = computed(() => this.templateMode ? this.routines().length > 0 : !!this.split());
+  readonly title = computed(() => this.templateMode ? this.routines()[0]?.name ?? '' : this.split()?.name ?? '');
+
   ngOnInit() {
     this.splitId = this.route.snapshot.paramMap.get('id') || '';
     this.loadSplit();
@@ -883,6 +960,20 @@ export class SplitDetailComponent implements OnInit {
 
   loadSplit() {
     this.loading.set(true);
+    if (this.templateMode) {
+      this.jymService.getTemplate(this.splitId).subscribe({
+        next: t => {
+          this.routines.set([{ ...t, items: t.items || [] }]);
+          this.loading.set(false);
+        },
+        error: () => {
+          this.loading.set(false);
+          this.toast.error('Could not open that template.');
+          this.goBack();
+        },
+      });
+      return;
+    }
     this.jymService.getSplit(this.splitId).subscribe({
       next: s => {
         this.split.set(s);
@@ -919,7 +1010,7 @@ export class SplitDetailComponent implements OnInit {
     this.jymService.updateRoutine(routine.id, { name }).subscribe({
       error: () => {
         this.routines.update(rs => rs.map(r => r.id === routine.id ? { ...r, name: routine.name } : r));
-        this.toast.error('Could not rename the day.');
+        this.toast.error(this.templateMode ? 'Could not rename the template.' : 'Could not rename the day.');
       },
     });
   }
@@ -955,15 +1046,25 @@ export class SplitDetailComponent implements OnInit {
     ));
   }
 
-  goBack() { this.router.navigate(['/jym/plan']); }
+  goBack() {
+    this.router.navigate(['/jym/plan'], this.templateMode ? { queryParams: { tab: 'templates' } } : {});
+  }
 
   startEditName() {
-    this.editName = this.split()?.name || '';
+    this.editName = this.title();
     this.editingName.set(true);
   }
 
   saveName() {
-    if (!this.editName.trim() || this.editName.trim() === this.split()?.name) {
+    if (!this.editName.trim() || this.editName.trim() === this.title()) {
+      this.editingName.set(false);
+      return;
+    }
+    if (this.templateMode) {
+      const t = this.routines()[0];
+      this.dayNameDraft = this.editName;
+      this.renamingDay.set(t.id);
+      this.saveDayName(t);
       this.editingName.set(false);
       return;
     }
@@ -1017,7 +1118,7 @@ export class SplitDetailComponent implements OnInit {
   async deleteRoutine(routine: Routine, ri: number) {
     const ok = await this.confirmService.confirm({
       title: `Delete ${routine.name}?`,
-      message: 'The training day and the exercises planned on it are removed from this split.',
+      message: 'The day and the exercises planned on it are removed from this split.',
       confirmLabel: 'Delete day',
       danger: true,
     });
@@ -1027,7 +1128,76 @@ export class SplitDetailComponent implements OnInit {
         this.routines.update(list => list.filter((_, i) => i !== ri));
         this.toast.success(`${routine.name} deleted`);
       },
-      error: () => this.toast.error('Could not delete the training day.'),
+      error: () => this.toast.error('Could not delete the day.'),
+    });
+  }
+
+  onDayAction(routine: Routine, ri: number, action: string) {
+    if (action === 'template') this.saveDayAsTemplate(routine);
+    else if (action === 'delete') this.deleteRoutine(routine, ri);
+  }
+
+  /** A copy of the day, plan and all, as a template; the day stays in the split. */
+  async saveDayAsTemplate(routine: Routine) {
+    await this.saveQueue;
+    this.jymService.copyRoutine(routine.id).subscribe({
+      next: t => this.toast.success(`${t.name} saved as a template`),
+      error: () => this.toast.error('Could not save the day as a template.'),
+    });
+  }
+
+  openAddToSplit() {
+    this.showAddToSplit.set(true);
+    this.splitsLoading.set(true);
+    this.jymService.listSplits().subscribe({
+      next: s => { this.splits.set(s); this.splitsLoading.set(false); },
+      error: () => { this.splitsLoading.set(false); this.toast.error('Could not load your splits.'); },
+    });
+  }
+
+  /** A copy of the template becomes the split's last day; the template stays. */
+  async addToSplit(split: Split) {
+    const t = this.routines()[0];
+    if (!t || this.copying()) return;
+    this.copying.set(true);
+    await this.saveQueue;
+    this.jymService.copyRoutine(t.id, { split_id: split.id }).subscribe({
+      next: day => {
+        this.copying.set(false);
+        this.showAddToSplit.set(false);
+        this.toast.success(`Added to ${split.name} as day ${day.day_order}`);
+      },
+      error: () => {
+        this.copying.set(false);
+        this.toast.error('Could not add it to that split.');
+      },
+    });
+  }
+
+  /** Starts a workout from the template once its last edit is saved. */
+  async startTemplate() {
+    const t = this.routines()[0];
+    if (!t) return;
+    await this.saveQueue;
+    this.launcher.start({ routine_id: t.id });
+  }
+
+  async deleteTemplate() {
+    const t = this.routines()[0];
+    if (!t) return;
+    const ok = await this.confirmService.confirm({
+      title: `Delete ${t.name}?`,
+      message: 'This removes the template only. Workouts you started from it are not affected.',
+      confirmLabel: 'Delete template',
+      danger: true,
+    });
+    if (!ok) return;
+    this.jymService.deleteTemplate(t.id).subscribe({
+      next: () => {
+        this.toast.success(`${t.name} deleted`);
+        this.goBack();
+      },
+      error: () => this.toast.error('Could not delete the template.'),
     });
   }
 

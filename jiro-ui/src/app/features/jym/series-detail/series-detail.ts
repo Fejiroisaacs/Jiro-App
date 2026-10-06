@@ -211,9 +211,9 @@ import { seriesProgress } from '../series-progress';
       @if (showRoutinePicker()) {
 <jiro-modal title="Start session" maxWidth="440px" (close)="showRoutinePicker.set(false)">
         <div class="routine-picker">
-          <p class="picker-sub">Pick a routine for this session, or go freestyle.</p>
+          <p class="picker-sub">Pick a day for this workout, or go freestyle.</p>
           @if (loadingRoutines()) {
-<div class="routine-list" role="status" aria-label="Loading routines">
+<div class="routine-list" role="status" aria-label="Loading days">
             @for (i of [1, 2, 3]; track i) { <jiro-skeleton height="52px" /> }
           </div>
 }
@@ -227,7 +227,7 @@ import { seriesProgress } from '../series-progress';
 }
             <button class="routine-row freestyle-row" (click)="startFreestyle()">
               <div class="routine-row-name">Freestyle</div>
-              <span class="routine-row-count">No template</span>
+              <span class="routine-row-count">Add exercises as you go</span>
             </button>
           </div>
 }

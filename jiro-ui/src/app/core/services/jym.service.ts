@@ -686,6 +686,15 @@ export class JymService {
     return this.http.post<Routine>(`${API_URL}/sessions/${sessionId}/template`, { name });
   }
 
+  getTemplate(id: string): Observable<Routine> {
+    return this.http.get<Routine>(`${API_URL}/templates/${id}`);
+  }
+
+  /** Copies a day or template with its plan: into a split as its last day, or with no split_id as a template. */
+  copyRoutine(id: string, req: { split_id?: string; name?: string } = {}): Observable<Routine> {
+    return this.http.post<Routine>(`${API_URL}/routines/${id}/copy`, req);
+  }
+
   deleteTemplate(routineId: string): Observable<void> {
     return this.http.delete<void>(`${API_URL}/routines/${routineId}`);
   }

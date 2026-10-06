@@ -96,7 +96,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 
         <!-- Empty routines -->
         @if (split()!.routines.length === 0) {
-          <jiro-empty-state compact heading="No routines yet" message="Whoever shared this split has not added training days to it." />
+          <jiro-empty-state compact heading="No days yet" message="Whoever shared this split has not added days to it." />
         }
       </div>
 }

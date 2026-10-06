@@ -12,7 +12,7 @@ import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro
   imports: [FormsModule, JiroModalComponent, JiroButtonComponent],
   template: `
     <jiro-modal sheet title="Save as template" maxWidth="420px" (close)="close.emit()">
-      <p class="hint">Keeps this workout's exercises, sets and reps to start from another day.</p>
+      <p class="hint">Keeps this workout's exercises, sets and reps as a template to start again any time.</p>
       <label class="field-label" for="template-name">Name</label>
       <input
         id="template-name"

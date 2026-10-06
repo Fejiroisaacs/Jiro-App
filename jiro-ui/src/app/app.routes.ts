@@ -251,6 +251,13 @@ export const routes: Routes = [
         data: { ...PRIVATE_PAGE },
         loadComponent: () => import('./features/jym/split-detail/split-detail').then(m => m.SplitDetailComponent),
       },
+      // A template is edited on the split page with one day and no split around it.
+      {
+        path: 'jym/templates/:id',
+        title: 'Template',
+        data: { ...PRIVATE_PAGE, template: true },
+        loadComponent: () => import('./features/jym/split-detail/split-detail').then(m => m.SplitDetailComponent),
+      },
       {
         path: 'jym/exercises/:id',
         title: 'Exercise',
