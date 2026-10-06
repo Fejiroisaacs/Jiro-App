@@ -81,14 +81,35 @@ func isUniqueViolation(err error) bool {
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
+// exerciseColumns is an Exercise's columns, in exerciseDest's order.
+const exerciseColumns = `id, user_id, name, muscle_group, secondary_muscles, notes, rest_seconds, created_at, updated_at`
+
+func exerciseDest(ex *models.Exercise) []any {
+	return []any{&ex.ID, &ex.UserID, &ex.Name, &ex.MuscleGroup, &ex.SecondaryMuscles, &ex.Notes, &ex.RestSeconds, &ex.CreatedAt, &ex.UpdatedAt}
+}
+
 func (s *JymService) CreateExercise(ctx context.Context, userID uuid.UUID, req *models.CreateExerciseRequest) (*models.Exercise, error) {
+	primary, err := cleanPrimary(req.MuscleGroup)
+	if err != nil {
+		return nil, err
+	}
+	if primary != nil && *primary == "" {
+		primary = nil
+	}
+	// Secondaries need a primary.
+	secondaries := []string{}
+	if primary != nil {
+		if secondaries, err = cleanSecondaries(req.SecondaryMuscles, *primary); err != nil {
+			return nil, err
+		}
+	}
 	ex := &models.Exercise{}
-	err := s.db.QueryRow(ctx,
-		`INSERT INTO exercises (user_id, name, muscle_group, notes)
-		 VALUES ($1, $2, $3, $4)
-		 RETURNING id, user_id, name, muscle_group, notes, created_at, updated_at`,
-		userID, req.Name, req.MuscleGroup, req.Notes,
-	).Scan(&ex.ID, &ex.UserID, &ex.Name, &ex.MuscleGroup, &ex.Notes, &ex.CreatedAt, &ex.UpdatedAt)
+	err = s.db.QueryRow(ctx,
+		`INSERT INTO exercises (user_id, name, muscle_group, secondary_muscles, notes)
+		 VALUES ($1, $2, $3, $4, $5)
+		 RETURNING `+exerciseColumns,
+		userID, req.Name, primary, secondaries, req.Notes,
+	).Scan(exerciseDest(ex)...)
 	if err != nil {
 		if isUniqueViolation(err) {
 			return nil, ErrExerciseNameTaken
@@ -100,7 +121,7 @@ func (s *JymService) CreateExercise(ctx context.Context, userID uuid.UUID, req *
 
 func (s *JymService) ListExercises(ctx context.Context, userID uuid.UUID, search, muscleGroup string) ([]models.Exercise, error) {
 	query := `
-		SELECT e.id, e.user_id, e.name, e.muscle_group, e.notes, e.created_at, e.updated_at,
+		SELECT e.id, e.user_id, e.name, e.muscle_group, e.secondary_muscles, e.notes, e.rest_seconds, e.created_at, e.updated_at,
 		       (SELECT MAX(s.started_at) FROM session_sets ss
 		        JOIN sessions s ON s.id = ss.session_id
 		        WHERE ss.exercise_id = e.id AND s.user_id = e.user_id) AS last_performed_at
@@ -113,7 +134,10 @@ func (s *JymService) ListExercises(ctx context.Context, userID uuid.UUID, search
 	}
 	if muscleGroup != "" {
 		args = append(args, muscleGroup)
-		query += ` AND LOWER(TRIM(e.muscle_group)) = LOWER(TRIM($` + intStr(len(args)) + `))`
+		// The library's filter finds a muscle as the primary or as a secondary.
+		n := intStr(len(args))
+		query += ` AND (LOWER(TRIM(e.muscle_group)) = LOWER(TRIM($` + n + `))
+		           OR EXISTS (SELECT 1 FROM unnest(e.secondary_muscles) m WHERE LOWER(m) = LOWER(TRIM($` + n + `))))`
 	}
 	query += ` ORDER BY e.name ASC`
 
@@ -126,7 +150,7 @@ func (s *JymService) ListExercises(ctx context.Context, userID uuid.UUID, search
 	var exercises []models.Exercise
 	for rows.Next() {
 		var ex models.Exercise
-		if err := rows.Scan(&ex.ID, &ex.UserID, &ex.Name, &ex.MuscleGroup, &ex.Notes, &ex.CreatedAt, &ex.UpdatedAt, &ex.LastPerformedAt); err != nil {
+		if err := rows.Scan(append(exerciseDest(&ex), &ex.LastPerformedAt)...); err != nil {
 			return nil, err
 		}
 		exercises = append(exercises, ex)
@@ -142,10 +166,10 @@ func (s *JymService) ListExercises(ctx context.Context, userID uuid.UUID, search
 func (s *JymService) GetExerciseWithHistory(ctx context.Context, userID, exerciseID uuid.UUID, limit *int) (*models.ExerciseWithHistory, error) {
 	ex := &models.ExerciseWithHistory{}
 	err := s.db.QueryRow(ctx,
-		`SELECT id, user_id, name, muscle_group, notes, created_at, updated_at
+		`SELECT `+exerciseColumns+`
 		 FROM exercises WHERE id = $1 AND user_id = $2`,
 		exerciseID, userID,
-	).Scan(&ex.ID, &ex.UserID, &ex.Name, &ex.MuscleGroup, &ex.Notes, &ex.CreatedAt, &ex.UpdatedAt)
+	).Scan(exerciseDest(&ex.Exercise)...)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrExerciseNotFound
@@ -196,17 +220,35 @@ func (s *JymService) GetExerciseWithHistory(ctx context.Context, userID, exercis
 }
 
 func (s *JymService) UpdateExercise(ctx context.Context, userID, exerciseID uuid.UUID, req *models.UpdateExerciseRequest) (*models.Exercise, error) {
+	primary, err := cleanPrimary(req.MuscleGroup)
+	if err != nil {
+		return nil, err
+	}
+	// Spelled from the list here; the new primary (or the kept one) is taken out in SQL.
+	var secondaries []string
+	if req.SecondaryMuscles != nil {
+		if secondaries, err = cleanSecondaries(req.SecondaryMuscles, ""); err != nil {
+			return nil, err
+		}
+	}
 	ex := &models.Exercise{}
-	err := s.db.QueryRow(ctx,
-		`UPDATE exercises SET
-		   name         = COALESCE($3, name),
-		   muscle_group = CASE WHEN $4::TEXT IS NULL THEN muscle_group ELSE NULLIF(TRIM($4), '') END,
-		   notes        = CASE WHEN $5::TEXT IS NULL THEN notes ELSE NULLIF(TRIM($5), '') END,
-		   updated_at   = NOW()
+	err = s.db.QueryRow(ctx,
+		`WITH next AS (
+		   SELECT CASE WHEN $4::TEXT IS NULL THEN muscle_group ELSE NULLIF($4, '') END AS primary_group
+		   FROM exercises WHERE id = $1 AND user_id = $2
+		 )
+		 UPDATE exercises SET
+		   name              = COALESCE($3, name),
+		   muscle_group      = next.primary_group,
+		   secondary_muscles = CASE WHEN next.primary_group IS NULL THEN '{}'
+		                            ELSE array_remove(COALESCE($6::TEXT[], secondary_muscles), next.primary_group) END,
+		   notes             = CASE WHEN $5::TEXT IS NULL THEN notes ELSE NULLIF(TRIM($5), '') END,
+		   updated_at        = NOW()
+		 FROM next
 		 WHERE id = $1 AND user_id = $2
-		 RETURNING id, user_id, name, muscle_group, notes, created_at, updated_at`,
-		exerciseID, userID, req.Name, req.MuscleGroup, req.Notes,
-	).Scan(&ex.ID, &ex.UserID, &ex.Name, &ex.MuscleGroup, &ex.Notes, &ex.CreatedAt, &ex.UpdatedAt)
+		 RETURNING `+exerciseColumns,
+		exerciseID, userID, req.Name, primary, req.Notes, secondaries,
+	).Scan(exerciseDest(ex)...)
 	if err != nil {
 		if isUniqueViolation(err) {
 			return nil, ErrExerciseNameTaken
@@ -217,6 +259,21 @@ func (s *JymService) UpdateExercise(ctx context.Context, userID, exerciseID uuid
 		return nil, err
 	}
 	return ex, nil
+}
+
+// SetExerciseRest sets the exercise's own rest; nil clears it.
+func (s *JymService) SetExerciseRest(ctx context.Context, userID, exerciseID uuid.UUID, seconds *int) error {
+	tag, err := s.db.Exec(ctx,
+		`UPDATE exercises SET rest_seconds = $3, updated_at = NOW() WHERE id = $1 AND user_id = $2`,
+		exerciseID, userID, seconds,
+	)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrExerciseNotFound
+	}
+	return nil
 }
 
 // DeleteExercise removes the exercise and all associated session_attachment rows,
@@ -832,7 +889,7 @@ func (s *JymService) listRoutineItems(ctx context.Context, routineID uuid.UUID) 
 // listSessionExercises is a workout's list in order.
 func listSessionExercises(ctx context.Context, q querier, sessionID uuid.UUID) ([]models.SessionExercise, error) {
 	rows, err := q.Query(ctx,
-		`SELECT se.exercise_id, e.name, e.muscle_group, se.position, se.target_sets, se.target_reps, `+planColumns("se")+`
+		`SELECT se.exercise_id, e.name, e.muscle_group, se.position, se.target_sets, se.target_reps, e.rest_seconds, `+planColumns("se")+`
 		 FROM session_exercises se JOIN exercises e ON e.id = se.exercise_id
 		 WHERE se.session_id = $1
 		 ORDER BY se.position, se.exercise_id`,
@@ -845,7 +902,7 @@ func listSessionExercises(ctx context.Context, q querier, sessionID uuid.UUID) (
 	list := []models.SessionExercise{}
 	for rows.Next() {
 		var x models.SessionExercise
-		if err := rows.Scan(append([]any{&x.ExerciseID, &x.ExerciseName, &x.MuscleGroup, &x.Position, &x.TargetSets, &x.TargetReps},
+		if err := rows.Scan(append([]any{&x.ExerciseID, &x.ExerciseName, &x.MuscleGroup, &x.Position, &x.TargetSets, &x.TargetReps, &x.ExerciseRestSeconds},
 			planDest(&x.PlanDetails)...)...); err != nil {
 			return nil, err
 		}
@@ -2785,7 +2842,7 @@ func (s *JymService) copySplit(ctx context.Context, importerID, splitID uuid.UUI
 	// Load routines + items
 	rows, err := s.db.Query(ctx, `
 		SELECT r.id, r.name, r.day_order,
-		       e.name, e.muscle_group,
+		       e.name, e.muscle_group, COALESCE(e.secondary_muscles, '{}'),
 		       COALESCE(ri.target_sets, 0), COALESCE(ri.target_reps, 0),
 		       COALESCE(ri.order_index, 0), ri.target_reps_max, ri.target_rpe, ri.rest_seconds, ri.notes, ri.superset_group
 		FROM routines r
@@ -2799,12 +2856,13 @@ func (s *JymService) copySplit(ctx context.Context, importerID, splitID uuid.UUI
 	}
 
 	type itemRow struct {
-		exName     string
-		mg         *string
-		targetSets int
-		targetReps int
-		orderIdx   int
-		plan       models.PlanDetails
+		exName      string
+		mg          *string
+		secondaries []string
+		targetSets  int
+		targetReps  int
+		orderIdx    int
+		plan        models.PlanDetails
 	}
 	type routineData struct {
 		name     string
@@ -2821,10 +2879,11 @@ func (s *JymService) copySplit(ctx context.Context, importerID, splitID uuid.UUI
 		var dayOrder int
 		var exName *string
 		var mg *string
+		var secondaries []string
 		var tSets, tReps, orderIdx int
 		var plan models.PlanDetails
 
-		if err := rows.Scan(&rID, &rName, &dayOrder, &exName, &mg, &tSets, &tReps, &orderIdx,
+		if err := rows.Scan(&rID, &rName, &dayOrder, &exName, &mg, &secondaries, &tSets, &tReps, &orderIdx,
 			&plan.TargetRepsMax, &plan.TargetRPE, &plan.RestSeconds, &plan.Notes, &plan.SupersetGroup); err != nil {
 			rows.Close()
 			return uuid.Nil, err
@@ -2835,7 +2894,7 @@ func (s *JymService) copySplit(ctx context.Context, importerID, splitID uuid.UUI
 		}
 		if exName != nil {
 			rMap[rID].items = append(rMap[rID].items, itemRow{
-				exName: *exName, mg: mg, targetSets: tSets, targetReps: tReps, orderIdx: orderIdx, plan: plan,
+				exName: *exName, mg: mg, secondaries: secondaries, targetSets: tSets, targetReps: tReps, orderIdx: orderIdx, plan: plan,
 			})
 		}
 	}
@@ -2849,7 +2908,7 @@ func (s *JymService) copySplit(ctx context.Context, importerID, splitID uuid.UUI
 
 	exCache := map[string]uuid.UUID{}
 
-	resolveExercise := func(name string, mg *string) (uuid.UUID, error) {
+	resolveExercise := func(name string, mg *string, secondaries []string) (uuid.UUID, error) {
 		if id, ok := exCache[name]; ok {
 			return id, nil
 		}
@@ -2866,8 +2925,8 @@ func (s *JymService) copySplit(ctx context.Context, importerID, splitID uuid.UUI
 			return uuid.Nil, err
 		}
 		err = tx.QueryRow(ctx,
-			`INSERT INTO exercises (user_id, name, muscle_group) VALUES ($1, $2, $3) RETURNING id`,
-			importerID, name, mg,
+			`INSERT INTO exercises (user_id, name, muscle_group, secondary_muscles) VALUES ($1, $2, $3, $4) RETURNING id`,
+			importerID, name, mg, secondaries,
 		).Scan(&id)
 		if err != nil {
 			return uuid.Nil, err
@@ -2896,7 +2955,7 @@ func (s *JymService) copySplit(ctx context.Context, importerID, splitID uuid.UUI
 			return uuid.Nil, err
 		}
 		for _, item := range rd.items {
-			exID, err := resolveExercise(item.exName, item.mg)
+			exID, err := resolveExercise(item.exName, item.mg, item.secondaries)
 			if err != nil {
 				return uuid.Nil, err
 			}

@@ -3,6 +3,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { RecipeService, RecipeWithTrials } from '../../../core/services/recipe.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { readLocal, writeLocal, removeLocal } from '../../../core/storage';
+import { ScreenWakeLock } from '../../../core/utils/wake-lock';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 
@@ -15,12 +16,6 @@ interface CookIngredient {
   item: string;
   amount: string;
   checked: boolean;
-}
-
-/** The subset of the Screen Wake Lock API we use; it is not in every lib.dom. */
-interface WakeLockSentinelLike {
-  released: boolean;
-  release(): Promise<void>;
 }
 
 /**
@@ -383,7 +378,7 @@ export class CookModeComponent implements OnInit, OnDestroy {
   notes = signal('');
 
   private recipeId = '';
-  private wakeLock: WakeLockSentinelLike | null = null;
+  private readonly wakeLock = new ScreenWakeLock();
 
   ngOnInit() {
     this.recipeId = this.route.snapshot.paramMap.get('id') ?? '';
@@ -410,45 +405,13 @@ export class CookModeComponent implements OnInit, OnDestroy {
       },
     });
 
-    void this.requestWakeLock();
-    document.addEventListener('visibilitychange', this.onVisibilityChange);
+    // Keep the screen on while cooking.
+    this.wakeLock.hold();
   }
 
   ngOnDestroy() {
-    document.removeEventListener('visibilitychange', this.onVisibilityChange);
-    void this.releaseWakeLock();
+    this.wakeLock.release();
   }
-
-  /**
-   * Keep the screen on while cooking. Absent in Firefox, rejected outright on
-   * low battery, and iOS only has it from Safari 16.4, so every path is
-   * swallowed: no wake lock is a worse cook, not a broken page.
-   */
-  private async requestWakeLock() {
-    const nav = navigator as Navigator & { wakeLock?: { request(type: 'screen'): Promise<WakeLockSentinelLike> } };
-    if (!nav.wakeLock) return;
-    try {
-      this.wakeLock = await nav.wakeLock.request('screen');
-    } catch {
-      this.wakeLock = null;
-    }
-  }
-
-  private async releaseWakeLock() {
-    try {
-      await this.wakeLock?.release();
-    } catch {
-      /* already gone */
-    }
-    this.wakeLock = null;
-  }
-
-  /** Browsers drop the sentinel whenever the tab hides, so ask again on return. */
-  private readonly onVisibilityChange = () => {
-    if (document.visibilityState === 'visible' && !this.wakeLock) {
-      void this.requestWakeLock();
-    }
-  };
 
   /** Desktop convenience. On a phone, the Exit button is the way out. */
   @HostListener('document:keydown.escape')

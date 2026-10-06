@@ -13,7 +13,11 @@ type Exercise struct {
 	UserID      uuid.UUID `json:"user_id"`
 	Name        string    `json:"name"`
 	MuscleGroup *string   `json:"muscle_group"`
-	Notes       *string   `json:"notes"`
+	// SecondaryMuscles organise the exercise (the library filter finds them); counts use the primary only.
+	SecondaryMuscles []string `json:"secondary_muscles"`
+	Notes            *string  `json:"notes"`
+	// RestSeconds is this exercise's rest when the plan sets none; nil rests for the account's usual.
+	RestSeconds *int      `json:"rest_seconds"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 	// LastPerformedAt is only populated by ListExercises; nil on the other
@@ -111,15 +115,18 @@ type ExercisePR struct {
 }
 
 type CreateExerciseRequest struct {
-	Name        string  `json:"name" binding:"required"`
-	MuscleGroup *string `json:"muscle_group"`
-	Notes       *string `json:"notes"`
+	Name             string   `json:"name" binding:"required"`
+	MuscleGroup      *string  `json:"muscle_group"`
+	SecondaryMuscles []string `json:"secondary_muscles" binding:"max=10"`
+	Notes            *string  `json:"notes"`
 }
 
 type UpdateExerciseRequest struct {
 	Name        *string `json:"name"`
 	MuscleGroup *string `json:"muscle_group"`
-	Notes       *string `json:"notes"`
+	// SecondaryMuscles left out (null) keeps them; [] clears them.
+	SecondaryMuscles []string `json:"secondary_muscles" binding:"max=10"`
+	Notes            *string  `json:"notes"`
 }
 
 // ─── Split ───────────────────────────────────────────────────────────────────
@@ -427,7 +434,14 @@ type SessionExercise struct {
 	Position     int       `json:"position"`
 	TargetSets   *int      `json:"target_sets"`
 	TargetReps   *int      `json:"target_reps"`
+	// ExerciseRestSeconds is the exercise's own rest, used when the plan's RestSeconds is nil.
+	ExerciseRestSeconds *int `json:"exercise_rest_seconds"`
 	PlanDetails
+}
+
+// SetExerciseRestRequest sets an exercise's own rest; null goes back to the account's usual.
+type SetExerciseRestRequest struct {
+	RestSeconds *int `json:"rest_seconds" binding:"omitempty,min=15,max=600"`
 }
 
 type AddSessionExerciseRequest struct {

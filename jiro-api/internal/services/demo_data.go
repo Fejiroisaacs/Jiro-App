@@ -18,6 +18,7 @@ type demoExercise struct {
 	ID          uuid.UUID
 	Name        string
 	MuscleGroup string
+	Secondary   []string
 	Notes       string
 	CreatedAt   time.Time
 }
@@ -254,6 +255,15 @@ type demoLift struct {
 	warmupLbs           float64 // 0 = no warm-up set
 }
 
+// demoSecondary shows the other muscles a lift works (they organise only; counts use the primary).
+var demoSecondary = map[string][]string{
+	"Bench Press":    {"Shoulders", "Triceps"},
+	"Overhead Press": {"Triceps"},
+	"Deadlift":       {"Legs", "Glutes"},
+	"Barbell Row":    {"Biceps"},
+	"Back Squat":     {"Glutes"},
+}
+
 // demoPlans shows the plan's extras: a rep range, target RPE, rest, a cue, and one superset.
 var demoPlans = func() map[string]models.PlanDetails {
 	n := func(v int) *int { return &v }
@@ -310,7 +320,7 @@ func buildDemoJym(ds *demoDataset, at func(int, int, int) time.Time, date func(i
 			id := uuid.New()
 			exerciseIDs[lift.name] = id
 			ds.Exercises = append(ds.Exercises, demoExercise{
-				ID: id, Name: lift.name, MuscleGroup: lift.muscle, Notes: lift.notes,
+				ID: id, Name: lift.name, MuscleGroup: lift.muscle, Secondary: demoSecondary[lift.name], Notes: lift.notes,
 				CreatedAt: at(-44, 20, 40+len(ds.Exercises)),
 			})
 			ds.RoutineItems = append(ds.RoutineItems, demoRoutineItem{
@@ -882,8 +892,12 @@ func nullIfEmpty(s string) *string {
 // queue adds every INSERT for the dataset to b, in foreign-key order.
 func (ds *demoDataset) queue(b *pgx.Batch, userID uuid.UUID) {
 	for _, e := range ds.Exercises {
-		b.Queue(`INSERT INTO exercises (id, user_id, name, muscle_group, notes, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$6)`,
-			e.ID, userID, e.Name, e.MuscleGroup, nullIfEmpty(e.Notes), e.CreatedAt)
+		secondary := e.Secondary
+		if secondary == nil {
+			secondary = []string{}
+		}
+		b.Queue(`INSERT INTO exercises (id, user_id, name, muscle_group, secondary_muscles, notes, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$7)`,
+			e.ID, userID, e.Name, e.MuscleGroup, secondary, nullIfEmpty(e.Notes), e.CreatedAt)
 	}
 	splitCreated := ds.Routines[0].CreatedAt.Add(-time.Minute)
 	b.Queue(`INSERT INTO splits (id, user_id, name, description, visibility, tags, created_at, updated_at) VALUES ($1,$2,$3,$4,'private',$5,$6,$6)`,

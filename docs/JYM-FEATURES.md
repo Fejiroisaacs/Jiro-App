@@ -26,9 +26,11 @@ Jym is the gym tracking module of Jiro. This document describes how each user-fa
 ## Workout Structure
 
 ### Exercises
-A personal exercise dictionary. Each exercise has a **name**, optional **muscle group**, and optional **notes**. Exercise names are unique per user.
+A personal exercise dictionary. Each exercise has a **name**, an optional **main muscle group**, any **other muscles it works**, and optional **notes**. Exercise names are unique per user.
 
-- Create, edit, and delete exercises from the library (`/jym/exercises`), and filter it by muscle group (case doesn't matter).
+- Muscles come from one list: Chest, Back, Shoulders, Biceps, Triceps, Legs, Glutes, Core, Cardio and Other. Names stored before the list were mapped onto it ignoring case (quads, hamstrings and calves became Legs, abs became Core, anything else Other).
+- **Also works** (the secondary muscles) organises an exercise: Bench Press is Chest, and also works Shoulders and Triceps. They show as muted tags in the library and on the exercise page, and the library's muscle filter finds them (Triceps lists Bench Press too, with its Triceps tag marked). Everything that counts uses the main muscle only (see How Jym Counts).
+- Create, edit, and delete exercises from the library (`/jym/exercises`), and filter it by muscle group.
 - Each row shows the best set and when the exercise was last trained.
 - Renaming an exercise renames it across all history, since sets reference the exercise by ID.
 - Deleting an exercise removes every set logged with it; the library asks first.
@@ -88,6 +90,7 @@ The ⋯ button opens a sheet (a bottom sheet on a phone) with:
 - **Type**: Normal, Deload or Test. Deload sets are never PRs and don't count towards your best, and next time's suggestion skips deload and test workouts. Changing a workout's type re-rates its PRs.
 - **Units**: lbs or kg, the account's unit (the same setting as in Settings). Changing it converts the whole workout: logged sets are shown from their stored kg, typed sets and suggestions are converted.
 - **Rest timer**: 1m, 1:30, 2m, 3m or 5m (see Rest Timer).
+- **Keep screen on**: Off (the default) or On, kept on this device (`jiro_jym_keep_awake`). On holds a Screen Wake Lock while the workout is open, so a locked screen doesn't pause the rest timer; it is taken again when the tab comes back and released on leaving. Browsers without the API (Firefox, iOS before Safari 16.4) just keep their usual screen timeout.
 - **Save as template**, **Leave for now** (the workout stays open; resume it from the Jym home) and **Discard workout** (asks first, naming the logged sets).
 
 ### Each Exercise
@@ -145,7 +148,8 @@ Every exercise with history shows one line above its sets: what you did last tim
 
 ### Rest Timer
 After every logged set, a rest timer opens under the sticky bar.
-- It runs for the exercise's planned rest when it has one, otherwise the account's rest length (90 seconds unless changed in Workout options or Settings). In a superset it waits for the end of the round (see Supersets in the Workout).
+- It runs for the exercise's planned rest when it has one, otherwise the exercise's own rest, otherwise the account's rest length (90 seconds unless changed in Workout options or Settings). In a superset it waits for the end of the round (see Supersets in the Workout).
+- An exercise's own rest is set from its menu: **Rest timer** opens a sheet with **Usual** (the default: no rest of its own) or 1m, 1:30, 2m, 3m or 5m. It is saved on the exercise (`exercises.rest_seconds`, `PUT /jym/exercises/:id/rest`) and used in every workout; changing it while that exercise's rest runs restarts the rest at the new length. Changing the account's length only restarts a running rest that came from it.
 - **+30s** lengthens this rest only; the next one starts at the usual length again.
 - **Skip** ends it early. When rest is done it turns green, beeps and vibrates, then closes after 3 seconds.
 
@@ -223,7 +227,8 @@ At `/jym/exercises/:id`:
 
 - **Header**: exercise name, muscle group, best weight ever and the best estimated 1RM, from working sets outside deloads.
 - **Charts**: **Est. 1RM** (the best set's, see How Jym counts), **Volume** and **Max weight**, one point per workout from `GET /jym/exercises/:id/stats`. Deloads and workouts with only warm-ups are left out.
-  - Points sit at their real dates on a date axis with month ticks, so a break shows as a gap.
+  - Points sit at their real dates on a date axis with month ticks, so a break shows as a gap. The axis runs from the first workout shown to today.
+  - A chart shows at most your latest 20 workouts in the range (a note under it says so), and the line never swings above or below its points (monotone curves). Reps @ Weight is capped the same way.
   - **3M**, **1Y** and **All** set the range; the page opens on 1Y when the history goes back more than a year, otherwise All. The Est. 1RM tooltip names the set behind each point.
 - **Reps @ Weight**: the reps of each working set at one weight, per workout, outside deloads. Its data is fetched when it's picked (`GET /jym/exercises/:id/reps-at?weight=`).
 - **Workouts**: every workout with this exercise, newest first, ten at a time (`GET /jym/exercises/:id/workouts`). Each shows its date, day, type, the exercise note and its sets (warm-ups marked W, RPE, estimated 1RM, PR badges), and links to its summary, or to the player while it's open. **See all workouts with ...** opens them in history.
@@ -301,6 +306,7 @@ One set of rules, in `jiro-api/internal/services/jym_metrics.go`, behind every l
 - **Estimated 1RM** is Epley, `weight × (1 + reps/30)`, with a single meaning the weight itself and reps capped at 10, since Epley overshoots beyond that (340 × 12 counts as 340 × 10). It is rounded to 0.1 kg.
 - **PRs** in a session count lifts with a new record, not record sets: three sets that each beat the last on one lift are one record.
 - **Templates** saved from a workout take their sets and reps from its working sets.
+- **Muscles** count by an exercise's main muscle group only: sets per muscle in a summary, "last trained" on the Jym home, the PR wall's groups, a workout's muscle tags and Discover's filter. The muscles it also works are for organising.
 
 ## How Personal Records Work
 

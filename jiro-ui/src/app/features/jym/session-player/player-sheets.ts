@@ -2,6 +2,14 @@ import { Component, computed, inject, input, output } from '@angular/core';
 import { SettingsService } from '../../../core/services/settings.service';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
+import { restText } from '../plan-text';
+
+const REST_PRESETS = [60, 90, 120, 180, 300];
+
+/** 60 is "1m", 90 is "1:30". */
+function restLabel(seconds: number): string {
+  return seconds % 60 ? restText(seconds) : `${seconds / 60}m`;
+}
 
 
 const SESSION_TYPES = [
@@ -14,7 +22,7 @@ const TYPE_HELP: Record<string, string> = {
   test: "A max attempt. Records count, but next time's suggestion ignores it.",
 };
 
-/** Workout options: type, units, rest, and leaving; fixing a finished workout keeps only type, units and Save as template. */
+/** Workout options: type, units, rest, the screen, and leaving; fixing a finished workout keeps only type, units and Save as template. */
 @Component({
   selector: 'jym-options-sheet',
   standalone: true,
@@ -49,7 +57,16 @@ const TYPE_HELP: Record<string, string> = {
             <button type="button" class="seg-btn" [class.active]="restSetting() === d" [attr.aria-pressed]="restSetting() === d" (click)="rest.emit(d)">{{ restLabel(d) }}</button>
           }
         </div>
-        <p class="opt-help">Starts after each logged set. Remembered for next time.</p>
+        <p class="opt-help">Starts after each logged set, unless the plan or the exercise's menu sets its own. Remembered for next time.</p>
+      </div>
+
+      <div class="opt-group" role="group" aria-labelledby="opt-awake-label">
+        <span class="opt-label" id="opt-awake-label">Keep screen on</span>
+        <div class="seg">
+          <button type="button" class="seg-btn" [class.active]="!keepAwake()" [attr.aria-pressed]="!keepAwake()" (click)="awake.emit(false)">Off</button>
+          <button type="button" class="seg-btn" [class.active]="keepAwake()" [attr.aria-pressed]="keepAwake()" (click)="awake.emit(true)">On</button>
+        </div>
+        <p class="opt-help">The screen stays on while this workout is open, so the rest timer can sound. On this device only; uses more battery.</p>
       </div>
       }
 
@@ -77,12 +94,14 @@ export class OptionsSheetComponent {
   readonly settings = inject(SettingsService);
   readonly sessionType = input.required<string>();
   readonly restSetting = input.required<number>();
+  readonly keepAwake = input(false);
   readonly fix = input(false);
   readonly discarding = input(false);
 
   readonly type = output<string>();
   readonly unit = output<string>();
   readonly rest = output<number>();
+  readonly awake = output<boolean>();
   readonly saveTemplate = output<void>();
   readonly leave = output<void>();
   readonly discard = output<void>();
@@ -90,14 +109,53 @@ export class OptionsSheetComponent {
 
   readonly sessionTypes = SESSION_TYPES;
   readonly units = ['lbs', 'kg'];
-  readonly restPresets = [60, 90, 120, 180, 300];
+  readonly restPresets = REST_PRESETS;
   readonly typeHelp = computed(() => TYPE_HELP[this.sessionType()] ?? "Counts for records and next time's suggestion.");
+  readonly restLabel = restLabel;
+}
 
-  restLabel(seconds: number): string {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return s ? `${m}:${String(s).padStart(2, '0')}` : `${m}m`;
-  }
+/** One exercise's rest: its own length, or your usual; a plan's rest still comes first. */
+@Component({
+  selector: 'jym-rest-sheet',
+  standalone: true,
+  imports: [JiroModalComponent],
+  template: `
+    <jiro-modal sheet title="Rest timer" maxWidth="440px" (close)="close.emit()">
+      <p class="sheet-sub">After {{ exerciseName() }}</p>
+      <div class="opt-group" role="group" aria-label="Rest after this exercise">
+        <div class="seg">
+          <button type="button" class="seg-btn" [class.active]="own() === null" [attr.aria-pressed]="own() === null" (click)="choose.emit(null)">Usual</button>
+          @for (d of presets; track d) {
+            <button type="button" class="seg-btn" [class.active]="own() === d" [attr.aria-pressed]="own() === d" (click)="choose.emit(d)">{{ restLabel(d) }}</button>
+          }
+        </div>
+        <p class="opt-help">{{ help() }}</p>
+      </div>
+    </jiro-modal>
+  `,
+  styleUrl: './player-sheets.css',
+})
+export class RestSheetComponent {
+  readonly exerciseName = input.required<string>();
+  /** The exercise's own rest; null is your usual. */
+  readonly own = input<number | null>(null);
+  /** The plan's rest in this workout, which wins over the exercise's. */
+  readonly planned = input<number | null>(null);
+  /** Your usual rest, from Workout options. */
+  readonly usual = input.required<number>();
+
+  readonly choose = output<number | null>();
+  readonly close = output<void>();
+
+  readonly presets = REST_PRESETS;
+  readonly restLabel = restLabel;
+  readonly help = computed(() => {
+    const planned = this.planned();
+    if (planned != null) return `This workout's plan rests ${restText(planned)} here, so that comes first. Your choice applies when a plan doesn't set one.`;
+    return this.own() === null
+      ? `Rests your usual ${restText(this.usual())}, set in Workout options. Pick a length to give this exercise its own.`
+      : 'Remembered for this exercise in every workout.';
+  });
 }
 
 /** One set's sheet: make it a warm-up or a working set, or remove it. */

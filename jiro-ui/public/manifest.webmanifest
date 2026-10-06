@@ -2,7 +2,7 @@
   "name": "Jiro",
   "short_name": "Jiro",
   "description": "Your life, in one place: recipes, workouts, journal and money.",
-  "start_url": "/",
+  "start_url": "/dashboard",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#F2ECE2",

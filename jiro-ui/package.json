@@ -10,7 +10,7 @@
     "build:sitemap": "node scripts/build-sitemap.mjs",
     "check:css": "node scripts/check-css-vars.mjs",
     "icons": "node scripts/build-icons.mjs",
-    "test:unit": "node --import ./scripts/ts-resolve.mjs --experimental-strip-types --disable-warning=ExperimentalWarning --test src/app/features/jym/weight-suggestion.spec.ts src/app/features/jym/plateau-rule.spec.ts src/app/features/jym/exercise-stats.spec.ts src/app/features/jym/history-month.spec.ts src/app/features/jym/plan-text.spec.ts src/app/features/jym/supersets.spec.ts src/app/features/jym/deload-rule.spec.ts src/app/features/jym/series-progress.spec.ts src/app/features/jym/plates.spec.ts src/app/features/jym/stale-workout.spec.ts src/app/features/jym/number-input.spec.ts src/app/features/jym/session-player/player-blocks.spec.ts src/app/core/utils/day.spec.ts",
+    "test:unit": "node --import ./scripts/ts-resolve.mjs --experimental-strip-types --disable-warning=ExperimentalWarning --test src/app/features/jym/weight-suggestion.spec.ts src/app/features/jym/plateau-rule.spec.ts src/app/features/jym/exercise-stats.spec.ts src/app/features/jym/history-month.spec.ts src/app/features/jym/plan-text.spec.ts src/app/features/jym/supersets.spec.ts src/app/features/jym/shared/muscles.spec.ts src/app/features/jym/deload-rule.spec.ts src/app/features/jym/series-progress.spec.ts src/app/features/jym/plates.spec.ts src/app/features/jym/stale-workout.spec.ts src/app/features/jym/number-input.spec.ts src/app/features/jym/session-player/player-blocks.spec.ts src/app/core/utils/day.spec.ts",
     "serve:ssr:jiro-ui": "node dist/jiro-ui/server/server.mjs"
   },
   "prettier": {

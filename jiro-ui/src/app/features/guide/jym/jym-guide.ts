@@ -30,7 +30,8 @@ import { GUIDE } from '../shared';
         <guide-steps>
           <li>Open <a routerLink="/jym/exercises">Exercises</a>.</li>
           <li>Type in <strong>Search exercises...</strong>, or select a muscle group such as <strong>Chest</strong> to filter the list.</li>
-          <li>To add one, select <strong>New exercise</strong>, enter a <strong>Name</strong>, choose a <strong>Muscle group</strong>, add any <strong>Notes</strong>, then select <strong>Create exercise</strong>.</li>
+          <li>To add one, select <strong>New exercise</strong>, enter a <strong>Name</strong> and choose a <strong>Main muscle group</strong>. Under <strong>Also works</strong>, select any other muscles it trains, such as Triceps for a bench press. Add any <strong>Notes</strong>, then select <strong>Create exercise</strong>.</li>
+          <li>Filtering by a muscle also lists exercises that work it as an extra muscle. Your stats count each exercise under its main muscle group only.</li>
           <li>To rename or delete an exercise, open the menu at the end of its row and choose <strong>Edit</strong> or <strong>Delete</strong>. A new name shows in your past sessions too.</li>
         </guide-steps>
         <guide-tip>You can also create an exercise while building a split or during a workout, from the search box in <strong>Add exercise</strong>.</guide-tip>
@@ -47,7 +48,7 @@ import { GUIDE } from '../shared';
           <li><strong>Form progression</strong> shows the form check clips you added during workouts, and <strong>Notes</strong> shows the notes you wrote for this exercise.</li>
         </guide-steps>
         <guide-shot guide="jym" name="exercise-detail" [width]="1600" [height]="1422"
-          alt="The Bench Press page: Best weight 175.0 lbs and Est. 1RM 210.1 lbs, a note, the Est. 1RM chart with 3M, 1Y and All, rising from August to late September, and the Workouts, Form progression and Notes tabs." />
+          alt="The Bench Press page: Chest, with Shoulders and Triceps as the other muscles it works, Best weight 175.0 lbs and Est. 1RM 210.1 lbs, a note, the Est. 1RM chart with 3M, 1Y and All, rising from August to late September, and the Workouts, Form progression and Notes tabs." />
         <guide-tip>If your top weight has stayed the same, or dropped, over your last three sessions of an exercise, its page says so and suggests what to try.</guide-tip>
       </guide-section>
 
@@ -91,6 +92,7 @@ import { GUIDE } from '../shared';
           <li>Optionally, enter an <strong>RPE</strong> from 1 to 10 for how hard the set felt.</li>
           <li>Select the tick to log what the row shows, so repeating a set is one tap. If it beats your best for that exercise, it gets a <strong>PR</strong> badge. Warm-up sets never get one.</li>
           <li>The rest timer opens under the bar at the top, for the exercise's planned rest or your usual one. Select <strong>+30s</strong> for a longer rest this time, or <strong>Skip</strong>. It beeps when your rest is over.</li>
+          <li>To give an exercise its own rest in every workout, open its menu (three dots) and select <strong>Rest timer</strong>, then a length. <strong>Usual</strong> goes back to your usual rest. A plan's rest still comes first.</li>
           <li>Select a set's number to mark it as a warm-up or to remove it. To fix a logged set, select its weight or reps, change them and select <strong>Save</strong>.</li>
           <li>Use <strong>+ Add set</strong> for another set and <strong>+ Add exercise</strong> for another exercise.</li>
           <li>To change the order, open an exercise's menu (three dots) and select <strong>Move up</strong> or <strong>Move down</strong>. <strong>Remove exercise</strong> is there too.</li>
@@ -99,6 +101,7 @@ import { GUIDE } from '../shared';
         <guide-shot guide="jym" name="session-sets" [width]="1400" [height]="1268"
           alt="Bench Press during a workout: a note saying last time was 175 lbs for 5, 5, 5, 5 and to try 180 lbs, a warm-up set of 95 lbs marked with a flame, four logged sets of 175 lbs with the 6-rep set marked PR, a sixth row ready to log 175 lbs for 5, and a Plates button." />
         <guide-tip>A set is a PR when it is the heaviest weight you have logged for that exercise, or the same top weight for more reps. Warm-ups are left out on both sides: they never count as a PR and never raise the bar for one. Marking a PR set as a warm-up takes its badge away.</guide-tip>
+        <guide-tip>A locked phone can hold the rest timer's beep until you look again. To keep the screen on during a workout, open <strong>Workout options</strong> and set <strong>Keep screen on</strong> to <strong>On</strong>. It only applies to this device.</guide-tip>
       </guide-section>
 
       <guide-section id="warm-up-and-load-the-bar" title="Warm up and load the bar"

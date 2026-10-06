@@ -15,7 +15,7 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
 import { PlayerStore } from './player-store';
 import { RestRowComponent } from './rest-row';
 import { PlatesSheetComponent } from './plates-sheet';
-import { OptionsSheetComponent, SetSheetComponent } from './player-sheets';
+import { OptionsSheetComponent, RestSheetComponent, SetSheetComponent } from './player-sheets';
 import { ExercisePickerComponent, PickerExercise } from './exercise-picker';
 import { ExerciseBlockComponent } from './exercise-block';
 import { SaveTemplateDialogComponent } from '../shared/save-template-dialog';
@@ -26,7 +26,7 @@ import { ConfirmService } from '../../../core/services/confirm.service';
   selector: 'app-session-player',
   providers: [PlayerStore],
   standalone: true,
-  imports: [FormsModule, JiroButtonComponent, JiroIconComponent, JiroSkeletonComponent, JiroEmptyStateComponent, SaveTemplateDialogComponent, RestRowComponent, PlatesSheetComponent, OptionsSheetComponent, SetSheetComponent, ExercisePickerComponent, ExerciseBlockComponent],
+  imports: [FormsModule, JiroButtonComponent, JiroIconComponent, JiroSkeletonComponent, JiroEmptyStateComponent, SaveTemplateDialogComponent, RestRowComponent, PlatesSheetComponent, OptionsSheetComponent, SetSheetComponent, RestSheetComponent, ExercisePickerComponent, ExerciseBlockComponent],
   template: `
     <h1 class="sr-only">Active session</h1>
     <!-- Sticky bar: the clock, the options, and Finish; everything else waits in the options sheet. -->
@@ -186,8 +186,8 @@ import { ConfirmService } from '../../../core/services/confirm.service';
     <!-- Workout options: type, units, rest, and leaving -->
     @if (showOptions()) {
       <jym-options-sheet
-        [sessionType]="sessionType()" [restSetting]="store.restSetting()" [fix]="store.fix" [discarding]="discarding()"
-        (type)="setSessionType($event)" (unit)="toggleUnit($event)" (rest)="store.setRestDefault($event)"
+        [sessionType]="sessionType()" [restSetting]="store.restSetting()" [keepAwake]="store.keepAwake()" [fix]="store.fix" [discarding]="discarding()"
+        (type)="setSessionType($event)" (unit)="toggleUnit($event)" (rest)="store.setRestDefault($event)" (awake)="store.setKeepAwake($event)"
         (saveTemplate)="showOptions.set(false); showTemplateSave.set(true)"
         (leave)="exitSession()" (discard)="discardSession()" (close)="showOptions.set(false)" />
     }
@@ -200,6 +200,12 @@ import { ConfirmService } from '../../../core/services/confirm.service';
     @if (store.setSheetRow(); as ref) {
       <jym-set-sheet [setNumber]="ref.row.setNumber" [summary]="ref.summary" [isWarmup]="ref.row.isWarmup"
         (toggleWarmup)="store.toggleWarmupFromSheet()" (remove)="store.removeSetFromSheet()" (close)="store.setSheet.set(null)" />
+    }
+
+    <!-- One exercise's rest, from its menu -->
+    @if (store.restSheetBlock(); as rb) {
+      <jym-rest-sheet [exerciseName]="rb.exerciseName" [own]="rb.ownRest ?? null" [planned]="rb.plan?.rest ?? null" [usual]="store.restSetting()"
+        (choose)="store.setExerciseRest(rb.exerciseId, $event)" (close)="store.restSheet.set(null)" />
     }
 
     <!-- Plates for one side of the bar, from the account's bar and plates -->
@@ -484,6 +490,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     if (!this.store.fix) {
       this.startTimer();
       document.addEventListener('visibilitychange', this.onVisibilityChange);
+      this.store.applyWakeLock();
     }
 
     // Load all exercises for the picker
@@ -546,6 +553,7 @@ export class SessionPlayerComponent implements OnInit, OnDestroy {
     this.store.flushDraft();
     if (this.timerInterval) clearInterval(this.timerInterval);
     this.store.rest.clear();
+    this.store.applyWakeLock(false);
     document.removeEventListener('visibilitychange', this.onVisibilityChange);
   }
 

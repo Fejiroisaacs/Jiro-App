@@ -98,12 +98,14 @@ type exportJymData struct {
 }
 
 type exportExercise struct {
-	ID          uuid.UUID `json:"id"`
-	Name        string    `json:"name"`
-	MuscleGroup *string   `json:"muscle_group"`
-	Notes       *string   `json:"notes"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID               uuid.UUID `json:"id"`
+	Name             string    `json:"name"`
+	MuscleGroup      *string   `json:"muscle_group"`
+	SecondaryMuscles []string  `json:"secondary_muscles"`
+	Notes            *string   `json:"notes"`
+	RestSeconds      *int      `json:"rest_seconds"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }
 
 type exportSplit struct {
@@ -503,12 +505,14 @@ func (h *ExportHandler) gatherJym(ctx context.Context, userID uuid.UUID) (export
 	}
 	for _, ex := range exercises {
 		out.Exercises = append(out.Exercises, exportExercise{
-			ID:          ex.ID,
-			Name:        ex.Name,
-			MuscleGroup: ex.MuscleGroup,
-			Notes:       ex.Notes,
-			CreatedAt:   ex.CreatedAt,
-			UpdatedAt:   ex.UpdatedAt,
+			ID:               ex.ID,
+			Name:             ex.Name,
+			MuscleGroup:      ex.MuscleGroup,
+			SecondaryMuscles: ex.SecondaryMuscles,
+			RestSeconds:      ex.RestSeconds,
+			Notes:            ex.Notes,
+			CreatedAt:        ex.CreatedAt,
+			UpdatedAt:        ex.UpdatedAt,
 		})
 	}
 

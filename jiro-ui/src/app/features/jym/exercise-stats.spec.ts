@@ -1,7 +1,7 @@
 // Run with `npm run test:unit` (Node's test runner; the app build skips *.spec.ts).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chartedWorkouts, defaultRange, inRange, monthTickLabel, monthTicks, notesOf, statsSeries, type StatsWorkout } from './exercise-stats.ts';
+import { chartedWorkouts, defaultRange, inRange, latestPoints, monthTickLabel, monthTicks, notesOf, statsSeries, type StatsWorkout } from './exercise-stats.ts';
 
 const NOW = new Date('2026-10-01T12:00:00Z').getTime();
 const daysAgo = (n: number) => new Date(NOW - n * 86_400_000).toISOString();
@@ -63,4 +63,13 @@ test('a tick names its year at January and on the first tick', () => {
   assert.equal(monthTickLabel(new Date(2026, 3, 1).getTime(), false), 'Apr');
   assert.equal(monthTickLabel(new Date(2026, 0, 1).getTime(), false), 'Jan 2026');
   assert.equal(monthTickLabel(new Date(2025, 9, 1).getTime(), true), 'Oct 2025');
+});
+
+test('a chart shows the latest 20 workouts at most', () => {
+  const many = Array.from({ length: 34 }, (_, i) => i);
+  const { shown, total } = latestPoints(many);
+  assert.equal(shown.length, 20);
+  assert.equal(shown[0], 14);
+  assert.equal(total, 34);
+  assert.equal(latestPoints([1, 2, 3]).shown.length, 3);
 });
