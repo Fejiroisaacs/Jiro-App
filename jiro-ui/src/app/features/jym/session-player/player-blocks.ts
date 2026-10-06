@@ -39,6 +39,8 @@ export interface ExerciseBlock {
   suggestionIcon?: 'trend-up' | 'repeat';
   /** Its superset in the workout's list (supersets.ts); null outside one. */
   group?: number | null;
+  /** The exercise's own rest in seconds, used when the plan sets none; null rests for your usual. */
+  ownRest?: number | null;
 }
 
 /** A plan entry in the player; reps is the bottom of the range when repsMax is set. */
@@ -59,6 +61,11 @@ export function planOf(x: SessionExercise): BlockPlan | undefined {
     sets: x.target_sets, reps: x.target_reps, repsMax: x.target_reps_max ?? null,
     rpe: x.target_rpe ?? null, rest: x.rest_seconds ?? null, note: x.notes ?? null,
   };
+}
+
+/** The rest after this exercise when it's set: the plan's, else its own; null rests for your usual. */
+export function restOf(block: ExerciseBlock): number | null {
+  return block.plan?.rest ?? block.ownRest ?? null;
 }
 
 /** "Plan 3×8-12 · RPE 8 · 2:00". */
@@ -87,7 +94,10 @@ export function blockFromEntry(x: SessionExercise): ExerciseBlock {
   const rows = plan
     ? Array.from({ length: plan.sets }, (_, i) => newRow(i + 1, { ghostReps: String(plan.reps) }))
     : [newRow(1)];
-  return { ...emptyBlock(x.exercise_id, x.exercise_name, x.muscle_group, rows), ...(plan ? { plan } : {}), group: x.superset_group ?? null };
+  return {
+    ...emptyBlock(x.exercise_id, x.exercise_name, x.muscle_group, rows), ...(plan ? { plan } : {}),
+    group: x.superset_group ?? null, ownRest: x.exercise_rest_seconds ?? null,
+  };
 }
 
 /** Logged sets as saved rows, one block per exercise in the order the sets come; `display` shows stored kg. */
@@ -133,6 +143,7 @@ export function buildBlocks(
     const plan = planOf(x);
     if (plan) b.plan = plan;
     b.group = x.superset_group ?? null;
+    b.ownRest = x.exercise_rest_seconds ?? null;
     const last = b.sets.filter(s => !s.isWarmup).at(-1);
     for (let n = b.sets.length + 1; plan && n <= plan.sets; n++) {
       b.sets.push(newRow(n, { ghostWeight: last?.weight ?? '', ghostReps: String(plan.reps) }));

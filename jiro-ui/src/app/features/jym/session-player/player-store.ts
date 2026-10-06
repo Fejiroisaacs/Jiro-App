@@ -23,9 +23,11 @@ import { platesFor, warmupRamp } from '../plates';
 import { DRAFT_VERSION, SessionDraft, clearDraft, readDraft, writeDraft } from '../shared/session-draft';
 import {
   ExerciseBlock, SetRow, Suggestion, blockFromEntry, buildBlocks, canLog, isShort, logLabel as logLabelText, newRow,
-  rampSummary, rpeInvalid, suggestionFrom, workingWeight,
+  rampSummary, restOf, rpeInvalid, suggestionFrom, workingWeight,
 } from './player-blocks';
 import { RestTimer } from './rest-timer';
+import { ScreenWakeLock } from '../../../core/utils/wake-lock';
+import { readLocal, writeLocal } from '../../../core/storage';
 import { groupLabels, linkedWithNext, membersOf, normalizeGroups, roundStep, segments, toggleLink } from '../supersets';
 import { PickerExercise } from './exercise-picker';
 
@@ -85,6 +87,15 @@ export class PlayerStore {
   readonly rest = new RestTimer();
   private readonly restChoice = signal<number | null>(null);
   readonly restSetting = computed(() => this.restChoice() ?? this.settingsService.restSeconds());
+  /** The exercise whose rest is running, and whether it runs at your usual length; a change to that restarts it. */
+  private restAfter: string | null = null;
+  private restIsUsual = true;
+  /** The exercise whose Rest sheet is open. */
+  readonly restSheet = signal<string | null>(null);
+  readonly restSheetBlock = computed(() => this.blocks().find(b => b.exerciseId === this.restSheet()) ?? null);
+  // Keep the screen on during the workout: a per-device choice, as it costs this phone's battery.
+  readonly keepAwake = signal(readLocal(KEEP_AWAKE_KEY) === '1');
+  private readonly wakeLock = new ScreenWakeLock();
 
   sessionId = '';
   /** Fixing a finished workout (route data `fix`): no clock, rest, draft or Finish; sets are fixed in. */
@@ -119,15 +130,18 @@ export class PlayerStore {
   });
 
   // ── Rest timer ──────────────────────────────────────────────────
-  private startRestTimer(seconds = this.restSetting()) {
-    this.rest.start(seconds);
+  /** Undefined seconds is your usual length. */
+  private startRestTimer(seconds: number | undefined, after: string | null) {
+    this.restAfter = after;
+    this.restIsUsual = seconds === undefined;
+    this.rest.start(seconds ?? this.restSetting());
   }
 
   /** Every rest's length, remembered on the account; applied at once, reverted if the save fails. */
   setRestDefault(seconds: number) {
     if (seconds === this.restSetting()) return;
     this.restChoice.set(seconds);
-    if (this.rest.active() && !this.rest.done()) this.startRestTimer(seconds);
+    if (this.rest.active() && !this.rest.done() && this.restIsUsual) this.startRestTimer(undefined, this.restAfter);
     this.authService.updateSettings({ rest_seconds: seconds }).subscribe({
       next: () => this.restChoice.set(null),
       error: () => {
@@ -135,6 +149,40 @@ export class PlayerStore {
         this.toast.error('Could not save the rest timer.');
       },
     });
+  }
+
+  /** The exercise's own rest, saved on it; null goes back to your usual. Shown at once, reverted if the save fails. */
+  setExerciseRest(exerciseId: string, seconds: number | null) {
+    const before = this.blocks().find(b => b.exerciseId === exerciseId);
+    if (!before || (before.ownRest ?? null) === seconds) return;
+    const prev = before.ownRest ?? null;
+    const apply = (rest: number | null) =>
+      this.blocks.update(bs => bs.map(b => b.exerciseId === exerciseId ? { ...b, ownRest: rest } : b));
+    apply(seconds);
+    // A rest running after this exercise (or its superset) restarts at the new length.
+    const bi = this.blocks().findIndex(b => b.exerciseId === exerciseId);
+    const after = this.restAfter ? this.blocks().findIndex(b => b.exerciseId === this.restAfter) : -1;
+    if (this.rest.active() && !this.rest.done() && after >= 0 && membersOf(this.groups(), after).includes(bi)) {
+      this.startRestTimer(this.restFor(after, false), this.restAfter);
+    }
+    this.jymService.setExerciseRest(exerciseId, seconds).subscribe({
+      error: () => {
+        apply(prev);
+        this.toast.error('Could not save the rest for this exercise.');
+      },
+    });
+  }
+
+  /** Keeps the screen on while the workout is open, on this device. */
+  setKeepAwake(on: boolean) {
+    this.keepAwake.set(on);
+    writeLocal(KEEP_AWAKE_KEY, on ? '1' : '0');
+    this.applyWakeLock();
+  }
+
+  /** Holds the wake lock while it's on and the workout is live; the player calls it on open and close. */
+  applyWakeLock(open = !this.closed) {
+    if (open && this.keepAwake() && !this.fix) this.wakeLock.hold(); else this.wakeLock.release();
   }
 
   /** A new row's ghosts: the last logged working set, else the suggestion the other rows carry; never a warm-up. */
@@ -236,13 +284,15 @@ export class PlayerStore {
   blockActions(bi: number): JiroMenuItem[] {
     const last = this.blocks().length - 1;
     const link = linkedWithNext(this.groups(), bi) ? [UNLINK_NEXT] : bi < last ? [LINK_NEXT] : [];
-    return [...(bi > 0 ? [MOVE_UP] : []), ...(bi < last ? [MOVE_DOWN] : []), ...link, REMOVE];
+    const rest = this.fix ? [] : [REST];
+    return [...(bi > 0 ? [MOVE_UP] : []), ...(bi < last ? [MOVE_DOWN] : []), ...link, ...rest, REMOVE];
   }
 
   onBlockAction(bi: number, action: string) {
     if (action === 'up') this.moveBlock(bi, -1);
     else if (action === 'down') this.moveBlock(bi, 1);
     else if (action === 'link') this.applyLayout(this.blocks(), toggleLink(this.groups(), bi));
+    else if (action === 'rest') this.restSheet.set(this.blocks()[bi]?.exerciseId ?? null);
     else if (action === 'remove') this.removeBlock(bi);
   }
 
@@ -281,15 +331,18 @@ export class PlayerStore {
   private afterLogged(bi: number, warmup: boolean) {
     const blocks = this.blocks();
     const step = warmup ? { rest: true, next: null } : roundStep(this.groups(), bi, j => blocks[j].sets.some(s => !s.saved && !s.isWarmup));
-    if (step.rest) this.startRestTimer(this.restFor(bi, warmup));
+    if (step.rest) this.startRestTimer(this.restFor(bi, warmup), this.blocks()[bi].exerciseId);
     if (step.next !== null) this.pointTo(step.next);
   }
 
-  /** Seconds to rest after exercise bi: its plan's, or in a superset the longest of its members'; undefined is your usual. */
+  /**
+   * Seconds to rest after exercise bi: the plan's, else the exercise's own; in a superset the longest of its
+   * members'. Undefined is your usual.
+   */
   private restFor(bi: number, warmup: boolean): number | undefined {
     const blocks = this.blocks();
     const members = warmup ? [bi] : membersOf(this.groups(), bi);
-    const planned = members.map(i => blocks[i].plan?.rest).filter((r): r is number => r != null);
+    const planned = members.map(i => restOf(blocks[i])).filter((r): r is number => r != null);
     return planned.length ? Math.max(...planned) : undefined;
   }
 
@@ -614,6 +667,7 @@ export class PlayerStore {
   /** The session is over (finished, discarded or ended elsewhere): drop its draft for good. */
   closeDraft() {
     this.closed = true;
+    this.wakeLock.release();
     if (this.draftTimer) clearTimeout(this.draftTimer);
     clearDraft(this.sessionId);
   }
@@ -832,6 +886,8 @@ const SUGGESTION_SETS = 60;
 const MOVE_UP: JiroMenuItem = { id: 'up', label: 'Move up', icon: 'caret-up' };
 const MOVE_DOWN: JiroMenuItem = { id: 'down', label: 'Move down', icon: 'caret-down' };
 const REMOVE: JiroMenuItem = { id: 'remove', label: 'Remove exercise', icon: 'trash', danger: true };
+const REST: JiroMenuItem = { id: 'rest', label: 'Rest timer', icon: 'timer' };
+const KEEP_AWAKE_KEY = 'jiro_jym_keep_awake';
 const LINK_NEXT: JiroMenuItem = { id: 'link', label: 'Superset with next', icon: 'link' };
 const UNLINK_NEXT: JiroMenuItem = { id: 'link', label: 'Unlink from next', icon: 'link' };
 

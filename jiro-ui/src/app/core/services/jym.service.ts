@@ -16,6 +16,8 @@ export interface Exercise {
   /** Other muscles it works, for organising only; every count uses muscle_group. */
   secondary_muscles: string[];
   notes: string | null;
+  /** Its own rest when the plan sets none; null rests for the account's usual. */
+  rest_seconds: number | null;
   created_at: string;
   updated_at: string;
   /** Only populated by listExercises(); null elsewhere and when never performed. */
@@ -340,6 +342,8 @@ export interface SessionExercise extends PlanDetails {
   position: number;
   target_sets: number | null;
   target_reps: number | null;
+  /** The exercise's own rest, used when the plan's rest_seconds is null. */
+  exercise_rest_seconds: number | null;
 }
 
 export interface SessionWithSets extends Session {
@@ -459,6 +463,11 @@ export class JymService {
 
   updateExercise(id: string, req: UpdateExerciseRequest): Observable<Exercise> {
     return this.http.put<Exercise>(`${API_URL}/exercises/${id}`, req);
+  }
+
+  /** The exercise's own rest in seconds; null goes back to the account's usual. */
+  setExerciseRest(id: string, seconds: number | null): Observable<{ rest_seconds: number | null }> {
+    return this.http.put<{ rest_seconds: number | null }>(`${API_URL}/exercises/${id}/rest`, { rest_seconds: seconds });
   }
 
   deleteExercise(id: string): Observable<void> {

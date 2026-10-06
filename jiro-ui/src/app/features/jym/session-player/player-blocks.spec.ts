@@ -1,7 +1,7 @@
 // Run with: npm run test:unit
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildBlocks, canLog, isShort, logLabel, newRow, planTag, rampSummary, rpeInvalid, suggestionFrom, workingWeight, emptyBlock } from './player-blocks.ts';
+import { buildBlocks, canLog, isShort, logLabel, newRow, planTag, rampSummary, restOf, rpeInvalid, suggestionFrom, workingWeight, emptyBlock } from './player-blocks.ts';
 
 const same = (kg: number) => kg;
 const entry = (id: string, sets: number | null = null, reps: number | null = null, position = 1) =>
@@ -127,4 +127,18 @@ test('the suggestion line: up with a plan, hold after a miss, reps for bodyweigh
   assert.equal(hold.icon, 'repeat');
   const bw = suggestionFrom({ last: [{ weight: 0, reps: 10, warmup: false }, { weight: 0, reps: 9, warmup: false }], move: 'reps', weight: 0, reps: 11, reason: null }, undefined, 'kg');
   assert.equal(bw.text, 'Last time 10, 9 reps. Aim for 11 reps.');
+});
+
+test("rest after an exercise is the plan's, else the exercise's own, else null for your usual", () => {
+  const withRest = (planRest: number | null, own: number | null) => {
+    const x = { ...entry('row', 3, 8), rest_seconds: planRest, exercise_rest_seconds: own };
+    return restOf(buildBlocks([x], [], {}, same)[0]);
+  };
+  assert.equal(withRest(180, 90), 180);
+  assert.equal(withRest(null, 90), 90);
+  assert.equal(withRest(null, null), null);
+  // Outside a plan, and once logged, the exercise's own rest still applies.
+  const loose = { ...entry('curl'), exercise_rest_seconds: 60 };
+  assert.equal(restOf(buildBlocks([loose], [], {}, same)[0]), 60);
+  assert.equal(restOf(buildBlocks([loose], [set('curl', 1, 10, 12)], {}, same)[0]), 60);
 });
