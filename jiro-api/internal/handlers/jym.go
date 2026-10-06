@@ -607,6 +607,55 @@ func (h *JymHandler) ListTemplates(c *gin.Context) {
 	c.JSON(http.StatusOK, templates)
 }
 
+// GET /jym/templates/:id
+func (h *JymHandler) GetTemplate(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid template ID"}})
+		return
+	}
+	tmpl, err := h.jymService.GetTemplate(c.Request.Context(), userID, id)
+	if err != nil {
+		if err == services.ErrRoutineNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Template not found"}})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to load the template"}})
+		return
+	}
+	c.JSON(http.StatusOK, tmpl)
+}
+
+// POST /jym/routines/:id/copy
+func (h *JymHandler) CopyRoutine(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_ID", Message: "Invalid day or template ID"}})
+		return
+	}
+	var req models.CopyRoutineRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()}})
+		return
+	}
+	copied, err := h.jymService.CopyRoutine(c.Request.Context(), userID, id, req.SplitID, req.Name)
+	if err != nil {
+		if err == services.ErrRoutineNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Day or template not found"}})
+			return
+		}
+		if err == services.ErrSplitNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Split not found"}})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to copy"}})
+		return
+	}
+	c.JSON(http.StatusCreated, copied)
+}
+
 func (h *JymHandler) CreateTemplateFromSession(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 	sessionID, err := uuid.Parse(c.Param("id"))

@@ -231,6 +231,13 @@ type CreateRoutineRequest struct {
 	DayOrder int    `json:"day_order"`
 }
 
+// CopyRoutineRequest copies a day or template: into SplitID as its last day, or with none as a template.
+type CopyRoutineRequest struct {
+	SplitID *uuid.UUID `json:"split_id"`
+	// Name defaults to the source's.
+	Name *string `json:"name" binding:"omitempty,max=100"`
+}
+
 type UpdateRoutineRequest struct {
 	Name     *string `json:"name"`
 	DayOrder *int    `json:"day_order"`

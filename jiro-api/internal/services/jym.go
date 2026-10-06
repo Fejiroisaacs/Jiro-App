@@ -8,6 +8,7 @@ import (
 	"io"
 	"math"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/models"
@@ -669,7 +670,7 @@ func (s *JymService) UpdateRoutine(ctx context.Context, userID, routineID uuid.U
 		   name      = COALESCE($3, name),
 		   day_order = COALESCE($4, day_order)
 		 WHERE id = $1
-		   AND split_id IN (SELECT id FROM splits WHERE user_id = $2)
+		   AND (split_id IN (SELECT id FROM splits WHERE user_id = $2) OR (split_id IS NULL AND user_id = $2))
 		 RETURNING id, user_id, split_id, name, day_order, created_at`,
 		routineID, userID, req.Name, req.DayOrder,
 	).Scan(&rt.ID, &rt.UserID, &rt.SplitID, &rt.Name, &rt.DayOrder, &rt.CreatedAt)
@@ -2986,16 +2987,92 @@ func intStr(n int) string {
 // ListTemplates returns all standalone routines (split_id IS NULL) owned by the user,
 // with their exercise items included.
 func (s *JymService) ListTemplates(ctx context.Context, userID uuid.UUID) ([]models.RoutineWithItems, error) {
-	rows, err := s.db.Query(ctx,
+	return s.routinesWithItems(ctx, s.db, `r.user_id = $1 AND r.split_id IS NULL`, userID)
+}
+
+// GetTemplate is one of the user's templates with its items.
+func (s *JymService) GetTemplate(ctx context.Context, userID, templateID uuid.UUID) (*models.RoutineWithItems, error) {
+	list, err := s.routinesWithItems(ctx, s.db, `r.user_id = $1 AND r.split_id IS NULL AND r.id = $2`, userID, templateID)
+	if err != nil {
+		return nil, err
+	}
+	if len(list) == 0 {
+		return nil, ErrRoutineNotFound
+	}
+	return &list[0], nil
+}
+
+// CopyRoutine copies a day or template with its whole plan: into splitID as its last day, or with none as a
+// template. The source stays as it is.
+func (s *JymService) CopyRoutine(ctx context.Context, userID, routineID uuid.UUID, splitID *uuid.UUID, name *string) (*models.RoutineWithItems, error) {
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	var srcName string
+	if err := tx.QueryRow(ctx, `SELECT name FROM routines WHERE id = $1 AND user_id = $2`, routineID, userID).Scan(&srcName); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrRoutineNotFound
+		}
+		return nil, err
+	}
+	if name != nil && strings.TrimSpace(*name) != "" {
+		srcName = strings.TrimSpace(*name)
+	}
+	dayOrder := 1
+	if splitID != nil {
+		if err := tx.QueryRow(ctx,
+			`SELECT COALESCE((SELECT MAX(day_order) FROM routines WHERE split_id = s.id), 0) + 1
+			 FROM splits s WHERE s.id = $1 AND s.user_id = $2`,
+			*splitID, userID,
+		).Scan(&dayOrder); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, ErrSplitNotFound
+			}
+			return nil, err
+		}
+	}
+	var newID uuid.UUID
+	if err := tx.QueryRow(ctx,
+		`INSERT INTO routines (user_id, split_id, name, day_order) VALUES ($1, $2, $3, $4) RETURNING id`,
+		userID, splitID, srcName, dayOrder,
+	).Scan(&newID); err != nil {
+		return nil, err
+	}
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO routine_items (routine_id, exercise_id, target_sets, target_reps, order_index,
+		                            target_reps_max, target_rpe, rest_seconds, notes, superset_group)
+		 SELECT $1, exercise_id, target_sets, target_reps, order_index,
+		        target_reps_max, target_rpe, rest_seconds, notes, superset_group
+		 FROM routine_items WHERE routine_id = $2`,
+		newID, routineID,
+	); err != nil {
+		return nil, err
+	}
+	list, err := s.routinesWithItems(ctx, tx, `r.user_id = $1 AND r.id = $2`, userID, newID)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return &list[0], nil
+}
+
+// routinesWithItems is the routines matching where (over alias r), newest first, each with its items in order.
+func (s *JymService) routinesWithItems(ctx context.Context, q querier, where string, args ...any) ([]models.RoutineWithItems, error) {
+	rows, err := q.Query(ctx,
 		`SELECT r.id, r.user_id, r.split_id, r.name, r.day_order, r.created_at,
 		        ri.id, ri.routine_id, ri.exercise_id, ri.target_sets, ri.target_reps, ri.order_index,
 		        e.name, e.muscle_group, ri.target_reps_max, ri.target_rpe, ri.rest_seconds, ri.notes, ri.superset_group
 		 FROM routines r
 		 LEFT JOIN routine_items ri ON ri.routine_id = r.id
 		 LEFT JOIN exercises e ON e.id = ri.exercise_id
-		 WHERE r.user_id = $1 AND r.split_id IS NULL
-		 ORDER BY r.created_at DESC, ri.order_index ASC`,
-		userID,
+		 WHERE `+where+`
+		 ORDER BY r.created_at DESC, r.id, ri.order_index ASC`,
+		args...,
 	)
 	if err != nil {
 		return nil, err
