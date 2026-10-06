@@ -76,7 +76,7 @@ import { GUIDE } from '../shared';
         lead="Start from a day of a split to get its exercises and targets ready, or start an empty freestyle session.">
         <guide-steps>
           <li>On the <a routerLink="/jym">Jym</a> home page, select the play button on a split. You can also select <strong>Start</strong> on a split in <a routerLink="/jym/plan">Plan</a>.</li>
-          <li>In <strong>Choose routine</strong>, pick the day you are training, or <strong>Freestyle (no routine)</strong>.</li>
+          <li>In <strong>Choose a day</strong>, pick the day you are training, or <strong>Freestyle</strong>.</li>
           <li>For a workout with no plan, select <strong>Freestyle session</strong> on the Jym home page, or <strong>New session</strong> in <a routerLink="/jym/track">Track</a>.</li>
           <li>With Jiro installed on an Android phone or a computer, press and hold (or right-click) its icon for <strong>Start workout</strong> and <strong>Resume workout</strong>. iPhones don't offer these shortcuts.</li>
         </guide-steps>
@@ -141,11 +141,14 @@ import { GUIDE } from '../shared';
       </guide-section>
 
       <guide-section id="save-and-reuse-a-template" title="Save and reuse a template"
-        lead="A template keeps a workout's exercises so you can start the same workout again.">
+        lead="A template is a workout on its own, outside any split, that you can start again whenever you like.">
         <guide-steps>
           <li>During a workout with at least one logged set, open <strong>Workout options</strong> and select <strong>Save as template</strong>. A finished workout's summary has the same button.</li>
           <li>Enter a name and select <strong>Save template</strong>.</li>
+          <li>To make one from a split's day instead, open the day's menu (three dots) on the split and select <strong>Save as template</strong>. The day stays in the split.</li>
           <li>To use it, select the template under <strong>Templates</strong> on the <a routerLink="/jym">Jym</a> home page, or select <strong>Start</strong> on it in <a routerLink="/jym/plan" [queryParams]="{ tab: 'templates' }">Plan, Templates</a>.</li>
+          <li>To change one, select <strong>Edit</strong> on it in Plan, Templates. Rename it with the pencil, and add, drag, link or remove exercises and set their plans the same way as on a split's day.</li>
+          <li>To put a template into a split, select <strong>Add to split</strong> while editing it, then the split. A copy becomes the split's last day, and the template stays as it is.</li>
         </guide-steps>
         <guide-shot guide="jym" name="save-template" [width]="840" [height]="584"
           alt="The Save as template window with the name Push day A, and Cancel and Save template buttons." />
