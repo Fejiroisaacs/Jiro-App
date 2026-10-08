@@ -43,7 +43,7 @@ func finishSession(t *testing.T, svc *JymService, userID, sessionID uuid.UUID) {
 func logSet(t *testing.T, svc *JymService, userID, sessionID, exerciseID uuid.UUID, n int, weight float64, reps int) *models.SessionSet {
 	t.Helper()
 	set, err := svc.LogSet(context.Background(), userID, sessionID, &models.CreateSetRequest{
-		ExerciseID: exerciseID, SetNumber: n, Weight: weight, RepsPerformed: reps,
+		ExerciseID: exerciseID, SetNumber: n, Weight: weight, RepsPerformed: ip(reps),
 	})
 	if err != nil {
 		t.Fatalf("log %v x %d: %v", weight, reps, err)

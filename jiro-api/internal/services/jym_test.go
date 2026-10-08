@@ -94,7 +94,7 @@ func TestLogSetRefusesEndedSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("start session: %v", err)
 	}
-	set := &models.CreateSetRequest{ExerciseID: ex.ID, SetNumber: 1, Weight: 100, RepsPerformed: 5}
+	set := &models.CreateSetRequest{ExerciseID: ex.ID, SetNumber: 1, Weight: 100, RepsPerformed: ip(5)}
 	if _, err := svc.LogSet(ctx, userID, started.ID, set); err != nil {
 		t.Fatalf("log set on live session: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestWarmupIsNeverPR(t *testing.T) {
 	}
 	warm := true
 	first, err := svc.LogSet(ctx, userID, started.ID, &models.CreateSetRequest{
-		ExerciseID: ex.ID, SetNumber: 1, Weight: 60, RepsPerformed: 10, IsWarmup: &warm,
+		ExerciseID: ex.ID, SetNumber: 1, Weight: 60, RepsPerformed: ip(10), IsWarmup: &warm,
 	})
 	if err != nil {
 		t.Fatalf("log warm-up: %v", err)
@@ -148,7 +148,7 @@ func TestWarmupIsNeverPR(t *testing.T) {
 		t.Fatalf("first-ever warm-up was marked a PR")
 	}
 	work, err := svc.LogSet(ctx, userID, started.ID, &models.CreateSetRequest{
-		ExerciseID: ex.ID, SetNumber: 2, Weight: 80, RepsPerformed: 5,
+		ExerciseID: ex.ID, SetNumber: 2, Weight: 80, RepsPerformed: ip(5),
 	})
 	if err != nil {
 		t.Fatalf("log working set: %v", err)
@@ -157,7 +157,7 @@ func TestWarmupIsNeverPR(t *testing.T) {
 		t.Fatalf("first working set should be a PR")
 	}
 	heavyWarm, err := svc.LogSet(ctx, userID, started.ID, &models.CreateSetRequest{
-		ExerciseID: ex.ID, SetNumber: 3, Weight: 120, RepsPerformed: 1, IsWarmup: &warm,
+		ExerciseID: ex.ID, SetNumber: 3, Weight: 120, RepsPerformed: ip(1), IsWarmup: &warm,
 	})
 	if err != nil {
 		t.Fatalf("log heavy warm-up: %v", err)

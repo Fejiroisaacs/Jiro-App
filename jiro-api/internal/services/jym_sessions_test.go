@@ -79,7 +79,7 @@ func TestExerciseHistoryHeaderCoversAllWorkingSets(t *testing.T) {
 	sess := startSession(t, svc, userID, "")
 	warm := true
 	if _, err := svc.LogSet(ctx, userID, sess, &models.CreateSetRequest{
-		ExerciseID: ex, SetNumber: 1, Weight: 200, RepsPerformed: 1, IsWarmup: &warm,
+		ExerciseID: ex, SetNumber: 1, Weight: 200, RepsPerformed: ip(1), IsWarmup: &warm,
 	}); err != nil {
 		t.Fatalf("log warm-up: %v", err)
 	}

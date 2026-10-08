@@ -35,12 +35,42 @@ A personal exercise dictionary. Each exercise has a **name**, an optional **main
 - Renaming an exercise renames it across all history, since sets reference the exercise by ID.
 - Deleting an exercise removes every set logged with it; the library asks first.
 
-### Splits & Routines
-A **split** is a named training plan (e.g. "PPL", "Upper/Lower"). It contains one or more **routines** (e.g. "Push Day", "Pull Day"). Each routine has an ordered list of exercises with target sets and reps.
+### Exercise Types
+Each exercise has a **type** (`exercises.kind`), which sets its inputs, volume and records. The rules and the decision
+log are in [JYM-EXERCISE-TYPES.md](JYM-EXERCISE-TYPES.md).
+
+| Type | Player columns | Volume | Record |
+|---|---|---|---|
+| Weight × reps (default) | Weight, Reps | weight × reps | more weight, or more reps at it |
+| Bodyweight | + kg (added, blank is none), Reps | (body weight + load) × reps | e1RM of body weight + load (load, then reps, with no body weight logged) |
+| Duration | + kg, Time | none (counts as time held) | the longest hold at the same or more load |
+| Distance + time | Distance, Time | none (counts as distance) | the longest distance, or the best pace over 400 m |
+
+- A bodyweight set carries the body weight it counts (`session_sets.body_weight_kg`): the latest entry on or before
+  the workout's day. Logging or deleting a body weight refreshes those and re-rates.
+- Distance follows the weight unit: km for kg, miles for lbs (stored in metres). Times are typed on the number
+  keypad and fill from the right: 45 is 0:45, 130 is 1:30, 2505 is 25:05.
+- Plans hold sets × the type's target: 3 × 8, 3 × 0:45 (seconds in `target_reps`), 1 × 5 km (`target_distance_m`).
+- The type changes freely between weight × reps and bodyweight; to or from duration or distance only before any set
+  is logged (409 `KIND_LOCKED`). The library tags non-weight types and filters by type.
+- Only weight × reps gets today's aim, plates, warm-up ramps and the deload, plateau and series rules; the others
+  show last time and ghost it. A logged distance set shows its pace and which record it set.
+- Summaries and history cards add the distance and the time held; the exercise page charts e1RM and most reps
+  (bodyweight), the longest hold, or distance and pace (pace axis inverted).
+
+### Splits, Days and Templates
+A **split** is a named training plan (e.g. "PPL", "Upper/Lower"). It contains one or more **days** (e.g. "Push Day", "Pull Day"). Each day has an ordered list of exercises with target sets and reps. A **template** is the same thing on its own, outside any split. The UI says "day" inside a split and "template" on its own, never "routine" (the API and database still call both a routine: `routines`, `routine_id`).
 
 - Build splits at `/jym/splits/:id`. Drag exercises to reorder them or move them to another day.
 - **Add day** adds a day after the last one. Tap a day's name to rename it; the arrows move it earlier or later.
 - Multiple splits can exist at once; a series makes one active.
+- A day's menu (⋯) has **Save as template** (a copy, plan and supersets included; the day stays) and **Delete day**.
+
+### Templates
+- Saved from a workout (Workout options or the summary) or from a split's day. Listed in Plan > Templates and on the Jym home.
+- `/jym/templates/:id` edits one on the split page in template mode: rename, add, drag, plan sheet, supersets and remove all work as on a day; there is no day number, visibility, tags, share or series. **Start** waits for any save still running.
+- **Add to split** copies it into a split as the last day (`POST /jym/routines/:id/copy` with `split_id`; without one, the same endpoint makes a template). Both directions copy, so later edits on one don't touch the other.
+- `GET /jym/templates/:id` reads one; `PUT /jym/routines/:id` renames a template as well as a day.
 
 ### The Plan for Each Exercise
 Tap an exercise's plan chip (such as "3×8") to open its plan:
@@ -77,8 +107,8 @@ A **series** ties a split to a time window (weeks, sessions count, or open-ended
 ## Live Session Player
 
 ### Starting a Session
-- **Routine session**: tap "Start" next to a routine on the hub. The player pre-populates exercise blocks and set rows from the routine's targets.
-- **The workout keeps its own list** on the server: its exercises, in order, with the plan's sets and reps as they were when it started. Editing the routine mid-workout doesn't change it, and an exercise added or removed on one phone shows the same on another.
+- **From a day or template**: tap "Start" next to it on the hub (the picker is **Choose a day**, with **Freestyle** last). The player pre-populates exercise blocks and set rows from its targets.
+- **The workout keeps its own list** on the server: its exercises, in order, with the plan's sets and reps as they were when it started. Editing the day mid-workout doesn't change it, and an exercise added or removed on one phone shows the same on another.
 - **Freestyle session**: tap "Freestyle session" for an open canvas; add any exercises you want.
 - **A workout is already open**: every start button asks whether to resume it, start a new one anyway, or cancel. A forgotten one gets a different choice (see Forgotten Workouts).
 
@@ -114,7 +144,7 @@ Each exercise block shows a set table with columns: **Set**, **Weight**, **Reps*
 - Ghost values before the first set are today's aim (see below); after it, the last logged working set.
 - A saved set is tinted. A **PR** badge appears if the set is a personal record.
 - Tap a logged value to correct it: the row shows **Cancel** and **Save** under it (Enter on reps or RPE also saves; Escape cancels on desktop).
-- In a routine, the block shows its plan ("Plan 3 × 8"), and a logged working set below the planned reps is marked.
+- From a day or template, the block shows its plan ("Plan 3 × 8"), and a logged working set below the planned reps is marked.
 
 ### The Set Number
 Tap a set's number for its sheet: **Mark as warm-up** (or **Make it a working set**) and **Remove set**. Removing a logged set deletes it; removing an unlogged row just drops it. The rows renumber either way.
@@ -139,7 +169,7 @@ Every exercise with history shows one line above its sets: what you did last tim
 > *Last time 100 lbs × 8, 8, 6. Stay at 100 lbs until every set hits 8.*
 
 - **Last time** is the latest finished normal workout that started before this one. Deload and test days and unfinished workouts are skipped, and warm-ups are not counted.
-- **With a plan** (a routine's sets × reps), it is double progression: once enough sets at the top weight hit the planned reps, try one plate more; until then, stay at the same weight.
+- **With a plan** (a day's or template's sets × reps), it is double progression: once enough sets at the top weight hit the planned reps, try one plate more; until then, stay at the same weight.
 - **With a rep range** (8-12), the plate goes on once every set at the top weight reaches the top of the range, and today aims for the bottom again. Until then it stays, aiming one rep past last time's best, never past the top: *Last time 100 kg × 10, 9, 8. Stay at 100 kg until every set hits 12; aim for 11 today.* A set below the bottom of the range is marked short.
 - **Freestyle**: one plate more, unless the top set was logged at RPE 9 or more; then stay and aim for one more rep.
 - **Bodyweight** lifts aim for one more rep.
@@ -174,9 +204,9 @@ A workout is **stale** when it's open and nothing has been logged for 3 hours (o
 
 ### Workout Summary
 At `/jym/sessions/:id/summary`, built by the server (`GET /jym/sessions/:id/summary`), so a reload keeps it and its numbers match history. Finish, history ("View summary"), the day view and search all open it, and **Done** returns where you came from.
-- The routine name under "Workout complete", when it ran ("Mon 28 Sep, 7:30 PM to 8:42 PM"), then duration, volume and work sets (warm-ups left out) and the number of lifts that set a record.
+- The day or template name under "Workout complete", when it ran ("Mon 28 Sep, 7:30 PM to 8:42 PM"), then duration, volume and work sets (warm-ups left out) and the number of lifts that set a record.
 - **Edit times** changes a finished workout's start or end. The end is after the start, not in the future and at most 24 hours later, and the times must include every logged set.
-- **Repeat workout** starts a normal workout with the same exercises in the order they were done, of the same routine if there was one (exercises in the routine keep its sets and reps).
+- **Repeat workout** starts a normal workout with the same exercises in the order they were done, of the same day or template if there was one (exercises in it keep its sets and reps).
 - **Save as template** saves its exercises, sets and reps.
 - An open workout's summary says it isn't finished and offers **Resume workout**.
 - **Muscle groups**: each group's share of the working sets, so bodyweight work counts.
@@ -204,7 +234,7 @@ At `/jym/sessions/:id/summary`, built by the server (`GET /jym/sessions/:id/summ
 
 Sessions at `/jym/track?tab=sessions`, 50 at a time with "Show older sessions", showing:
 - Date and time
-- Routine name (or "Freestyle")
+- Day or template name (or "Freestyle")
 - Duration
 - Working sets (warm-ups left out)
 - Total volume (weight × reps over working sets, displayed in your preferred unit)

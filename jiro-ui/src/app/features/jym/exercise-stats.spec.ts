@@ -73,3 +73,18 @@ test('a chart shows the latest 20 workouts at most', () => {
   assert.equal(total, 34);
   assert.equal(latestPoints([1, 2, 3]).shown.length, 3);
 });
+
+test('holds, distances and pace chart from their own numbers; a workout without a pace is left out', () => {
+  const w = (id: string, day: string, extra: Record<string, unknown>) => ({
+    session_id: id, started_at: `2026-09-${day}T10:00:00Z`, session_type: 'normal', working_sets: 1,
+    max_weight: 0, best_e1rm: 0, volume: 0, note: null, ...extra,
+  });
+  const runs = [
+    w('a', '01', { max_distance_m: 5000, best_pace_s_per_km: 300 }),
+    w('b', '08', { max_distance_m: 300, best_pace_s_per_km: null }),
+  ];
+  const now = Date.parse('2026-09-20T00:00:00Z');
+  assert.deepEqual(statsSeries(runs, 'distance', 'all', now).map(p => p.y), [5000, 300]);
+  assert.deepEqual(statsSeries(runs, 'pace', 'all', now).map(p => p.sessionId), ['a']);
+  assert.deepEqual(statsSeries([w('p', '01', { max_duration_s: 75 })], 'hold', 'all', now).map(p => p.y), [75]);
+});

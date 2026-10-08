@@ -4,7 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
-import { JymService, SessionReport, UpdateSessionTimesRequest } from '../../../core/services/jym.service';
+import { JymService, SessionReport, SetRef, UpdateSessionTimesRequest } from '../../../core/services/jym.service';
+import { ExerciseKind, distanceText, distanceUnit, durationText, kindOf, setText } from '../exercise-kind';
 import { SettingsService } from '../../../core/services/settings.service';
 import { ToastService } from '../../../core/services/toast.service';
 import { dayKey, fromZonedInput, timeInZone, toZonedInput } from '../../../core/utils/day';
@@ -26,6 +27,9 @@ interface LiftHighlight {
   est1RM: number;
   isPR: boolean;
   previous?: { weight: number; reps: number; est1RM: number };
+  /** The best set and last time's in the lift's own words ("100 × 5", "0:45", "5 km in 26:00"). */
+  text: string;
+  previousText?: string;
 }
 
 interface MuscleGroupData {
@@ -118,6 +122,18 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
             <div class="stat-value">{{ totalSets() }}</div>
             <div class="stat-label">Work sets</div>
           </div>
+          @if (totalDistance(); as d) {
+            <div class="stat-card">
+              <div class="stat-value">{{ d }}</div>
+              <div class="stat-label">Distance</div>
+            </div>
+          }
+          @if (totalHeld(); as t) {
+            <div class="stat-card">
+              <div class="stat-value">{{ t }}</div>
+              <div class="stat-label">Time held</div>
+            </div>
+          }
         </div>
 
         @if (muscleGroups().length > 0) {
@@ -153,11 +169,11 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
                     } @else {
                       <span class="best-tag">Best</span>
                     }
-                    <span class="lift-weight">{{ lift.weight | number:'1.0-1' }} × {{ lift.reps }}</span>
+                    <span class="lift-weight">{{ lift.text }}</span>
                   </div>
                   @if (lift.previous; as prev) {
                     <div class="lift-previous">
-                      Last time {{ prev.weight | number:'1.0-1' }} × {{ prev.reps }}
+                      Last time {{ lift.previousText }}
                       @if (est1RMDelta(lift); as d) {
                         <span class="delta" [class.delta-up]="d.direction === 'up'" [class.delta-down]="d.direction === 'down'">
                           {{ d.direction === 'up' ? '↑' : d.direction === 'down' ? '↓' : '' }}{{ d.pct > 0 ? d.pct + '%' : '' }}
@@ -270,7 +286,7 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
                 @if (lift.isPR) {
                   <span class="sc-pr">PR</span>
                 }
-                <span class="sc-lw">{{ lift.weight | number:'1.0-1' }} × {{ lift.reps }}</span>
+                <span class="sc-lw">{{ lift.text }}</span>
               </div>
             }
           </div>
@@ -391,12 +407,14 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
 
     .stats-row {
       display: flex;
+      flex-wrap: wrap;
       gap: var(--space-sm);
       margin-bottom: var(--space-xl);
     }
 
+    /* As many as fit at 96 px or more: a phone shows three, then the distance and time held below. */
     .stat-card {
-      flex: 1;
+      flex: 1 1 96px;
       background: var(--bg-surface);
       border: 1px solid var(--border-color);
       border-radius: var(--border-radius-lg);
@@ -869,6 +887,9 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
 export class SessionSummaryComponent implements OnInit {
   durationStr    = signal('');
   totalVolume    = signal('0');
+  /** Distance run, rowed or ridden, and time held, when the workout had any. */
+  totalDistance  = signal('');
+  totalHeld      = signal('');
   totalSets      = signal(0);
   prCount        = signal(0);
   sessionType    = signal('normal');
@@ -955,6 +976,9 @@ export class SessionSummaryComponent implements OnInit {
     this.totalSets.set(r.set_count);
     const volume = Math.round(this.settings.toDisplay(r.total_volume));
     this.totalVolume.set(`${volume.toLocaleString('en-US')} ${this.settings.unitLabel()}`);
+    const dUnit = distanceUnit(this.settings.weightUnit());
+    this.totalDistance.set(r.total_distance_m > 0 ? distanceText(r.total_distance_m, dUnit) : '');
+    this.totalHeld.set(r.total_duration_s > 0 ? durationText(r.total_duration_s) : '');
     this.prCount.set(r.pr_count);
 
     const allSets = r.muscles.reduce((sum, m) => sum + m.sets, 0) || 1;
@@ -965,6 +989,11 @@ export class SessionSummaryComponent implements OnInit {
       color: muscleColor(m.muscle_group),
     })));
 
+    const words = (kind: ExerciseKind, s: SetRef) => {
+      const weight = this.settings.toDisplay(s.weight);
+      return kind === 'weight_reps' ? `${+weight.toFixed(1)} × ${s.reps}`
+        : setText(kind, { weight: +weight.toFixed(1), reps: s.reps, duration_s: s.duration_s, distance_m: s.distance_m }, this.settings.unitLabel());
+    };
     const highlights: LiftHighlight[] = r.exercises.flatMap(e => e.best ? [{
       exerciseId: e.exercise_id,
       exerciseName: e.name,
@@ -976,6 +1005,8 @@ export class SessionSummaryComponent implements OnInit {
       previous: e.previous
         ? { weight: this.settings.toDisplay(e.previous.weight), reps: e.previous.reps, est1RM: e.previous.est_1rm }
         : undefined,
+      text: words(kindOf(e.kind), e.best),
+      previousText: e.previous ? words(kindOf(e.kind), e.previous) : undefined,
     }] : []);
     this.liftHighlights.set(highlights);
     // Weighted lifts by estimated 1RM, then bodyweight lifts by reps.

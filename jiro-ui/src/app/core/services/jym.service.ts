@@ -3,6 +3,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { SettingsService } from './settings.service';
+import type { ExerciseKind } from '../../features/jym/exercise-kind';
 
 const API_URL = `${environment.apiUrl}/jym`;
 
@@ -18,6 +19,8 @@ export interface Exercise {
   notes: string | null;
   /** Its own rest when the plan sets none; null rests for the account's usual. */
   rest_seconds: number | null;
+  /** How its sets are logged (exercise-kind.ts). */
+  kind: ExerciseKind;
   created_at: string;
   updated_at: string;
   /** Only populated by listExercises(); null elsewhere and when never performed. */
@@ -38,6 +41,11 @@ export interface SetHistory {
   is_pr: boolean;
   session_type: string;
   exercise_note: string | null;
+  /** Duration and distance sets have these instead of reps (reps is 0). */
+  duration_s: number | null;
+  distance_m: number | null;
+  /** The body weight a bodyweight set counts, in kg. */
+  body_weight_kg: number | null;
 }
 
 export interface ExerciseWithHistory extends Exercise {
@@ -61,6 +69,10 @@ export interface ExerciseStatsWorkout {
   volume: number;
   has_pr: boolean;
   note: string | null;
+  /** Duration: the longest hold. Distance: the longest distance and the best pace (s/km) over 400 m. */
+  max_duration_s: number;
+  max_distance_m: number;
+  best_pace_s_per_km: number | null;
 }
 
 /** An exercise's whole history, one row per workout, oldest first. */
@@ -85,6 +97,11 @@ export interface ExerciseWorkoutSet {
   is_warmup: boolean;
   is_pr: boolean;
   est_1rm: number;
+  duration_s: number | null;
+  distance_m: number | null;
+  body_weight_kg: number | null;
+  /** A distance record: 'distance' or 'pace'. */
+  pr_kind: 'distance' | 'pace' | null;
 }
 
 /** A workout that included an exercise, with that exercise's sets. */
@@ -102,10 +119,16 @@ export interface ExercisePR {
   exercise_id: string;
   name: string;
   muscle_group: string | null;
+  kind: ExerciseKind;
   weight: number;
   reps: number;
   est_1rm: number;
   date: string;
+  duration_s: number | null;
+  distance_m: number | null;
+  body_weight_kg: number | null;
+  /** A distance lift's fastest pace over 400 m or more, seconds per km. */
+  best_pace_s_per_km: number | null;
 }
 
 /** One set with its estimated 1RM, in kg; `date` is its workout's start, given for last time. */
@@ -114,12 +137,16 @@ export interface SetRef {
   reps: number;
   est_1rm: number;
   date?: string;
+  duration_s?: number;
+  distance_m?: number;
+  body_weight_kg?: number;
 }
 
 export interface ExerciseReport {
   exercise_id: string;
   name: string;
   muscle_group: string | null;
+  kind: ExerciseKind;
   /** Working sets. */
   sets: number;
   volume: number;
@@ -178,6 +205,8 @@ export interface PlanDetails {
   notes: string | null;
   /** Adjacent items with the same number are one superset (supersets.ts). */
   superset_group: number | null;
+  /** A distance exercise's target in metres; a duration exercise's target seconds are target_reps. */
+  target_distance_m?: number | null;
 }
 
 export interface RoutineItem extends PlanDetails {
@@ -189,6 +218,7 @@ export interface RoutineItem extends PlanDetails {
   order_index: number;
   exercise_name: string;
   muscle_group: string | null;
+  exercise_kind: ExerciseKind;
 }
 
 export interface Routine {
@@ -288,6 +318,9 @@ export interface SessionSummary extends Session {
   /** When the first and last sets (warm-ups included) were logged, by the server's clock; null with no sets. */
   first_set_at: string | null;
   last_set_at: string | null;
+  /** Working distance sets' metres, and seconds held over duration sets. */
+  total_distance_m: number;
+  total_duration_s: number;
 }
 
 export type SessionType = 'normal' | 'deload' | 'test';
@@ -316,6 +349,14 @@ export interface SessionSet {
   created_at: string;
   exercise_name: string;
   muscle_group: string | null;
+  exercise_kind: ExerciseKind;
+  /** Duration and distance sets have these instead of reps (reps_performed is 0). */
+  duration_s: number | null;
+  distance_m: number | null;
+  /** The body weight a bodyweight set counts, in kg. */
+  body_weight_kg: number | null;
+  /** A distance record: 'distance' or 'pace'. */
+  pr_kind: 'distance' | 'pace' | null;
 }
 
 export interface SessionAttachment {
@@ -344,6 +385,7 @@ export interface SessionExercise extends PlanDetails {
   target_reps: number | null;
   /** The exercise's own rest, used when the plan's rest_seconds is null. */
   exercise_rest_seconds: number | null;
+  exercise_kind: ExerciseKind;
 }
 
 export interface SessionWithSets extends Session {
@@ -363,9 +405,9 @@ export interface StartSessionResponse extends Session {
 
 // ─── Requests ─────────────────────────────────────────────────────────────────
 
-export interface CreateExerciseRequest { name: string; muscle_group?: string; secondary_muscles?: string[]; notes?: string; }
-/** secondary_muscles left out keeps them; [] clears them. */
-export interface UpdateExerciseRequest { name?: string; muscle_group?: string; secondary_muscles?: string[]; notes?: string; }
+export interface CreateExerciseRequest { name: string; muscle_group?: string; secondary_muscles?: string[]; notes?: string; kind?: ExerciseKind; }
+/** secondary_muscles left out keeps them; [] clears them. kind changes only as kindChangeAllowed says (409 otherwise). */
+export interface UpdateExerciseRequest { name?: string; muscle_group?: string; secondary_muscles?: string[]; notes?: string; kind?: ExerciseKind; }
 export interface CreateSplitRequest { name: string; description?: string; tags?: string[]; }
 export interface UpdateSplitRequest { name?: string; description?: string; visibility?: string; tags?: string[]; }
 export interface CreateRoutineRequest { name: string; day_order?: number; }
@@ -388,10 +430,14 @@ export interface UpdateSessionRequest { ended_at?: string; notes?: string; sessi
 /** A finished workout's new start or end; a field left out keeps its value. */
 export interface UpdateSessionTimesRequest { started_at?: string; ended_at?: string; }
 export interface CreateSetRequest {
-  exercise_id: string; set_number: number; weight: number; reps_performed: number; rpe?: number; is_warmup?: boolean; exercise_note?: string;
+  exercise_id: string; set_number: number; weight: number; rpe?: number; is_warmup?: boolean; exercise_note?: string;
+  /** Reps for weight and bodyweight; duration_s for a hold; distance_m and duration_s for distance. */
+  reps_performed?: number; duration_s?: number; distance_m?: number;
   /** Adds the set to a finished workout; the server times it inside that workout. */ fix?: boolean;
 }
-export interface UpdateSetRequest { weight?: number; reps_performed?: number; rpe?: number; is_warmup?: boolean; exercise_note?: string; }
+export interface UpdateSetRequest {
+  weight?: number; reps_performed?: number; duration_s?: number; distance_m?: number; rpe?: number; is_warmup?: boolean; exercise_note?: string;
+}
 export interface CreateSeriesRequest { split_id: string; name: string; duration_type: 'weeks' | 'sessions' | 'open'; target_weeks?: number; target_sessions?: number; }
 export interface UpdateSeriesRequest { name?: string; ended_at?: string; }
 
@@ -400,6 +446,7 @@ export interface UpdateSeriesRequest { name?: string; ended_at?: string; }
 export interface ShareExercisePreview extends PlanDetails {
   name: string;
   muscle_group: string | null;
+  kind: ExerciseKind;
   target_sets: number;
   target_reps: number;
 }
@@ -684,6 +731,15 @@ export class JymService {
 
   createTemplateFromSession(sessionId: string, name: string): Observable<Routine> {
     return this.http.post<Routine>(`${API_URL}/sessions/${sessionId}/template`, { name });
+  }
+
+  getTemplate(id: string): Observable<Routine> {
+    return this.http.get<Routine>(`${API_URL}/templates/${id}`);
+  }
+
+  /** Copies a day or template with its plan: into a split as its last day, or with no split_id as a template. */
+  copyRoutine(id: string, req: { split_id?: string; name?: string } = {}): Observable<Routine> {
+    return this.http.post<Routine>(`${API_URL}/routines/${id}/copy`, req);
   }
 
   deleteTemplate(routineId: string): Observable<void> {

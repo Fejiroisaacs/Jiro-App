@@ -37,7 +37,7 @@ func TestSessionListsCountWorkingSetsAndPRLifts(t *testing.T) {
 	sess := startSession(t, svc, userID, "")
 	warm := true
 	if _, err := svc.LogSet(ctx, userID, sess, &models.CreateSetRequest{
-		ExerciseID: bench, SetNumber: 1, Weight: 60, RepsPerformed: 10, IsWarmup: &warm,
+		ExerciseID: bench, SetNumber: 1, Weight: 60, RepsPerformed: ip(10), IsWarmup: &warm,
 	}); err != nil {
 		t.Fatalf("log warm-up: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestSeriesCountsFinishedWorkoutsWithWorkingSets(t *testing.T) {
 	warmOnly := start()
 	warm := true
 	if _, err := svc.LogSet(ctx, userID, warmOnly, &models.CreateSetRequest{
-		ExerciseID: ex, SetNumber: 1, Weight: 60, RepsPerformed: 5, IsWarmup: &warm,
+		ExerciseID: ex, SetNumber: 1, Weight: 60, RepsPerformed: ip(5), IsWarmup: &warm,
 	}); err != nil {
 		t.Fatalf("log warm-up: %v", err)
 	}
@@ -202,7 +202,7 @@ func TestTemplateTakesRepsFromWorkingSets(t *testing.T) {
 	warm := true
 	for i, reps := range []int{10, 10} {
 		if _, err := svc.LogSet(ctx, userID, sess, &models.CreateSetRequest{
-			ExerciseID: squat, SetNumber: i + 1, Weight: 60, RepsPerformed: reps, IsWarmup: &warm,
+			ExerciseID: squat, SetNumber: i + 1, Weight: 60, RepsPerformed: ip(reps), IsWarmup: &warm,
 		}); err != nil {
 			t.Fatalf("log warm-up: %v", err)
 		}
@@ -211,7 +211,7 @@ func TestTemplateTakesRepsFromWorkingSets(t *testing.T) {
 		logSet(t, svc, userID, sess, squat, i+3, 100, 5)
 	}
 	if _, err := svc.LogSet(ctx, userID, sess, &models.CreateSetRequest{
-		ExerciseID: mobility, SetNumber: 1, Weight: 0, RepsPerformed: 12, IsWarmup: &warm,
+		ExerciseID: mobility, SetNumber: 1, Weight: 0, RepsPerformed: ip(12), IsWarmup: &warm,
 	}); err != nil {
 		t.Fatalf("log warm-up only lift: %v", err)
 	}

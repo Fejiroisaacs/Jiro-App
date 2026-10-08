@@ -4,7 +4,9 @@ import { ToastService } from '../../../core/services/toast.service';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { JymService, SharePreview } from '../../../core/services/jym.service';
 import { planText } from '../plan-text';
+import { distanceUnit, kindOf } from '../exercise-kind';
 import { AuthService } from '../../../core/services/auth.service';
+import { SettingsService } from '../../../core/services/settings.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroLogoComponent } from '../../../shared/components/jiro-logo/jiro-logo';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
@@ -73,7 +75,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
                     @if (ex.muscle_group) {
 <span class="ex-muscle">{{ ex.muscle_group }}</span>
 }
-                    <span class="ex-targets">{{ planText(ex) }}</span>
+                    <span class="ex-targets">{{ planChip(ex) }}</span>
                   </span>
                 </div>
 }
@@ -226,6 +228,11 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 })
 export class SharePreviewComponent implements OnInit {
   readonly planText = planText;
+  private readonly settings = inject(SettingsService);
+  /** The plan chip in the exercise's own terms: reps, a hold or a distance. */
+  planChip(x: Parameters<typeof planText>[0] & { kind?: string | null }): string {
+    return planText(x, 'short', { kind: kindOf(x.kind), distanceUnit: distanceUnit(this.settings.weightUnit()) });
+  }
   loading = signal(true);
   error = signal('');
   errorTitle = signal('Link not found');

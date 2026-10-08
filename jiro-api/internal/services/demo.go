@@ -110,6 +110,17 @@ func (s *DemoService) seed(ctx context.Context, tx pgx.Tx, now time.Time) (uuid.
 	if err := tx.SendBatch(ctx, b).Close(); err != nil {
 		return uuid.Nil, err
 	}
+	// The bodyweight, duration and distance lifts get their body weights and records from the real rules.
+	if _, err := refreshBodyWeightCopies(ctx, tx, id, demoTimeZone, nil); err != nil {
+		return uuid.Nil, err
+	}
+	for _, e := range ds.Exercises {
+		if e.Kind != "" {
+			if _, err := rerateExercisePRs(ctx, tx, id, e.ID); err != nil {
+				return uuid.Nil, err
+			}
+		}
+	}
 	return id, nil
 }
 

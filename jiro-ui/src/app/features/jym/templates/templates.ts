@@ -1,11 +1,13 @@
 import { Component, OnInit, inject, input, signal } from '@angular/core';
 
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { JymService, Routine } from '../../../core/services/jym.service';
 import { planText } from '../plan-text';
+import { distanceUnit, kindOf } from '../exercise-kind';
 import { WorkoutLauncher } from '../shared/workout-launcher';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { SettingsService } from '../../../core/services/settings.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
@@ -15,11 +17,11 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 @Component({
   selector: 'app-jym-templates',
   standalone: true,
-  imports: [JiroSkeletonComponent, JiroButtonComponent, JiroIconComponent, JiroPageHeaderComponent, JiroEmptyStateComponent],
+  imports: [RouterLink, JiroSkeletonComponent, JiroButtonComponent, JiroIconComponent, JiroPageHeaderComponent, JiroEmptyStateComponent],
   template: `
     <div class="templates-page">
       @if (!embedded()) {
-        <jiro-page-header heading="Templates" subtitle="Reusable workout layouts saved from your sessions" />
+        <jiro-page-header heading="Templates" subtitle="Workouts to start any time, saved from a workout or a split's day" />
       }
 
       @if (loading()) {
@@ -30,7 +32,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
         <jiro-empty-state
           icon="floppy-disk"
           heading="No templates yet"
-          message="In a workout, open Workout options and choose Save as template to keep its exercises." />
+          message="In a workout, open Workout options and choose Save as template. On a split, a day's menu has Save as template too." />
       }
 
       @if (!loading() && templates().length > 0) {
@@ -38,12 +40,12 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
         @for (t of templates(); track t) {
 <div class="template-card">
           <div class="template-info">
-            <div class="template-name">{{ t.name }}</div>
+            <a class="template-name" [routerLink]="['/jym/templates', t.id]">{{ t.name }}</a>
             <div class="template-exercises">
               @for (item of t.items; track item; let last = $last) {
 <span class="ex-chip">
                 {{ item.exercise_name }}
-                <span class="ex-sets">{{ planText(item) }}</span>
+                <span class="ex-sets">{{ planChip(item) }}</span>
                 @if (!last) {
 <span class="ex-sep"> · </span>
 }
@@ -55,6 +57,9 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
             </div>
           </div>
           <div class="template-actions">
+            <a class="edit-link" [routerLink]="['/jym/templates', t.id]" [attr.aria-label]="'Edit template ' + t.name">
+              <jiro-icon name="pencil-simple" [size]="14" /> Edit
+            </a>
             <jiro-button variant="primary" type="button" (click)="startFromTemplate(t)">
               <jiro-icon name="play:fill" [size]="11" />
               Start
@@ -86,7 +91,17 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     }
 
     .template-info { flex: 1; min-width: 0; }
-    .template-name { font-weight: 600; font-size: var(--font-size-base); margin-bottom: 4px; }
+    .template-name {
+      display: inline-block; font-weight: 600; font-size: var(--font-size-base); margin-bottom: 4px;
+      color: var(--text-primary); text-decoration: none;
+    }
+    .template-name:hover { text-decoration: underline; }
+    .edit-link {
+      display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 var(--space-md);
+      border: 1px solid var(--border-color); border-radius: var(--border-radius-sm);
+      color: var(--text-primary); font-size: var(--font-size-sm); font-weight: 600; text-decoration: none;
+    }
+    .edit-link:hover { background: var(--bg-surface-hover); }
     .template-exercises {
       font-size: var(--font-size-sm); color: var(--text-secondary);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -99,7 +114,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 
     .delete-btn {
       display: flex; align-items: center; justify-content: center;
-      width: 40px; height: 40px; border-radius: var(--border-radius-sm);
+      width: 44px; height: 44px; border-radius: var(--border-radius-sm);
       border: 1px solid var(--border-color); background: none;
       color: var(--text-secondary); cursor: pointer; transition: all 0.15s;
     }
@@ -113,6 +128,11 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 })
 export class JymTemplatesComponent implements OnInit {
   readonly planText = planText;
+  private readonly settings = inject(SettingsService);
+  /** The plan chip in the exercise's own terms: reps, a hold or a distance. */
+  planChip(x: Parameters<typeof planText>[0] & { exercise_kind?: string | null }): string {
+    return planText(x, 'short', { kind: kindOf(x.exercise_kind), distanceUnit: distanceUnit(this.settings.weightUnit()) });
+  }
   embedded = input(false);
   templates = signal<Routine[]>([]);
   loading = signal(true);
@@ -138,7 +158,7 @@ export class JymTemplatesComponent implements OnInit {
   async deleteTemplate(t: Routine) {
     const ok = await this.confirmService.confirm({
       title: `Delete ${t.name}?`,
-      message: 'This removes the template only. Sessions you started from it are not affected.',
+      message: 'This removes the template only. Workouts you started from it are not affected.',
       confirmLabel: 'Delete template',
       danger: true,
     });

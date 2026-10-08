@@ -5,8 +5,9 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import {
-  JymService, Exercise, ExerciseStats, ExerciseStatsWorkout, ExerciseWorkout, ExerciseFormCheck, RepsAtWeight,
+  JymService, Exercise, ExerciseStats, ExerciseStatsWorkout, ExerciseWorkout, ExerciseWorkoutSet, ExerciseFormCheck, RepsAtWeight,
 } from '../../../core/services/jym.service';
+import { ExerciseKind, distanceText, distanceUnit, durationText, kindOf, paceText, setText, toDistanceUnit } from '../exercise-kind';
 import { SettingsService } from '../../../core/services/settings.service';
 import { chartTones } from '../../../shared/chart-theme';
 import { UploadService } from '../../../core/services/upload.service';
@@ -26,7 +27,15 @@ import {
 
 Chart.register(...registerables);
 
-type ChartType = '1rm' | 'volume' | 'maxweight' | 'repsatweight';
+type ChartType = '1rm' | 'volume' | 'maxweight' | 'repsatweight' | 'reps' | 'hold' | 'distance' | 'pace';
+
+/** The charts each type of exercise has, first is the default. */
+const CHART_TABS: Record<ExerciseKind, { type: ChartType; label: string }[]> = {
+  weight_reps: [{ type: '1rm', label: 'Est. 1RM' }, { type: 'volume', label: 'Volume' }, { type: 'maxweight', label: 'Max weight' }, { type: 'repsatweight', label: 'Reps @ Weight' }],
+  bodyweight: [{ type: '1rm', label: 'Est. 1RM' }, { type: 'reps', label: 'Most reps' }, { type: 'volume', label: 'Volume' }],
+  duration: [{ type: 'hold', label: 'Longest hold' }],
+  distance: [{ type: 'distance', label: 'Distance' }, { type: 'pace', label: 'Pace' }],
+};
 type SectionTab = 'history' | 'form' | 'notes';
 
 @Component({
@@ -60,14 +69,12 @@ type SectionTab = 'history' | 'form' | 'notes';
           </div>
           @if (hasHistory()) {
 <div class="pr-stats">
-            <div class="stat">
-              <span class="stat-label">Best weight</span>
-              <span class="stat-value">{{ settingsService.toDisplay(exercise()!.best_weight) | number:'1.1-1' }} {{ settingsService.unitLabel() }}</span>
-            </div>
-            <div class="stat">
-              <span class="stat-label">Est. 1RM</span>
-              <span class="stat-value primary">{{ settingsService.toDisplay(exercise()!.est_1rm) | number:'1.1-1' }} {{ settingsService.unitLabel() }}</span>
-            </div>
+            @for (st of headerStats(); track st.label; let last = $last) {
+              <div class="stat">
+                <span class="stat-label">{{ st.label }}</span>
+                <span class="stat-value" [class.primary]="last">{{ st.value }}</span>
+              </div>
+            }
           </div>
 }
         </div>
@@ -102,10 +109,9 @@ type SectionTab = 'history' | 'form' | 'notes';
 
           <!-- Tab chips -->
           <div class="chart-tabs">
-            <button class="chart-tab" [class.active]="selectedChart() === '1rm'"         (click)="switchChart('1rm')">Est. 1RM</button>
-            <button class="chart-tab" [class.active]="selectedChart() === 'volume'"      (click)="switchChart('volume')">Volume</button>
-            <button class="chart-tab" [class.active]="selectedChart() === 'maxweight'"   (click)="switchChart('maxweight')">Max weight</button>
-            <button class="chart-tab" [class.active]="selectedChart() === 'repsatweight'" (click)="switchChart('repsatweight')">Reps @ Weight</button>
+            @for (tab of chartTabs(); track tab.type) {
+              <button class="chart-tab" [class.active]="selectedChart() === tab.type" (click)="switchChart(tab.type)">{{ tab.label }}</button>
+            }
           </div>
 
           <!-- Range -->
@@ -198,9 +204,9 @@ type SectionTab = 'history' | 'form' | 'notes';
                 @for (set of w.sets; track set.id) {
 <li class="wk-set" [class.is-warmup]="set.is_warmup">
                   <span class="ws-num">{{ set.is_warmup ? 'W' : set.set_number }}</span>
-                  <span class="ws-load">{{ settingsService.toDisplay(set.weight) | number:'1.0-1' }} {{ settingsService.unitLabel() }} × {{ set.reps }}</span>
+                  <span class="ws-load">{{ setLine(set) }}</span>
                   @if (set.rpe != null) { <span class="ws-rpe">RPE {{ set.rpe }}</span> }
-                  @if (!set.is_warmup) { <span class="ws-orm">e1RM {{ settingsService.toDisplay(set.est_1rm) | number:'1.0-1' }}</span> }
+                  @if (!set.is_warmup && set.est_1rm > 0) { <span class="ws-orm">e1RM {{ settingsService.toDisplay(set.est_1rm) | number:'1.0-1' }}</span> }
                   @if (set.is_pr) { <jym-pr-badge /> }
                 </li>
 }
@@ -688,6 +694,41 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
   private readonly toast = inject(ToastService);
 
   hasHistory = computed(() => (this.stats()?.workouts.length ?? 0) > 0);
+  readonly kind = computed(() => kindOf(this.exercise()?.kind));
+  readonly chartTabs = computed(() => CHART_TABS[this.kind()]);
+  private readonly dUnit = computed(() => distanceUnit(this.settingsService.weightUnit()));
+
+  /** The header's two numbers, by type: best weight and e1RM; most reps and e1RM; the longest hold; distance and pace. */
+  readonly headerStats = computed(() => {
+    const ex = this.exercise();
+    const ws = (this.stats()?.workouts ?? []).filter(w => w.session_type !== 'deload');
+    const unit = this.settingsService.unitLabel();
+    const kg = (v: number) => `${+this.settingsService.toDisplay(v).toFixed(1)} ${unit}`;
+    switch (this.kind()) {
+      case 'duration':
+        return [{ label: 'Longest hold', value: durationText(Math.max(0, ...ws.map(w => w.max_duration_s))) }];
+      case 'distance': {
+        const paces = ws.map(w => w.best_pace_s_per_km).filter((p): p is number => !!p);
+        return [
+          { label: 'Longest', value: distanceText(Math.max(0, ...ws.map(w => w.max_distance_m)), this.dUnit()) },
+          ...(paces.length ? [{ label: 'Fastest pace', value: paceText(Math.min(...paces), 1000, this.dUnit())! }] : []),
+        ];
+      }
+      case 'bodyweight':
+        return [{ label: 'Most reps', value: String(Math.max(0, ...ws.map(w => w.max_reps))) }, { label: 'Est. 1RM', value: kg(ex?.est_1rm ?? 0) }];
+      default:
+        return [{ label: 'Best weight', value: kg(ex?.best_weight ?? 0) }, { label: 'Est. 1RM', value: kg(ex?.est_1rm ?? 0) }];
+    }
+  });
+
+  /** One set in the workouts list, in the exercise's own words. */
+  setLine(set: ExerciseWorkoutSet): string {
+    const unit = this.settingsService.unitLabel();
+    const weight = +this.settingsService.toDisplay(set.weight).toFixed(1);
+    const kind = this.kind();
+    return kind === 'weight_reps' ? `${weight} ${unit} × ${set.reps}`
+      : setText(kind, { weight, reps: set.reps, duration_s: set.duration_s, distance_m: set.distance_m }, unit);
+  }
   uniqueWeights = computed(() => this.stats()?.weights ?? []);
 
   groupedFormChecks = computed(() => {
@@ -726,7 +767,8 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
 
   sessionNotes = computed(() => notesOf(this.stats()?.workouts ?? []));
 
-  plateauStatus = computed<PlateauStatus>(() => detectPlateau(this.stats()?.workouts ?? []));
+  // The plateau rule reads weights; other types have none to judge.
+  plateauStatus = computed<PlateauStatus>(() => this.kind() === 'weight_reps' ? detectPlateau(this.stats()?.workouts ?? []) : null);
 
   /** Says why a chart is empty: nothing in this range, or nothing at all. */
   chartEmptyText = computed(() => {
@@ -777,6 +819,7 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
         if (id !== this.currentId) return;
         const { history: _history, ...header } = ex;
         this.exercise.set(header);
+        this.selectedChart.set(CHART_TABS[kindOf(header.kind)][0].type);
         this.stats.set(stats);
         this.range.set(defaultRange(stats.workouts, Date.now()));
         this.loading.set(false);
@@ -890,6 +933,10 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
       case 'volume':       this.drawLine('volume', unit);    break;
       case 'maxweight':    this.drawLine('maxweight', unit); break;
       case 'repsatweight': this.drawRepsAtWeightChart();     break;
+      case 'reps':         this.drawLine('reps', unit);      break;
+      case 'hold':         this.drawLine('hold', unit);      break;
+      case 'distance':     this.drawLine('distance', unit);  break;
+      case 'pace':         this.drawLine('pace', unit);      break;
     }
   }
 
@@ -903,11 +950,21 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
     this.chartEmpty.set(false);
 
     const tone = chartTones();
-    const shown = points.map(p => ({ ...p, y: Math.round(this.settingsService.toDisplay(p.y) * 10) / 10 }));
+    const dUnit = this.dUnit();
+    // Weights show in the account's unit, distances in km or miles, pace per km or mile; reps and holds as they are.
+    const scale = (y: number) => measure === 'distance' ? toDistanceUnit(y, dUnit)
+      : measure === 'pace' ? (dUnit === 'mi' ? y * 1.609344 : y)
+        : measure === 'reps' || measure === 'hold' ? y : this.settingsService.toDisplay(y);
+    const shown = points.map(p => ({ ...p, y: Math.round(scale(p.y) * 10) / 10 }));
+    const time = (v: number) => durationText(v);
     const spec = {
       e1rm:      { color: tone.primary, title: 'Estimated 1RM progress', axis: `Est. 1RM (${unit})`, unit },
       volume:    { color: tone.warning, title: 'Total session volume', axis: `Volume (${unit}×reps)`, unit: `${unit}×reps` },
       maxweight: { color: tone.accent,  title: 'Heaviest set per session', axis: `Weight (${unit})`, unit },
+      reps:      { color: tone.accent,  title: 'Most reps in a set', axis: 'Reps', unit: 'reps' },
+      hold:      { color: tone.primary, title: 'Longest hold per session', axis: 'Time held', unit: '', format: time },
+      distance:  { color: tone.primary, title: 'Longest distance per session', axis: `Distance (${dUnit})`, unit: dUnit },
+      pace:      { color: tone.accent,  title: 'Best pace per session (faster is higher)', axis: `Pace (per ${dUnit})`, unit: `/${dUnit}`, format: time, reverse: true },
     }[measure];
     this.chart = new Chart(this.canvasRef.nativeElement, this.lineConfig(shown, spec, now));
   }
@@ -988,7 +1045,7 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
 
   /** A line over a date-scaled axis: workouts sit at their real distance apart. */
   private lineConfig(
-    points: StatsPoint[], spec: { color: string; title: string; axis: string; unit: string }, now: number,
+    points: StatsPoint[], spec: { color: string; title: string; axis: string; unit: string; format?: (v: number) => string; reverse?: boolean }, now: number,
   ): ChartConfiguration<'line', StatsPoint[]> {
     const tone = chartTones();
     const workouts = new Map((this.stats()?.workouts ?? []).map(w => [w.session_id, w]));
@@ -1027,7 +1084,8 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
           tooltip: {
             callbacks: {
               title: items => items.length ? this.formatDate(new Date(items[0].parsed.x ?? 0).toISOString(), true) : '',
-              label: ctx => ` ${ctx.parsed.y} ${spec.unit}${this.bestSetText(workouts.get((ctx.raw as StatsPoint).sessionId))}`,
+              label: ctx => ` ${spec.format ? spec.format(ctx.parsed.y ?? 0) : ctx.parsed.y} ${spec.unit}`.trimEnd()
+                + this.bestSetText(workouts.get((ctx.raw as StatsPoint).sessionId)),
             },
           },
         },
@@ -1043,9 +1101,11 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
             ticks: { font: { size: 11 }, color: tone.tick, maxRotation: 0, callback: v => monthTickLabel(Number(v), Number(v) === ticks[0]) },
           },
           y: {
+            // Pace: a lower time is better, so it reads upward.
+            reverse: !!spec.reverse,
             title: { display: true, text: spec.axis, font: { size: 11 }, color: tone.muted },
             grid: { color: tone.grid },
-            ticks: { font: { size: 11 }, callback: v => `${v}` },
+            ticks: { font: { size: 11 }, callback: v => spec.format ? spec.format(Number(v)) : `${v}` },
           },
         },
       },

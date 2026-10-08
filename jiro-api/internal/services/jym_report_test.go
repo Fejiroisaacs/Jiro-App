@@ -40,7 +40,7 @@ func TestSessionReportLastTimeIsLikeForLike(t *testing.T) {
 
 	earlier := startSession(t, svc, userID, "")
 	if _, err := svc.LogSet(ctx, userID, earlier, &models.CreateSetRequest{
-		ExerciseID: ex, SetNumber: 1, Weight: 140, RepsPerformed: 1, IsWarmup: &warm,
+		ExerciseID: ex, SetNumber: 1, Weight: 140, RepsPerformed: ip(1), IsWarmup: &warm,
 	}); err != nil {
 		t.Fatalf("log warm-up: %v", err)
 	}
@@ -101,7 +101,7 @@ func TestSessionReportBestSetsTotalsAndMuscles(t *testing.T) {
 	sess := started.ID
 	warm := true
 	if _, err := svc.LogSet(ctx, userID, sess, &models.CreateSetRequest{
-		ExerciseID: bench, SetNumber: 1, Weight: 60, RepsPerformed: 10, IsWarmup: &warm,
+		ExerciseID: bench, SetNumber: 1, Weight: 60, RepsPerformed: ip(10), IsWarmup: &warm,
 	}); err != nil {
 		t.Fatalf("log warm-up: %v", err)
 	}

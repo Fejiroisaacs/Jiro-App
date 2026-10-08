@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -17,9 +18,9 @@ func (s *JymService) GetExerciseStats(ctx context.Context, userID, exerciseID uu
 		return nil, ErrExerciseNotFound
 	}
 
-	e1rm := e1rmSQL("ss.weight", "ss.reps_performed")
+	e1rm := e1rmSQL(loadSQL, "ss.reps_performed")
 	// The best set orders like bestSet: estimated 1RM, then reps, then weight.
-	bestOrder := `ORDER BY ` + e1rm + ` DESC, ss.reps_performed DESC, ss.weight DESC`
+	bestOrder := `ORDER BY ` + e1rm + ` DESC NULLS LAST, ss.reps_performed DESC NULLS LAST, ss.weight DESC`
 	rows, err := s.db.Query(ctx,
 		`SELECT s.id, s.started_at, s.ended_at, s.session_type,
 		        `+workingSetCountSQL+`,
@@ -27,9 +28,12 @@ func (s *JymService) GetExerciseStats(ctx context.Context, userID, exerciseID uu
 		        COALESCE(MAX(ss.reps_performed) FILTER (WHERE NOT ss.is_warmup), 0),
 		        COALESCE(MAX(`+e1rm+`) FILTER (WHERE NOT ss.is_warmup), 0),
 		        (array_agg(ss.weight `+bestOrder+`) FILTER (WHERE NOT ss.is_warmup))[1],
-		        (array_agg(ss.reps_performed `+bestOrder+`) FILTER (WHERE NOT ss.is_warmup))[1],
+		        (array_agg(COALESCE(ss.reps_performed, 0) `+bestOrder+`) FILTER (WHERE NOT ss.is_warmup))[1],
 		        `+workingVolumeSQL+`,
 		        BOOL_OR(ss.is_pr),
+		        COALESCE(MAX(ss.duration_s) FILTER (WHERE NOT ss.is_warmup AND ss.distance_m IS NULL), 0),
+		        COALESCE(MAX(ss.distance_m) FILTER (WHERE NOT ss.is_warmup), 0)::float8,
+		        MIN(ss.duration_s / (ss.distance_m / 1000)) FILTER (WHERE NOT ss.is_warmup AND ss.distance_m >= `+fmt.Sprint(minPaceDistanceM)+`)::float8,
 		        (array_agg(ss.exercise_note ORDER BY ss.set_number, ss.created_at)
 		           FILTER (WHERE NULLIF(TRIM(ss.exercise_note), '') IS NOT NULL))[1]
 		 FROM session_sets ss
@@ -50,12 +54,18 @@ func (s *JymService) GetExerciseStats(ctx context.Context, userID, exerciseID uu
 		var bestWeight *float64
 		var bestReps *int
 		if err := rows.Scan(&w.SessionID, &w.StartedAt, &w.EndedAt, &w.SessionType, &w.WorkingSets,
-			&w.MaxWeight, &w.MaxReps, &w.BestE1RM, &bestWeight, &bestReps, &w.Volume, &w.HasPR, &w.Note); err != nil {
+			&w.MaxWeight, &w.MaxReps, &w.BestE1RM, &bestWeight, &bestReps, &w.Volume, &w.HasPR,
+			&w.MaxDurationS, &w.MaxDistanceM, &w.BestPaceSKm, &w.Note); err != nil {
 			return nil, err
 		}
 		w.BestE1RM = roundTenth(w.BestE1RM)
-		if bestWeight != nil && bestReps != nil {
-			w.BestSet = &models.SetRef{Weight: *bestWeight, Reps: *bestReps, Est1RM: epley1RM(*bestWeight, *bestReps)}
+		if w.BestPaceSKm != nil {
+			p := roundTenth(*w.BestPaceSKm)
+			w.BestPaceSKm = &p
+		}
+		// The best set's estimated 1RM is the workout's, body weight included.
+		if bestWeight != nil && bestReps != nil && *bestReps > 0 {
+			w.BestSet = &models.SetRef{Weight: *bestWeight, Reps: *bestReps, Est1RM: w.BestE1RM}
 		}
 		stats.Workouts = append(stats.Workouts, w)
 	}
@@ -97,7 +107,7 @@ func (s *JymService) GetRepsAtWeight(ctx context.Context, userID, exerciseID uui
 		 FROM session_sets ss
 		 JOIN sessions s ON ss.session_id = s.id
 		 WHERE ss.exercise_id = $1 AND s.user_id = $2 AND NOT ss.is_warmup AND s.session_type <> 'deload'
-		   AND ABS(ss.weight - $3) < 0.01
+		   AND ss.reps_performed IS NOT NULL AND ABS(ss.weight - $3) < 0.01
 		 GROUP BY s.id
 		 ORDER BY s.started_at, s.id`,
 		exerciseID, userID, weight,
@@ -140,7 +150,8 @@ func (s *JymService) ListExerciseWorkouts(ctx context.Context, userID, exerciseI
 		   LIMIT $5
 		 )
 		 SELECT s.id, s.started_at, s.ended_at, s.session_type, r.name,
-		        ss.id, ss.set_number, ss.weight, ss.reps_performed, ss.rpe, ss.is_warmup, ss.is_pr, ss.exercise_note
+		        ss.id, ss.set_number, ss.weight, COALESCE(ss.reps_performed, 0), ss.rpe, ss.is_warmup, ss.is_pr, ss.exercise_note,
+		        ss.duration_s, ss.distance_m, ss.body_weight_kg, ss.pr_kind
 		 FROM page
 		 JOIN sessions s ON s.id = page.id
 		 LEFT JOIN routines r ON s.routine_id = r.id
@@ -159,10 +170,13 @@ func (s *JymService) ListExerciseWorkouts(ctx context.Context, userID, exerciseI
 		var set models.ExerciseWorkoutSet
 		var note *string
 		if err := rows.Scan(&w.SessionID, &w.StartedAt, &w.EndedAt, &w.SessionType, &w.RoutineName,
-			&set.ID, &set.SetNumber, &set.Weight, &set.Reps, &set.RPE, &set.IsWarmup, &set.IsPR, &note); err != nil {
+			&set.ID, &set.SetNumber, &set.Weight, &set.Reps, &set.RPE, &set.IsWarmup, &set.IsPR, &note,
+			&set.DurationS, &set.DistanceM, &set.BodyWeightKg, &set.PRKind); err != nil {
 			return nil, err
 		}
-		set.Est1RM = epley1RM(set.Weight, set.Reps)
+		if set.Reps > 0 {
+			set.Est1RM = epley1RM(set.Weight+defloat(set.BodyWeightKg), set.Reps)
+		}
 		if n := len(out); n == 0 || out[n-1].SessionID != w.SessionID {
 			w.Sets = []models.ExerciseWorkoutSet{}
 			out = append(out, w)

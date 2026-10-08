@@ -25,10 +25,58 @@ func roundTenth(v float64) float64 {
 	return math.Round(v*10) / 10
 }
 
+// loadSQL is a set's load in SQL: its weight, plus the body weight a bodyweight set counts.
+const loadSQL = `(ss.weight + COALESCE(ss.body_weight_kg, 0))`
+
 // e1rmSQL is epley1RM in SQL, unrounded so it can sit inside MAX; round the result with roundTenth.
+// A set without reps (duration, distance) has none.
 func e1rmSQL(weight, reps string) string {
 	return fmt.Sprintf("CASE WHEN %[2]s <= 1 THEN %[1]s ELSE %[1]s * (1 + LEAST(%[2]s, %[3]d) / 30.0) END",
 		weight, reps, e1rmRepCap)
+}
+
+// bestSetOf is a lift's best set by its kind: the longest hold, the longest distance, else bestSet.
+func bestSetOf(kind string, sets []models.SetRef) *models.SetRef {
+	if len(sets) == 0 || repKind(kind) {
+		return bestSet(sets)
+	}
+	best := sets[0]
+	for _, s := range sets[1:] {
+		switch kind {
+		case KindDuration:
+			if deint(s.DurationS) > deint(best.DurationS) || deint(s.DurationS) == deint(best.DurationS) && s.Weight > best.Weight {
+				best = s
+			}
+		case KindDistance:
+			if defloat(s.DistanceM) > defloat(best.DistanceM) {
+				best = s
+			}
+		}
+	}
+	return &best
+}
+
+func deint(p *int) int {
+	if p == nil {
+		return 0
+	}
+	return *p
+}
+
+func defloat(p *float64) float64 {
+	if p == nil {
+		return 0
+	}
+	return *p
+}
+
+// setRef is a set as a summary shows it; a bodyweight set's estimated 1RM counts its body weight.
+func setRef(weight float64, reps int, durationS *int, distanceM, bodyWeight *float64) models.SetRef {
+	ref := models.SetRef{Weight: weight, Reps: reps, DurationS: durationS, DistanceM: distanceM, BodyWeightKg: bodyWeight}
+	if reps > 0 {
+		ref.Est1RM = epley1RM(weight+defloat(bodyWeight), reps)
+	}
+	return ref
 }
 
 // bestSet is the set with the highest estimated 1RM, then the most reps, so bodyweight sets compare by reps.
@@ -67,9 +115,10 @@ func seriesSessionCountSQL(seriesID string) string {
 // Session aggregates over session_sets ss (and exercises e): working sets only, and PRs counted as lifts with a new record.
 const (
 	workingSetCountSQL = `COUNT(ss.id) FILTER (WHERE NOT ss.is_warmup)`
-	workingVolumeSQL   = `COALESCE(SUM(ss.weight * ss.reps_performed) FILTER (WHERE NOT ss.is_warmup), 0)`
-	prLiftCountSQL     = `COUNT(DISTINCT ss.exercise_id) FILTER (WHERE ss.is_pr)`
-	muscleGroupsSQL    = `COALESCE(array_agg(DISTINCT e.muscle_group) FILTER (WHERE e.muscle_group IS NOT NULL AND NOT ss.is_warmup), '{}'::text[])`
+	// Load × reps: duration and distance sets have no reps, so they add nothing.
+	workingVolumeSQL = `COALESCE(SUM(` + loadSQL + ` * ss.reps_performed) FILTER (WHERE NOT ss.is_warmup), 0)`
+	prLiftCountSQL   = `COUNT(DISTINCT ss.exercise_id) FILTER (WHERE ss.is_pr)`
+	muscleGroupsSQL  = `COALESCE(array_agg(DISTINCT e.muscle_group) FILTER (WHERE e.muscle_group IS NOT NULL AND NOT ss.is_warmup), '{}'::text[])`
 )
 
 // sessionAggregatesSQL is the tail of a session list row: set_count, pr_count, total_volume, muscle_groups,
@@ -78,4 +127,6 @@ const sessionAggregatesSQL = workingSetCountSQL + ` AS set_count, ` +
 	prLiftCountSQL + ` AS pr_count, ` +
 	workingVolumeSQL + ` AS total_volume, ` +
 	muscleGroupsSQL + ` AS muscle_groups, ` +
-	`MIN(ss.created_at) AS first_set_at, MAX(ss.created_at) AS last_set_at`
+	`MIN(ss.created_at) AS first_set_at, MAX(ss.created_at) AS last_set_at, ` +
+	`COALESCE(SUM(ss.distance_m) FILTER (WHERE NOT ss.is_warmup), 0)::float8 AS total_distance_m, ` +
+	`COALESCE(SUM(ss.duration_s) FILTER (WHERE NOT ss.is_warmup AND ss.distance_m IS NULL), 0)::int AS total_duration_s`

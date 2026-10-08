@@ -8,6 +8,7 @@ import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-s
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { formatInstant } from '../../../core/utils/format-date';
+import { distanceText, distanceUnit, kindOf, paceText, setText } from '../exercise-kind';
 
 /** A muscle group as one label whatever its case or spacing: " chest" and "Chest" are "Chest". */
 function muscleGroupLabel(mg: string | null): string {
@@ -80,14 +81,24 @@ function muscleGroupLabel(mg: string | null): string {
                 <jym-pr-badge />
                 {{ pr.name }}
               </span>
-              <span class="col-lift lift-val">
-                {{ settingsService.toDisplay(pr.weight) | number:'1.1-1' }}
-                <span class="unit">{{ settingsService.unitLabel() }}</span>
-                × {{ pr.reps }}
-              </span>
+              @if (pr.kind === 'weight_reps' || !pr.kind) {
+                <span class="col-lift lift-val">
+                  {{ settingsService.toDisplay(pr.weight) | number:'1.1-1' }}
+                  <span class="unit">{{ settingsService.unitLabel() }}</span>
+                  × {{ pr.reps }}
+                </span>
+              } @else {
+                <span class="col-lift lift-val">{{ bestText(pr) }}</span>
+              }
               <span class="col-1rm orm-val">
-                {{ settingsService.toDisplay(pr.est_1rm) | number:'1.1-1' }}
-                <span class="unit">{{ settingsService.unitLabel() }}</span>
+                @if (pr.est_1rm) {
+                  {{ settingsService.toDisplay(pr.est_1rm) | number:'1.1-1' }}
+                  <span class="unit">{{ settingsService.unitLabel() }}</span>
+                } @else if (fastest(pr); as f) {
+                  <span [attr.aria-label]="'Fastest pace ' + f">{{ f }}</span>
+                } @else {
+                  <span aria-label="No estimated 1RM">—</span>
+                }
               </span>
               <span class="col-date date-val">{{ formatDate(pr.date) }}</span>
             </div>
@@ -231,6 +242,19 @@ export class PrWallComponent implements OnInit {
       next: prs => { this.prs.set(prs); this.loading.set(false); },
       error: () => this.loading.set(false),
     });
+  }
+
+  /** A non-weight record in its own words: "8 × +20 lbs", "1:15", "5 km". */
+  bestText(pr: ExercisePR): string {
+    const kind = kindOf(pr.kind);
+    if (kind === 'distance') return distanceText(pr.distance_m ?? 0, distanceUnit(this.settingsService.weightUnit()));
+    const weight = +this.settingsService.toDisplay(pr.weight).toFixed(1);
+    return setText(kind, { weight, reps: pr.reps, duration_s: pr.duration_s }, this.settingsService.unitLabel());
+  }
+
+  /** A distance lift's fastest pace over 400 m or more. */
+  fastest(pr: ExercisePR): string | null {
+    return pr.best_pace_s_per_km ? paceText(pr.best_pace_s_per_km, 1000, distanceUnit(this.settingsService.weightUnit())) : null;
   }
 
   formatDate(instant: string): string {

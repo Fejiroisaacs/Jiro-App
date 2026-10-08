@@ -149,9 +149,9 @@ import { weeksElapsed } from '../series-progress';
 
       <!-- Routine Picker Modal -->
       @if (showRoutinePicker()) {
-<jiro-modal title="Choose routine" maxWidth="420px" (close)="showRoutinePicker.set(false)">
+<jiro-modal title="Choose a day" maxWidth="420px" (close)="showRoutinePicker.set(false)">
         @if (loadingRoutines()) {
-          <div class="sk-list" role="status" aria-label="Loading routines">@for (i of [1, 2, 3]; track i) { <jiro-skeleton height="48px" /> }</div>
+          <div class="sk-list" role="status" aria-label="Loading days">@for (i of [1, 2, 3]; track i) { <jiro-skeleton height="48px" /> }</div>
         }
         @if (!loadingRoutines()) {
 <div class="routine-list">
@@ -165,7 +165,7 @@ import { weeksElapsed } from '../series-progress';
           </button>
 }
           <button class="routine-pick-btn freestyle" (click)="startFreeWithSplit()">
-            Freestyle (no routine)
+            Freestyle
           </button>
         </div>
 }

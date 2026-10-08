@@ -4,6 +4,7 @@ import { SettingsService } from '../../../core/services/settings.service';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JymPrBadgeComponent } from '../shared/pr-badge/pr-badge';
 import { ExerciseBlock, SetRow } from './player-blocks';
+import { paceText } from '../exercise-kind';
 import { PlayerStore } from './player-store';
 
 /** One set: its number (warm-up, remove), weight, reps, RPE and ✓, and Cancel / Save while a logged set is edited. */
@@ -40,9 +41,9 @@ import { PlayerStore } from './player-store';
         autocomplete="off"
         [(ngModel)]="row.weight"
         (ngModelChange)="store.saveDraftSoon()"
-        [placeholder]="row.ghostWeight || '0'"
+        [placeholder]="row.ghostWeight || (block.kind === 'distance' ? '' : '0')"
         [class.has-ghost]="row.ghostWeight && !store.filled(row.weight)"
-        [attr.aria-label]="'Set ' + row.setNumber + ' weight (' + settingsService.unitLabel() + ')'"
+        [attr.aria-label]="'Set ' + row.setNumber + ' ' + firstLabel()"
         [readonly]="row.saved && !row.editing"
         [class.logged]="row.saved && !row.editing"
         [attr.title]="row.saved && !row.editing ? 'Tap to edit' : null"
@@ -58,9 +59,10 @@ import { PlayerStore } from './player-store';
         autocomplete="off"
         [(ngModel)]="row.reps"
         (ngModelChange)="store.saveDraftSoon()"
-        [placeholder]="row.ghostReps || '0'"
+        [placeholder]="row.ghostReps || (timed() ? '0:00' : '0')"
         [class.has-ghost]="row.ghostReps && !store.filled(row.reps)"
-        [attr.aria-label]="'Set ' + row.setNumber + ' reps' + (store.isShort(block, row) ? ', below plan' : '')"
+        [attr.aria-label]="'Set ' + row.setNumber + (timed() ? ' time, minutes and seconds' : ' reps') + (store.isShort(block, row) ? ', below plan' : '')"
+        (blur)="timed() && store.formatTime(bi, si)"
         [readonly]="row.saved && !row.editing"
         [class.logged]="row.saved && !row.editing"
         [attr.title]="row.saved && !row.editing ? 'Tap to edit' : null"
@@ -90,8 +92,8 @@ import { PlayerStore } from './player-store';
       <div class="action-cell">
         @if (!row.saved) {
           <!-- One tap logs what the row shows: typed values, else the ghosts. -->
-          <button type="button" class="log-btn" [attr.aria-label]="store.logLabel(row)"
-            [disabled]="!store.canLog(row)" (click)="store.logSet(bi, si)">
+          <button type="button" class="log-btn" [attr.aria-label]="store.logLabel(row, block.kind)"
+            [disabled]="!store.canLog(row, block.kind)" (click)="store.logSet(bi, si)">
             @if (row.saving) {
               <span class="spinner-sm"></span>
             } @else {
@@ -115,8 +117,11 @@ import { PlayerStore } from './player-store';
       <div class="edit-actions">
         <button type="button" class="edit-btn" (pointerdown)="$event.preventDefault()" (click)="store.cancelEdit(bi, si)">Cancel</button>
         <button type="button" class="edit-btn edit-btn--save" [attr.aria-label]="'Save set ' + row.setNumber"
-          (pointerdown)="$event.preventDefault()" [disabled]="row.saving || !store.editValid(row)" (click)="store.saveEdit(bi, si)">Save</button>
+          (pointerdown)="$event.preventDefault()" [disabled]="row.saving || !store.editValid(row, block.kind)" (click)="store.saveEdit(bi, si)">Save</button>
       </div>
+    }
+    @if (block.kind === 'distance' && row.saved && !row.editing && pace(row); as p) {
+      <div class="pace-note">{{ p }}{{ row.isPR && row.prKind ? ' · ' + (row.prKind === 'pace' ? 'fastest pace' : 'longest distance') : '' }}</div>
     }
     @if ((!row.saved || row.editing) && store.filled(row.rpe) && store.rpeInvalid(row.rpe)) {
       <div class="rpe-err-msg" role="alert">RPE must be between 1 and 10</div>
@@ -184,6 +189,12 @@ import { PlayerStore } from './player-store';
       padding: 2px var(--space-lg) var(--space-xs);
     }
 
+    .pace-note {
+      font-size: var(--font-size-xs); color: var(--text-secondary);
+      padding: 0 var(--space-lg) var(--space-xs) calc(var(--space-lg) + 44px + var(--space-sm));
+      background: rgba(var(--color-primary-rgb), 0.04); border-bottom: 1px solid var(--border-color);
+    }
+
     .action-cell { display: flex; align-items: center; justify-content: center; min-width: 0; }
 
     .logged-mark { color: var(--text-muted); }
@@ -232,6 +243,7 @@ import { PlayerStore } from './player-store';
       }
       .set-input { padding: 8px 8px; }
       .edit-actions, .rpe-err-msg { padding-left: var(--space-md); padding-right: var(--space-md); }
+      .pace-note { padding-left: calc(var(--space-md) + 44px + 6px); }
     }
 
   `],
@@ -244,4 +256,22 @@ export class SetRowComponent {
   readonly rowInput = input.required<SetRow>({ alias: 'row' });
   /** Its place in the exercise, which the store's methods take. */
   readonly setIndex = input.required<number>({ alias: 'si' });
+
+  /** The second column is a time (holds, distances) rather than reps. */
+  timed(): boolean {
+    const k = this.blockInput().kind;
+    return k === 'duration' || k === 'distance';
+  }
+
+  /** The first column in words, for its label: weight, the load added, or the distance. */
+  firstLabel(): string {
+    const unit = this.settingsService.unitLabel();
+    const k = this.blockInput().kind;
+    return k === 'distance' ? `distance (${this.store.dUnit()})` : k === 'weight_reps' ? `weight (${unit})` : `added weight (${unit}), blank for none`;
+  }
+
+  /** A logged distance set's pace. */
+  pace(row: SetRow): string | null {
+    return paceText(row.durationS, row.distanceM, this.store.dUnit());
+  }
 }

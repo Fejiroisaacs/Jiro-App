@@ -1,7 +1,7 @@
 // Run with: npm run test:unit
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildBlocks, canLog, isShort, logLabel, newRow, planTag, rampSummary, restOf, rpeInvalid, suggestionFrom, workingWeight, emptyBlock } from './player-blocks.ts';
+import { buildBlocks, canLog, convertDistanceText, isShort, lastTimeFrom, logLabel, newRow, planTag, rampSummary, restOf, rowValues, rpeInvalid, suggestionFrom, workingWeight, emptyBlock } from './player-blocks.ts';
 
 const same = (kg: number) => kg;
 const entry = (id: string, sets: number | null = null, reps: number | null = null, position = 1) =>
@@ -17,7 +17,7 @@ const shape = (blocks: ReturnType<typeof buildBlocks>) =>
 test('the list sets the order; plan exercises get their planned rows, others one row', () => {
   const blocks = buildBlocks([entry('curl'), entry('squat', 3, 5)], [], {}, same);
   assert.equal(shape(blocks), 'curl[1] squat[1~x5 2~x5 3~x5]');
-  assert.deepEqual(blocks[1].plan, { sets: 3, reps: 5, repsMax: null, rpe: null, rest: null, note: null });
+  assert.deepEqual(blocks[1].plan, { sets: 3, reps: 5, repsMax: null, rpe: null, rest: null, note: null, distanceM: null });
   assert.equal(blocks[0].plan, undefined);
 });
 
@@ -101,7 +101,7 @@ test('the working weight is the next working row, typed or ghosted, else the las
 
 test("a plan entry's details reach the block, and its tag reads them", () => {
   const blocks = buildBlocks([{ ...entry('row', 3, 8), target_reps_max: 12, target_rpe: 8, rest_seconds: 90, notes: 'Brace' }], [], {}, same);
-  assert.deepEqual(blocks[0].plan, { sets: 3, reps: 8, repsMax: 12, rpe: 8, rest: 90, note: 'Brace' });
+  assert.deepEqual(blocks[0].plan, { sets: 3, reps: 8, repsMax: 12, rpe: 8, rest: 90, note: 'Brace', distanceM: null });
   // Planned rows ghost the bottom of the range.
   assert.equal(shape(blocks), 'row[1~x8 2~x8 3~x8]');
   assert.equal(planTag(blocks[0].plan!), 'Plan 3×8-12 · RPE 8 · 1:30');
@@ -142,3 +142,70 @@ test("rest after an exercise is the plan's, else the exercise's own, else null f
   assert.equal(restOf(buildBlocks([loose], [], {}, same)[0]), 60);
   assert.equal(restOf(buildBlocks([loose], [set('curl', 1, 10, 12)], {}, same)[0]), 60);
 });
+
+test('each kind reads its own two columns', () => {
+  const row = (weight: string, reps: string) => newRow(1, { weight, reps });
+  assert.deepEqual(rowValues(row('100', '5')), { first: 100, second: 5 });
+  assert.equal(rowValues(row('', '5')), null, 'weights need a weight');
+  assert.deepEqual(rowValues(row('', '8'), 'bodyweight'), { first: 0, second: 8 }, 'no load is bodyweight alone');
+  assert.deepEqual(rowValues(row('', '130'), 'duration'), { first: 0, second: 90 }, 'a typed time fills from the right');
+  assert.equal(rowValues(row('', '0'), 'duration'), null);
+  assert.deepEqual(rowValues(row('5', '26:00'), 'distance'), { first: 5, second: 1560 });
+  assert.equal(rowValues(row('0', '26:00'), 'distance'), null, 'a distance needs a distance');
+  assert.equal(canLog(newRow(1, { ghostReps: '0:45' }), 'duration'), true, 'a planned hold logs from its ghost');
+  assert.equal(logLabel(newRow(2, { reps: '45' }), 'kg', 'duration'), 'Log set 2: 0:45');
+  assert.equal(logLabel(newRow(1, { weight: '10', reps: '8' }), 'kg', 'bodyweight'), 'Log set 1: 8 × +10 kg');
+  assert.equal(logLabel(newRow(1, { weight: '5', reps: '2600' }), 'kg', 'distance', 'km'), 'Log set 1: 5 km in 26:00');
+});
+
+test('plans ghost their target by kind, and a short hold or run is marked', () => {
+  const entry = (kind: string, reps: number, distance: number | null = null) => ({
+    exercise_id: kind, exercise_name: kind, muscle_group: null, position: 1, target_sets: 2, target_reps: reps,
+    exercise_kind: kind, target_distance_m: distance,
+  });
+  const [plank] = buildBlocks([entry('duration', 45)], [], {}, same, 'km');
+  assert.equal(plank.kind, 'duration');
+  assert.deepEqual(plank.sets.map(s => s.ghostReps), ['0:45', '0:45']);
+  assert.equal(planTag(plank.plan!, 'duration'), 'Plan 2×0:45');
+  const [run] = buildBlocks([entry('distance', 1, 5000)], [], {}, same, 'km');
+  assert.deepEqual(run.sets.map(s => s.ghostWeight), ['5', '5']);
+  assert.equal(planTag(run.plan!, 'distance', 'km'), 'Plan 2×5 km');
+  assert.equal(isShort(plank, newRow(1, { reps: '0:40', saved: true })), true);
+  assert.equal(isShort(plank, newRow(1, { reps: '0:45', saved: true })), false);
+  assert.equal(isShort(run, newRow(1, { distanceM: 4000, saved: true })), true);
+});
+
+test('logged distance sets show distance and time in the unit', () => {
+  const sets = [{ ...set('run', 1, 0, 0), exercise_kind: 'distance', duration_s: 1560, distance_m: 5000, pr_kind: 'pace' }];
+  const [b] = buildBlocks([], sets, {}, same, 'km');
+  assert.equal(b.kind, 'distance');
+  assert.equal(b.sets[0].weight, '5');
+  assert.equal(b.sets[0].reps, '26:00');
+  assert.equal(b.sets[0].prKind, 'pace');
+  assert.equal(convertDistanceText('5', 'kg', 'lbs'), '3.11');
+  // Typed text converts at two decimals; logged rows come back from their stored metres instead.
+  assert.equal(convertDistanceText('3.107', 'lbs', 'kg'), '5');
+});
+
+test('last time for kinds without an aim: the latest earlier workout, its first set as the ghost', () => {
+  const h = (session: string, date: string, n: number, extra: Record<string, unknown>) => ({
+    session_id: session, date, ended_at: date, set_number: n, weight: 0, reps: 0, rpe: null, is_warmup: false,
+    est_1rm: 0, is_pr: false, session_type: 'normal', exercise_note: null, duration_s: null, distance_m: null, body_weight_kg: null, ...extra,
+  });
+  const history = [
+    h('old', '2026-09-01T10:00:00Z', 1, { duration_s: 30 }),
+    h('last', '2026-09-08T10:00:00Z', 1, { duration_s: 45 }),
+    h('last', '2026-09-08T10:00:00Z', 2, { duration_s: 40 }),
+    h('now', '2026-09-15T10:00:00Z', 1, { duration_s: 60 }),
+  ];
+  const o = { excludeSessionId: 'now', before: '2026-09-15T09:00:00Z', unit: 'kg', dUnit: 'km' as const, display: same };
+  const s = lastTimeFrom('duration', history, o)!;
+  assert.equal(s.text, 'Last time 0:45, 0:40.');
+  assert.equal(s.ghostReps, '0:45');
+  assert.equal(s.ghostWeight, '', 'no load ghosts blank');
+  const pull = lastTimeFrom('bodyweight', [h('last', '2026-09-08T10:00:00Z', 1, { reps: 8, weight: 10 })], o)!;
+  assert.equal(pull.text, 'Last time 8 × +10 kg.');
+  assert.equal(pull.ghostWeight, '10');
+  assert.equal(lastTimeFrom('duration', [], o), null);
+});
+

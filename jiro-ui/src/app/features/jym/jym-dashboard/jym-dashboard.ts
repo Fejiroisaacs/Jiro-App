@@ -300,7 +300,7 @@ const DELOAD_SNOOZE_DAYS = 7;
           <jiro-empty-state
             compact
             heading="No templates yet"
-            message="In a workout, open Workout options and choose Save as template to keep its layout." />
+            message="Save one from a workout's options, or from a day's menu on a split." />
         }
         @if (!templatesLoading() && templates().length > 0) {
 <div class="splits-row">
@@ -321,9 +321,9 @@ const DELOAD_SNOOZE_DAYS = 7;
 
       <!-- Start Session: choose routine modal -->
       @if (showRoutinePicker()) {
-<jiro-modal title="Choose routine" maxWidth="420px" (close)="showRoutinePicker.set(false)">
+<jiro-modal title="Choose a day" maxWidth="420px" (close)="showRoutinePicker.set(false)">
         @if (loadingRoutines()) {
-<div class="list-skeletons" role="status" aria-label="Loading routines">
+<div class="list-skeletons" role="status" aria-label="Loading days">
             @for (i of [1, 2, 3]; track i) { <jiro-skeleton height="48px" /> }
           </div>
         }
@@ -339,7 +339,7 @@ const DELOAD_SNOOZE_DAYS = 7;
           </button>
 }
           <button class="routine-pick-btn freestyle" (click)="startFreeWithSplit()">
-            Freestyle (no routine)
+            Freestyle
           </button>
         </div>
 }

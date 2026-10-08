@@ -3,7 +3,9 @@ import { ToastService } from '../../../core/services/toast.service';
 
 import { ActivatedRoute, Router } from '@angular/router';
 import { JymService, PublicSplitDetail } from '../../../core/services/jym.service';
+import { SettingsService } from '../../../core/services/settings.service';
 import { planText } from '../plan-text';
+import { distanceUnit, kindOf } from '../exercise-kind';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
@@ -81,7 +83,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 <span class="ex-muscle text-secondary">{{ ex.muscle_group }}</span>
 }
                 </div>
-                <span class="ex-sets">{{ planText(ex) }}</span>
+                <span class="ex-sets">{{ planChip(ex) }}</span>
               </div>
 }
               @if (routine.exercises.length === 0) {
@@ -96,7 +98,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 
         <!-- Empty routines -->
         @if (split()!.routines.length === 0) {
-          <jiro-empty-state compact heading="No routines yet" message="Whoever shared this split has not added training days to it." />
+          <jiro-empty-state compact heading="No days yet" message="Whoever shared this split has not added days to it." />
         }
       </div>
 }
@@ -187,6 +189,11 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 })
 export class DiscoverDetailComponent implements OnInit {
   readonly planText = planText;
+  private readonly settings = inject(SettingsService);
+  /** The plan chip in the exercise's own terms: reps, a hold or a distance. */
+  planChip(x: Parameters<typeof planText>[0] & { kind?: string | null }): string {
+    return planText(x, 'short', { kind: kindOf(x.kind), distanceUnit: distanceUnit(this.settings.weightUnit()) });
+  }
   split = signal<PublicSplitDetail | null>(null);
   loading = signal(true);
   error = signal(false);

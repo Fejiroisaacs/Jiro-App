@@ -1,11 +1,16 @@
 /** The player's rows and exercise blocks, built from the server's list, logged sets and this device's draft. */
-import type { SessionExercise, SessionSet } from '../../../core/services/jym.service';
+import type { SessionExercise, SessionSet, SetHistory } from '../../../core/services/jym.service';
 import { planText } from '../plan-text';
+import { durationText, kindOf, parseDuration, setText, toDistanceUnit } from '../exercise-kind';
+import type { ExerciseKind } from '../exercise-kind';
 import type { DraftRow } from '../shared/session-draft';
 import type { NextSets } from '../weight-suggestion';
 import { filled, parseDecimal, parseWhole } from '../number-input';
 
-/** One row of an exercise; weight, reps and RPE are the text typed (a comma may be the decimal point). */
+/**
+ * One row of an exercise; weight, reps and RPE are the text typed (a comma may be the decimal point). By kind,
+ * `weight` is the weight, the added load, or the distance (km or mi), and `reps` is the reps or the time ("0:45").
+ */
 export interface SetRow {
   setNumber: number;
   weight: string;
@@ -23,12 +28,18 @@ export interface SetRow {
   /** A logged set opened for correction, and its values before the edit. */
   editing?: boolean;
   before?: { weight: string; reps: string; rpe: string };
+  /** A logged distance set's stored metres and time, and which record it set (distance or pace). */
+  distanceM?: number | null;
+  durationS?: number | null;
+  prKind?: 'distance' | 'pace' | null;
 }
 
 export interface ExerciseBlock {
   exerciseId: string;
   exerciseName: string;
   muscleGroup: string | null;
+  /** How its sets are logged; weight × reps when unknown. */
+  kind: ExerciseKind;
   sets: SetRow[];
   ghostSets: { weight: number; reps: number }[];
   suggestion: string | null;
@@ -52,6 +63,8 @@ export interface BlockPlan {
   /** Seconds; null rests for your usual time. */
   rest: number | null;
   note: string | null;
+  /** A distance plan's target in metres. */
+  distanceM: number | null;
 }
 
 /** The entry's plan, or none outside the plan. */
@@ -60,7 +73,15 @@ export function planOf(x: SessionExercise): BlockPlan | undefined {
   return {
     sets: x.target_sets, reps: x.target_reps, repsMax: x.target_reps_max ?? null,
     rpe: x.target_rpe ?? null, rest: x.rest_seconds ?? null, note: x.notes ?? null,
+    distanceM: x.target_distance_m ?? null,
   };
+}
+
+/** A planned row's ghosts by kind: the reps, the hold's time, or the distance (time is what you do). */
+function planGhosts(kind: ExerciseKind, plan: BlockPlan, dUnit: 'km' | 'mi'): Partial<SetRow> {
+  if (kind === 'duration') return { ghostReps: durationText(plan.reps) };
+  if (kind === 'distance') return plan.distanceM ? { ghostWeight: String(toDistanceUnit(plan.distanceM, dUnit)) } : {};
+  return { ghostReps: String(plan.reps) };
 }
 
 /** The rest after this exercise when it's set: the plan's, else its own; null rests for your usual. */
@@ -68,11 +89,12 @@ export function restOf(block: ExerciseBlock): number | null {
   return block.plan?.rest ?? block.ownRest ?? null;
 }
 
-/** "Plan 3×8-12 · RPE 8 · 2:00". */
-export function planTag(plan: BlockPlan): string {
+/** "Plan 3×8-12 · RPE 8 · 2:00", "Plan 3×0:45", "Plan 1×5 km". */
+export function planTag(plan: BlockPlan, kind: ExerciseKind = 'weight_reps', dUnit: 'km' | 'mi' = 'km'): string {
   return 'Plan ' + planText({
     target_sets: plan.sets, target_reps: plan.reps, target_reps_max: plan.repsMax, target_rpe: plan.rpe, rest_seconds: plan.rest,
-  });
+    target_distance_m: plan.distanceM,
+  }, 'short', { kind, distanceUnit: dUnit });
 }
 
 export function newRow(setNumber: number, init: Partial<SetRow> = {}): SetRow {
@@ -84,33 +106,45 @@ export function newRow(setNumber: number, init: Partial<SetRow> = {}): SetRow {
   };
 }
 
-export function emptyBlock(exerciseId: string, exerciseName: string, muscleGroup: string | null, sets: SetRow[]): ExerciseBlock {
-  return { exerciseId, exerciseName, muscleGroup, sets, ghostSets: [], suggestion: null, exerciseNote: '' };
+export function emptyBlock(exerciseId: string, exerciseName: string, muscleGroup: string | null, sets: SetRow[], kind: ExerciseKind = 'weight_reps'): ExerciseBlock {
+  return { exerciseId, exerciseName, muscleGroup, kind, sets, ghostSets: [], suggestion: null, exerciseNote: '' };
 }
 
-/** A block for one entry of the list with nothing logged: its planned rows (planned reps as ghosts), else one row. */
-export function blockFromEntry(x: SessionExercise): ExerciseBlock {
+/** A block for one entry of the list with nothing logged: its planned rows (the plan's target as ghosts), else one row. */
+export function blockFromEntry(x: SessionExercise, dUnit: 'km' | 'mi' = 'km'): ExerciseBlock {
   const plan = planOf(x);
+  const kind = kindOf(x.exercise_kind);
   const rows = plan
-    ? Array.from({ length: plan.sets }, (_, i) => newRow(i + 1, { ghostReps: String(plan.reps) }))
+    ? Array.from({ length: plan.sets }, (_, i) => newRow(i + 1, planGhosts(kind, plan, dUnit)))
     : [newRow(1)];
   return {
-    ...emptyBlock(x.exercise_id, x.exercise_name, x.muscle_group, rows), ...(plan ? { plan } : {}),
+    ...emptyBlock(x.exercise_id, x.exercise_name, x.muscle_group, rows, kind), ...(plan ? { plan } : {}),
     group: x.superset_group ?? null, ownRest: x.exercise_rest_seconds ?? null,
   };
 }
 
+/** A logged set's two columns by kind: weight and reps, load and time, or distance and time. */
+export function loggedColumns(kind: ExerciseKind, s: { weight: number; reps_performed: number; duration_s?: number | null; distance_m?: number | null },
+  display: (kg: number) => number, dUnit: 'km' | 'mi'): Pick<SetRow, 'weight' | 'reps'> {
+  if (kind === 'distance') return { weight: String(toDistanceUnit(s.distance_m ?? 0, dUnit)), reps: durationText(s.duration_s ?? 0) };
+  if (kind === 'duration') return { weight: String(display(s.weight)), reps: durationText(s.duration_s ?? 0) };
+  return { weight: String(display(s.weight)), reps: String(s.reps_performed) };
+}
+
 /** Logged sets as saved rows, one block per exercise in the order the sets come; `display` shows stored kg. */
-export function loggedBlocks(sets: SessionSet[], display: (kg: number) => number): ExerciseBlock[] {
+export function loggedBlocks(sets: SessionSet[], display: (kg: number) => number, dUnit: 'km' | 'mi' = 'km'): ExerciseBlock[] {
   const byExercise = new Map<string, ExerciseBlock>();
   for (const s of sets) {
+    const kind = kindOf(s.exercise_kind);
     if (!byExercise.has(s.exercise_id)) {
-      byExercise.set(s.exercise_id, { ...emptyBlock(s.exercise_id, s.exercise_name, s.muscle_group, []), exerciseNote: s.exercise_note || '' });
+      byExercise.set(s.exercise_id, { ...emptyBlock(s.exercise_id, s.exercise_name, s.muscle_group, [], kind), exerciseNote: s.exercise_note || '' });
     }
     byExercise.get(s.exercise_id)!.sets.push(newRow(s.set_number, {
-      weight: String(display(s.weight)),
+      ...loggedColumns(kind, s, display, dUnit),
       weightKg: s.weight,
-      reps: String(s.reps_performed),
+      distanceM: s.distance_m ?? null,
+      durationS: s.duration_s ?? null,
+      prKind: s.pr_kind ?? null,
       rpe: s.rpe != null ? String(s.rpe) : '',
       saved: true,
       isPR: s.is_pr,
@@ -131,22 +165,24 @@ export function buildBlocks(
   sets: SessionSet[],
   draftRows: Record<string, DraftRow[]>,
   display: (kg: number) => number,
+  dUnit: 'km' | 'mi' = 'km',
 ): ExerciseBlock[] {
-  const logged = new Map(loggedBlocks(sets, display).map(b => [b.exerciseId, b]));
+  const logged = new Map(loggedBlocks(sets, display, dUnit).map(b => [b.exerciseId, b]));
   // Logged exercises missing from the list (never expected) still show, after it.
   const listed = new Set(exercises.map(x => x.exercise_id));
   const extra = [...logged.values()].filter(b => !listed.has(b.exerciseId));
 
   const blocks = exercises.map(x => {
     const b = logged.get(x.exercise_id);
-    if (!b) return blockFromEntry(x);
+    if (!b) return blockFromEntry(x, dUnit);
     const plan = planOf(x);
+    b.kind = kindOf(x.exercise_kind);
     if (plan) b.plan = plan;
     b.group = x.superset_group ?? null;
     b.ownRest = x.exercise_rest_seconds ?? null;
     const last = b.sets.filter(s => !s.isWarmup).at(-1);
     for (let n = b.sets.length + 1; plan && n <= plan.sets; n++) {
-      b.sets.push(newRow(n, { ghostWeight: last?.weight ?? '', ghostReps: String(plan.reps) }));
+      b.sets.push(newRow(n, { ghostWeight: last?.weight ?? '', ghostReps: last?.reps ?? '', ...planGhosts(b.kind, plan, dUnit) }));
     }
     return b;
   });
@@ -160,7 +196,8 @@ export function buildBlocks(
     b.sets = [...kept, ...rows.filter(d => !taken.has(d.setNumber)).map(d => newRow(d.setNumber, {
       weight: d.weight, reps: d.reps, rpe: d.rpe, isWarmup: d.isWarmup,
       ghostWeight: d.isWarmup ? '' : last?.weight ?? '',
-      ghostReps: !d.isWarmup && b.plan ? String(b.plan.reps) : '',
+      ghostReps: '',
+      ...(!d.isWarmup && b.plan ? planGhosts(b.kind, b.plan, dUnit) : {}),
     }))].sort((x, y) => x.setNumber - y.setNumber);
   }
   return [...blocks, ...extra];
@@ -172,26 +209,78 @@ export function rpeInvalid(rpe: string): boolean {
   return v === null || v < 1 || v > 10;
 }
 
-/** ✓ is ready when weight and reps each read as numbers, typed (0 included) or ghosted. */
-export function canLog(row: SetRow): boolean {
-  const weight = parseDecimal(filled(row.weight) ? row.weight : row.ghostWeight);
-  const reps = parseWhole(filled(row.reps) ? row.reps : row.ghostReps);
-  return !row.saving && weight !== null && reps !== null && reps >= 1
-    && !(filled(row.rpe) && rpeInvalid(row.rpe));
+/**
+ * What a row logs, read by kind from typed values (a typed 0 included) or ghosts: `first` is the weight, the added
+ * load (blank is none) or the distance in the shown unit; `second` is the reps, or the time in seconds. Null when
+ * a needed value doesn't read.
+ */
+export function rowValues(row: Pick<SetRow, 'weight' | 'reps' | 'ghostWeight' | 'ghostReps'>, kind: ExerciseKind = 'weight_reps'): { first: number; second: number } | null {
+  const firstText = filled(row.weight) ? row.weight : row.ghostWeight;
+  const secondText = filled(row.reps) ? row.reps : row.ghostReps;
+  const loadOptional = kind === 'bodyweight' || kind === 'duration';
+  const first = loadOptional && !filled(firstText) ? 0 : parseDecimal(firstText);
+  if (first === null || (kind === 'distance' && first <= 0)) return null;
+  if (kind === 'duration' || kind === 'distance') {
+    const seconds = parseDuration(secondText);
+    return seconds === null ? null : { first, second: seconds };
+  }
+  const reps = parseWhole(secondText);
+  return reps === null || reps < 1 ? null : { first, second: reps };
 }
 
-/** The ✓'s accessible name: what one tap logs. */
-export function logLabel(row: SetRow, unit: string): string {
-  const weight = filled(row.weight) ? row.weight : row.ghostWeight;
-  const reps = filled(row.reps) ? row.reps : row.ghostReps;
-  return filled(weight) && filled(reps)
-    ? `Log set ${row.setNumber}: ${weight} ${unit} × ${reps}`
-    : `Log set ${row.setNumber}`;
+/** ✓ is ready when the row's values read for its kind, typed or ghosted. */
+export function canLog(row: SetRow, kind: ExerciseKind = 'weight_reps'): boolean {
+  return !row.saving && rowValues(row, kind) !== null && !(filled(row.rpe) && rpeInvalid(row.rpe));
 }
 
-/** A logged working set below the plan's reps. */
+/** The ✓'s accessible name: what one tap logs ("Log set 2: 100 lbs × 5", "Log set 1: 0:45", "Log set 1: 3 mi in 26:00"). */
+export function logLabel(row: SetRow, unit: string, kind: ExerciseKind = 'weight_reps', dUnit: 'km' | 'mi' = 'km'): string {
+  const v = rowValues(row, kind);
+  if (!v) return `Log set ${row.setNumber}`;
+  const text = kind === 'distance'
+    ? `${v.first} ${dUnit} in ${durationText(v.second)}`
+    : setText(kind, { weight: v.first, reps: v.second, duration_s: v.second }, unit);
+  return `Log set ${row.setNumber}: ${text}`;
+}
+
+/** A logged working set under the plan: fewer reps, a shorter hold, or a shorter distance. */
 export function isShort(block: ExerciseBlock, row: SetRow): boolean {
-  return !!block.plan && row.saved && !row.isWarmup && (parseWhole(row.reps) ?? 0) < block.plan.reps;
+  if (!block.plan || !row.saved || row.isWarmup) return false;
+  if (block.kind === 'duration') return (parseDuration(row.reps) ?? 0) < block.plan.reps;
+  if (block.kind === 'distance') return !!block.plan.distanceM && (row.distanceM ?? 0) < block.plan.distanceM - 0.5;
+  return (parseWhole(row.reps) ?? 0) < block.plan.reps;
+}
+
+/**
+ * "Last time" for kinds without an aim (bodyweight, duration, distance): the latest earlier normal workout's working
+ * sets in words, and its first set as every row's ghost. `display` shows stored kg; `before` is this workout's start.
+ */
+export function lastTimeFrom(kind: ExerciseKind, history: SetHistory[], o: {
+  excludeSessionId: string; before: string; unit: string; dUnit: 'km' | 'mi'; display: (kg: number) => number;
+}): Suggestion | null {
+  const earlier = history.filter(h => h.session_id !== o.excludeSessionId && h.session_type === 'normal'
+    && !h.is_warmup && Date.parse(h.date) < Date.parse(o.before));
+  if (!earlier.length) return null;
+  const latest = earlier.reduce((a, b) => Date.parse(b.date) > Date.parse(a.date) ? b : a);
+  const sets = earlier.filter(h => h.session_id === latest.session_id).sort((a, b) => a.set_number - b.set_number);
+  const words = sets.map(h => setText(kind, { weight: o.display(h.weight), reps: h.reps, duration_s: h.duration_s, distance_m: h.distance_m }, o.unit));
+  const first = sets[0];
+  const cols = loggedColumns(kind, { weight: first.weight, reps_performed: first.reps, duration_s: first.duration_s, distance_m: first.distance_m }, o.display, o.dUnit);
+  return {
+    text: `Last time ${words.join(', ')}.`,
+    // A bodyweight or hold with no load ghosts a blank load, not "0".
+    ghostWeight: kind !== 'distance' && first.weight === 0 ? '' : cols.weight,
+    ghostReps: cols.reps,
+    icon: 'repeat',
+  };
+}
+
+/** A distance in the other unit when the weight unit switches (kg ↔ lbs is km ↔ mi). */
+export function convertDistanceText(value: string, fromWeightUnit: string, toWeightUnit: string): string {
+  const n = parseDecimal(value);
+  if (n === null || fromWeightUnit === toWeightUnit) return value;
+  const metres = n * (fromWeightUnit === 'kg' ? 1000 : 1609.344);
+  return String(toDistanceUnit(metres, toWeightUnit === 'kg' ? 'km' : 'mi'));
 }
 
 /** The weight an exercise works at next: the first unlogged working row, typed or ghosted, else the last logged. */
