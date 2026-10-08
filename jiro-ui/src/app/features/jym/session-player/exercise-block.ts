@@ -25,7 +25,7 @@ import { SetRowComponent } from './set-row';
     <span class="mg-tag">{{ block.muscleGroup }}</span>
     }
                   @if (block.plan) {
-                    <span class="plan-tag">{{ planTag(block.plan) }}</span>
+                    <span class="plan-tag">{{ planTag(block.plan, block.kind, store.dUnit()) }}</span>
                   }
                   @if (store.isCollapsed(bi) && store.savedCount(bi) > 0) {
     <span class="sets-done-tag">{{ store.savedCount(bi) }} sets</span>
@@ -68,7 +68,7 @@ import { SetRowComponent } from './set-row';
                 </div>
 
                 <!-- Warm-ups before the first working set: the bar, then about 50, 70 and 85 percent. -->
-                @if (store.warmupRampFor(block); as ramp) {
+                @if (block.kind === 'weight_reps' ? store.warmupRampFor(block) : null; as ramp) {
                   <button type="button" class="warmup-prompt" (click)="store.addWarmups(bi, ramp)">
                     <jiro-icon name="fire" [size]="16" />
                     <span class="warmup-prompt-text">
@@ -81,8 +81,8 @@ import { SetRowComponent } from './set-row';
                 <!-- Set header -->
                 <div class="set-header-row" aria-hidden="true">
                   <span class="sh set-num">Set</span>
-                  <span class="sh">Weight ({{ settingsService.unitLabel() }})</span>
-                  <span class="sh">Reps</span>
+                  <span class="sh">{{ firstColumn(block) }}</span>
+                  <span class="sh">{{ block.kind === 'duration' || block.kind === 'distance' ? 'Time' : 'Reps' }}</span>
                   <span class="sh">RPE</span>
                   <span class="sh"></span>
                 </div>
@@ -132,9 +132,11 @@ import { SetRowComponent } from './set-row';
                     </a>
 
     }
-                  <button type="button" class="plates-btn" aria-haspopup="dialog" (click)="store.openPlates(block)">
-                    <jiro-icon name="barbell" [size]="16" /> Plates
-                  </button>
+                  @if (block.kind === 'weight_reps') {
+                    <button type="button" class="plates-btn" aria-haspopup="dialog" (click)="store.openPlates(block)">
+                      <jiro-icon name="barbell" [size]="16" /> Plates
+                    </button>
+                  }
                 </div>
 
     }
@@ -369,4 +371,11 @@ export class ExerciseBlockComponent {
   /** Its place in the workout, which the store's methods take. */
   readonly index = input.required<number>({ alias: 'bi' });
   readonly planTag = planTag;
+
+  /** The first column's heading: the weight, the load added (bodyweight, holds), or the distance. */
+  firstColumn(block: ExerciseBlock): string {
+    const unit = this.settingsService.unitLabel();
+    if (block.kind === 'distance') return `Distance (${this.store.dUnit()})`;
+    return block.kind === 'weight_reps' ? `Weight (${unit})` : `+ ${unit}`;
+  }
 }

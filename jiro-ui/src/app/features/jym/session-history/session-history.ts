@@ -6,6 +6,7 @@ import { ActivatedRoute, NavigationEnd, Router, RouterLink } from '@angular/rout
 import { filter } from 'rxjs';
 import { Exercise, JymService, SessionListOptions, SessionSummary, SessionType, SessionWithSets } from '../../../core/services/jym.service';
 import { WorkoutLauncher } from '../shared/workout-launcher';
+import { distanceText, distanceUnit, durationText } from '../exercise-kind';
 import { SettingsService } from '../../../core/services/settings.service';
 import { UploadService } from '../../../core/services/upload.service';
 import { ConfirmService } from '../../../core/services/confirm.service';
@@ -185,6 +186,12 @@ import { HistoryCalendarComponent } from './history-calendar';
                 @if (s.total_volume > 0) {
 <span class="stat-pill vol-pill">{{ settingsService.toDisplay(s.total_volume) | number:'1.0-0' }} {{ settingsService.unitLabel() }}</span>
 }
+                @if (s.total_distance_m > 0) {
+                  <span class="stat-pill">{{ distance(s.total_distance_m) }}</span>
+                }
+                @if (s.total_duration_s > 0) {
+                  <span class="stat-pill" [attr.aria-label]="held(s.total_duration_s) + ' held'">{{ held(s.total_duration_s) }} held</span>
+                }
               </div>
               <button class="delete-session-btn" type="button" (click)="deleteSession($event, s)" title="Delete session"
                 [attr.aria-label]="'Delete session from ' + formatDate(s.started_at)">
@@ -947,6 +954,15 @@ export class SessionHistoryComponent implements OnInit {
 
   formatDate(instant: string): string {
     return formatInstant(instant, this.settingsService.timezone(), { weekday: true });
+  }
+
+  /** A workout's distance in the account's unit (km for kg, miles for lbs). */
+  distance(metres: number): string {
+    return distanceText(metres, distanceUnit(this.settingsService.weightUnit()));
+  }
+
+  held(seconds: number): string {
+    return durationText(seconds);
   }
 
   formatDuration(start: string, end: string): string {

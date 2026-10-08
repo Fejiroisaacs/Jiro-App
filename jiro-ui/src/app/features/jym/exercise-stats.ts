@@ -11,15 +11,20 @@ export interface StatsWorkout {
   /** kg × reps over working sets. */
   volume: number;
   note: string | null;
+  max_reps?: number;
+  /** Duration: the longest hold. Distance: the longest distance (m) and best pace (s/km) over 400 m. */
+  max_duration_s?: number;
+  max_distance_m?: number;
+  best_pace_s_per_km?: number | null;
 }
 
 export type StatsRange = '3m' | '1y' | 'all';
-export type StatsMeasure = 'e1rm' | 'volume' | 'maxweight';
+export type StatsMeasure = 'e1rm' | 'volume' | 'maxweight' | 'reps' | 'hold' | 'distance' | 'pace';
 
 export interface StatsPoint {
   /** Epoch ms of the workout's start, so the axis spaces workouts by date. */
   x: number;
-  /** kg (or kg × reps for volume). */
+  /** kg (kg × reps for volume), reps, seconds held, metres, or seconds per km. */
   y: number;
   sessionId: string;
 }
@@ -47,11 +52,15 @@ export function defaultRange(workouts: readonly StatsWorkout[], now: number): St
   return first < now - RANGE_DAYS['1y'] * DAY_MS ? '1y' : 'all';
 }
 
-/** One point per charted workout in the range, oldest first. */
+/** One point per charted workout in the range, oldest first; a workout without the measure (no pace) is left out. */
 export function statsSeries(workouts: readonly StatsWorkout[], measure: StatsMeasure, range: StatsRange, now: number): StatsPoint[] {
-  const pick = (w: StatsWorkout) => measure === 'e1rm' ? w.best_e1rm : measure === 'volume' ? w.volume : w.max_weight;
+  const pick = (w: StatsWorkout): number | null | undefined => ({
+    e1rm: w.best_e1rm, volume: w.volume, maxweight: w.max_weight, reps: w.max_reps,
+    hold: w.max_duration_s, distance: w.max_distance_m, pace: w.best_pace_s_per_km,
+  })[measure];
   return inRange(chartedWorkouts(workouts), range, now)
-    .map(w => ({ x: new Date(w.started_at).getTime(), y: pick(w), sessionId: w.session_id }))
+    .map(w => ({ x: new Date(w.started_at).getTime(), y: pick(w) ?? 0, sessionId: w.session_id }))
+    .filter(p => measure !== 'pace' || p.y > 0)
     .sort((a, b) => a.x - b.x);
 }
 

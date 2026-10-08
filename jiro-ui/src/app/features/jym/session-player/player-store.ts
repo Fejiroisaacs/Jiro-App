@@ -22,9 +22,10 @@ import { filled, parseDecimal, parseWhole } from '../number-input';
 import { platesFor, warmupRamp } from '../plates';
 import { DRAFT_VERSION, SessionDraft, clearDraft, readDraft, writeDraft } from '../shared/session-draft';
 import {
-  ExerciseBlock, SetRow, Suggestion, blockFromEntry, buildBlocks, canLog, isShort, logLabel as logLabelText, newRow,
-  rampSummary, restOf, rpeInvalid, suggestionFrom, workingWeight,
+  ExerciseBlock, SetRow, Suggestion, blockFromEntry, buildBlocks, canLog as canLogRow, convertDistanceText, isShort, lastTimeFrom,
+  logLabel as logLabelText, loggedColumns, newRow, rampSummary, restOf, rowValues, rpeInvalid, suggestionFrom, workingWeight,
 } from './player-blocks';
+import { ExerciseKind, distanceUnit, durationText, kindOf, parseDistance, parseDuration, toDistanceUnit } from '../exercise-kind';
 import { RestTimer } from './rest-timer';
 import { ScreenWakeLock } from '../../../core/utils/wake-lock';
 import { readLocal, writeLocal } from '../../../core/storage';
@@ -73,8 +74,14 @@ export class PlayerStore {
     return { bi, si, row, summary: `${block.exerciseName}${values}${row.saved ? ', logged' : ', not logged yet'}` };
   });
   readonly filled = filled;
-  readonly canLog = canLog;
   readonly isShort = isShort;
+  /** Distances follow the weight unit: km for kg, miles for lbs. */
+  readonly dUnit = computed(() => distanceUnit(this.settingsService.weightUnit()));
+
+  /** ✓ is ready when the row reads for its exercise's kind. */
+  canLog(row: SetRow, kind: ExerciseKind = 'weight_reps'): boolean {
+    return canLogRow(row, kind);
+  }
   readonly rpeInvalid = rpeInvalid;
   readonly rampSummary = rampSummary;
   // The account's bar and plate sizes for the unit in use (warm-up ramps); the sheet opens at platesWeight.
@@ -206,12 +213,13 @@ export class PlayerStore {
   persistRow(blockIndex: number, setIndex: number, startRest: boolean): Promise<boolean> {
     const block = this.blocks()[blockIndex];
     const row = block?.sets[setIndex];
-    if (!row || !this.canLog(row)) return Promise.resolve(false);
+    if (!row || !this.canLog(row, block.kind)) return Promise.resolve(false);
     // Typed values win, a typed 0 included; otherwise the ghosts the row shows.
-    const weightNum = parseDecimal(filled(row.weight) ? row.weight : row.ghostWeight)!;
-    const repsNum = parseWhole(filled(row.reps) ? row.reps : row.ghostReps)!;
-    const weight = String(weightNum);
-    const reps = String(repsNum);
+    const kind = block.kind;
+    const v = rowValues(row, kind)!;
+    const timed = kind === 'duration' || kind === 'distance';
+    const weight = kind === 'distance' || v.first !== 0 || filled(row.weight) || filled(row.ghostWeight) ? String(v.first) : '';
+    const reps = timed ? durationText(v.second) : String(v.second);
 
     // Warm up audio NOW, synchronously while the tap gesture is still active.
     // Safari blocks AudioContext creation/resume in async callbacks (e.g. HTTP responses).
@@ -225,8 +233,9 @@ export class PlayerStore {
     const req: CreateSetRequest = {
       exercise_id: block.exerciseId,
       set_number: row.setNumber,
-      weight: this.settingsService.toKg(weightNum),
-      reps_performed: repsNum,
+      weight: kind === 'distance' ? 0 : this.settingsService.toKg(v.first),
+      ...(timed ? { duration_s: v.second } : { reps_performed: v.second }),
+      ...(kind === 'distance' ? { distance_m: parseDistance(String(v.first), this.dUnit())! } : {}),
       rpe: parseWhole(row.rpe) ?? undefined,
       is_warmup: row.isWarmup,
       exercise_note: block.exerciseNote || undefined,
@@ -240,6 +249,7 @@ export class PlayerStore {
             ...b,
             sets: b.sets.map((s, si) => si === setIndex ? {
               ...s, saving: false, saved: true, isPR: saved.is_pr, id: saved.id, weightKg: saved.weight,
+              distanceM: saved.distance_m, durationS: saved.duration_s, prKind: saved.pr_kind,
             } : s),
           } : b));
           if (startRest && !this.fix) this.afterLogged(blockIndex, row.isWarmup);
@@ -564,7 +574,7 @@ export class PlayerStore {
     this.jymService.addSessionExercise(this.sessionId, ex.id).subscribe({
       next: entry => {
         if (this.blocks().some(b => b.exerciseId === entry.exercise_id)) return;
-        const block = blockFromEntry(entry);
+        const block = blockFromEntry(entry, this.dUnit());
         this.blocks.update(bs => [...bs, block]);
         this.loadSuggestionsForBlocks([block]);
       },
@@ -576,10 +586,10 @@ export class PlayerStore {
   refreshPrBadges() {
     this.jymService.getSession(this.sessionId).subscribe({
       next: s => {
-        const pr = new Map(s.sets.map(x => [x.id, x.is_pr]));
+        const pr = new Map(s.sets.map(x => [x.id, x]));
         this.blocks.update(bs => bs.map(b => ({
           ...b,
-          sets: b.sets.map(r => (r.id && pr.has(r.id) ? { ...r, isPR: pr.get(r.id)! } : r)),
+          sets: b.sets.map(r => (r.id && pr.has(r.id) ? { ...r, isPR: pr.get(r.id)!.is_pr, prKind: pr.get(r.id)!.pr_kind } : r)),
         })));
       },
     });
@@ -599,13 +609,17 @@ export class PlayerStore {
     }
     // v1 drafts (typed rows only) are from long before; their rows are not restored.
     const unit = this.settingsService.weightUnit();
+    const kinds = new Map(exercises.map(x => [x.exercise_id, kindOf(x.exercise_kind)]));
     const rows: SessionDraft['rows'] = {};
     if (draft && (draft.v ?? 1) >= 2) {
       for (const [id, list] of Object.entries(draft.rows)) {
-        rows[id] = list.map(d => draft.unit && draft.unit !== unit ? { ...d, weight: this.convertText(d.weight, draft.unit, unit) } : d);
+        rows[id] = list.map(d => draft.unit && draft.unit !== unit ? {
+          ...d,
+          weight: kinds.get(id) === 'distance' ? convertDistanceText(d.weight, draft.unit, unit) : this.convertText(d.weight, draft.unit, unit),
+        } : d);
       }
     }
-    const blocks = buildBlocks(exercises, session.sets ?? [], rows, kg => this.settingsService.toDisplay(kg));
+    const blocks = buildBlocks(exercises, session.sets ?? [], rows, kg => this.settingsService.toDisplay(kg), this.dUnit());
     this.loadSuggestionsForBlocks(blocks);
     return blocks;
   }
@@ -630,7 +644,8 @@ export class PlayerStore {
   unloggedRows(): { bi: number; si: number }[] {
     const rows: { bi: number; si: number }[] = [];
     this.blocks().forEach((b, bi) => b.sets.forEach((s, si) => {
-      if (!s.saved && filled(s.weight) && filled(s.reps) && this.canLog(s)) rows.push({ bi, si });
+      const typed = filled(s.reps) && (filled(s.weight) || b.kind === 'bodyweight' || b.kind === 'duration');
+      if (!s.saved && typed && this.canLog(s, b.kind)) rows.push({ bi, si });
     }));
     return rows;
   }
@@ -774,6 +789,13 @@ export class PlayerStore {
   /** The hint line ("Last time ... Stay at ...") and the ghost values, from nextSets(). */
   private suggestionFor(block: ExerciseBlock, history: SetHistory[]): Suggestion | null {
     const unit = this.settingsService.unitLabel();
+    // Bodyweight, holds and distances show last time only; today's aim is a weight × reps feature.
+    if (block.kind !== 'weight_reps') {
+      return lastTimeFrom(block.kind, history, {
+        excludeSessionId: this.sessionId, before: this.startedAt.toISOString(), unit, dUnit: this.dUnit(),
+        display: kg => this.settingsService.toDisplay(kg),
+      });
+    }
     const next = nextSets(history, {
       excludeSessionId: this.sessionId,
       before: this.startedAt.toISOString(),
@@ -784,8 +806,18 @@ export class PlayerStore {
     return next ? suggestionFrom(next, block.plan, unit) : null;
   }
 
-  logLabel(row: SetRow): string {
-    return logLabelText(row, this.settingsService.unitLabel());
+  logLabel(row: SetRow, kind: ExerciseKind = 'weight_reps'): string {
+    return logLabelText(row, this.settingsService.unitLabel(), kind, this.dUnit());
+  }
+
+  /** A typed time reads back formatted when you leave the box: "130" becomes 1:30. */
+  formatTime(bi: number, si: number) {
+    const row = this.blocks()[bi]?.sets[si];
+    const seconds = row ? parseDuration(row.reps) : null;
+    if (row && seconds !== null && durationText(seconds) !== row.reps) {
+      this.patchRow(bi, si, { reps: durationText(seconds) });
+      this.saveDraftSoon();
+    }
   }
 
   /** A tap on a logged value opens its row for editing; unlocking and focusing inside the tap lets a phone open its keyboard. */
@@ -805,15 +837,17 @@ export class PlayerStore {
     this.patchRow(bi, si, { editing: false, ...(row.before ?? {}), before: undefined });
   }
 
-  editValid(row: SetRow): boolean {
-    const reps = parseWhole(row.reps);
-    return parseDecimal(row.weight) !== null && reps !== null && reps >= 1 && !(filled(row.rpe) && this.rpeInvalid(row.rpe));
+  editValid(row: SetRow, kind: ExerciseKind = 'weight_reps'): boolean {
+    return rowValues({ weight: row.weight, reps: row.reps, ghostWeight: '', ghostReps: '' }, kind) !== null
+      && !(filled(row.rpe) && this.rpeInvalid(row.rpe));
   }
 
   /** Saves a corrected set; the API re-rates the exercise, so PR badges are re-read. */
   saveEdit(bi: number, si: number) {
-    const row = this.blocks()[bi]?.sets[si];
-    if (!row?.id || !row.editing || row.saving || !this.editValid(row)) return;
+    const block = this.blocks()[bi];
+    const row = block?.sets[si];
+    if (!row?.id || !row.editing || row.saving || !this.editValid(row, block.kind)) return;
+    const kind = block.kind;
     const before = row.before;
     if (before && row.weight === before.weight && row.reps === before.reps && row.rpe === before.rpe) {
       this.patchRow(bi, si, { editing: false, before: undefined });
@@ -821,9 +855,11 @@ export class PlayerStore {
     }
     const id = row.id;
     const rpe = parseWhole(row.rpe);
+    const v = rowValues({ weight: row.weight, reps: row.reps, ghostWeight: '', ghostReps: '' }, kind)!;
     const req: UpdateSetRequest = {
-      weight: this.settingsService.toKg(parseDecimal(row.weight)!),
-      reps_performed: parseWhole(row.reps)!,
+      ...(kind === 'distance'
+        ? { distance_m: parseDistance(String(v.first), this.dUnit())!, duration_s: v.second }
+        : { weight: this.settingsService.toKg(v.first), ...(kind === 'duration' ? { duration_s: v.second } : { reps_performed: v.second }) }),
       ...(rpe !== null ? { rpe } : {}),
     };
     this.patchSet(id, { saving: true });
@@ -831,9 +867,8 @@ export class PlayerStore {
       next: saved => {
         this.patchSet(id, {
           saving: false, editing: false, before: undefined,
-          weightKg: saved.weight,
-          weight: String(this.settingsService.toDisplay(saved.weight)),
-          reps: String(saved.reps_performed),
+          weightKg: saved.weight, distanceM: saved.distance_m, durationS: saved.duration_s,
+          ...loggedColumns(kind, saved, kg => this.settingsService.toDisplay(kg), this.dUnit()),
           rpe: saved.rpe != null ? String(saved.rpe) : '',
         });
         this.refreshPrBadges();
@@ -868,13 +903,18 @@ export class PlayerStore {
 
   /** Logged rows come back from their stored kg; typed rows and ghosts are converted; suggestions are rebuilt. */
   private convertWorkout(from: string, to: string) {
+    const dUnit = distanceUnit(to);
     this.blocks.update(bs => bs.map(b => ({
       ...b,
-      sets: b.sets.map(s => ({
+      sets: b.sets.map(s => b.kind === 'distance' ? {
+        ...s,
+        weight: s.saved && s.distanceM != null ? String(toDistanceUnit(s.distanceM, dUnit)) : convertDistanceText(s.weight, from, to),
+        ghostWeight: convertDistanceText(s.ghostWeight, from, to),
+      } : {
         ...s,
         weight: s.saved && s.weightKg != null ? String(this.settingsService.toDisplay(s.weightKg)) : this.convertText(s.weight, from, to),
         ghostWeight: this.convertText(s.ghostWeight, from, to),
-      })),
+      }),
     })));
     for (const b of this.blocks()) this.applySuggestion(b.exerciseId);
   }
