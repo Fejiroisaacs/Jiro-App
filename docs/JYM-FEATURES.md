@@ -35,6 +35,29 @@ A personal exercise dictionary. Each exercise has a **name**, an optional **main
 - Renaming an exercise renames it across all history, since sets reference the exercise by ID.
 - Deleting an exercise removes every set logged with it; the library asks first.
 
+### Exercise Types
+Each exercise has a **type** (`exercises.kind`), which sets its inputs, volume and records. The rules and the decision
+log are in [JYM-EXERCISE-TYPES.md](JYM-EXERCISE-TYPES.md).
+
+| Type | Player columns | Volume | Record |
+|---|---|---|---|
+| Weight × reps (default) | Weight, Reps | weight × reps | more weight, or more reps at it |
+| Bodyweight | + kg (added, blank is none), Reps | (body weight + load) × reps | e1RM of body weight + load (load, then reps, with no body weight logged) |
+| Duration | + kg, Time | none (counts as time held) | the longest hold at the same or more load |
+| Distance + time | Distance, Time | none (counts as distance) | the longest distance, or the best pace over 400 m |
+
+- A bodyweight set carries the body weight it counts (`session_sets.body_weight_kg`): the latest entry on or before
+  the workout's day. Logging or deleting a body weight refreshes those and re-rates.
+- Distance follows the weight unit: km for kg, miles for lbs (stored in metres). Times are typed on the number
+  keypad and fill from the right: 45 is 0:45, 130 is 1:30, 2505 is 25:05.
+- Plans hold sets × the type's target: 3 × 8, 3 × 0:45 (seconds in `target_reps`), 1 × 5 km (`target_distance_m`).
+- The type changes freely between weight × reps and bodyweight; to or from duration or distance only before any set
+  is logged (409 `KIND_LOCKED`). The library tags non-weight types and filters by type.
+- Only weight × reps gets today's aim, plates, warm-up ramps and the deload, plateau and series rules; the others
+  show last time and ghost it. A logged distance set shows its pace and which record it set.
+- Summaries and history cards add the distance and the time held; the exercise page charts e1RM and most reps
+  (bodyweight), the longest hold, or distance and pace (pace axis inverted).
+
 ### Splits, Days and Templates
 A **split** is a named training plan (e.g. "PPL", "Upper/Lower"). It contains one or more **days** (e.g. "Push Day", "Pull Day"). Each day has an ordered list of exercises with target sets and reps. A **template** is the same thing on its own, outside any split. The UI says "day" inside a split and "template" on its own, never "routine" (the API and database still call both a routine: `routines`, `routine_id`).
 
