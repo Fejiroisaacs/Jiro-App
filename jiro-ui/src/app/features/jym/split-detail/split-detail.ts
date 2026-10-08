@@ -553,20 +553,19 @@ import { MUSCLE_GROUPS } from '../shared/muscles';
     .tags-display { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 
     .tag-chip {
-      background: var(--bg-canvas); 
+      background: transparent;
       color: var(--text-primary);
       font-size: var(--font-size-xs); 
       font-weight: 600;
       padding: 4px 8px; 
       border-radius: var(--border-radius-pill);
-      border: 1px dashed var(--border-color);
-      box-shadow: 1px 1px 0 var(--border-color);
+      border: 1px solid var(--border-color);
       white-space: nowrap;
     }
 
     .tag-edit-btn {
       display: flex; align-items: center; gap: 4px;
-      background: none; border: 1px dashed var(--border-color);
+      background: none; border: 1px solid var(--border-color);
       border-radius: var(--border-radius-pill); padding: 2px 8px;
       color: var(--text-muted); font-size: 11px; cursor: pointer;
       transition: all 0.15s;

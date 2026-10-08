@@ -196,9 +196,9 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .discover-btn {
       display: flex; align-items: center; gap: 6px;
       min-height: 40px; padding: 8px 14px; font-family: inherit;
-      background: none; border: 1px solid var(--border-color);
+      background: none; border: 1px solid color-mix(in srgb, var(--text-primary) 40%, transparent);
       border-radius: var(--border-radius);
-      color: var(--text-secondary); font-size: var(--font-size-sm);
+      color: var(--text-primary); font-size: var(--font-size-sm); font-weight: 600;
       cursor: pointer; transition: all 0.15s; white-space: nowrap;
     }
 
@@ -207,14 +207,13 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
     .split-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: var(--space-xs); }
 
     .tag-chip {
-      background: var(--bg-canvas); 
+      background: transparent;
       color: var(--text-primary);
       font-size: var(--font-size-xs); 
       font-weight: 600;
       padding: 4px 8px; 
       border-radius: var(--border-radius-pill);
-      border: 1px dashed var(--border-color);
-      box-shadow: 1px 1px 0 var(--border-color);
+      border: 1px solid var(--border-color);
       white-space: nowrap;
     }
 

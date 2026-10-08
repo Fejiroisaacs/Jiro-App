@@ -270,7 +270,7 @@ import { seriesProgress } from '../series-progress';
       .header-btns > * { flex: 1; --jiro-btn-width: 100%; }
     }
 
-    .split-label { font-size: var(--font-size-xs); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+    .split-label { font-size: var(--font-size-sm); color: var(--text-secondary); margin-bottom: 4px; }
 
     .detail-header h1 { font-size: var(--font-size-2xl); font-weight: 700; margin-bottom: var(--space-xs); }
 

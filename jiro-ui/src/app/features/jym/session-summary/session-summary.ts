@@ -434,11 +434,9 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
     .stat-label,
     .section-label {
       font-family: var(--font-family);
-      font-size: var(--font-size-xs);
+      font-size: var(--font-size-sm);
       font-weight: 600;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+      color: var(--text-secondary);
     }
 
     .stat-label { margin-top: 4px; }

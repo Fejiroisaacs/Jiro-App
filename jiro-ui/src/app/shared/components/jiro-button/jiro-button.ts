@@ -103,13 +103,15 @@ import { Component, booleanAttribute, input } from '@angular/core';
       transform: translate(-2px, -2px);
     }
 
+    /* Outlined, so it never reads as a selected or disabled block beside the primary. */
     .jiro-btn--secondary {
-      background: var(--color-secondary);
+      background: transparent;
       color: var(--text-primary);
-      border-color: var(--border-color);
+      border-color: color-mix(in srgb, var(--text-primary) 40%, transparent);
     }
     .jiro-btn--secondary:hover:not(:disabled) {
-      background: var(--color-secondary-hover);
+      background: rgba(var(--color-primary-rgb), 0.06);
+      border-color: var(--text-primary);
       box-shadow: 4px 4px 0px rgba(var(--shadow-rgb), 0.15);
       transform: translate(-2px, -2px);
     }
