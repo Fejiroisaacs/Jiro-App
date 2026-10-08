@@ -42,7 +42,7 @@ func (s *JymService) GetSessionReport(ctx context.Context, userID, sessionID uui
 	muscleSets := map[string]int{}
 
 	setRows, err := s.db.Query(ctx,
-		`SELECT ss.exercise_id, e.name, e.muscle_group, ss.weight, ss.reps_performed, COALESCE(ss.is_pr, false)
+		`SELECT ss.exercise_id, e.name, e.muscle_group, ss.weight, COALESCE(ss.reps_performed, 0), COALESCE(ss.is_pr, false)
 		 FROM session_sets ss
 		 JOIN exercises e ON e.id = ss.exercise_id
 		 WHERE ss.session_id = $1 AND NOT ss.is_warmup
@@ -125,7 +125,7 @@ func (s *JymService) lastTimeSets(ctx context.Context, userID, sessionID uuid.UU
 		     AND (s.started_at, s.id) < ($3::timestamptz, $4::uuid)
 		   ORDER BY ss.exercise_id, s.started_at DESC, s.id DESC
 		 )
-		 SELECT prev.exercise_id, prev.started_at, ss.weight, ss.reps_performed
+		 SELECT prev.exercise_id, prev.started_at, ss.weight, COALESCE(ss.reps_performed, 0)
 		 FROM prev
 		 JOIN session_sets ss ON ss.session_id = prev.session_id AND ss.exercise_id = prev.exercise_id AND NOT ss.is_warmup`,
 		userID, exerciseIDs, startedAt, sessionID,

@@ -17,9 +17,11 @@ type Exercise struct {
 	SecondaryMuscles []string `json:"secondary_muscles"`
 	Notes            *string  `json:"notes"`
 	// RestSeconds is this exercise's rest when the plan sets none; nil rests for the account's usual.
-	RestSeconds *int      `json:"rest_seconds"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	RestSeconds *int `json:"rest_seconds"`
+	// Kind is how its sets are logged: weight_reps, bodyweight, duration or distance.
+	Kind      string    `json:"kind"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 	// LastPerformedAt is only populated by ListExercises; nil on the other
 	// exercise endpoints, which never select it.
 	LastPerformedAt *time.Time `json:"last_performed_at"`
@@ -36,6 +38,9 @@ type SetHistory struct {
 	Reps         int        `json:"reps"`
 	RPE          *int       `json:"rpe"`
 	IsWarmup     bool       `json:"is_warmup"`
+	DurationS    *int       `json:"duration_s"`
+	DistanceM    *float64   `json:"distance_m"`
+	BodyWeightKg *float64   `json:"body_weight_kg"`
 	Est1RM       float64    `json:"est_1rm"`
 	IsPR         bool       `json:"is_pr"`
 	SessionType  string     `json:"session_type"`
@@ -119,6 +124,8 @@ type CreateExerciseRequest struct {
 	MuscleGroup      *string  `json:"muscle_group"`
 	SecondaryMuscles []string `json:"secondary_muscles" binding:"max=10"`
 	Notes            *string  `json:"notes"`
+	// Kind defaults to weight_reps.
+	Kind *string `json:"kind" binding:"omitempty,oneof=weight_reps bodyweight duration distance"`
 }
 
 type UpdateExerciseRequest struct {
@@ -127,6 +134,8 @@ type UpdateExerciseRequest struct {
 	// SecondaryMuscles left out (null) keeps them; [] clears them.
 	SecondaryMuscles []string `json:"secondary_muscles" binding:"max=10"`
 	Notes            *string  `json:"notes"`
+	// Kind changes freely between weight_reps and bodyweight; to or from the others only with no sets.
+	Kind *string `json:"kind" binding:"omitempty,oneof=weight_reps bodyweight duration distance"`
 }
 
 // ─── Split ───────────────────────────────────────────────────────────────────
@@ -208,6 +217,8 @@ type PlanDetails struct {
 	Notes         *string `json:"notes" binding:"omitempty,max=140"`
 	// Adjacent items with the same number are one superset; numbered 1, 2, 3 in order once saved.
 	SupersetGroup *int `json:"superset_group" binding:"omitempty,min=1,max=100"`
+	// A distance exercise's target in metres; a duration exercise's target seconds are TargetReps.
+	TargetDistanceM *float64 `json:"target_distance_m" binding:"omitempty,gt=0,lte=1000000"`
 }
 
 type RoutineItem struct {
@@ -222,6 +233,7 @@ type RoutineItem struct {
 
 type RoutineItemWithExercise struct {
 	RoutineItem
+	ExerciseKind string  `json:"exercise_kind"`
 	ExerciseName string  `json:"exercise_name"`
 	MuscleGroup  *string `json:"muscle_group"`
 }
@@ -380,6 +392,7 @@ type CreateShareResponse struct {
 type ShareExercisePreview struct {
 	Name        string  `json:"name"`
 	MuscleGroup *string `json:"muscle_group"`
+	Kind        string  `json:"kind"`
 	TargetSets  int     `json:"target_sets"`
 	TargetReps  int     `json:"target_reps"`
 	PlanDetails
@@ -442,7 +455,8 @@ type SessionExercise struct {
 	TargetSets   *int      `json:"target_sets"`
 	TargetReps   *int      `json:"target_reps"`
 	// ExerciseRestSeconds is the exercise's own rest, used when the plan's RestSeconds is nil.
-	ExerciseRestSeconds *int `json:"exercise_rest_seconds"`
+	ExerciseRestSeconds *int   `json:"exercise_rest_seconds"`
+	ExerciseKind        string `json:"exercise_kind"`
 	PlanDetails
 }
 
@@ -546,6 +560,12 @@ type SessionSet struct {
 	IsWarmup      bool      `json:"is_warmup"`
 	ExerciseNote  *string   `json:"exercise_note"`
 	CreatedAt     time.Time `json:"created_at"`
+	// RepsPerformed is 0 for duration and distance sets, which have these instead.
+	DurationS *int     `json:"duration_s"`
+	DistanceM *float64 `json:"distance_m"`
+	// BodyWeightKg is the body weight a bodyweight set counts; PRKind names a distance record (distance, pace).
+	BodyWeightKg *float64 `json:"body_weight_kg"`
+	PRKind       *string  `json:"pr_kind"`
 }
 
 // PreviousBest is the best set for one exercise from the most recent session
@@ -587,13 +607,16 @@ type SessionSetWithExercise struct {
 	SessionSet
 	ExerciseName string  `json:"exercise_name"`
 	MuscleGroup  *string `json:"muscle_group"`
+	ExerciseKind string  `json:"exercise_kind"`
 }
 
 type CreateSetRequest struct {
 	ExerciseID    uuid.UUID `json:"exercise_id" binding:"required"`
 	SetNumber     int       `json:"set_number" binding:"required,min=1,max=200"`
 	Weight        float64   `json:"weight" binding:"gte=0,lte=2000"`
-	RepsPerformed int       `json:"reps_performed" binding:"required,min=1,max=1000"`
+	RepsPerformed *int      `json:"reps_performed" binding:"omitempty,min=1,max=1000"`
+	DurationS     *int      `json:"duration_s" binding:"omitempty,min=1,max=86400"`
+	DistanceM     *float64  `json:"distance_m" binding:"omitempty,gt=0,lte=1000000"`
 	RPE           *int      `json:"rpe" binding:"omitempty,min=1,max=10"`
 	IsWarmup      *bool     `json:"is_warmup"`
 	ExerciseNote  *string   `json:"exercise_note"`
@@ -604,6 +627,8 @@ type CreateSetRequest struct {
 type UpdateSetRequest struct {
 	Weight        *float64 `json:"weight" binding:"omitempty,gte=0,lte=2000"`
 	RepsPerformed *int     `json:"reps_performed" binding:"omitempty,min=1,max=1000"`
+	DurationS     *int     `json:"duration_s" binding:"omitempty,min=1,max=86400"`
+	DistanceM     *float64 `json:"distance_m" binding:"omitempty,gt=0,lte=1000000"`
 	RPE           *int     `json:"rpe" binding:"omitempty,min=1,max=10"`
 	IsWarmup      *bool    `json:"is_warmup"`
 	ExerciseNote  *string  `json:"exercise_note"`

@@ -910,7 +910,7 @@ func (ds *demoDataset) queue(b *pgx.Batch, userID uuid.UUID) {
 	}
 	for _, it := range ds.RoutineItems {
 		b.Queue(`INSERT INTO routine_items (routine_id, exercise_id, target_sets, target_reps, order_index,
-		                                   target_reps_max, target_rpe, rest_seconds, notes, superset_group) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+		                                   target_reps_max, target_rpe, rest_seconds, notes, superset_group, target_distance_m) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
 			append([]any{it.RoutineID, it.ExerciseID, it.TargetSets, it.TargetReps, it.OrderIndex}, planArgs(it.Plan)...)...)
 	}
 	b.Queue(`INSERT INTO split_series (id, user_id, split_id, name, duration_type, target_weeks, started_at, created_at) VALUES ($1,$2,$3,$4,'weeks',6,$5,$5)`,

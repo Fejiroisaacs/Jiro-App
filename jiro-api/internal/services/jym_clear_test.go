@@ -29,7 +29,7 @@ func TestEmptyTextClearsExerciseFieldsAndSetNotes(t *testing.T) {
 
 	sess := startSession(t, svc, userID, "")
 	note := "Felt heavy"
-	set, err := svc.LogSet(ctx, userID, sess, &models.CreateSetRequest{ExerciseID: ex.ID, SetNumber: 1, Weight: 60, RepsPerformed: 5, ExerciseNote: &note})
+	set, err := svc.LogSet(ctx, userID, sess, &models.CreateSetRequest{ExerciseID: ex.ID, SetNumber: 1, Weight: 60, RepsPerformed: ip(5), ExerciseNote: &note})
 	if err != nil {
 		t.Fatalf("log: %v", err)
 	}

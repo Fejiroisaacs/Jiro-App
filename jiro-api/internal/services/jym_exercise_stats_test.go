@@ -24,7 +24,7 @@ func warmupSet(t *testing.T, svc *JymService, userID, sessionID, exerciseID uuid
 	t.Helper()
 	warm := true
 	if _, err := svc.LogSet(context.Background(), userID, sessionID, &models.CreateSetRequest{
-		ExerciseID: exerciseID, SetNumber: n, Weight: weight, RepsPerformed: reps, IsWarmup: &warm,
+		ExerciseID: exerciseID, SetNumber: n, Weight: weight, RepsPerformed: ip(reps), IsWarmup: &warm,
 	}); err != nil {
 		t.Fatalf("warm-up: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestExerciseStatsCarryTheWorkoutsNote(t *testing.T) {
 	row := prTestSetup(t, svc, userID, "Row")
 	w := startSession(t, svc, userID, "")
 	note := "Elbows in"
-	if _, err := svc.LogSet(ctx, userID, w, &models.CreateSetRequest{ExerciseID: row, SetNumber: 1, Weight: 60, RepsPerformed: 8, ExerciseNote: &note}); err != nil {
+	if _, err := svc.LogSet(ctx, userID, w, &models.CreateSetRequest{ExerciseID: row, SetNumber: 1, Weight: 60, RepsPerformed: ip(8), ExerciseNote: &note}); err != nil {
 		t.Fatalf("log: %v", err)
 	}
 	stats, err := svc.GetExerciseStats(ctx, userID, row)

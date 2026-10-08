@@ -147,6 +147,10 @@ func (h *JymHandler) UpdateExercise(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "INVALID_MUSCLE", Message: err.Error()}})
 			return
 		}
+		if errors.Is(err, services.ErrKindLocked) {
+			c.JSON(http.StatusConflict, models.ErrorResponse{Error: models.ErrorDetail{Code: "KIND_LOCKED", Message: err.Error()}})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to update exercise"}})
 		return
 	}
@@ -1098,6 +1102,10 @@ func (h *JymHandler) LogSet(c *gin.Context) {
 			respondSessionEnded(c)
 			return
 		}
+		if errors.Is(err, services.ErrSetFields) {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "SET_FIELDS", Message: err.Error()}})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to log set"}})
 		return
 	}
@@ -1120,6 +1128,10 @@ func (h *JymHandler) UpdateSet(c *gin.Context) {
 	if err != nil {
 		if err == services.ErrSetNotFound {
 			c.JSON(http.StatusNotFound, models.ErrorResponse{Error: models.ErrorDetail{Code: "NOT_FOUND", Message: "Set not found"}})
+			return
+		}
+		if errors.Is(err, services.ErrSetFields) {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "SET_FIELDS", Message: err.Error()}})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to update set"}})

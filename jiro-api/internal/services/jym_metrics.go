@@ -25,7 +25,11 @@ func roundTenth(v float64) float64 {
 	return math.Round(v*10) / 10
 }
 
+// loadSQL is a set's load in SQL: its weight, plus the body weight a bodyweight set counts.
+const loadSQL = `(ss.weight + COALESCE(ss.body_weight_kg, 0))`
+
 // e1rmSQL is epley1RM in SQL, unrounded so it can sit inside MAX; round the result with roundTenth.
+// A set without reps (duration, distance) has none.
 func e1rmSQL(weight, reps string) string {
 	return fmt.Sprintf("CASE WHEN %[2]s <= 1 THEN %[1]s ELSE %[1]s * (1 + LEAST(%[2]s, %[3]d) / 30.0) END",
 		weight, reps, e1rmRepCap)
@@ -67,9 +71,10 @@ func seriesSessionCountSQL(seriesID string) string {
 // Session aggregates over session_sets ss (and exercises e): working sets only, and PRs counted as lifts with a new record.
 const (
 	workingSetCountSQL = `COUNT(ss.id) FILTER (WHERE NOT ss.is_warmup)`
-	workingVolumeSQL   = `COALESCE(SUM(ss.weight * ss.reps_performed) FILTER (WHERE NOT ss.is_warmup), 0)`
-	prLiftCountSQL     = `COUNT(DISTINCT ss.exercise_id) FILTER (WHERE ss.is_pr)`
-	muscleGroupsSQL    = `COALESCE(array_agg(DISTINCT e.muscle_group) FILTER (WHERE e.muscle_group IS NOT NULL AND NOT ss.is_warmup), '{}'::text[])`
+	// Load × reps: duration and distance sets have no reps, so they add nothing.
+	workingVolumeSQL = `COALESCE(SUM(` + loadSQL + ` * ss.reps_performed) FILTER (WHERE NOT ss.is_warmup), 0)`
+	prLiftCountSQL   = `COUNT(DISTINCT ss.exercise_id) FILTER (WHERE ss.is_pr)`
+	muscleGroupsSQL  = `COALESCE(array_agg(DISTINCT e.muscle_group) FILTER (WHERE e.muscle_group IS NOT NULL AND NOT ss.is_warmup), '{}'::text[])`
 )
 
 // sessionAggregatesSQL is the tail of a session list row: set_count, pr_count, total_volume, muscle_groups,

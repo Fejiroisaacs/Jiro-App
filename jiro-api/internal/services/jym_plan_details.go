@@ -15,17 +15,18 @@ var ErrInvalidPlan = errors.New("a rep range must end at or above where it start
 
 // planColumns lists PlanDetails' columns on a table alias, in planDest's order.
 func planColumns(alias string) string {
-	return alias + ".target_reps_max, " + alias + ".target_rpe, " + alias + ".rest_seconds, " + alias + ".notes, " + alias + ".superset_group"
+	return alias + ".target_reps_max, " + alias + ".target_rpe, " + alias + ".rest_seconds, " + alias + ".notes, " + alias + ".superset_group, " +
+		alias + ".target_distance_m"
 }
 
 // planDest is where planColumns scan to.
 func planDest(d *models.PlanDetails) []any {
-	return []any{&d.TargetRepsMax, &d.TargetRPE, &d.RestSeconds, &d.Notes, &d.SupersetGroup}
+	return []any{&d.TargetRepsMax, &d.TargetRPE, &d.RestSeconds, &d.Notes, &d.SupersetGroup, &d.TargetDistanceM}
 }
 
 // planArgs are a PlanDetails' values in planColumns' order, for an INSERT.
 func planArgs(d models.PlanDetails) []any {
-	return []any{d.TargetRepsMax, d.TargetRPE, d.RestSeconds, d.Notes, d.SupersetGroup}
+	return []any{d.TargetRepsMax, d.TargetRPE, d.RestSeconds, d.Notes, d.SupersetGroup, d.TargetDistanceM}
 }
 
 // normalizeGroups keeps a superset only where its members sit together: each run of two or more equal

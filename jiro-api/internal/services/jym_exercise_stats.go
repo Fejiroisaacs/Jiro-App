@@ -17,9 +17,9 @@ func (s *JymService) GetExerciseStats(ctx context.Context, userID, exerciseID uu
 		return nil, ErrExerciseNotFound
 	}
 
-	e1rm := e1rmSQL("ss.weight", "ss.reps_performed")
+	e1rm := e1rmSQL(loadSQL, "ss.reps_performed")
 	// The best set orders like bestSet: estimated 1RM, then reps, then weight.
-	bestOrder := `ORDER BY ` + e1rm + ` DESC, ss.reps_performed DESC, ss.weight DESC`
+	bestOrder := `ORDER BY ` + e1rm + ` DESC NULLS LAST, ss.reps_performed DESC NULLS LAST, ss.weight DESC`
 	rows, err := s.db.Query(ctx,
 		`SELECT s.id, s.started_at, s.ended_at, s.session_type,
 		        `+workingSetCountSQL+`,
@@ -27,7 +27,7 @@ func (s *JymService) GetExerciseStats(ctx context.Context, userID, exerciseID uu
 		        COALESCE(MAX(ss.reps_performed) FILTER (WHERE NOT ss.is_warmup), 0),
 		        COALESCE(MAX(`+e1rm+`) FILTER (WHERE NOT ss.is_warmup), 0),
 		        (array_agg(ss.weight `+bestOrder+`) FILTER (WHERE NOT ss.is_warmup))[1],
-		        (array_agg(ss.reps_performed `+bestOrder+`) FILTER (WHERE NOT ss.is_warmup))[1],
+		        (array_agg(COALESCE(ss.reps_performed, 0) `+bestOrder+`) FILTER (WHERE NOT ss.is_warmup))[1],
 		        `+workingVolumeSQL+`,
 		        BOOL_OR(ss.is_pr),
 		        (array_agg(ss.exercise_note ORDER BY ss.set_number, ss.created_at)
@@ -97,7 +97,7 @@ func (s *JymService) GetRepsAtWeight(ctx context.Context, userID, exerciseID uui
 		 FROM session_sets ss
 		 JOIN sessions s ON ss.session_id = s.id
 		 WHERE ss.exercise_id = $1 AND s.user_id = $2 AND NOT ss.is_warmup AND s.session_type <> 'deload'
-		   AND ABS(ss.weight - $3) < 0.01
+		   AND ss.reps_performed IS NOT NULL AND ABS(ss.weight - $3) < 0.01
 		 GROUP BY s.id
 		 ORDER BY s.started_at, s.id`,
 		exerciseID, userID, weight,
@@ -140,7 +140,7 @@ func (s *JymService) ListExerciseWorkouts(ctx context.Context, userID, exerciseI
 		   LIMIT $5
 		 )
 		 SELECT s.id, s.started_at, s.ended_at, s.session_type, r.name,
-		        ss.id, ss.set_number, ss.weight, ss.reps_performed, ss.rpe, ss.is_warmup, ss.is_pr, ss.exercise_note
+		        ss.id, ss.set_number, ss.weight, COALESCE(ss.reps_performed, 0), ss.rpe, ss.is_warmup, ss.is_pr, ss.exercise_note
 		 FROM page
 		 JOIN sessions s ON s.id = page.id
 		 LEFT JOIN routines r ON s.routine_id = r.id

@@ -25,7 +25,7 @@ func pastWorkout(t *testing.T, svc *JymService, userID uuid.UUID, hoursAgo int, 
 func fixSet(t *testing.T, svc *JymService, userID, sessionID, exerciseID uuid.UUID, n int, weight float64, reps int) *models.SessionSet {
 	t.Helper()
 	set, err := svc.LogSet(context.Background(), userID, sessionID, &models.CreateSetRequest{
-		ExerciseID: exerciseID, SetNumber: n, Weight: weight, RepsPerformed: reps, Fix: true,
+		ExerciseID: exerciseID, SetNumber: n, Weight: weight, RepsPerformed: ip(reps), Fix: true,
 	})
 	if err != nil {
 		t.Fatalf("fix %v x %d: %v", weight, reps, err)
@@ -64,7 +64,7 @@ func TestFixAddsASetInsideTheWorkout(t *testing.T) {
 	ex := prTestSetup(t, svc, userID, "Fix Squat")
 	past := pastWorkout(t, svc, userID, 30, nil)
 
-	if _, err := svc.LogSet(ctx, userID, past.ID, &models.CreateSetRequest{ExerciseID: ex, SetNumber: 1, Weight: 100, RepsPerformed: 5}); !errors.Is(err, ErrSessionEnded) {
+	if _, err := svc.LogSet(ctx, userID, past.ID, &models.CreateSetRequest{ExerciseID: ex, SetNumber: 1, Weight: 100, RepsPerformed: ip(5)}); !errors.Is(err, ErrSessionEnded) {
 		t.Fatalf("without fix: got %v, want ErrSessionEnded", err)
 	}
 	first := fixSet(t, svc, userID, past.ID, ex, 1, 100, 5)
