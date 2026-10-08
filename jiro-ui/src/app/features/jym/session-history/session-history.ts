@@ -1037,9 +1037,11 @@ function summaryFromDetail(d: SessionWithSets): SessionSummary {
     ...session,
     set_count: working.length,
     pr_count: new Set(sets.filter(x => x.is_pr).map(x => x.exercise_id)).size,
-    total_volume: working.reduce((sum, x) => sum + x.weight * x.reps_performed, 0),
+    total_volume: working.reduce((sum, x) => sum + (x.weight + (x.body_weight_kg ?? 0)) * x.reps_performed, 0),
     muscle_groups: [],
     first_set_at: times[0] ?? null,
     last_set_at: times.at(-1) ?? null,
+    total_distance_m: working.reduce((sum, x) => sum + (x.distance_m ?? 0), 0),
+    total_duration_s: working.reduce((sum, x) => sum + (x.distance_m ? 0 : x.duration_s ?? 0), 0),
   };
 }

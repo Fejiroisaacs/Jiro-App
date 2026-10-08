@@ -9,9 +9,11 @@ export interface PickerExercise {
   id: string;
   name: string;
   muscle_group: string | null;
+  kind?: ExerciseKind;
 }
 
 import { MUSCLE_GROUPS } from '../shared/muscles';
+import { EXERCISE_KINDS, ExerciseKind } from '../exercise-kind';
 
 /** Add exercise: search your library, or create one (named from the search) and add it. */
 @Component({
@@ -58,8 +60,12 @@ import { MUSCLE_GROUPS } from '../shared/muscles';
             placeholder="e.g. Romanian Deadlift"
             (keydown.enter)="!saving() && newName.trim() && create()"
           />
+          <label class="create-label" for="new-ex-kind" style="margin-top:var(--space-sm)">Type</label>
+          <select id="new-ex-kind" class="create-select" [(ngModel)]="newKind">
+            @for (k of exerciseKinds; track k.value) { <option [value]="k.value">{{ k.label }}</option> }
+          </select>
           <label class="create-label" for="new-ex-mg" style="margin-top:var(--space-sm)">Muscle group <span class="optional">(optional)</span></label>
-          <select id="new-ex-mg" class="create-select" [(ngModel)]="newMuscleGroup">
+          <select id="new-ex-mg" class="create-select" [ngModel]="newMuscleGroup" (ngModelChange)="setMuscle($event)">
             <option value="">None</option>
             @for (mg of muscleGroups; track mg) {
               <option [value]="mg">{{ mg }}</option>
@@ -160,14 +166,23 @@ export class ExercisePickerComponent {
   readonly creating = signal(false);
   newName = '';
   newMuscleGroup = '';
+  newKind: ExerciseKind = 'weight_reps';
+  readonly exerciseKinds = EXERCISE_KINDS;
   readonly saving = signal(false);
   readonly error = signal('');
 
   startCreate() {
     this.newName = this.search().trim();
     this.newMuscleGroup = '';
+    this.newKind = 'weight_reps';
     this.error.set('');
     this.creating.set(true);
+  }
+
+  /** Cardio suggests distance + time; it can still be changed. */
+  setMuscle(muscle: string) {
+    this.newMuscleGroup = muscle;
+    if (muscle === 'Cardio' && this.newKind === 'weight_reps') this.newKind = 'distance';
   }
 
   create() {
@@ -175,9 +190,9 @@ export class ExercisePickerComponent {
     if (!name) return;
     this.saving.set(true);
     this.error.set('');
-    this.jym.createExercise({ name, muscle_group: this.newMuscleGroup || undefined }).subscribe({
+    this.jym.createExercise({ name, muscle_group: this.newMuscleGroup || undefined, kind: this.newKind }).subscribe({
       next: ex => {
-        const entry = { id: ex.id, name: ex.name, muscle_group: ex.muscle_group };
+        const entry = { id: ex.id, name: ex.name, muscle_group: ex.muscle_group, kind: ex.kind };
         this.saving.set(false);
         this.created.emit(entry);
         this.picked.emit(entry);

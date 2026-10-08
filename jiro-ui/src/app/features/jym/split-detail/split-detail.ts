@@ -17,7 +17,8 @@ import { WorkoutLauncher } from '../shared/workout-launcher';
 import { JiroMenuComponent, JiroMenuItem } from '../../../shared/components/jiro-menu/jiro-menu';
 import { SettingsService } from '../../../core/services/settings.service';
 import { formatInstant } from '../../../core/utils/format-date';
-import { REST_CHOICES, planText, restText } from '../plan-text';
+import { REST_CHOICES, PlanKind, planText, restText } from '../plan-text';
+import { EXERCISE_KINDS, ExerciseKind, distanceUnit, durationText, isRepKind, kindOf, parseDistance, parseDuration, toDistanceUnit } from '../exercise-kind';
 import { groupLabels, linkedWithNext, normalizeItems, toggleLink } from '../supersets';
 import { MUSCLE_GROUPS } from '../shared/muscles';
 
@@ -223,7 +224,7 @@ import { MUSCLE_GROUPS } from '../shared/muscles';
 }
                 <button type="button" class="target-text" (click)="openTargetEdit(ri, ii)"
                   [attr.aria-label]="'Edit the plan for ' + item.exercise_name + ': ' + planLabel(item)"
-                  title="Edit the plan">{{ planText(item) }}</button>
+                  title="Edit the plan">{{ planText(item, 'short', planKind(item)) }}</button>
                 @if (item.notes) {
                   <span class="item-note">{{ item.notes }}</span>
                 }
@@ -333,8 +334,14 @@ import { MUSCLE_GROUPS } from '../shared/muscles';
             <input id="picker-new-name" class="form-input" type="text" [(ngModel)]="newExName" placeholder="e.g. Bulgarian Split Squat" />
           </div>
           <div class="form-group">
+            <label class="form-label" for="picker-new-kind">Type</label>
+            <select id="picker-new-kind" class="form-input" [(ngModel)]="newExKind">
+              @for (k of exerciseKinds; track k.value) { <option [value]="k.value">{{ k.label }}</option> }
+            </select>
+          </div>
+          <div class="form-group">
             <label class="form-label" for="picker-new-mg">Muscle group</label>
-            <select id="picker-new-mg" class="form-input" [(ngModel)]="newExMuscleGroup">
+            <select id="picker-new-mg" class="form-input" [ngModel]="newExMuscleGroup" (ngModelChange)="setNewMuscle($event)">
               <option value="">None</option>
               @for (mg of muscleGroups; track mg) {
 <option [value]="mg">{{ mg }}</option>
@@ -361,12 +368,28 @@ import { MUSCLE_GROUPS } from '../shared/muscles';
               <label class="form-label" for="picker-sets">Sets</label>
               <input id="picker-sets" class="form-input" type="number" [(ngModel)]="pickerSets" min="1" max="20" />
             </div>
-            <div class="form-group">
-              <label class="form-label" for="picker-reps">Reps</label>
-              <input id="picker-reps" class="form-input" type="number" [(ngModel)]="pickerReps" min="1" max="100" />
-            </div>
+            @switch (kindOf(pickerSelectedEx()!.kind)) {
+              @case ('duration') {
+                <div class="form-group">
+                  <label class="form-label" for="picker-time">Time</label>
+                  <input id="picker-time" class="form-input" type="text" inputmode="numeric" [(ngModel)]="pickerTarget" placeholder="0:45" />
+                </div>
+              }
+              @case ('distance') {
+                <div class="form-group">
+                  <label class="form-label" for="picker-distance">Distance ({{ distUnit() }})</label>
+                  <input id="picker-distance" class="form-input" type="text" inputmode="decimal" [(ngModel)]="pickerTarget" />
+                </div>
+              }
+              @default {
+                <div class="form-group">
+                  <label class="form-label" for="picker-reps">Reps</label>
+                  <input id="picker-reps" class="form-input" type="number" [(ngModel)]="pickerReps" min="1" max="100" />
+                </div>
+              }
+            }
           </div>
-          <jiro-button variant="primary" type="button" (click)="confirmAddExercise()">
+          <jiro-button variant="primary" type="button" [disabled]="pickerTargetValue() === null" (click)="confirmAddExercise()">
             Add {{ pickerSelectedEx()!.name }}
           </jiro-button>
         </div>
@@ -405,20 +428,35 @@ import { MUSCLE_GROUPS } from '../shared/muscles';
     @if (targetEdit(); as te) {
 <jiro-modal [title]="'Plan for ' + te.name" maxWidth="400px" (close)="targetEdit.set(null)">
       <form class="simple-form plan-form" (ngSubmit)="saveTargetEdit()">
-        <div class="target-row three">
+        <div class="target-row" [class.three]="isRepKind(te.kind)">
           <div class="form-group">
             <label class="form-label" for="edit-target-sets">Sets</label>
             <input id="edit-target-sets" class="form-input" type="number" inputmode="numeric" [(ngModel)]="editSets" name="editSets" min="1" max="20" required />
           </div>
-          <div class="form-group">
-            <label class="form-label" for="edit-target-reps">Reps</label>
-            <input id="edit-target-reps" class="form-input" type="number" inputmode="numeric" [(ngModel)]="editReps" name="editReps" min="1" max="100" required />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="edit-target-max">Up to</label>
-            <input id="edit-target-max" class="form-input" type="number" inputmode="numeric" [(ngModel)]="editRepsMax" name="editRepsMax" min="1" max="100" placeholder="Optional" />
-          </div>
+          @if (te.kind === 'duration') {
+            <div class="form-group">
+              <label class="form-label" for="edit-target-time">Time</label>
+              <input id="edit-target-time" class="form-input" type="text" inputmode="numeric" [(ngModel)]="editTarget" name="editTarget" placeholder="0:45" required />
+            </div>
+          } @else if (te.kind === 'distance') {
+            <div class="form-group">
+              <label class="form-label" for="edit-target-distance">Distance ({{ distUnit() }})</label>
+              <input id="edit-target-distance" class="form-input" type="text" inputmode="decimal" [(ngModel)]="editTarget" name="editTarget" required />
+            </div>
+          } @else {
+            <div class="form-group">
+              <label class="form-label" for="edit-target-reps">Reps</label>
+              <input id="edit-target-reps" class="form-input" type="number" inputmode="numeric" [(ngModel)]="editReps" name="editReps" min="1" max="100" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="edit-target-max">Up to</label>
+              <input id="edit-target-max" class="form-input" type="number" inputmode="numeric" [(ngModel)]="editRepsMax" name="editRepsMax" min="1" max="100" placeholder="Optional" />
+            </div>
+          }
         </div>
+        @if (!isRepKind(te.kind) && editTarget.trim() && editTargetValue() === null) {
+          <p class="plan-error" role="alert">{{ te.kind === 'duration' ? 'Enter a time such as 45 or 1:30, up to 16:40.' : 'Enter a distance such as 5 or 2.5.' }}</p>
+        }
         @if (!validRange()) {
           <p class="plan-error" role="alert">Up to must be at least {{ editReps }}.</p>
         }
@@ -445,7 +483,7 @@ import { MUSCLE_GROUPS } from '../shared/muscles';
         <p class="plan-hint">With a range, add weight once every set reaches the top.</p>
         <div class="form-actions">
           <jiro-button variant="secondary" type="button" (click)="targetEdit.set(null)">Cancel</jiro-button>
-          <jiro-button variant="primary" type="submit" [disabled]="!validTarget(editSets, 20) || !validTarget(editReps, 100) || !validRange()">Save</jiro-button>
+          <jiro-button variant="primary" type="submit" [disabled]="!planValid()">Save</jiro-button>
         </div>
       </form>
     </jiro-modal>
@@ -888,7 +926,9 @@ export class SplitDetailComponent implements OnInit {
   ];
 
   // Editing one exercise's target sets and reps
-  targetEdit = signal<{ ri: number; ii: number; name: string } | null>(null);
+  targetEdit = signal<{ ri: number; ii: number; name: string; kind: ExerciseKind } | null>(null);
+  /** A hold's time or a distance, as typed, for duration and distance plans. */
+  editTarget = '';
   editSets = 3;
   editReps = 8;
   editRepsMax: number | null = null;
@@ -927,15 +967,23 @@ export class SplitDetailComponent implements OnInit {
   pickerSelectedEx = signal<Exercise | null>(null);
   pickerSets = 3;
   pickerReps = 8;
+  /** The picker's time or distance for a duration or distance exercise, as typed. */
+  pickerTarget = '';
   private pickerRoutineIndex = 0;
 
   // Inline exercise creation
   creatingExercise = signal(false);
   newExName = '';
   newExMuscleGroup = '';
+  newExKind: ExerciseKind = 'weight_reps';
   newExSaving = signal(false);
   newExError = signal('');
   readonly muscleGroups = MUSCLE_GROUPS;
+  readonly exerciseKinds = EXERCISE_KINDS;
+  readonly kindOf = kindOf;
+  readonly isRepKind = isRepKind;
+  /** Distances follow the weight unit: km for kg, miles for lbs. */
+  readonly distUnit = computed(() => distanceUnit(this.settings.weightUnit()));
 
   splitId = '';
 
@@ -1261,13 +1309,52 @@ export class SplitDetailComponent implements OnInit {
   openTargetEdit(ri: number, ii: number) {
     const item = this.routines()[ri]?.items[ii];
     if (!item) return;
+    const kind = kindOf(item.exercise_kind);
     this.editSets = item.target_sets;
     this.editReps = item.target_reps;
     this.editRepsMax = item.target_reps_max;
     this.editRpe = item.target_rpe;
     this.editRest = item.rest_seconds;
     this.editNote = item.notes ?? '';
-    this.targetEdit.set({ ri, ii, name: item.exercise_name });
+    this.editTarget = kind === 'duration' ? durationText(item.target_reps)
+      : kind === 'distance' && item.target_distance_m ? String(toDistanceUnit(item.target_distance_m, this.distUnit())) : '';
+    this.targetEdit.set({ ri, ii, name: item.exercise_name, kind });
+  }
+
+  /** What a plan's target means for this item: reps, seconds held, or a distance in the account's unit. */
+  planKind(item: { exercise_kind?: string | null }): PlanKind {
+    return { kind: kindOf(item.exercise_kind), distanceUnit: this.distUnit() };
+  }
+
+  /** The plan sheet's time (seconds, up to 1000) or distance (metres); null when not valid. */
+  editTargetValue(): number | null {
+    return this.targetValue(this.targetEdit()?.kind ?? 'weight_reps', this.editTarget);
+  }
+
+  private targetValue(kind: ExerciseKind, text: string): number | null {
+    if (kind === 'duration') {
+      const s = parseDuration(text);
+      return s !== null && s <= 1000 ? s : null;
+    }
+    return kind === 'distance' ? parseDistance(text, this.distUnit()) : null;
+  }
+
+  planValid(): boolean {
+    const te = this.targetEdit();
+    if (!te || !this.validTarget(this.editSets, 20)) return false;
+    return isRepKind(te.kind) ? this.validTarget(this.editReps, 100) && this.validRange() : this.editTargetValue() !== null;
+  }
+
+  /** The picker's target: reps, or the typed time or distance; null when not valid. */
+  pickerTargetValue(): number | null {
+    const kind = kindOf(this.pickerSelectedEx()?.kind);
+    return isRepKind(kind) ? this.pickerReps : this.targetValue(kind, this.pickerTarget);
+  }
+
+  /** Cardio suggests Distance + time for a new exercise; it can still be changed. */
+  setNewMuscle(muscle: string) {
+    this.newExMuscleGroup = muscle;
+    if (muscle === 'Cardio' && this.newExKind === 'weight_reps') this.newExKind = 'distance';
   }
 
   validTarget(v: number, max: number): boolean {
@@ -1299,19 +1386,22 @@ export class SplitDetailComponent implements OnInit {
 
   /** The chip's spoken text: the plan in words, and the cue. */
   planLabel(item: RoutineItem): string {
-    return planText(item, 'long') + (item.notes ? `. ${item.notes}` : '');
+    return planText(item, 'long', this.planKind(item)) + (item.notes ? `. ${item.notes}` : '');
   }
 
   saveTargetEdit() {
     const te = this.targetEdit();
-    if (!te || !this.validTarget(this.editSets, 20) || !this.validTarget(this.editReps, 100) || !this.validRange()) return;
+    if (!te || !this.planValid()) return;
     const sets = this.editSets;
-    const reps = this.editReps;
+    const value = this.editTargetValue();
+    // A hold's seconds are its reps; a distance plan's reps only say there is a plan.
+    const reps = te.kind === 'duration' ? value! : te.kind === 'distance' ? 1 : this.editReps;
     const details = {
-      target_reps_max: this.editRepsMax && this.editRepsMax > reps ? this.editRepsMax : null,
+      target_reps_max: isRepKind(te.kind) && this.editRepsMax && this.editRepsMax > reps ? this.editRepsMax : null,
       target_rpe: this.editRpe,
       rest_seconds: this.editRest,
       notes: this.editNote.trim() || null,
+      target_distance_m: te.kind === 'distance' ? value : null,
     };
     this.routines.update(rs => rs.map((r, i) => i !== te.ri ? r : {
       ...r,
@@ -1339,14 +1429,17 @@ export class SplitDetailComponent implements OnInit {
 
   addExerciseToRoutine(ex: Exercise) {
     this.pickerSelectedEx.set(ex);
-    this.pickerSets = 3;
+    const kind = kindOf(ex.kind);
+    this.pickerSets = kind === 'distance' ? 1 : 3;
     this.pickerReps = 8;
+    this.pickerTarget = kind === 'duration' ? '0:45' : kind === 'distance' ? (this.distUnit() === 'km' ? '5' : '3') : '';
     this.creatingExercise.set(false);
   }
 
   startCreateExercise() {
     this.newExName = this.exSearch.trim();
     this.newExMuscleGroup = '';
+    this.newExKind = 'weight_reps';
     this.newExError.set('');
     this.creatingExercise.set(true);
   }
@@ -1359,6 +1452,7 @@ export class SplitDetailComponent implements OnInit {
     this.jymService.createExercise({
       name,
       muscle_group: this.newExMuscleGroup || undefined,
+      kind: this.newExKind,
     }).subscribe({
       next: ex => {
         // Add to local exercise list
@@ -1381,13 +1475,18 @@ export class SplitDetailComponent implements OnInit {
     if (!ex) return;
     const ri = this.pickerRoutineIndex;
     const routine = this.routines()[ri];
+    const kind = kindOf(ex.kind);
+    const value = this.pickerTargetValue();
+    if (value === null) return;
 
     const newItem: RoutineItem = {
       id: '',
       routine_id: routine.id,
       exercise_id: ex.id,
       target_sets: this.pickerSets,
-      target_reps: this.pickerReps,
+      target_reps: kind === 'distance' ? 1 : value,
+      target_distance_m: kind === 'distance' ? value : null,
+      exercise_kind: kind,
       target_reps_max: null,
       target_rpe: null,
       rest_seconds: null,
@@ -1463,6 +1562,7 @@ function toEntries(items: RoutineItem[]): ReplaceItemEntry[] {
     rest_seconds: item.rest_seconds,
     notes: item.notes,
     superset_group: item.superset_group,
+    target_distance_m: item.target_distance_m ?? null,
     detailed: true,
   }));
 }

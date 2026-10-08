@@ -1,5 +1,6 @@
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
@@ -16,6 +17,7 @@ import { JiroMenuComponent, JiroMenuItem } from '../../../shared/components/jiro
 import { formatDay } from '../../../core/utils/format-date';
 import { dayKey, todayKey } from '../../../core/utils/day';
 import { MUSCLE_GROUPS, toggleSecondary, withoutPrimary } from '../shared/muscles';
+import { EXERCISE_KINDS, ExerciseKind, distanceText, distanceUnit, isRepKind, kindChangeAllowed, kindOf, kindTag, paceText, setText } from '../exercise-kind';
 
 const ROW_ACTIONS: JiroMenuItem[] = [
   { id: 'edit', label: 'Edit', icon: 'pencil-simple' },
@@ -51,6 +53,10 @@ const ROW_ACTIONS: JiroMenuItem[] = [
           aria-label="Search exercises"
           [(ngModel)]="searchQuery"
           (input)="onSearch()" />
+        <select class="kind-select" aria-label="Filter by type" [ngModel]="activeKind()" (ngModelChange)="activeKind.set($event)">
+          <option value="">All types</option>
+          @for (k of exerciseKinds; track k.value) { <option [value]="k.value">{{ k.label }}</option> }
+        </select>
         @if (embedded()) {
           <jiro-button type="button" (click)="showCreate.set(true)">New exercise</jiro-button>
         }
@@ -66,7 +72,7 @@ const ROW_ACTIONS: JiroMenuItem[] = [
         <div class="ex-loading" aria-busy="true" aria-label="Loading exercises">
           <jiro-skeleton [lines]="5" height="56px" />
         </div>
-      } @else if (exercises().length === 0) {
+      } @else if (shown().length === 0) {
         @if (hasFilters()) {
           <jiro-empty-state icon="magnifying-glass" heading="No exercises match" message="Try another name, or clear the filters.">
             <jiro-button variant="secondary" size="sm" type="button" (click)="clearFilters()">Clear filters</jiro-button>
@@ -78,7 +84,7 @@ const ROW_ACTIONS: JiroMenuItem[] = [
         }
       } @else {
         <ul class="ex-list">
-          @for (ex of exercises(); track ex.id) {
+          @for (ex of shown(); track ex.id) {
             <li class="ex-row">
               <a class="ex-link" [routerLink]="['/jym/exercises', ex.id]">
                 <span class="ex-main">
@@ -89,11 +95,14 @@ const ROW_ACTIONS: JiroMenuItem[] = [
                   @for (m of ex.secondary_muscles; track m) {
                     <span class="mg-also" [class.match]="m === activeMG()" [attr.aria-label]="'Also works ' + m">{{ m }}</span>
                   }
+                  @if (kindTag(ex.kind); as tag) {
+                    <span class="kind-tag">{{ tag }}</span>
+                  }
                 </span>
                 @if (prFor(ex.id); as pr) {
                   <span class="ex-best">
-                    <span class="best-set">{{ weight(pr.weight) }} {{ unit() }} &times; {{ pr.reps }}</span>
-                    <span class="best-meta">est. 1RM {{ weight(pr.est_1rm) }} {{ unit() }} &middot; last trained {{ ago(ex.last_performed_at ?? pr.date) }}</span>
+                    <span class="best-set">{{ bestText(pr) }}</span>
+                    <span class="best-meta">{{ pr.est_1rm ? 'est. 1RM ' + weight(pr.est_1rm) + ' ' + unit() + ' · ' : '' }}last trained {{ ago(ex.last_performed_at ?? pr.date) }}</span>
                   </span>
                 } @else if (ex.last_performed_at) {
                   <span class="ex-best ex-best--none">Last trained {{ ago(ex.last_performed_at) }}</span>
@@ -114,6 +123,13 @@ const ROW_ACTIONS: JiroMenuItem[] = [
             <div class="form-group">
               <label class="form-label" for="ex-new-name">Name</label>
               <input id="ex-new-name" class="form-input" type="text" [(ngModel)]="newName" name="name" placeholder="e.g. Barbell Back Squat" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="ex-new-kind">Type</label>
+              <select id="ex-new-kind" class="form-input" [(ngModel)]="newKind" name="kind">
+                @for (k of exerciseKinds; track k.value) { <option [value]="k.value">{{ k.label }}</option> }
+              </select>
+              <p class="form-hint">{{ kindHelp(newKind) }}</p>
             </div>
             <div class="form-group">
               <label class="form-label" for="ex-new-mg">Main muscle group</label>
@@ -156,6 +172,15 @@ const ROW_ACTIONS: JiroMenuItem[] = [
             <div class="form-group">
               <label class="form-label" for="ex-edit-name">Name</label>
               <input id="ex-edit-name" class="form-input" type="text" [(ngModel)]="editName" name="ename" placeholder="Exercise name" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="ex-edit-kind">Type</label>
+              <select id="ex-edit-kind" class="form-input" [(ngModel)]="editKind" name="ekind" aria-describedby="ex-edit-kind-help">
+                @for (k of exerciseKinds; track k.value) {
+                  <option [value]="k.value" [disabled]="!canSwitchTo(k.value)">{{ k.label }}</option>
+                }
+              </select>
+              <p class="form-hint" id="ex-edit-kind-help">{{ editKindHelp() }}</p>
             </div>
             <div class="form-group">
               <label class="form-label" for="ex-edit-mg">Main muscle group</label>
@@ -286,6 +311,15 @@ const ROW_ACTIONS: JiroMenuItem[] = [
     }
 
     .mg-also.match { color: var(--color-primary); border-color: var(--color-primary); }
+    .kind-tag {
+      font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: var(--border-radius-pill);
+      background: var(--bg-canvas); color: var(--text-secondary); border: 1px dashed var(--border-color);
+    }
+    .kind-select {
+      min-height: 44px; padding: 0 var(--space-sm); border: 1px solid var(--border-color); border-radius: var(--border-radius);
+      background: var(--bg-surface); color: var(--text-primary); font: inherit; font-size: var(--font-size-sm);
+    }
+    .form-hint { font-size: var(--font-size-xs); color: var(--text-secondary); margin-top: 4px; }
 
     .ex-form .form-input:not(.form-textarea) { min-height: 44px; }
 
@@ -402,6 +436,16 @@ export class ExerciseLibraryComponent implements OnInit {
   editMg = '';
   editSecondary: string[] = [];
   editNotes = '';
+  editKind: ExerciseKind = 'weight_reps';
+  newKind: ExerciseKind = 'weight_reps';
+  readonly activeKind = signal<ExerciseKind | ''>('');
+  readonly exerciseKinds = EXERCISE_KINDS;
+  readonly kindTag = (k: string) => kindTag(kindOf(k));
+  /** The list as filtered by type (search and muscle filter on the server). */
+  readonly shown = computed(() => {
+    const k = this.activeKind();
+    return k ? this.exercises().filter(e => kindOf(e.kind) === k) : this.exercises();
+  });
 
   private readonly prByExercise = computed(() => new Map(this.prs().map(p => [p.exercise_id, p])));
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
@@ -427,6 +471,33 @@ export class ExerciseLibraryComponent implements OnInit {
 
   prFor(id: string): ExercisePR | null {
     return this.prByExercise().get(id) ?? null;
+  }
+
+  /** The record as its type reads it: "100 kg × 5", "8 × +20 kg", "1:15", "5 km in 26:00 · fastest 4:55 /km". */
+  bestText(pr: ExercisePR): string {
+    const kind = kindOf(pr.kind);
+    const text = setText(kind, { weight: this.settings.toDisplay(pr.weight), reps: pr.reps, duration_s: pr.duration_s, distance_m: pr.distance_m }, this.unit());
+    if (kind !== 'distance') return text;
+    const dUnit = distanceUnit(this.settings.weightUnit());
+    const fastest = pr.best_pace_s_per_km ? paceText(pr.best_pace_s_per_km, 1000, dUnit) : null;
+    return `${distanceText(pr.distance_m ?? 0, dUnit)}${fastest ? ` · fastest ${fastest}` : ''}`;
+  }
+
+  kindHelp(kind: ExerciseKind): string {
+    return EXERCISE_KINDS.find(k => k.value === kind)?.help ?? '';
+  }
+
+  /** Logged sets lock the type to its own inputs: weights and bodyweight swap, the others stay. */
+  canSwitchTo(kind: ExerciseKind): boolean {
+    const ex = this.editingExercise();
+    return !ex || kindChangeAllowed(kindOf(ex.kind), kind, !!ex.last_performed_at);
+  }
+
+  editKindHelp(): string {
+    const ex = this.editingExercise();
+    if (ex?.last_performed_at && !isRepKind(kindOf(ex.kind))) return 'It has logged sets, so its type stays. Make a new exercise for another type.';
+    if (ex?.last_performed_at) return 'It has logged sets, so it can switch between weight × reps and bodyweight only.';
+    return this.kindHelp(this.editKind);
   }
 
   unit(): string {
@@ -485,6 +556,8 @@ export class ExerciseLibraryComponent implements OnInit {
   /** A new primary can't stay a secondary; no primary means no secondaries. */
   setNewPrimary(mg: string) {
     this.newMG = mg;
+    // Cardio suggests distance + time; it can still be changed.
+    if (mg === 'Cardio' && this.newKind === 'weight_reps') this.newKind = 'distance';
     this.newSecondary = withoutPrimary(mg, this.newSecondary);
   }
 
@@ -501,11 +574,12 @@ export class ExerciseLibraryComponent implements OnInit {
       muscle_group: this.newMG || undefined,
       secondary_muscles: this.newMG ? this.newSecondary : [],
       notes: this.newNotes.trim() || undefined,
+      kind: this.newKind,
     }).subscribe({
       next: ex => {
         this.exercises.update(list => [ex, ...list]);
         this.showCreate.set(false);
-        this.newName = ''; this.newMG = ''; this.newSecondary = []; this.newNotes = '';
+        this.newName = ''; this.newMG = ''; this.newSecondary = []; this.newNotes = ''; this.newKind = 'weight_reps';
         this.saving.set(false);
         this.toast.success(`${ex.name} added`);
       },
@@ -518,6 +592,7 @@ export class ExerciseLibraryComponent implements OnInit {
     this.editMg = ex.muscle_group ?? '';
     this.editSecondary = [...(ex.secondary_muscles ?? [])];
     this.editNotes = ex.notes ?? '';
+    this.editKind = kindOf(ex.kind);
     this.editingExercise.set(ex);
   }
 
@@ -530,6 +605,7 @@ export class ExerciseLibraryComponent implements OnInit {
       muscle_group: this.editMg || '',
       secondary_muscles: this.editMg ? this.editSecondary : [],
       notes: this.editNotes.trim(),
+      kind: this.editKind,
     }).subscribe({
       next: updated => {
         this.exercises.update(list => list.map(e => e.id === updated.id ? updated : e));
@@ -537,7 +613,12 @@ export class ExerciseLibraryComponent implements OnInit {
         this.editSaving.set(false);
         this.toast.success('Exercise saved');
       },
-      error: () => { this.editSaving.set(false); this.toast.error('Could not save the exercise.'); },
+      error: (err: HttpErrorResponse) => {
+        this.editSaving.set(false);
+        this.toast.error(err.status === 409 && err.error?.error?.code === 'KIND_LOCKED'
+          ? 'It has logged sets, so its type can only switch between weight × reps and bodyweight.'
+          : 'Could not save the exercise.');
+      },
     });
   }
 

@@ -3,9 +3,11 @@ import { Component, OnInit, inject, input, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { JymService, Routine } from '../../../core/services/jym.service';
 import { planText } from '../plan-text';
+import { distanceUnit, kindOf } from '../exercise-kind';
 import { WorkoutLauncher } from '../shared/workout-launcher';
 import { ConfirmService } from '../../../core/services/confirm.service';
 import { ToastService } from '../../../core/services/toast.service';
+import { SettingsService } from '../../../core/services/settings.service';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
 import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-header/jiro-page-header';
@@ -43,7 +45,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
               @for (item of t.items; track item; let last = $last) {
 <span class="ex-chip">
                 {{ item.exercise_name }}
-                <span class="ex-sets">{{ planText(item) }}</span>
+                <span class="ex-sets">{{ planChip(item) }}</span>
                 @if (!last) {
 <span class="ex-sep"> · </span>
 }
@@ -126,6 +128,11 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 })
 export class JymTemplatesComponent implements OnInit {
   readonly planText = planText;
+  private readonly settings = inject(SettingsService);
+  /** The plan chip in the exercise's own terms: reps, a hold or a distance. */
+  planChip(x: Parameters<typeof planText>[0] & { exercise_kind?: string | null }): string {
+    return planText(x, 'short', { kind: kindOf(x.exercise_kind), distanceUnit: distanceUnit(this.settings.weightUnit()) });
+  }
   embedded = input(false);
   templates = signal<Routine[]>([]);
   loading = signal(true);
