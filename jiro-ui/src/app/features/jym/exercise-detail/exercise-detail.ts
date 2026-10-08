@@ -339,9 +339,11 @@ type SectionTab = 'history' | 'form' | 'notes';
 
     .detail-body { display: flex; flex-direction: column; gap: var(--space-xl); }
 
+    /* The page header already leaves its margin below the title; the body's gap would double it. */
     .detail-header {
       display: flex; align-items: flex-start; justify-content: space-between;
       gap: var(--space-lg); flex-wrap: wrap;
+      margin-top: calc(-1 * var(--space-xl));
     }
 
     .detail-title { display: flex; align-items: center; gap: var(--space-md); flex-wrap: wrap; }

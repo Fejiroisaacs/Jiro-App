@@ -565,7 +565,9 @@ const DELOAD_SNOOZE_DAYS = 7;
       border-radius: var(--border-radius); padding: var(--space-md) var(--space-lg);
     }
 
-    .mg-panel { flex: 0 1 280px; }
+    /* Beside the heatmap it keeps to 280px; wrapped onto its own row it fills it. */
+    .mg-panel { flex: 1 1 280px; max-width: 100%; }
+    @media (min-width: 900px) { .mg-panel { flex-grow: 0; } }
 
     .stats-header {
       display: flex; align-items: baseline; justify-content: space-between;
