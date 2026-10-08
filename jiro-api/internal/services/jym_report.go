@@ -42,7 +42,8 @@ func (s *JymService) GetSessionReport(ctx context.Context, userID, sessionID uui
 	muscleSets := map[string]int{}
 
 	setRows, err := s.db.Query(ctx,
-		`SELECT ss.exercise_id, e.name, e.muscle_group, ss.weight, COALESCE(ss.reps_performed, 0), COALESCE(ss.is_pr, false)
+		`SELECT ss.exercise_id, e.name, e.muscle_group, ss.weight, COALESCE(ss.reps_performed, 0), COALESCE(ss.is_pr, false),
+		        e.kind, ss.duration_s, ss.distance_m, ss.body_weight_kg
 		 FROM session_sets ss
 		 JOIN exercises e ON e.id = ss.exercise_id
 		 WHERE ss.session_id = $1 AND NOT ss.is_warmup
@@ -60,22 +61,25 @@ func (s *JymService) GetSessionReport(ctx context.Context, userID, sessionID uui
 		var weight float64
 		var reps int
 		var isPR bool
-		if err := setRows.Scan(&exID, &name, &group, &weight, &reps, &isPR); err != nil {
+		var kind string
+		var duration *int
+		var distance, bodyWeight *float64
+		if err := setRows.Scan(&exID, &name, &group, &weight, &reps, &isPR, &kind, &duration, &distance, &bodyWeight); err != nil {
 			return nil, err
 		}
 		l, ok := lifts[exID]
 		if !ok {
-			l = &lift{report: models.ExerciseReport{ExerciseID: exID, Name: name, MuscleGroup: group}}
+			l = &lift{report: models.ExerciseReport{ExerciseID: exID, Name: name, MuscleGroup: group, Kind: kind}}
 			lifts[exID] = l
 			order = append(order, exID)
 		}
-		set := models.SetRef{Weight: weight, Reps: reps, Est1RM: epley1RM(weight, reps)}
+		set := setRef(weight, reps, duration, distance, bodyWeight)
 		l.sets = append(l.sets, set)
 		if isPR {
 			l.prs = append(l.prs, set)
 		}
 		l.report.Sets++
-		l.report.Volume += weight * float64(reps)
+		l.report.Volume += (weight + defloat(bodyWeight)) * float64(reps)
 		muscleSets[muscleKey(group)]++
 	}
 	if err := setRows.Err(); err != nil {
@@ -92,11 +96,11 @@ func (s *JymService) GetSessionReport(ctx context.Context, userID, sessionID uui
 		l.report.Volume = roundTenth(l.report.Volume)
 		l.report.IsPR = len(l.prs) > 0
 		if l.report.IsPR {
-			l.report.Best = bestSet(l.prs)
+			l.report.Best = bestSetOf(l.report.Kind, l.prs)
 		} else {
-			l.report.Best = bestSet(l.sets)
+			l.report.Best = bestSetOf(l.report.Kind, l.sets)
 		}
-		l.report.Previous = bestSet(previous[id])
+		l.report.Previous = bestSetOf(l.report.Kind, previous[id])
 		report.Exercises = append(report.Exercises, l.report)
 	}
 
@@ -125,7 +129,7 @@ func (s *JymService) lastTimeSets(ctx context.Context, userID, sessionID uuid.UU
 		     AND (s.started_at, s.id) < ($3::timestamptz, $4::uuid)
 		   ORDER BY ss.exercise_id, s.started_at DESC, s.id DESC
 		 )
-		 SELECT prev.exercise_id, prev.started_at, ss.weight, COALESCE(ss.reps_performed, 0)
+		 SELECT prev.exercise_id, prev.started_at, ss.weight, COALESCE(ss.reps_performed, 0), ss.duration_s, ss.distance_m, ss.body_weight_kg
 		 FROM prev
 		 JOIN session_sets ss ON ss.session_id = prev.session_id AND ss.exercise_id = prev.exercise_id AND NOT ss.is_warmup`,
 		userID, exerciseIDs, startedAt, sessionID,
@@ -139,10 +143,14 @@ func (s *JymService) lastTimeSets(ctx context.Context, userID, sessionID uuid.UU
 		var date time.Time
 		var weight float64
 		var reps int
-		if err := rows.Scan(&exID, &date, &weight, &reps); err != nil {
+		var duration *int
+		var distance, bodyWeight *float64
+		if err := rows.Scan(&exID, &date, &weight, &reps, &duration, &distance, &bodyWeight); err != nil {
 			return nil, err
 		}
-		out[exID] = append(out[exID], models.SetRef{Weight: weight, Reps: reps, Est1RM: epley1RM(weight, reps), Date: &date})
+		ref := setRef(weight, reps, duration, distance, bodyWeight)
+		ref.Date = &date
+		out[exID] = append(out[exID], ref)
 	}
 	return out, rows.Err()
 }

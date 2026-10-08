@@ -104,6 +104,7 @@ type exportExercise struct {
 	SecondaryMuscles []string  `json:"secondary_muscles"`
 	Notes            *string   `json:"notes"`
 	RestSeconds      *int      `json:"rest_seconds"`
+	Kind             string    `json:"kind"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
 }
@@ -180,6 +181,11 @@ type exportSet struct {
 	IsWarmup      bool      `json:"is_warmup"`
 	ExerciseNote  *string   `json:"exercise_note"`
 	CreatedAt     time.Time `json:"created_at"`
+	ExerciseKind  string    `json:"exercise_kind"`
+	DurationS     *int      `json:"duration_s"`
+	DistanceM     *float64  `json:"distance_m"`
+	BodyWeightKg  *float64  `json:"body_weight_kg"`
+	PRKind        *string   `json:"pr_kind"`
 }
 
 type exportSessionAttachment struct {
@@ -510,6 +516,7 @@ func (h *ExportHandler) gatherJym(ctx context.Context, userID uuid.UUID) (export
 			MuscleGroup:      ex.MuscleGroup,
 			SecondaryMuscles: ex.SecondaryMuscles,
 			RestSeconds:      ex.RestSeconds,
+			Kind:             ex.Kind,
 			Notes:            ex.Notes,
 			CreatedAt:        ex.CreatedAt,
 			UpdatedAt:        ex.UpdatedAt,
@@ -607,6 +614,11 @@ func (h *ExportHandler) gatherJym(ctx context.Context, userID uuid.UUID) (export
 				IsWarmup:      set.IsWarmup,
 				ExerciseNote:  set.ExerciseNote,
 				CreatedAt:     set.CreatedAt,
+				ExerciseKind:  set.ExerciseKind,
+				DurationS:     set.DurationS,
+				DistanceM:     set.DistanceM,
+				BodyWeightKg:  set.BodyWeightKg,
+				PRKind:        set.PRKind,
 			})
 		}
 		for _, a := range full.Attachments {

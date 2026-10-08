@@ -17,6 +17,7 @@ import (
 type demoExercise struct {
 	ID          uuid.UUID
 	Name        string
+	Kind        string // "" is weight_reps
 	MuscleGroup string
 	Secondary   []string
 	Notes       string
@@ -52,7 +53,9 @@ type demoSet struct {
 	ExerciseID uuid.UUID
 	SetNumber  int
 	WeightKg   float64
-	Reps       int
+	Reps       int // 0 = none (duration, distance)
+	DurationS  int // 0 = none
+	DistanceM  float64
 	RPE        int // 0 = not recorded
 	IsPR       bool
 	IsWarmup   bool
@@ -277,6 +280,34 @@ var demoPlans = func() map[string]models.PlanDetails {
 	}
 }()
 
+// demoKindLift is a lift logged other than by weight × reps (J21); its records come from the real rules once seeded.
+type demoKindLift struct {
+	name, muscle, kind string
+	sets, target       int     // target is reps, or seconds held
+	meters             float64 // a distance plan's target
+	// set is round r's set s: added load in lbs, reps, seconds and metres.
+	set func(r, s int) (lbs float64, reps, secs int, meters float64)
+}
+
+// demoKindLifts are the Pull and Legs days' bodyweight, duration and distance lifts, by day.
+var demoKindLifts = map[int][]demoKindLift{
+	1: {{"Pull-up", "Back", KindBodyweight, 3, 8, 0, func(r, s int) (float64, int, int, float64) {
+		reps := 8
+		if s == 2 && r%2 == 1 {
+			reps = 7
+		}
+		return [6]float64{0, 0, 0, 10, 10, 15}[r], reps, 0, 0
+	}}},
+	2: {
+		{"Plank", "Core", KindDuration, 3, 45, 0, func(r, s int) (float64, int, int, float64) {
+			return 0, 0, [6]int{45, 45, 50, 55, 55, 60}[r] - s*5, 0
+		}},
+		{"Run", "Cardio", KindDistance, 1, 1, 3000, func(r, s int) (float64, int, int, float64) {
+			return 0, 0, [6]int{1050, 1065, 1100, 1000, 1080, 1360}[r], [6]float64{3000, 3000, 3200, 3000, 3000, 4000}[r]
+		}},
+	},
+}
+
 func buildDemoJym(ds *demoDataset, at func(int, int, int) time.Time, date func(int) string) {
 	days := []struct {
 		name  string
@@ -327,6 +358,21 @@ func buildDemoJym(ds *demoDataset, at func(int, int, int) time.Time, date func(i
 				RoutineID: routineIDs[di], ExerciseID: id, TargetSets: lift.sets, TargetReps: lift.reps, OrderIndex: li,
 				Plan: demoPlans[lift.name],
 			})
+		}
+		for ki, lift := range demoKindLifts[di] {
+			id := uuid.New()
+			exerciseIDs[lift.name] = id
+			ds.Exercises = append(ds.Exercises, demoExercise{
+				ID: id, Name: lift.name, Kind: lift.kind, MuscleGroup: lift.muscle, CreatedAt: at(-44, 20, 40+len(ds.Exercises)),
+			})
+			item := demoRoutineItem{
+				RoutineID: routineIDs[di], ExerciseID: id, TargetSets: lift.sets, TargetReps: lift.target, OrderIndex: len(day.lifts) + ki,
+			}
+			if lift.meters > 0 {
+				m := lift.meters
+				item.Plan.TargetDistanceM = &m
+			}
+			ds.RoutineItems = append(ds.RoutineItems, item)
 		}
 	}
 
@@ -397,6 +443,16 @@ func buildDemoJym(ds *demoDataset, at func(int, int, int) time.Time, date func(i
 				clock = clock.Add(3 * time.Minute)
 			}
 			clock = clock.Add(2 * time.Minute)
+		}
+		for _, lift := range demoKindLifts[di] {
+			for s := 0; s < lift.sets; s++ {
+				lbs, reps, secs, meters := lift.set(round, s)
+				ds.Sets = append(ds.Sets, demoSet{
+					SessionID: sess.ID, ExerciseID: exerciseIDs[lift.name], SetNumber: s + 1,
+					WeightKg: lbsToKg(lbs), Reps: reps, DurationS: secs, DistanceM: meters, RPE: 8, CreatedAt: clock,
+				})
+				clock = clock.Add(time.Duration(max(secs, 120)) * time.Second)
+			}
 		}
 		sess.EndedAt = clock
 		ds.Sessions = append(ds.Sessions, sess)
@@ -896,8 +952,12 @@ func (ds *demoDataset) queue(b *pgx.Batch, userID uuid.UUID) {
 		if secondary == nil {
 			secondary = []string{}
 		}
-		b.Queue(`INSERT INTO exercises (id, user_id, name, muscle_group, secondary_muscles, notes, created_at, updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$7)`,
-			e.ID, userID, e.Name, e.MuscleGroup, secondary, nullIfEmpty(e.Notes), e.CreatedAt)
+		kind := e.Kind
+		if kind == "" {
+			kind = KindWeightReps
+		}
+		b.Queue(`INSERT INTO exercises (id, user_id, name, muscle_group, secondary_muscles, notes, created_at, updated_at, kind) VALUES ($1,$2,$3,$4,$5,$6,$7,$7,$8)`,
+			e.ID, userID, e.Name, e.MuscleGroup, secondary, nullIfEmpty(e.Notes), e.CreatedAt, kind)
 	}
 	splitCreated := ds.Routines[0].CreatedAt.Add(-time.Minute)
 	b.Queue(`INSERT INTO splits (id, user_id, name, description, visibility, tags, created_at, updated_at) VALUES ($1,$2,$3,$4,'private',$5,$6,$6)`,
@@ -925,8 +985,20 @@ func (ds *demoDataset) queue(b *pgx.Batch, userID uuid.UUID) {
 			v := s.RPE
 			rpe = &v
 		}
-		b.Queue(`INSERT INTO session_sets (session_id, exercise_id, set_number, weight, reps_performed, rpe, is_pr, is_warmup, created_at) VALUES ($1,$2,$3,$4::numeric,$5,$6,$7,$8,$9)`,
-			s.SessionID, s.ExerciseID, s.SetNumber, money(s.WeightKg), s.Reps, rpe, s.IsPR, s.IsWarmup, s.CreatedAt)
+		var reps, secs *int
+		var meters *float64
+		if s.Reps > 0 {
+			reps = &s.Reps
+		}
+		if s.DurationS > 0 {
+			secs = &s.DurationS
+		}
+		if s.DistanceM > 0 {
+			meters = &s.DistanceM
+		}
+		b.Queue(`INSERT INTO session_sets (session_id, exercise_id, set_number, weight, reps_performed, rpe, is_pr, is_warmup, created_at, duration_s, distance_m)
+		         VALUES ($1,$2,$3,$4::numeric,$5,$6,$7,$8,$9,$10,$11)`,
+			s.SessionID, s.ExerciseID, s.SetNumber, money(s.WeightKg), reps, rpe, s.IsPR, s.IsWarmup, s.CreatedAt, secs, meters)
 	}
 	for _, w := range ds.BodyWeights {
 		b.Queue(`INSERT INTO body_weights (user_id, recorded_at, weight_kg, created_at) VALUES ($1,$2::date,$3::numeric,$2::date + time '12:05')`,

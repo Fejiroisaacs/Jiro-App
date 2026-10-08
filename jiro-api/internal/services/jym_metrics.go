@@ -35,6 +35,50 @@ func e1rmSQL(weight, reps string) string {
 		weight, reps, e1rmRepCap)
 }
 
+// bestSetOf is a lift's best set by its kind: the longest hold, the longest distance, else bestSet.
+func bestSetOf(kind string, sets []models.SetRef) *models.SetRef {
+	if len(sets) == 0 || repKind(kind) {
+		return bestSet(sets)
+	}
+	best := sets[0]
+	for _, s := range sets[1:] {
+		switch kind {
+		case KindDuration:
+			if deint(s.DurationS) > deint(best.DurationS) || deint(s.DurationS) == deint(best.DurationS) && s.Weight > best.Weight {
+				best = s
+			}
+		case KindDistance:
+			if defloat(s.DistanceM) > defloat(best.DistanceM) {
+				best = s
+			}
+		}
+	}
+	return &best
+}
+
+func deint(p *int) int {
+	if p == nil {
+		return 0
+	}
+	return *p
+}
+
+func defloat(p *float64) float64 {
+	if p == nil {
+		return 0
+	}
+	return *p
+}
+
+// setRef is a set as a summary shows it; a bodyweight set's estimated 1RM counts its body weight.
+func setRef(weight float64, reps int, durationS *int, distanceM, bodyWeight *float64) models.SetRef {
+	ref := models.SetRef{Weight: weight, Reps: reps, DurationS: durationS, DistanceM: distanceM, BodyWeightKg: bodyWeight}
+	if reps > 0 {
+		ref.Est1RM = epley1RM(weight+defloat(bodyWeight), reps)
+	}
+	return ref
+}
+
 // bestSet is the set with the highest estimated 1RM, then the most reps, so bodyweight sets compare by reps.
 func bestSet(sets []models.SetRef) *models.SetRef {
 	if len(sets) == 0 {
@@ -83,4 +127,6 @@ const sessionAggregatesSQL = workingSetCountSQL + ` AS set_count, ` +
 	prLiftCountSQL + ` AS pr_count, ` +
 	workingVolumeSQL + ` AS total_volume, ` +
 	muscleGroupsSQL + ` AS muscle_groups, ` +
-	`MIN(ss.created_at) AS first_set_at, MAX(ss.created_at) AS last_set_at`
+	`MIN(ss.created_at) AS first_set_at, MAX(ss.created_at) AS last_set_at, ` +
+	`COALESCE(SUM(ss.distance_m) FILTER (WHERE NOT ss.is_warmup), 0)::float8 AS total_distance_m, ` +
+	`COALESCE(SUM(ss.duration_s) FILTER (WHERE NOT ss.is_warmup AND ss.distance_m IS NULL), 0)::int AS total_duration_s`

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/models"
 	"github.com/google/uuid"
@@ -247,5 +248,103 @@ func TestSwitchingToBodyweightRerates(t *testing.T) {
 	got, _ = svc.GetSession(ctx, userID, sess.ID)
 	if got.Sets[0].BodyWeightKg != nil {
 		t.Fatal("weights don't count body weight")
+	}
+}
+
+func TestKindsInReportsStatsAndRecords(t *testing.T) {
+	svc, userID := testJymDB(t)
+	ctx := context.Background()
+	run := kindExercise(t, svc, userID, "Run", KindDistance)
+	plank := kindExercise(t, svc, userID, "Plank", KindDuration)
+	pull := kindExercise(t, svc, userID, "Pull-up", KindBodyweight)
+	sess, _ := svc.StartSession(ctx, userID, &models.CreateSessionRequest{})
+	today := sess.StartedAt.UTC().Format("2006-01-02")
+	if _, err := svc.LogBodyWeight(ctx, userID, &models.LogBodyWeightRequest{RecordedAt: today, WeightKg: 80}); err != nil {
+		t.Fatalf("body weight: %v", err)
+	}
+	logs := []*models.CreateSetRequest{
+		{ExerciseID: run, SetNumber: 1, DistanceM: fp(5000), DurationS: ip(1500)},
+		{ExerciseID: run, SetNumber: 2, DistanceM: fp(1000), DurationS: ip(240)},
+		{ExerciseID: plank, SetNumber: 1, DurationS: ip(45)},
+		{ExerciseID: plank, SetNumber: 2, DurationS: ip(60)},
+		{ExerciseID: pull, SetNumber: 1, Weight: 10, RepsPerformed: ip(5)},
+	}
+	for _, l := range logs {
+		if _, err := svc.LogSet(ctx, userID, sess.ID, l); err != nil {
+			t.Fatalf("log: %v", err)
+		}
+	}
+	end := sess.StartedAt.Add(time.Hour)
+	if _, err := svc.UpdateSession(ctx, userID, sess.ID, &models.UpdateSessionRequest{EndedAt: &end}); err != nil {
+		t.Fatalf("finish: %v", err)
+	}
+
+	rep, err := svc.GetSessionReport(ctx, userID, sess.ID)
+	if err != nil {
+		t.Fatalf("report: %v", err)
+	}
+	// Volume is the pull-ups only, (80 + 10) x 5; 6 km run and 1:45 held.
+	if rep.TotalVolume != 450 || rep.TotalDistanceM != 6000 || rep.TotalDurationS != 105 {
+		t.Fatalf("totals: volume %v, distance %v, held %v", rep.TotalVolume, rep.TotalDistanceM, rep.TotalDurationS)
+	}
+	best := map[string]*models.SetRef{}
+	for _, e := range rep.Exercises {
+		best[e.Kind] = e.Best
+	}
+	if best[KindDistance] == nil || *best[KindDistance].DistanceM != 5000 || *best[KindDuration].DurationS != 60 || best[KindBodyweight].Est1RM != 105 {
+		t.Fatalf("best sets: %+v %+v %+v", best[KindDistance], best[KindDuration], best[KindBodyweight])
+	}
+
+	prs, err := svc.GetPRs(ctx, userID)
+	if err != nil {
+		t.Fatalf("prs: %v", err)
+	}
+	byKind := map[string]models.ExercisePR{}
+	for _, p := range prs {
+		byKind[p.Kind] = p
+	}
+	// The run's best is its longest distance; its fastest pace is the 1 km at 4:00.
+	if r := byKind[KindDistance]; r.DistanceM == nil || *r.DistanceM != 5000 || r.BestPaceSKm == nil || *r.BestPaceSKm != 240 {
+		t.Fatalf("run record: %+v", r)
+	}
+	if p := byKind[KindDuration]; p.DurationS == nil || *p.DurationS != 60 {
+		t.Fatalf("plank record: %+v", p)
+	}
+	if p := byKind[KindBodyweight]; p.Est1RM != 105 {
+		t.Fatalf("pull-up record: %+v", p)
+	}
+
+	stats, err := svc.GetExerciseStats(ctx, userID, run)
+	if err != nil || len(stats.Workouts) != 1 {
+		t.Fatalf("stats: %v", err)
+	}
+	if w := stats.Workouts[0]; w.MaxDistanceM != 5000 || w.BestPaceSKm == nil || *w.BestPaceSKm != 240 || w.BestSet != nil {
+		t.Fatalf("run stats: %+v", w)
+	}
+	ps, _ := svc.GetExerciseStats(ctx, userID, plank)
+	if ps.Workouts[0].MaxDurationS != 60 {
+		t.Fatalf("plank stats: %+v", ps.Workouts[0])
+	}
+	ws, err := svc.ListExerciseWorkouts(ctx, userID, run, nil, uuid.Nil, 10)
+	if err != nil || len(ws) != 1 || ws[0].Sets[0].DistanceM == nil || ws[0].Sets[0].PRKind == nil {
+		t.Fatalf("run workouts: %v %+v", err, ws)
+	}
+
+	// A template from this workout keeps the hold and the distance.
+	tmpl, err := svc.CreateTemplateFromSession(ctx, userID, sess.ID, "Mixed")
+	if err != nil {
+		t.Fatalf("template: %v", err)
+	}
+	for _, it := range tmpl.Items {
+		switch it.ExerciseID {
+		case run:
+			if it.TargetDistanceM == nil || *it.TargetDistanceM != 3000 || it.TargetReps != 1 {
+				t.Fatalf("run plan: %+v", it)
+			}
+		case plank:
+			if it.TargetReps != 53 {
+				t.Fatalf("plank plan: %+v", it)
+			}
+		}
 	}
 }

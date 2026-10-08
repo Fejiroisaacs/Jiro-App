@@ -69,6 +69,10 @@ type ExerciseStatsWorkout struct {
 	Volume  float64 `json:"volume"`
 	HasPR   bool    `json:"has_pr"`
 	Note    *string `json:"note"`
+	// Duration: the longest hold. Distance: the longest distance, and the best pace over 400 m or more.
+	MaxDurationS int      `json:"max_duration_s"`
+	MaxDistanceM float64  `json:"max_distance_m"`
+	BestPaceSKm  *float64 `json:"best_pace_s_per_km"`
 }
 
 // ExerciseStats is an exercise's whole history, one row per workout, oldest first.
@@ -95,6 +99,11 @@ type ExerciseWorkoutSet struct {
 	IsWarmup  bool      `json:"is_warmup"`
 	IsPR      bool      `json:"is_pr"`
 	Est1RM    float64   `json:"est_1rm"`
+	DurationS *int      `json:"duration_s"`
+	DistanceM *float64  `json:"distance_m"`
+	// BodyWeightKg is a bodyweight set's body weight; PRKind names a distance record.
+	BodyWeightKg *float64 `json:"body_weight_kg"`
+	PRKind       *string  `json:"pr_kind"`
 }
 
 // ExerciseWorkout is a workout that included an exercise, with that exercise's sets.
@@ -113,10 +122,17 @@ type ExercisePR struct {
 	ExerciseID  uuid.UUID `json:"exercise_id"`
 	Name        string    `json:"name"`
 	MuscleGroup *string   `json:"muscle_group"`
+	Kind        string    `json:"kind"`
 	Weight      float64   `json:"weight"`
 	Reps        int       `json:"reps"`
 	Est1RM      float64   `json:"est_1rm"`
 	Date        time.Time `json:"date"`
+	// The best set's time and distance (duration, distance), body weight (bodyweight), and a distance
+	// exercise's fastest pace over 400 m or more, in seconds per km.
+	DurationS    *int     `json:"duration_s"`
+	DistanceM    *float64 `json:"distance_m"`
+	BodyWeightKg *float64 `json:"body_weight_kg"`
+	BestPaceSKm  *float64 `json:"best_pace_s_per_km"`
 }
 
 type CreateExerciseRequest struct {
@@ -437,6 +453,9 @@ type SessionSummary struct {
 	// When the first and last sets were logged, by the server's clock; null with no sets.
 	FirstSetAt *time.Time `json:"first_set_at"`
 	LastSetAt  *time.Time `json:"last_set_at"`
+	// Working distance sets' metres, and duration sets' seconds held.
+	TotalDistanceM float64 `json:"total_distance_m"`
+	TotalDurationS int     `json:"total_duration_s"`
 }
 
 // StartSessionResponse includes the created session and routine targets (if routine_id given).
@@ -582,6 +601,7 @@ type ExerciseReport struct {
 	ExerciseID  uuid.UUID `json:"exercise_id"`
 	Name        string    `json:"name"`
 	MuscleGroup *string   `json:"muscle_group"`
+	Kind        string    `json:"kind"`
 	Sets        int       `json:"sets"`
 	Volume      float64   `json:"volume"`
 	IsPR        bool      `json:"is_pr"`
@@ -595,6 +615,10 @@ type SetRef struct {
 	Reps   int        `json:"reps"`
 	Est1RM float64    `json:"est_1rm"`
 	Date   *time.Time `json:"date,omitempty"`
+	// Duration and distance sets have these instead of reps; a bodyweight set its body weight.
+	DurationS    *int     `json:"duration_s,omitempty"`
+	DistanceM    *float64 `json:"distance_m,omitempty"`
+	BodyWeightKg *float64 `json:"body_weight_kg,omitempty"`
 }
 
 // MuscleShare is a muscle group's working sets in a workout; ungrouped lifts are "other".

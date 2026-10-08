@@ -1465,7 +1465,7 @@ func scanSessionSummaries(rows pgx.Rows) ([]models.SessionSummary, error) {
 			&sess.ID, &sess.UserID, &sess.RoutineID, &sess.SeriesID, &sess.SessionType,
 			&sess.StartedAt, &sess.EndedAt, &sess.Notes,
 			&sess.RoutineName, &sess.SetCount, &sess.PRCount, &sess.TotalVolume, &sess.MuscleGroups,
-			&sess.FirstSetAt, &sess.LastSetAt,
+			&sess.FirstSetAt, &sess.LastSetAt, &sess.TotalDistanceM, &sess.TotalDurationS,
 		); err != nil {
 			return nil, err
 		}
@@ -2216,15 +2216,24 @@ func (s *JymService) DeleteSet(ctx context.Context, userID, setID uuid.UUID) err
 func (s *JymService) GetPRs(ctx context.Context, userID uuid.UUID) ([]models.ExercisePR, error) {
 	rows, err := s.db.Query(ctx,
 		`SELECT DISTINCT ON (ss.exercise_id)
-		        e.id, e.name, e.muscle_group,
-		        ss.weight, COALESCE(ss.reps_performed, 0), s.started_at
+		        e.id, e.name, e.muscle_group, e.kind,
+		        ss.weight, COALESCE(ss.reps_performed, 0), s.started_at, ss.duration_s, ss.distance_m, ss.body_weight_kg,
+		        (SELECT MIN(p.duration_s / (p.distance_m / 1000))::float8
+		         FROM session_sets p JOIN sessions ps ON ps.id = p.session_id
+		         WHERE p.exercise_id = ss.exercise_id AND p.is_pr AND p.distance_m >= `+fmt.Sprint(minPaceDistanceM)+`
+		           AND ps.session_type <> 'deload')
 		 FROM session_sets ss
 		 JOIN sessions s  ON ss.session_id  = s.id
 		 JOIN exercises e ON ss.exercise_id = e.id
 		 WHERE s.user_id = $1
 		   AND ss.is_pr  = true
 		   AND (s.session_type IS NULL OR s.session_type != 'deload')
-		 ORDER BY ss.exercise_id, ROUND(ss.weight, 1) DESC, ss.reps_performed DESC NULLS LAST, ss.weight DESC`,
+		 ORDER BY ss.exercise_id,
+		          CASE e.kind WHEN 'duration' THEN ss.duration_s
+		                      WHEN 'distance' THEN ss.distance_m
+		                      WHEN 'bodyweight' THEN `+e1rmSQL(loadSQL, "ss.reps_performed")+`
+		                      ELSE ROUND(ss.weight, 1) END DESC NULLS LAST,
+		          ss.reps_performed DESC NULLS LAST, ss.weight DESC`,
 		userID,
 	)
 	if err != nil {
@@ -2235,10 +2244,17 @@ func (s *JymService) GetPRs(ctx context.Context, userID uuid.UUID) ([]models.Exe
 	prs := []models.ExercisePR{}
 	for rows.Next() {
 		var pr models.ExercisePR
-		if err := rows.Scan(&pr.ExerciseID, &pr.Name, &pr.MuscleGroup, &pr.Weight, &pr.Reps, &pr.Date); err != nil {
+		if err := rows.Scan(&pr.ExerciseID, &pr.Name, &pr.MuscleGroup, &pr.Kind, &pr.Weight, &pr.Reps, &pr.Date,
+			&pr.DurationS, &pr.DistanceM, &pr.BodyWeightKg, &pr.BestPaceSKm); err != nil {
 			return nil, err
 		}
-		pr.Est1RM = epley1RM(pr.Weight, pr.Reps)
+		if pr.Reps > 0 {
+			pr.Est1RM = epley1RM(pr.Weight+defloat(pr.BodyWeightKg), pr.Reps)
+		}
+		if pr.BestPaceSKm != nil {
+			p := roundTenth(*pr.BestPaceSKm)
+			pr.BestPaceSKm = &p
+		}
 		prs = append(prs, pr)
 	}
 	return prs, nil
@@ -2655,7 +2671,12 @@ func (s *JymService) StreamSessionsCSV(ctx context.Context, userID uuid.UUID, fr
 			COALESCE(ss.reps_performed, 0),
 			COALESCE(ss.rpe::text, ''),
 			ss.is_warmup,
-			ss.is_pr
+			ss.is_pr,
+			e.kind,
+			COALESCE(ss.duration_s::text, ''),
+			COALESCE(ss.distance_m::text, ''),
+			ss.body_weight_kg,
+			COALESCE(ss.pr_kind, '')
 		FROM sessions s
 		LEFT JOIN routines r ON s.routine_id = r.id
 		JOIN session_sets ss ON ss.session_id = s.id
@@ -2673,23 +2694,32 @@ func (s *JymService) StreamSessionsCSV(ctx context.Context, userID uuid.UUID, fr
 	_ = cw.Write([]string{
 		"date", "session_id", "routine", "exercise", "muscle_group",
 		"set", "weight_kg", "reps", "rpe", "is_warmup", "is_pr", "estimated_1rm",
+		"kind", "duration_s", "distance_m", "body_weight_kg", "pr_kind",
 	})
 
 	for rows.Next() {
 		var date time.Time
 		var sessionID uuid.UUID
-		var routine, exercise, muscleGroup, rpe string
+		var routine, exercise, muscleGroup, rpe, kind, duration, distance, prKind string
 		var setNum, reps int
 		var weight float64
+		var bodyWeight *float64
 		var isWarmup, isPR bool
 
 		if err := rows.Scan(
 			&date, &sessionID, &routine, &exercise, &muscleGroup,
 			&setNum, &weight, &reps, &rpe, &isWarmup, &isPR,
+			&kind, &duration, &distance, &bodyWeight, &prKind,
 		); err != nil {
 			return err
 		}
-		est1rm := epley1RM(weight, reps)
+		est1rm, bw := "", ""
+		if reps > 0 {
+			est1rm = fmt.Sprintf("%.1f", epley1RM(weight+defloat(bodyWeight), reps))
+		}
+		if bodyWeight != nil {
+			bw = fmt.Sprintf("%.2f", *bodyWeight)
+		}
 
 		_ = cw.Write([]string{
 			date.Format("2006-01-02"),
@@ -2703,7 +2733,12 @@ func (s *JymService) StreamSessionsCSV(ctx context.Context, userID uuid.UUID, fr
 			rpe,
 			strconv.FormatBool(isWarmup),
 			strconv.FormatBool(isPR),
-			fmt.Sprintf("%.1f", est1rm),
+			est1rm,
+			kind,
+			duration,
+			distance,
+			bw,
+			prKind,
 		})
 	}
 
@@ -3275,7 +3310,9 @@ func (s *JymService) CreateTemplateFromSession(ctx context.Context, userID, sess
 	rows, err := s.db.Query(ctx,
 		`SELECT exercise_id,
 		        COUNT(*) FILTER (WHERE NOT is_warmup)::int AS target_sets,
-		        COALESCE(ROUND(AVG(reps_performed) FILTER (WHERE NOT is_warmup)), ROUND(AVG(reps_performed)), 0)::int AS target_reps
+		        COALESCE(ROUND(AVG(COALESCE(reps_performed, duration_s)) FILTER (WHERE NOT is_warmup AND distance_m IS NULL)),
+		                 ROUND(AVG(COALESCE(reps_performed, duration_s)) FILTER (WHERE distance_m IS NULL)), 0)::int AS target_reps,
+		        ROUND(AVG(distance_m) FILTER (WHERE NOT is_warmup))::float8 AS target_distance_m
 		 FROM session_sets
 		 WHERE session_id = $1
 		 GROUP BY exercise_id
@@ -3291,8 +3328,12 @@ func (s *JymService) CreateTemplateFromSession(ctx context.Context, userID, sess
 	for i := 0; rows.Next(); i++ {
 		var agg exAgg
 		agg.orderIdx = i
-		if err := rows.Scan(&agg.exerciseID, &agg.targetSets, &agg.targetReps); err != nil {
+		if err := rows.Scan(&agg.exerciseID, &agg.targetSets, &agg.targetReps, &agg.plan.TargetDistanceM); err != nil {
 			return nil, err
+		}
+		// A distance plan's target is its distance; its reps only say there is a plan.
+		if agg.plan.TargetDistanceM != nil {
+			agg.targetReps = 1
 		}
 		if agg.targetSets == 0 {
 			agg.targetSets = 1 // at least 1 if all were warmups
