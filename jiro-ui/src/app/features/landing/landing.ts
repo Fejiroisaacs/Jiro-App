@@ -52,10 +52,6 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
             @if (demoError()) {
               <p class="l-hero-error" role="alert">{{ demoError() }}</p>
             }
-            <!-- A real href, so it works without JavaScript; the handler only upgrades it to a smooth scroll. -->
-            <a href="#modules" class="l-hero-more" (click)="scrollToModules($event)">
-              Explore modules <jiro-icon name="caret-down" [size]="14" />
-            </a>
           </div>
 
           <!-- The real dashboard. Light and dark shots, shown to match the app's
@@ -149,9 +145,9 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
                 <p class="l-card-desc">Track spending, set budgets, and watch your net worth grow over time.</p>
               </div>
               <div class="l-card-shot">
-                <img class="shot-light" width="996" height="750" loading="lazy" decoding="async"
+                <img class="shot-light" width="900" height="675" loading="lazy" decoding="async"
                   alt="The Ledger month card: net for the month, income, expenses and savings rate." src="/images/landing/ledger-light.webp" />
-                <img class="shot-dark" width="996" height="750" loading="lazy" decoding="async"
+                <img class="shot-dark" width="900" height="675" loading="lazy" decoding="async"
                   alt="The Ledger month card: net for the month, income, expenses and savings rate." src="/images/landing/ledger-dark.webp" />
               </div>
             </div>
@@ -366,18 +362,6 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
       animation: fadeUp 0.65s 0.15s ease both;
     }
     .l-hero-actions .l-btn { white-space: nowrap; }
-    .l-hero-more {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      margin-top: var(--space-md);
-      font-size: var(--font-size-sm);
-      color: var(--text-secondary);
-      text-decoration: underline;
-      text-underline-offset: 3px;
-      animation: fadeUp 0.7s 0.2s ease both;
-    }
-    .l-hero-more:hover { color: var(--text-primary); }
     .l-hero-error {
       margin: var(--space-sm) 0 0;
       font-size: var(--font-size-sm);
@@ -446,7 +430,8 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
 
     /* Each card is a different shape, so the frame is set per card and the
        image crops into it rather than the image dictating the layout. */
-    .l-card--culinara .l-card-shot { aspect-ratio: 728 / 232; }
+    /* The recipe shot brings its own panel, so a border here would be a third frame. */
+    .l-card--culinara .l-card-shot { aspect-ratio: 728 / 232; border: none; }
     /* This card is double height. The phone sits as a device on the card,
        whole and uncropped, filling the space that is left. A cover crop here
        cut the app's own header off the sides. */
@@ -705,7 +690,7 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
     @media (prefers-reduced-motion: reduce) {
       .l-hero-title,
       .l-hero-sub,
-      .l-hero-actions, .l-hero-more { animation: none; }
+      .l-hero-actions { animation: none; }
     }
 
     /* ── Responsive ────────────────────────────────────────────────────────── */
@@ -739,7 +724,7 @@ export class LandingComponent implements OnInit {
   protected readonly demoLoading = signal(false);
   protected readonly demoError = signal('');
 
-  /** Honour the OS setting: no glare, section reveal or smooth scroll. */
+  /** Honour the OS setting: no section reveal. */
   readonly reducedMotion =
     this.isBrowser && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -812,19 +797,5 @@ export class LandingComponent implements OnInit {
         this.demoError.set(demoLoginErrorMessage(err));
       },
     });
-  }
-
-  /**
-   * The link already works on its own: `href="#modules"` jumps there with no
-   * JavaScript at all. This only upgrades the jump to a smooth scroll, so it
-   * takes over the event solely when it is actually going to do something
-   * different from the browser's default.
-   */
-  scrollToModules(event: Event) {
-    if (this.reducedMotion) return;
-    const target = document.getElementById('modules');
-    if (!target) return;
-    event.preventDefault();
-    target.scrollIntoView({ behavior: 'smooth' });
   }
 }
