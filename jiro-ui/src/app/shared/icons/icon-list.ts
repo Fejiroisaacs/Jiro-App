@@ -58,6 +58,7 @@ export const ICON_LIST = [
   'trend-up',
   'trend-down',
   'repeat',
+  'flag',
   'funnel-simple',
   'link',
   'lock',

@@ -1,7 +1,7 @@
 // Run with: npm run test:unit
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildBlocks, canLog, convertDistanceText, isShort, lastTimeFrom, logLabel, newRow, planTag, rampSummary, restOf, rowValues, rpeInvalid, suggestionFrom, workingWeight, emptyBlock } from './player-blocks.ts';
+import { buildBlocks, canLog, convertDistanceText, firstTimeFrom, isShort, lastTimeFrom, logLabel, newRow, planTag, rampSummary, restOf, rowValues, rpeInvalid, suggestionFrom, workingWeight, emptyBlock } from './player-blocks.ts';
 
 const same = (kg: number) => kg;
 const entry = (id: string, sets: number | null = null, reps: number | null = null, position = 1) =>
@@ -209,3 +209,21 @@ test('last time for kinds without an aim: the latest earlier workout, its first 
   assert.equal(lastTimeFrom('duration', [], o), null);
 });
 
+
+test('first time: no earlier working set outside a deload, warm-up or this workout', () => {
+  const h = (session: string, date: string, extra: Record<string, unknown> = {}) => ({
+    session_id: session, date, ended_at: date, set_number: 1, weight: 100, reps: 5, rpe: null, is_warmup: false,
+    est_1rm: 0, is_pr: false, session_type: 'normal', exercise_note: null, duration_s: null, distance_m: null, body_weight_kg: null, ...extra,
+  });
+  const o = { excludeSessionId: 'now', before: '2026-09-15T09:00:00Z' };
+  const first = firstTimeFrom([
+    h('now', '2026-09-15T09:10:00Z'),
+    h('deload', '2026-09-01T10:00:00Z', { session_type: 'deload' }),
+    h('warm', '2026-09-02T10:00:00Z', { is_warmup: true }),
+    h('later', '2026-09-20T10:00:00Z'),
+  ], o)!;
+  assert.equal(first.text, 'First time. Today sets your baseline.');
+  assert.equal(first.keepGhosts, true);
+  assert.equal(firstTimeFrom([h('last', '2026-09-08T10:00:00Z')], o), null);
+  assert.equal(firstTimeFrom([h('test', '2026-09-08T10:00:00Z', { session_type: 'test' })], o), null, 'a test workout counts');
+});
