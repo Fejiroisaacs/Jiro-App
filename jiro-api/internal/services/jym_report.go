@@ -91,8 +91,13 @@ func (s *JymService) GetSessionReport(ctx context.Context, userID, sessionID uui
 	if err != nil {
 		return nil, err
 	}
+	baselines, err := s.baselineSessions(ctx, userID, order)
+	if err != nil {
+		return nil, err
+	}
 	for _, id := range order {
 		l := lifts[id]
+		l.report.IsFirst = baselines[id] == sessionID
 		l.report.Volume = roundTenth(l.report.Volume)
 		l.report.IsPR = len(l.prs) > 0
 		if l.report.IsPR {
@@ -111,6 +116,35 @@ func (s *JymService) GetSessionReport(ctx context.Context, userID, sessionID uui
 		return cmp.Or(cmp.Compare(b.Sets, a.Sets), cmp.Compare(a.MuscleGroup, b.MuscleGroup))
 	})
 	return report, nil
+}
+
+// baselineSessions is each lift's first workout with a working set (not a warm-up, not a deload), in the order
+// ratePRs uses: no set in it is a record.
+func (s *JymService) baselineSessions(ctx context.Context, userID uuid.UUID, exerciseIDs []uuid.UUID) (map[uuid.UUID]uuid.UUID, error) {
+	out := map[uuid.UUID]uuid.UUID{}
+	if len(exerciseIDs) == 0 {
+		return out, nil
+	}
+	rows, err := s.db.Query(ctx,
+		`SELECT DISTINCT ON (ss.exercise_id) ss.exercise_id, ss.session_id
+		 FROM session_sets ss
+		 JOIN sessions s ON s.id = ss.session_id
+		 WHERE s.user_id = $1 AND ss.exercise_id = ANY($2::uuid[]) AND NOT ss.is_warmup AND s.session_type <> 'deload'
+		 ORDER BY ss.exercise_id, ss.created_at, ss.id`,
+		userID, exerciseIDs,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var exID, sessID uuid.UUID
+		if err := rows.Scan(&exID, &sessID); err != nil {
+			return nil, err
+		}
+		out[exID] = sessID
+	}
+	return out, rows.Err()
 }
 
 // lastTimeSets is each lift's working sets from its latest finished normal workout that started before this one.

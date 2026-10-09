@@ -1891,7 +1891,7 @@ func rerateExercisePRs(ctx context.Context, tx pgx.Tx, userID, exerciseID uuid.U
 	}
 
 	rows, err := tx.Query(ctx,
-		`SELECT ss.id, ss.weight, ss.reps_performed, ss.duration_s, ss.distance_m, ss.body_weight_kg,
+		`SELECT ss.id, ss.session_id, ss.weight, ss.reps_performed, ss.duration_s, ss.distance_m, ss.body_weight_kg,
 		        NOT ss.is_warmup AND s.session_type <> 'deload', ss.is_pr, ss.pr_kind
 		 FROM session_sets ss
 		 JOIN sessions s ON s.id = ss.session_id
@@ -1912,7 +1912,7 @@ func rerateExercisePRs(ctx context.Context, tx pgx.Tx, userID, exerciseID uuid.U
 	for rows.Next() {
 		var p prSet
 		var c current
-		if err := rows.Scan(&c.id, &p.weight, &p.reps, &p.durationS, &p.distanceM, &p.bodyWeight, &p.counts, &c.pr, &c.kind); err != nil {
+		if err := rows.Scan(&c.id, &p.session, &p.weight, &p.reps, &p.durationS, &p.distanceM, &p.bodyWeight, &p.counts, &c.pr, &c.kind); err != nil {
 			rows.Close()
 			return 0, err
 		}
@@ -2212,7 +2212,7 @@ func (s *JymService) DeleteSet(ctx context.Context, userID, setID uuid.UUID) err
 	return tx.Commit(ctx)
 }
 
-// GetPRs returns the best personal record set (by weight) for each exercise the user has logged.
+// GetPRs returns each logged exercise's best working set, a first workout's included.
 func (s *JymService) GetPRs(ctx context.Context, userID uuid.UUID) ([]models.ExercisePR, error) {
 	rows, err := s.db.Query(ctx,
 		`SELECT DISTINCT ON (ss.exercise_id)
@@ -2220,13 +2220,13 @@ func (s *JymService) GetPRs(ctx context.Context, userID uuid.UUID) ([]models.Exe
 		        ss.weight, COALESCE(ss.reps_performed, 0), s.started_at, ss.duration_s, ss.distance_m, ss.body_weight_kg,
 		        (SELECT MIN(p.duration_s / (p.distance_m / 1000))::float8
 		         FROM session_sets p JOIN sessions ps ON ps.id = p.session_id
-		         WHERE p.exercise_id = ss.exercise_id AND p.is_pr AND p.distance_m >= `+fmt.Sprint(minPaceDistanceM)+`
+		         WHERE p.exercise_id = ss.exercise_id AND NOT p.is_warmup AND p.distance_m >= `+fmt.Sprint(minPaceDistanceM)+`
 		           AND ps.session_type <> 'deload')
 		 FROM session_sets ss
 		 JOIN sessions s  ON ss.session_id  = s.id
 		 JOIN exercises e ON ss.exercise_id = e.id
 		 WHERE s.user_id = $1
-		   AND ss.is_pr  = true
+		   AND NOT ss.is_warmup
 		   AND (s.session_type IS NULL OR s.session_type != 'deload')
 		 ORDER BY ss.exercise_id,
 		          CASE e.kind WHEN 'duration' THEN ss.duration_s

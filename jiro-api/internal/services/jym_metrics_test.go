@@ -34,6 +34,9 @@ func TestSessionListsCountWorkingSetsAndPRLifts(t *testing.T) {
 	ctx := context.Background()
 	bench := prTestSetup(t, svc, userID, "Test Bench")
 	row := prTestSetup(t, svc, userID, "Test Row")
+	baselineWorkout(t, svc, userID,
+		models.CreateSetRequest{ExerciseID: bench, Weight: 50, RepsPerformed: ip(5)},
+		models.CreateSetRequest{ExerciseID: row, Weight: 30, RepsPerformed: ip(10)})
 	sess := startSession(t, svc, userID, "")
 	warm := true
 	if _, err := svc.LogSet(ctx, userID, sess, &models.CreateSetRequest{
@@ -55,8 +58,8 @@ func TestSessionListsCountWorkingSetsAndPRLifts(t *testing.T) {
 		t.Fatalf("list between: %v", err)
 	}
 	for name, rows := range map[string][]models.SessionSummary{"page": page, "day": day} {
-		if len(rows) != 1 {
-			t.Fatalf("%s: %d sessions, want 1", name, len(rows))
+		if len(rows) == 0 || rows[0].ID != sess {
+			t.Fatalf("%s: %d sessions, want this one first", name, len(rows))
 		}
 		got := rows[0]
 		if got.SetCount != 3 || got.TotalVolume != 1525 || got.PRCount != 2 {

@@ -12,6 +12,14 @@ import (
 
 func fp(v float64) *float64 { return &v }
 
+// apart puts each set in a workout of its own, so only the first set is the baseline.
+func apart(sets []prSet) []prSet {
+	for i := range sets {
+		sets[i].session = uuid.New()
+	}
+	return sets
+}
+
 // prFlags is ratePRs as one string: "-" for no record, "P" for a record, "d"/"p" for distance/pace records.
 func prFlags(kind string, sets []prSet) string {
 	out := ""
@@ -32,49 +40,63 @@ func prFlags(kind string, sets []prSet) string {
 
 func TestRatePRsBodyweight(t *testing.T) {
 	bw := fp(80)
-	sets := []prSet{
-		{weight: 0, reps: ip(8), bodyWeight: bw, counts: true},   // first: a record
+	sets := apart([]prSet{
+		{weight: 0, reps: ip(8), bodyWeight: bw, counts: true},   // first: the baseline
 		{weight: 0, reps: ip(8), bodyWeight: bw, counts: true},   // same: no
 		{weight: 0, reps: ip(10), bodyWeight: bw, counts: true},  // more reps, higher e1RM: yes
 		{weight: 10, reps: ip(5), bodyWeight: bw, counts: true},  // 90 x 5 = 105 < 80 x 10 = 106.7: no
 		{weight: 20, reps: ip(5), bodyWeight: bw, counts: true},  // 100 x 5 = 116.7: yes
 		{weight: 50, reps: ip(5), bodyWeight: bw, counts: false}, // warm-up: never
-	}
-	if got := prFlags(KindBodyweight, sets); got != "P-P-P-" {
+	})
+	if got := prFlags(KindBodyweight, sets); got != "--P-P-" {
 		t.Fatalf("with body weight: %s", got)
 	}
 	// No body weight yet: unweighted sets compare by reps.
-	none := []prSet{{reps: ip(8), counts: true}, {reps: ip(8), counts: true}, {reps: ip(9), counts: true}}
-	if got := prFlags(KindBodyweight, none); got != "P-P" {
+	none := apart([]prSet{{reps: ip(8), counts: true}, {reps: ip(8), counts: true}, {reps: ip(9), counts: true}})
+	if got := prFlags(KindBodyweight, none); got != "--P" {
 		t.Fatalf("without body weight: %s", got)
 	}
 }
 
 func TestRatePRsDuration(t *testing.T) {
-	sets := []prSet{
-		{durationS: ip(45), counts: true},             // first
+	sets := apart([]prSet{
+		{durationS: ip(45), counts: true},             // first: the baseline
 		{durationS: ip(40), counts: true},             // shorter
 		{weight: 10, durationS: ip(30), counts: true}, // first hold at 10 kg: longer than none at that load
 		{weight: 10, durationS: ip(30), counts: true}, // equal: no
 		{durationS: ip(50), counts: true},             // longest unloaded
 		{weight: 5, durationS: ip(40), counts: true},  // 10 kg held 30, 0 kg held 50 (less load): 40 at 5 kg beats 30
-	}
-	if got := prFlags(KindDuration, sets); got != "P-P-PP" {
+	})
+	if got := prFlags(KindDuration, sets); got != "--P-PP" {
 		t.Fatalf("duration: %s", got)
 	}
 }
 
 func TestRatePRsDistance(t *testing.T) {
-	sets := []prSet{
-		{distanceM: fp(5000), durationS: ip(1500), counts: true},  // first: distance (5:00 /km)
+	sets := apart([]prSet{
+		{distanceM: fp(5000), durationS: ip(1500), counts: true},  // first: the baseline (5:00 /km)
 		{distanceM: fp(3000), durationS: ip(870), counts: true},   // shorter, 4:50 /km: pace
 		{distanceM: fp(300), durationS: ip(60), counts: true},     // fast, but under 400 m: no
 		{distanceM: fp(3000), durationS: ip(900), counts: true},   // slower and shorter: no
 		{distanceM: fp(10000), durationS: ip(2800), counts: true}, // longest and fastest: distance wins the badge
 		{distanceM: fp(400), durationS: ip(80), counts: false},    // a warm-up: never
-	}
-	if got := prFlags(KindDistance, sets); got != "dp--d-" {
+	})
+	if got := prFlags(KindDistance, sets); got != "-p--d-" {
 		t.Fatalf("distance: %s", got)
+	}
+}
+
+func TestRatePRsFirstWorkoutIsTheBaseline(t *testing.T) {
+	warm, first, second := uuid.New(), uuid.New(), uuid.New()
+	sets := []prSet{
+		{session: warm, weight: 60, reps: ip(5), counts: false},  // warm-ups only: not the baseline
+		{session: first, weight: 80, reps: ip(5), counts: true},  // the baseline workout
+		{session: first, weight: 100, reps: ip(5), counts: true}, // heavier in it: still no record
+		{session: second, weight: 95, reps: ip(5), counts: true}, // under the baseline's best: no
+		{session: second, weight: 102.5, reps: ip(3), counts: true},
+	}
+	if got := prFlags(KindWeightReps, sets); got != "----P" {
+		t.Fatalf("baseline: %s", got)
 	}
 }
 
@@ -123,6 +145,7 @@ func TestBodyweightSetsCountBodyWeight(t *testing.T) {
 	svc, userID := testJymDB(t)
 	ctx := context.Background()
 	pull := kindExercise(t, svc, userID, "Pull-up", KindBodyweight)
+	baselineWorkout(t, svc, userID, models.CreateSetRequest{ExerciseID: pull, Weight: 0, RepsPerformed: ip(3)})
 	sess, err := svc.StartSession(ctx, userID, &models.CreateSessionRequest{})
 	if err != nil {
 		t.Fatalf("start: %v", err)
@@ -182,6 +205,9 @@ func TestDistanceAndDurationSets(t *testing.T) {
 	ctx := context.Background()
 	run := kindExercise(t, svc, userID, "Run", KindDistance)
 	plank := kindExercise(t, svc, userID, "Plank", KindDuration)
+	baselineWorkout(t, svc, userID,
+		models.CreateSetRequest{ExerciseID: run, DistanceM: fp(1000), DurationS: ip(400)},
+		models.CreateSetRequest{ExerciseID: plank, DurationS: ip(30)})
 	sess, err := svc.StartSession(ctx, userID, &models.CreateSessionRequest{})
 	if err != nil {
 		t.Fatalf("start: %v", err)
@@ -213,6 +239,9 @@ func TestDistanceAndDurationSets(t *testing.T) {
 	}
 	if _, err := svc.GetSession(ctx, userID, sess.ID); err != nil {
 		t.Fatalf("get: %v", err)
+	}
+	if ws, err := svc.ListExerciseWorkouts(ctx, userID, run, nil, uuid.Nil, 10); err != nil || ws[0].Sets[1].PRKind == nil || *ws[0].Sets[1].PRKind != "pace" {
+		t.Fatalf("listed run workouts: %v %+v", err, ws)
 	}
 	// With sets, a plank can't become a weight exercise; a pull-up can switch to weights and back.
 	wr := KindWeightReps
@@ -290,6 +319,9 @@ func TestKindsInReportsStatsAndRecords(t *testing.T) {
 	best := map[string]*models.SetRef{}
 	for _, e := range rep.Exercises {
 		best[e.Kind] = e.Best
+		if !e.IsFirst || e.IsPR {
+			t.Fatalf("%s: a first workout is the baseline, not a record", e.Name)
+		}
 	}
 	if best[KindDistance] == nil || *best[KindDistance].DistanceM != 5000 || *best[KindDuration].DurationS != 60 || best[KindBodyweight].Est1RM != 105 {
 		t.Fatalf("best sets: %+v %+v %+v", best[KindDistance], best[KindDuration], best[KindBodyweight])
@@ -326,7 +358,7 @@ func TestKindsInReportsStatsAndRecords(t *testing.T) {
 		t.Fatalf("plank stats: %+v", ps.Workouts[0])
 	}
 	ws, err := svc.ListExerciseWorkouts(ctx, userID, run, nil, uuid.Nil, 10)
-	if err != nil || len(ws) != 1 || ws[0].Sets[0].DistanceM == nil || ws[0].Sets[0].PRKind == nil {
+	if err != nil || len(ws) != 1 || ws[0].Sets[0].DistanceM == nil || ws[0].Sets[0].IsPR {
 		t.Fatalf("run workouts: %v %+v", err, ws)
 	}
 

@@ -73,8 +73,8 @@ func TestExerciseStatsFollowTheMetricRules(t *testing.T) {
 	if first.Volume != 100*5+90*12 {
 		t.Fatalf("workout 1 volume = %v, want working sets only", first.Volume)
 	}
-	if !first.HasPR {
-		t.Fatalf("workout 1 should hold a record")
+	if first.HasPR {
+		t.Fatalf("workout 1 is the baseline, not a record")
 	}
 	if d := stats.Workouts[1]; d.SessionID != w2 || d.SessionType != "deload" {
 		t.Fatalf("workout 2 = %+v, want the deload", d)

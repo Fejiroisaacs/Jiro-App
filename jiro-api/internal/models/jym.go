@@ -605,6 +605,7 @@ type ExerciseReport struct {
 	Sets        int       `json:"sets"`
 	Volume      float64   `json:"volume"`
 	IsPR        bool      `json:"is_pr"`
+	IsFirst     bool      `json:"is_first"` // this is the lift's first workout, its baseline
 	Best        *SetRef   `json:"best"`
 	Previous    *SetRef   `json:"previous"`
 }

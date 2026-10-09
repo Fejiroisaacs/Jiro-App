@@ -83,6 +83,7 @@ func TestFixAddsASetInsideTheWorkout(t *testing.T) {
 func TestFixedSetsAreRatedInTheirOwnTime(t *testing.T) {
 	svc, userID := testJymDB(t)
 	ex := prTestSetup(t, svc, userID, "Fix Bench")
+	fixSet(t, svc, userID, pastWorkout(t, svc, userID, 24*21, nil).ID, ex, 1, 50, 5) // the baseline
 
 	today := startSession(t, svc, userID, "")
 	todays := logSet(t, svc, userID, today, ex, 1, 100, 5)
