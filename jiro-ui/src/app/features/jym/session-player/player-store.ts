@@ -22,7 +22,7 @@ import { filled, parseDecimal, parseWhole } from '../number-input';
 import { platesFor, warmupRamp } from '../plates';
 import { DRAFT_VERSION, SessionDraft, clearDraft, readDraft, writeDraft } from '../shared/session-draft';
 import {
-  ExerciseBlock, SetRow, Suggestion, blockFromEntry, buildBlocks, canLog as canLogRow, convertDistanceText, isShort, lastTimeFrom,
+  ExerciseBlock, SetRow, Suggestion, blockFromEntry, buildBlocks, canLog as canLogRow, convertDistanceText, firstTimeFrom, isShort, lastTimeFrom,
   logLabel as logLabelText, loggedColumns, newRow, rampSummary, restOf, rowValues, rpeInvalid, suggestionFrom, workingWeight,
 } from './player-blocks';
 import { ExerciseKind, distanceUnit, durationText, kindOf, parseDistance, parseDuration, toDistanceUnit } from '../exercise-kind';
@@ -777,7 +777,7 @@ export class PlayerStore {
     if (!history || !block) return;
     const next = this.suggestionFor(block, history);
     if (!next) return;
-    const setGhosts = !block.sets.some(s => s.saved);
+    const setGhosts = !next.keepGhosts && !block.sets.some(s => s.saved);
     this.blocks.update(bs => bs.map(b => b.exerciseId === exerciseId ? {
       ...b,
       suggestion: next.text,
@@ -789,6 +789,8 @@ export class PlayerStore {
   /** The hint line ("Last time ... Stay at ...") and the ghost values, from nextSets(). */
   private suggestionFor(block: ExerciseBlock, history: SetHistory[]): Suggestion | null {
     const unit = this.settingsService.unitLabel();
+    const first = firstTimeFrom(history, { excludeSessionId: this.sessionId, before: this.startedAt.toISOString() });
+    if (first) return first;
     // Bodyweight, holds and distances show last time only; today's aim is a weight × reps feature.
     if (block.kind !== 'weight_reps') {
       return lastTimeFrom(block.kind, history, {

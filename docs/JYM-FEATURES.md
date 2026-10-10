@@ -142,7 +142,7 @@ Each exercise block shows a set table with columns: **Set**, **Weight**, **Reps*
 - The fields bring up a number keypad: decimal for weight, whole numbers for reps and RPE. A comma counts as a decimal point ("102,5"), and a typed 0 logs (bodyweight lifts).
 - **RPE** (Rating of Perceived Exertion, 1 to 10) is optional.
 - Ghost values before the first set are today's aim (see below); after it, the last logged working set.
-- A saved set is tinted. A **PR** badge appears if the set is a personal record.
+- A saved set is tinted. A **PR** badge appears if the set is a personal record. An exercise's first workout has none: its line reads *First time. Today sets your baseline.*
 - Tap a logged value to correct it: the row shows **Cancel** and **Save** under it (Enter on reps or RPE also saves; Escape cancels on desktop).
 - From a day or template, the block shows its plan ("Plan 3 × 8"), and a logged working set below the planned reps is marked.
 
@@ -168,6 +168,7 @@ Every exercise with history shows one line above its sets: what you did last tim
 
 > *Last time 100 lbs × 8, 8, 6. Stay at 100 lbs until every set hits 8.*
 
+- **First time** replaces it when no earlier workout has a working set of the exercise (deloads and warm-ups don't count), and the rows keep the plan's ghosts.
 - **Last time** is the latest finished normal workout that started before this one. Deload and test days and unfinished workouts are skipped, and warm-ups are not counted.
 - **With a plan** (a day's or template's sets × reps), it is double progression: once enough sets at the top weight hit the planned reps, try one plate more; until then, stay at the same weight.
 - **With a rep range** (8-12), the plate goes on once every set at the top weight reaches the top of the range, and today aims for the bottom again. Until then it stays, aiming one rep past last time's best, never past the top: *Last time 100 kg × 10, 9, 8. Stay at 100 kg until every set hits 12; aim for 11 today.* A set below the bottom of the range is marked short.
@@ -210,7 +211,7 @@ At `/jym/sessions/:id/summary`, built by the server (`GET /jym/sessions/:id/summ
 - **Save as template** saves its exercises, sets and reps.
 - An open workout's summary says it isn't finished and offers **Resume workout**.
 - **Muscle groups**: each group's share of the working sets, so bodyweight work counts.
-- **Session highlights**: each lift's best set, which is its best record set if it set one, otherwise its highest estimated 1RM (bodyweight lifts: most reps).
+- **Session highlights**: each lift's best set, which is its best record set if it set one, otherwise its highest estimated 1RM (bodyweight lifts: most reps). It is tagged PR, **First time** on the lift's first workout, or Best.
 - **Last time**: the lift's best set from its latest finished normal workout before this one, with the change in estimated 1RM. A record needs no change shown, and a deload isn't compared.
 - The share card ranks its top lifts by estimated 1RM, bodyweight lifts after them by reps.
 
@@ -276,7 +277,7 @@ Computed from the stats rows of finished normal workouts with a working set (`pl
 
 ## PR Wall
 
-At `/jym/exercises?tab=prs`: your **all-time best set** for every exercise you have logged, in a table per muscle group (grouped ignoring case), with the best lift, estimated 1RM and date. Biggest lifts first; warm-ups never count.
+At `/jym/exercises?tab=prs`: your **all-time best set** for every exercise you have logged, a first workout's included, in a table per muscle group (grouped ignoring case), with the best lift, estimated 1RM and date. Biggest lifts first; warm-ups never count.
 
 ---
 
@@ -340,6 +341,6 @@ One set of rules, in `jiro-api/internal/services/jym_metrics.go`, behind every l
 
 ## How Personal Records Work
 
-A working set is a PR when it beats every earlier working set of that exercise: heavier than the best weight, or the same weight with more reps. Weights within 0.05 kg count as the same, so switching units never makes a phantom PR. Warm-ups and deload sets are never PRs and never raise the bar.
+A working set is a PR when it beats every earlier working set of that exercise: heavier than the best weight, or the same weight with more reps. An exercise's first workout with a working set is its baseline: its sets raise the bar but are never PRs, since anything beats a best of nothing. Deleting that workout makes the next one the baseline. Weights within 0.05 kg count as the same, so switching units never makes a phantom PR. Warm-ups and deload sets are never PRs and never raise the bar.
 
 PR flags are stored on the sets and recomputed for the whole exercise whenever a set is logged, edited, deleted or marked a warm-up, and whenever a session's type changes. `go run ./cmd/rerate-prs` (from `jiro-api/`, with `DATABASE_URL` set) recomputes every flag.

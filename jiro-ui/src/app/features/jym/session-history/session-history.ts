@@ -184,7 +184,7 @@ import { HistoryCalendarComponent } from './history-calendar';
 <span class="stat-pill">{{ formatDuration(s.started_at, s.ended_at) }}</span>
 }
                 @if (s.total_volume > 0) {
-<span class="stat-pill vol-pill">{{ settingsService.toDisplay(s.total_volume) | number:'1.0-0' }} {{ settingsService.unitLabel() }}</span>
+<span class="stat-pill">{{ settingsService.toDisplay(s.total_volume) | number:'1.0-0' }} {{ settingsService.unitLabel() }}</span>
 }
                 @if (s.total_distance_m > 0) {
                   <span class="stat-pill">{{ distance(s.total_distance_m) }}</span>
@@ -351,11 +351,9 @@ import { HistoryCalendarComponent } from './history-calendar';
     }
 
     .date-label {
-      font-size: var(--font-size-xs);
+      font-size: var(--font-size-sm);
       font-weight: 600;
       color: var(--text-secondary);
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
     }
 
     .date-wrapper { position: relative; }
@@ -486,7 +484,6 @@ import { HistoryCalendarComponent } from './history-calendar';
       border-radius: var(--border-radius-pill); font-weight: 500;
     }
 
-    .vol-pill { background: var(--bg-canvas); color: var(--text-secondary); border: 1px solid var(--border-color); }
 
     .session-detail {
       border-top: 1px solid var(--border-color);
@@ -556,9 +553,8 @@ import { HistoryCalendarComponent } from './history-calendar';
 
     .detail-notes-label {
       display: block;
-      font-size: var(--font-size-xs); text-transform: uppercase;
-      letter-spacing: 0.5px; color: var(--text-muted);
-      font-weight: 500; margin-bottom: var(--space-xs);
+      font-size: var(--font-size-sm); color: var(--text-secondary);
+      font-weight: 600; margin-bottom: var(--space-xs);
     }
 
     .detail-notes-text {
@@ -579,8 +575,7 @@ import { HistoryCalendarComponent } from './history-calendar';
     }
 
     .section-label {
-      font-size: var(--font-size-xs); text-transform: uppercase;
-      letter-spacing: 0.5px; color: var(--text-muted); font-weight: 500;
+      font-size: var(--font-size-sm); color: var(--text-secondary); font-weight: 600;
     }
 
     .attachments-grid {

@@ -102,7 +102,7 @@ import { GUIDE } from '../shared';
         </guide-steps>
         <guide-shot guide="jym" name="session-sets" [width]="1400" [height]="1268"
           alt="Bench Press during a workout: a note saying last time was 175 lbs for 5, 5, 5, 5 and to try 180 lbs, a warm-up set of 95 lbs marked with a flame, four logged sets of 175 lbs with the 6-rep set marked PR, a sixth row ready to log 175 lbs for 5, and a Plates button." />
-        <guide-tip>A set is a PR when it is the heaviest weight you have logged for that exercise, or the same top weight for more reps. Warm-ups are left out on both sides: they never count as a PR and never raise the bar for one. Marking a PR set as a warm-up takes its badge away.</guide-tip>
+        <guide-tip>A set is a PR when it is the heaviest weight you have logged for that exercise, or the same top weight for more reps. Warm-ups are left out on both sides: they never count as a PR and never raise the bar for one. Marking a PR set as a warm-up takes its badge away. The first time you do an exercise sets your baseline, so PRs start from your second workout with it.</guide-tip>
         <guide-tip>A locked phone can hold the rest timer's beep until you look again. To keep the screen on during a workout, open <strong>Workout options</strong> and set <strong>Keep screen on</strong> to <strong>On</strong>. It only applies to this device.</guide-tip>
       </guide-section>
 

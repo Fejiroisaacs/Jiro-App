@@ -444,7 +444,8 @@ const DELOAD_SNOOZE_DAYS = 7;
       border-radius: var(--border-radius);
     }
     .up-next-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-    .up-next-label { margin-bottom: 2px; }
+    /* Reads like the other cards' titles, not a section heading. */
+    .up-next-label { margin-bottom: 2px; font-family: var(--font-family); font-size: var(--font-size-sm); font-weight: 600; color: var(--text-secondary); }
     .up-next-name { font-size: var(--font-size-lg); font-weight: 600; color: var(--text-primary); }
     .up-next-series { font-size: var(--font-size-sm); color: var(--text-secondary); }
     .up-next-actions { display: flex; gap: var(--space-sm); flex-shrink: 0; }
@@ -466,10 +467,7 @@ const DELOAD_SNOOZE_DAYS = 7;
 
     .asc-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 
-    .asc-split-label {
-      font-size: var(--font-size-xs); color: var(--text-muted);
-      text-transform: uppercase; letter-spacing: 0.5px;
-    }
+    .asc-split-label { font-size: var(--font-size-sm); color: var(--text-secondary); }
 
     .asc-name { font-size: var(--font-size-md); font-weight: 600; }
 
@@ -565,7 +563,9 @@ const DELOAD_SNOOZE_DAYS = 7;
       border-radius: var(--border-radius); padding: var(--space-md) var(--space-lg);
     }
 
-    .mg-panel { flex: 0 1 280px; }
+    /* Beside the heatmap it keeps to 280px; wrapped onto its own row it fills it. */
+    .mg-panel { flex: 1 1 280px; max-width: 100%; }
+    @media (min-width: 900px) { .mg-panel { flex-grow: 0; } }
 
     .stats-header {
       display: flex; align-items: baseline; justify-content: space-between;

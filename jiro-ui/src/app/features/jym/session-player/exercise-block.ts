@@ -319,9 +319,9 @@ import { SetRowComponent } from './set-row';
 
     .form-check-btn {
       display: inline-flex; align-items: center; gap: 6px;
-      font-size: var(--font-size-xs); color: var(--text-muted);
+      font-size: var(--font-size-xs); color: var(--text-primary);
       cursor: pointer; min-height: 44px; padding: 4px 12px; border-radius: var(--border-radius);
-      border: 1px dashed var(--border-color); background: none;
+      border: 1px solid color-mix(in srgb, var(--text-primary) 40%, transparent); background: none;
       white-space: nowrap; transition: all 0.15s; font-family: inherit;
     }
 

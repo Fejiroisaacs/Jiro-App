@@ -133,6 +133,7 @@ func TestWarmupIsNeverPR(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create exercise: %v", err)
 	}
+	baselineWorkout(t, svc, userID, models.CreateSetRequest{ExerciseID: ex.ID, Weight: 50, RepsPerformed: ip(5)})
 	started, err := svc.StartSession(ctx, userID, &models.CreateSessionRequest{})
 	if err != nil {
 		t.Fatalf("start session: %v", err)
@@ -154,7 +155,7 @@ func TestWarmupIsNeverPR(t *testing.T) {
 		t.Fatalf("log working set: %v", err)
 	}
 	if !work.IsPR {
-		t.Fatalf("first working set should be a PR")
+		t.Fatalf("80 x 5 should beat the baseline")
 	}
 	heavyWarm, err := svc.LogSet(ctx, userID, started.ID, &models.CreateSetRequest{
 		ExerciseID: ex.ID, SetNumber: 3, Weight: 120, RepsPerformed: ip(1), IsWarmup: &warm,

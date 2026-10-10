@@ -92,6 +92,7 @@ var (
 
 // prSet is one set in logging order, as records see it. Counts is false for warm-ups and deload sets.
 type prSet struct {
+	session    uuid.UUID
 	weight     float64
 	reps       *int
 	durationS  *int
@@ -113,8 +114,25 @@ type prResult struct {
 //   - duration: a longer hold than any earlier one at the same or more load;
 //   - distance: a longer distance, or a faster pace over at least minPaceDistanceM.
 //
-// Sets that don't count are never records and don't raise the bar.
+// Sets that don't count are never records and don't raise the bar. The first workout with a counting set is the
+// baseline: its sets raise the bar but are never records, since anything beats a best of nothing.
 func ratePRs(kind string, sets []prSet) []prResult {
+	out := ratePRsFromZero(kind, sets)
+	for i, s := range sets {
+		if s.counts {
+			for j := i; j < len(sets); j++ {
+				if sets[j].session == s.session {
+					out[j] = prResult{}
+				}
+			}
+			break
+		}
+	}
+	return out
+}
+
+// ratePRsFromZero is ratePRs with no baseline workout: the first counting set is a record.
+func ratePRsFromZero(kind string, sets []prSet) []prResult {
 	out := make([]prResult, len(sets))
 	switch kind {
 	case KindDuration:

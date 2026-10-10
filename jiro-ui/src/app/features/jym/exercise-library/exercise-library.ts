@@ -243,7 +243,7 @@ const ROW_ACTIONS: JiroMenuItem[] = [
 
     .mg-chip {
       min-height: 32px; padding: 4px 14px;
-      border: 1px dashed var(--border-color);
+      border: 1px solid var(--border-color);
       border-radius: var(--border-radius-pill);
       background: var(--bg-surface);
       cursor: pointer;
@@ -313,7 +313,7 @@ const ROW_ACTIONS: JiroMenuItem[] = [
     .mg-also.match { color: var(--color-primary); border-color: var(--color-primary); }
     .kind-tag {
       font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: var(--border-radius-pill);
-      background: var(--bg-canvas); color: var(--text-secondary); border: 1px dashed var(--border-color);
+      background: transparent; color: var(--text-secondary); border: 1px solid var(--border-color);
     }
     .kind-select {
       min-height: 44px; padding: 0 var(--space-sm); border: 1px solid var(--border-color); border-radius: var(--border-radius);

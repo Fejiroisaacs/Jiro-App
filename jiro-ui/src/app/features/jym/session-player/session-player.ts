@@ -32,7 +32,7 @@ import { ConfirmService } from '../../../core/services/confirm.service';
     <!-- Sticky bar: the clock, the options, and Finish; everything else waits in the options sheet. -->
     <div class="session-bar">
       <div class="session-bar-row">
-        <div class="session-bar-left">
+        <div class="session-bar-left" [class.session-bar-left--fix]="store.fix">
           @if (store.fix) {
             <span class="bar-label bar-label--always">Editing</span>
             <span class="timer timer--date">{{ fixDate() }}</span>
@@ -242,7 +242,8 @@ import { ConfirmService } from '../../../core/services/confirm.service';
 
     .bar-label { font-size: var(--font-size-xs); text-transform: uppercase; letter-spacing: 1px; opacity: 0.9; }
 
-    .timer--date { font-size: var(--font-size-lg); }
+    /* The date gives way to the buttons: it truncates rather than run under them. */
+    .timer--date { font-size: var(--font-size-lg); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
     .timer { font-size: var(--font-size-xl); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
@@ -407,6 +408,9 @@ import { ConfirmService } from '../../../core/services/confirm.service';
       .session-bar-row { padding: var(--space-xs) var(--space-md); }
       .bar-label:not(.bar-label--always) { display: none; }
       .timer { font-size: var(--font-size-lg); }
+      /* Editing: the label sits above the date, so the date has the row's width. */
+      .session-bar-left--fix { flex-direction: column; align-items: flex-start; gap: 0; }
+      .session-bar-left--fix .timer--date { font-size: var(--font-size-md); max-width: 100%; }
     }
 
     /* ── Set table on very small screens ── */

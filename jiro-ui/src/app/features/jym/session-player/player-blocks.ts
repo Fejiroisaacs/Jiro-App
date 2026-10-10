@@ -47,7 +47,7 @@ export interface ExerciseBlock {
   /** The plan's target for this exercise, as the workout started with it. */
   plan?: BlockPlan;
   /** repeat when the advice is to hold the weight, trend-up otherwise. */
-  suggestionIcon?: 'trend-up' | 'repeat';
+  suggestionIcon?: Suggestion['icon'];
   /** Its superset in the workout's list (supersets.ts); null outside one. */
   group?: number | null;
   /** The exercise's own rest in seconds, used when the plan sets none; null rests for your usual. */
@@ -275,6 +275,16 @@ export function lastTimeFrom(kind: ExerciseKind, history: SetHistory[], o: {
   };
 }
 
+/**
+ * "First time" when no earlier workout has a working set of the exercise (the API's baseline rule: warm-ups and
+ * deloads don't count). Nothing in this workout can be a record, so it says so instead of last time.
+ */
+export function firstTimeFrom(history: SetHistory[], o: { excludeSessionId: string; before: string }): Suggestion | null {
+  const earlier = history.some(h => h.session_id !== o.excludeSessionId && h.session_type !== 'deload'
+    && !h.is_warmup && Date.parse(h.date) < Date.parse(o.before));
+  return earlier ? null : { text: 'First time. Today sets your baseline.', ghostWeight: '', ghostReps: '', icon: 'flag', keepGhosts: true };
+}
+
 /** A distance in the other unit when the weight unit switches (kg ↔ lbs is km ↔ mi). */
 export function convertDistanceText(value: string, fromWeightUnit: string, toWeightUnit: string): string {
   const n = parseDecimal(value);
@@ -300,7 +310,9 @@ export interface Suggestion {
   text: string;
   ghostWeight: string;
   ghostReps: string;
-  icon: 'trend-up' | 'repeat';
+  icon: 'trend-up' | 'repeat' | 'flag';
+  /** Leave the rows' ghosts as they are (a first time has nothing to suggest). */
+  keepGhosts?: boolean;
 }
 
 /** The hint line ("Last time ... Stay at ...") and the ghost values, from nextSets(). */

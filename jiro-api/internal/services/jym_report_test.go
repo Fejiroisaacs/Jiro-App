@@ -93,6 +93,10 @@ func TestSessionReportBestSetsTotalsAndMuscles(t *testing.T) {
 	bench := exerciseIn(t, svc, userID, "Test Bench", "Chest")
 	pullUp := exerciseIn(t, svc, userID, "Test Pull-up", "back")
 	curl := exerciseIn(t, svc, userID, "Test Curl", "")
+	baselineWorkout(t, svc, userID,
+		models.CreateSetRequest{ExerciseID: bench, Weight: 50, RepsPerformed: ip(5)},
+		models.CreateSetRequest{ExerciseID: pullUp, Weight: 0, RepsPerformed: ip(5)},
+		models.CreateSetRequest{ExerciseID: curl, Weight: 10, RepsPerformed: ip(12)})
 
 	started, err := svc.StartSession(ctx, userID, &models.CreateSessionRequest{RoutineID: &day.ID, Force: true})
 	if err != nil {
@@ -127,7 +131,7 @@ func TestSessionReportBestSetsTotalsAndMuscles(t *testing.T) {
 		t.Fatalf("%d exercises, want 3", len(report.Exercises))
 	}
 	b, p := report.Exercises[0], report.Exercises[1]
-	if b.ExerciseID != bench || b.Sets != 2 || !b.IsPR || b.Best == nil || b.Best.Weight != 100 || b.Best.Reps != 5 {
+	if b.ExerciseID != bench || b.Sets != 2 || !b.IsPR || b.IsFirst || b.Best == nil || b.Best.Weight != 100 || b.Best.Reps != 5 {
 		t.Fatalf("bench = %+v, best %+v; want 2 sets, the 100 x 5 record shown", b, b.Best)
 	}
 	if p.Best == nil || p.Best.Reps != 10 {

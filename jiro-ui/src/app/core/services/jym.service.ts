@@ -151,6 +151,8 @@ export interface ExerciseReport {
   sets: number;
   volume: number;
   is_pr: boolean;
+  /** This is the lift's first workout: its baseline, so nothing in it is a record. */
+  is_first: boolean;
   /** The best record set if the lift set a record, otherwise the best working set. */
   best: SetRef | null;
   /** The best set of the latest finished normal workout before this one. */

@@ -26,6 +26,7 @@ interface LiftHighlight {
   /** In kg, from the API. */
   est1RM: number;
   isPR: boolean;
+  isFirst: boolean;
   previous?: { weight: number; reps: number; est1RM: number };
   /** The best set and last time's in the lift's own words ("100 × 5", "0:45", "5 km in 26:00"). */
   text: string;
@@ -166,6 +167,8 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
                   <div class="lift-current">
                     @if (lift.isPR) {
                       <jym-pr-badge />
+                    } @else if (lift.isFirst) {
+                      <span class="best-tag">First time</span>
                     } @else {
                       <span class="best-tag">Best</span>
                     }
@@ -434,11 +437,9 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
     .stat-label,
     .section-label {
       font-family: var(--font-family);
-      font-size: var(--font-size-xs);
+      font-size: var(--font-size-sm);
       font-weight: 600;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+      color: var(--text-secondary);
     }
 
     .stat-label { margin-top: 4px; }
@@ -1002,6 +1003,7 @@ export class SessionSummaryComponent implements OnInit {
       reps: e.best.reps,
       est1RM: e.best.est_1rm,
       isPR: e.is_pr,
+      isFirst: e.is_first,
       previous: e.previous
         ? { weight: this.settings.toDisplay(e.previous.weight), reps: e.previous.reps, est1RM: e.previous.est_1rm }
         : undefined,
