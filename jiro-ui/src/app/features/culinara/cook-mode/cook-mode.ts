@@ -175,6 +175,7 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
 
     .cook-title {
       font-family: var(--font-family-display);
+      letter-spacing: -0.02em;
       font-size: var(--font-size-lg);
       font-weight: 600;
       color: var(--text-primary);

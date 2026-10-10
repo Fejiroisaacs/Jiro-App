@@ -233,6 +233,7 @@ interface MonthGroup { key: string; label: string; entries: JournalEntry[]; }
     .month + .month { margin-top: var(--space-xl); }
     .month-title {
       font-family: var(--font-family-display);
+      letter-spacing: -0.02em;
       font-size: var(--font-size-md); font-weight: 600; color: var(--text-primary);
       margin: 0 0 var(--space-sm);
     }

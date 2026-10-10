@@ -314,15 +314,12 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
       font-weight: 600;
       cursor: pointer;
       font-family: inherit;
-      box-shadow: 2px 2px 0px transparent;
       transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     }
 
     .tag-chip:hover {
       border-color: var(--color-primary);
       color: var(--color-primary);
-      transform: translate(-1px, -1px);
-      box-shadow: var(--shadow-sm);
     }
 
     .tag-chip--active {
@@ -445,8 +442,6 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
     .remove-btn:hover {
       color: var(--color-danger);
       border-color: var(--color-danger);
-      box-shadow: 2px 2px 0px rgba(var(--color-danger-rgb), 0.15);
-      transform: translate(-1px, -1px);
     }
 
     .add-ingredient-btn {

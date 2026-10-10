@@ -214,8 +214,7 @@ let formSeq = 0;
     }
     .form-input:focus {
       border-color: var(--color-primary);
-      box-shadow: 2px 2px 0 var(--color-primary);
-      transform: translate(-1px, -1px);
+      box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.15);
     }
     select.form-input { appearance: none; cursor: pointer; text-overflow: ellipsis; }
     .form-textarea { resize: vertical; font-family: inherit; min-height: 60px; }

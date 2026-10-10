@@ -613,6 +613,7 @@ import { JiroMarkComponent } from '../../shared/components/jiro-mark/jiro-mark';
       padding-top: var(--space-md);
       border-top: 1px solid var(--border-color);
       font-family: var(--font-family-display);
+      letter-spacing: -0.02em;
       font-size: var(--font-size-xl);
       font-weight: 600;
       line-height: 1.25;

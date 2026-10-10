@@ -55,8 +55,7 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR, FormsModule } from '@angular/f
 
     .jiro-input:focus {
       border-color: var(--color-primary);
-      box-shadow: 2px 2px 0px var(--color-primary);
-      transform: translate(-1px, -1px);
+      box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.15);
     }
 
     .jiro-input::placeholder {
@@ -69,7 +68,7 @@ import { ControlValueAccessor, NG_VALUE_ACCESSOR, FormsModule } from '@angular/f
     }
     
     .has-error .jiro-input:focus {
-      box-shadow: 2px 2px 0px var(--color-danger);
+      box-shadow: 0 0 0 3px rgba(var(--color-danger-rgb), 0.15);
     }
 
     .jiro-error {

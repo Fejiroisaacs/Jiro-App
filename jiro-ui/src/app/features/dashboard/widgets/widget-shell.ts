@@ -184,6 +184,7 @@ export const WIDGET_TEXT_STYLES = `
 
   .tile-big {
     font-family: var(--font-family-display);
+    letter-spacing: -0.02em;
     font-size: var(--font-size-xl);
     font-weight: 600;
     color: var(--text-primary);
@@ -196,6 +197,7 @@ export const WIDGET_TEXT_STYLES = `
     flex-wrap: wrap;
     gap: var(--space-sm);
     font-family: var(--font-family-display);
+    letter-spacing: -0.02em;
     font-size: var(--font-size-3xl);
     font-weight: 600;
     line-height: 1;

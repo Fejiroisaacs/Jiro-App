@@ -233,8 +233,8 @@ export function weekRangeQuery(week: { from: string; to: string }, timeZone: str
       word-break: break-word;
     }
     .wv-note:hover {
-      box-shadow: var(--shadow-sm);
-      transform: translate(-1px, -1px);
+      box-shadow: var(--shadow-md);
+      transform: translateY(-1px);
     }
     .wv-note-author {
       font-size: 0.6rem;
