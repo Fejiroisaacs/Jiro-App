@@ -92,7 +92,7 @@ import { GUIDE } from '../shared';
           <li>The faint numbers in an empty row are today's aim, worked out from your last workout. A note above the rows shows what you lifted last time and what to try. With a rep range, add weight once every set reaches the top of the range. For an exercise you have never logged, the row shows only the target reps.</li>
           <li>Type the <strong>Weight</strong> and <strong>Reps</strong> you did, or leave the aim as it is. A number keypad opens for each box.</li>
           <li>Optionally, enter an <strong>RPE</strong> from 1 to 10 for how hard the set felt.</li>
-          <li>Select the tick to log what the row shows, so repeating a set is one tap. If it beats your best for that exercise, it gets a <strong>PR</strong> badge. Warm-up sets never get one.</li>
+          <li>Select the tick to log what the row shows, so repeating a set is one tap. If it beats your best for that exercise, it gets a badge naming the record: <strong>Weight PR</strong>, <strong>e1RM PR</strong> or <strong>Rep PR</strong>. Warm-up sets never get one.</li>
           <li>The rest timer opens under the bar at the top, for the exercise's planned rest or your usual one. Select <strong>+30s</strong> for a longer rest this time, or <strong>Skip</strong>. It beeps when your rest is over.</li>
           <li>To give an exercise its own rest in every workout, open its menu (three dots) and select <strong>Rest timer</strong>, then a length. <strong>Usual</strong> goes back to your usual rest. A plan's rest still comes first.</li>
           <li>Select a set's number to mark it as a warm-up or to remove it. To fix a logged set, select its weight or reps, change them and select <strong>Save</strong>.</li>
@@ -102,7 +102,7 @@ import { GUIDE } from '../shared';
         </guide-steps>
         <guide-shot guide="jym" name="session-sets" [width]="1400" [height]="1268"
           alt="Bench Press during a workout: a note saying last time was 175 lbs for 5, 5, 5, 5 and to try 180 lbs, a warm-up set of 95 lbs marked with a flame, four logged sets of 175 lbs with the 6-rep set marked PR, a sixth row ready to log 175 lbs for 5, and a Plates button." />
-        <guide-tip>A set is a PR when it is the heaviest weight you have logged for that exercise, or the same top weight for more reps. Warm-ups are left out on both sides: they never count as a PR and never raise the bar for one. Marking a PR set as a warm-up takes its badge away. The first time you do an exercise sets your baseline, so PRs start from your second workout with it.</guide-tip>
+        <guide-tip>A Weight PR is the heaviest weight you have logged for that exercise, or the same top weight for more reps. An e1RM PR beats your best estimated one-rep max, and a Rep PR is the most weight you've moved for that many reps. The exercise page's Records section lists them all, with a rep-max table. Warm-ups are left out on both sides: they never count as a PR and never raise the bar for one. Marking a PR set as a warm-up takes its badge away. The first time you do an exercise sets your baseline, so PRs start from your second workout with it.</guide-tip>
         <guide-tip>A locked phone can hold the rest timer's beep until you look again. To keep the screen on during a workout, open <strong>Workout options</strong> and set <strong>Keep screen on</strong> to <strong>On</strong>. It only applies to this device.</guide-tip>
       </guide-section>
 
