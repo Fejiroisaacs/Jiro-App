@@ -5,7 +5,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import {
-  JymService, Exercise, ExerciseStats, ExerciseStatsWorkout, ExerciseWorkout, ExerciseWorkoutSet, ExerciseFormCheck, RepsAtWeight,
+  JymService, Exercise, ExerciseStats, ExerciseStatsWorkout, ExerciseWorkout, ExerciseWorkoutSet, ExerciseFormCheck, RepsAtWeight, SetRef,
 } from '../../../core/services/jym.service';
 import { ExerciseKind, distanceText, distanceUnit, durationText, kindOf, paceText, setText, toDistanceUnit } from '../exercise-kind';
 import { SettingsService } from '../../../core/services/settings.service';
@@ -151,6 +151,42 @@ type SectionTab = 'history' | 'form' | 'notes';
         </div>
 }
 
+        <!-- Standing records: heaviest, best e1RM, and rep maxes or most reps -->
+        @if (recordLines().length) {
+          <section class="records" aria-labelledby="records-title">
+            <h2 id="records-title" class="records-title">Records</h2>
+            <dl class="rec-lines">
+              @for (l of recordLines(); track l.label) {
+                <div class="rec-line">
+                  <dt>{{ l.label }}</dt>
+                  <dd>
+                    <span class="rec-value">{{ l.value }}</span>
+                    @if (l.sub) { <span class="rec-sub">{{ l.sub }}</span> }
+                    @if (l.date) { <span class="rec-date">{{ l.date }}</span> }
+                  </dd>
+                </div>
+              }
+            </dl>
+            @if (repMaxRows().length) {
+              <table class="rm-table">
+                <caption class="sr-only">Rep maxes: the heaviest weight lifted for at least each number of reps</caption>
+                <thead>
+                  <tr><th scope="col">Reps</th><th scope="col">Best</th><th scope="col">Date</th></tr>
+                </thead>
+                <tbody>
+                  @for (m of repMaxRows(); track m.reps) {
+                    <tr [class.rm-empty]="!m.weight">
+                      <th scope="row">{{ m.reps }}</th>
+                      <td>{{ m.weight || '–' }}@if (m.from) {<span class="rm-from">&nbsp;× {{ m.from }}</span>}</td>
+                      <td class="rm-date">{{ m.date }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            }
+          </section>
+        }
+
         <!-- Section tabs + content -->
         <div class="section-panel">
         <div class="section-tabs-bar">
@@ -207,7 +243,7 @@ type SectionTab = 'history' | 'form' | 'notes';
                   <span class="ws-load">{{ setLine(set) }}</span>
                   @if (set.rpe != null) { <span class="ws-rpe">RPE {{ set.rpe }}</span> }
                   @if (!set.is_warmup && set.est_1rm > 0) { <span class="ws-orm">e1RM {{ settingsService.toDisplay(set.est_1rm) | number:'1.0-1' }}</span> }
-                  @if (set.is_pr) { <jym-pr-badge /> }
+                  @if (set.is_pr) { <jym-pr-badge [kind]="set.pr_kind" [kinds]="set.pr_kinds" /> }
                 </li>
 }
               </ul>
@@ -491,6 +527,27 @@ type SectionTab = 'history' | 'form' | 'notes';
     /* ── Section panel (tabs + content as one unit) ── */
     .section-panel { display: flex; flex-direction: column; }
 
+    /* ── Records ── */
+    .records {
+      background: var(--bg-surface); border: 1px solid var(--border-color);
+      border-radius: var(--border-radius-lg); padding: var(--space-lg);
+    }
+    .records-title { font-size: var(--font-size-lg); margin: 0 0 var(--space-md); }
+    .rec-lines { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: var(--space-md); margin: 0; }
+    .rec-line dt { font-size: var(--font-size-sm); font-weight: 600; color: var(--text-secondary); }
+    .rec-line dd { margin: 2px 0 0; display: flex; flex-direction: column; }
+    .rec-value { font-family: var(--font-family-display); font-size: var(--font-size-xl); letter-spacing: -0.02em; color: var(--text-primary); }
+    .rec-sub, .rec-date { font-size: var(--font-size-sm); color: var(--text-secondary); }
+    .rm-table { width: 100%; margin-top: var(--space-lg); border-collapse: collapse; font-size: var(--font-size-sm); }
+    .rm-table th, .rm-table td { padding: 6px var(--space-sm); text-align: left; border-top: 1px solid var(--border-color); }
+    .rm-table thead th { border-top: none; font-weight: 600; color: var(--text-secondary); }
+    .rm-table tbody th { width: 3.5em; font-weight: 600; color: var(--text-primary); }
+    .rm-table td { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+    .rm-from { color: var(--text-secondary); }
+    .rm-table .rm-date { color: var(--text-secondary); text-align: right; }
+    .rm-table thead th:last-child { text-align: right; }
+    .rm-empty td { color: var(--text-muted); }
+
     /* ── Tab panel ── */
     .tab-panel {
       padding-top: var(--space-md);
@@ -768,6 +825,33 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
   });
 
   sessionNotes = computed(() => notesOf(this.stats()?.workouts ?? []));
+
+  /** The Records panel's headline numbers, in the exercise's own terms. */
+  readonly recordLines = computed(() => {
+    const r = this.stats()?.records;
+    if (!r?.weight) return [];
+    const unit = this.settingsService.unitLabel();
+    const kg = (v: number) => +this.settingsService.toDisplay(v).toFixed(1);
+    const words = (s: SetRef) => setText(this.kind(), { weight: kg(s.weight), reps: s.reps }, unit);
+    const when = (s: SetRef) => (s.date ? this.formatDate(s.date) : '');
+    const lines: { label: string; value: string; sub?: string; date: string }[] = [];
+    if (this.kind() === 'bodyweight') {
+      lines.push({ label: 'Heaviest added load', value: r.weight.weight > 0 ? `+${kg(r.weight.weight)} ${unit}` : 'Bodyweight', sub: words(r.weight), date: when(r.weight) });
+      if (r.most_reps) lines.push({ label: 'Most reps', value: `${r.most_reps.reps} reps`, sub: words(r.most_reps), date: when(r.most_reps) });
+    } else {
+      lines.push({ label: 'Heaviest', value: words(r.weight), date: when(r.weight) });
+    }
+    if (r.e1rm) lines.push({ label: 'Best e1RM', value: `${kg(r.e1rm.est_1rm)} ${unit}`, sub: words(r.e1rm), date: when(r.e1rm) });
+    return lines;
+  });
+
+  /** Rep maxes, 1 to 12: the heaviest weight for at least that many reps, and the set's own reps when more. */
+  readonly repMaxRows = computed(() => (this.stats()?.records?.rep_maxes ?? []).map(m => ({
+    reps: m.reps,
+    weight: m.set ? `${+this.settingsService.toDisplay(m.set.weight).toFixed(1)} ${this.settingsService.unitLabel()}` : '',
+    from: m.set && m.set.reps > m.reps ? m.set.reps : null,
+    date: m.set?.date ? this.formatDate(m.set.date) : '',
+  })));
 
   // The plateau rule reads weights; other types have none to judge.
   plateauStatus = computed<PlateauStatus>(() => this.kind() === 'weight_reps' ? detectPlateau(this.stats()?.workouts ?? []) : null);

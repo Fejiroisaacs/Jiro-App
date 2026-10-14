@@ -26,6 +26,7 @@ interface LiftHighlight {
   /** In kg, from the API. */
   est1RM: number;
   isPR: boolean;
+  prKind: string | null;
   isFirst: boolean;
   previous?: { weight: number; reps: number; est1RM: number };
   /** The best set and last time's in the lift's own words ("100 × 5", "0:45", "5 km in 26:00"). */
@@ -166,7 +167,7 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
                 <div class="lift-aside">
                   <div class="lift-current">
                     @if (lift.isPR) {
-                      <jym-pr-badge />
+                      <jym-pr-badge [kind]="lift.prKind" />
                     } @else if (lift.isFirst) {
                       <span class="best-tag">First time</span>
                     } @else {
@@ -1008,6 +1009,7 @@ export class SessionSummaryComponent implements OnInit {
       reps: e.best.reps,
       est1RM: e.best.est_1rm,
       isPR: e.is_pr,
+      prKind: e.pr_kind ?? null,
       isFirst: e.is_first,
       previous: e.previous
         ? { weight: this.settings.toDisplay(e.previous.weight), reps: e.previous.reps, est1RM: e.previous.est_1rm }

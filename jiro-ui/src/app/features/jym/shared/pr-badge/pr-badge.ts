@@ -1,22 +1,22 @@
-import { Component, input } from '@angular/core';
+import { Component, computed, input } from '@angular/core';
+import { prDescription, prLabel } from './pr-kind';
 
 /**
- * "PR" chip shown beside a personal-record set. Replaces the baked
- * /icons/badge-icon.svg so the badge follows the theme and dark mode.
+ * A personal-record chip that names the top record a set earned ("Weight PR"), or plain "PR".
  *
- *   <jym-pr-badge />           small, inline with a set row
- *   <jym-pr-badge size="md" /> beside a heading
+ *   <jym-pr-badge [kind]="set.pr_kind" [kinds]="set.pr_kinds" />  inline with a set row
+ *   <jym-pr-badge size="md" />                                    beside a heading
  */
 @Component({
   selector: 'jym-pr-badge',
   standalone: true,
   host: {
     role: 'img',
-    'aria-label': 'Personal record',
-    title: 'Personal record',
+    '[attr.aria-label]': 'description()',
+    '[attr.title]': 'description()',
     '[class.md]': "size() === 'md'",
   },
-  template: `PR`,
+  template: `{{ label() }}`,
   styles: [`
     :host {
       display: inline-flex;
@@ -33,6 +33,7 @@ import { Component, input } from '@angular/core';
       font-weight: 700;
       letter-spacing: 0.6px;
       line-height: 1;
+      white-space: nowrap;
       flex-shrink: 0;
     }
     :host(.md) {
@@ -44,4 +45,8 @@ import { Component, input } from '@angular/core';
 })
 export class JymPrBadgeComponent {
   size = input<'sm' | 'md'>('sm');
+  kind = input<string | null | undefined>(null);
+  kinds = input<readonly string[] | null | undefined>(null);
+  readonly label = computed(() => prLabel(this.kind()));
+  readonly description = computed(() => prDescription(this.kinds()?.length ? this.kinds() : this.kind() ? [this.kind()!] : []));
 }

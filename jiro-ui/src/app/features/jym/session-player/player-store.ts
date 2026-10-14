@@ -249,7 +249,7 @@ export class PlayerStore {
             ...b,
             sets: b.sets.map((s, si) => si === setIndex ? {
               ...s, saving: false, saved: true, isPR: saved.is_pr, id: saved.id, weightKg: saved.weight,
-              distanceM: saved.distance_m, durationS: saved.duration_s, prKind: saved.pr_kind,
+              distanceM: saved.distance_m, durationS: saved.duration_s, prKind: saved.pr_kind, prKinds: saved.pr_kinds ?? [],
             } : s),
           } : b));
           if (startRest && !this.fix) this.afterLogged(blockIndex, row.isWarmup);
@@ -589,7 +589,7 @@ export class PlayerStore {
         const pr = new Map(s.sets.map(x => [x.id, x]));
         this.blocks.update(bs => bs.map(b => ({
           ...b,
-          sets: b.sets.map(r => (r.id && pr.has(r.id) ? { ...r, isPR: pr.get(r.id)!.is_pr, prKind: pr.get(r.id)!.pr_kind } : r)),
+          sets: b.sets.map(r => (r.id && pr.has(r.id) ? { ...r, isPR: pr.get(r.id)!.is_pr, prKind: pr.get(r.id)!.pr_kind, prKinds: pr.get(r.id)!.pr_kinds ?? [] } : r)),
         })));
       },
     });

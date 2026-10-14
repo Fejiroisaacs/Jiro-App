@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { SettingsService } from './settings.service';
 import type { ExerciseKind } from '../../features/jym/exercise-kind';
+import type { PrKind } from '../../features/jym/shared/pr-badge/pr-kind';
 
 const API_URL = `${environment.apiUrl}/jym`;
 
@@ -80,6 +81,16 @@ export interface ExerciseStats {
   workouts: ExerciseStatsWorkout[];
   /** Working weights outside deloads, heaviest first. */
   weights: number[];
+  /** Standing records for weight × reps and bodyweight exercises; null for holds and distances. */
+  records: ExerciseRecords | null;
+}
+
+/** An exercise's standing records: heaviest (added load for bodyweight), best e1RM, and rep maxes or most reps. */
+export interface ExerciseRecords {
+  weight: SetRef | null;
+  e1rm: SetRef | null;
+  most_reps?: SetRef | null;
+  rep_maxes?: { reps: number; set: SetRef | null }[];
 }
 
 export interface RepsAtWeight {
@@ -100,8 +111,9 @@ export interface ExerciseWorkoutSet {
   duration_s: number | null;
   distance_m: number | null;
   body_weight_kg: number | null;
-  /** A distance record: 'distance' or 'pace'. */
-  pr_kind: 'distance' | 'pace' | null;
+  /** The top record the set earned, and all of them in rank order (J16). */
+  pr_kind: PrKind | null;
+  pr_kinds: PrKind[];
 }
 
 /** A workout that included an exercise, with that exercise's sets. */
@@ -137,6 +149,7 @@ export interface SetRef {
   reps: number;
   est_1rm: number;
   date?: string;
+  session_id?: string;
   duration_s?: number;
   distance_m?: number;
   body_weight_kg?: number;
@@ -151,6 +164,8 @@ export interface ExerciseReport {
   sets: number;
   volume: number;
   is_pr: boolean;
+  /** The top record among the lift's record sets in this workout. */
+  pr_kind: PrKind | null;
   /** This is the lift's first workout: its baseline, so nothing in it is a record. */
   is_first: boolean;
   /** The best record set if the lift set a record, otherwise the best working set. */
@@ -357,8 +372,9 @@ export interface SessionSet {
   distance_m: number | null;
   /** The body weight a bodyweight set counts, in kg. */
   body_weight_kg: number | null;
-  /** A distance record: 'distance' or 'pace'. */
-  pr_kind: 'distance' | 'pace' | null;
+  /** The top record the set earned, and all of them in rank order (J16). */
+  pr_kind: PrKind | null;
+  pr_kinds: PrKind[];
 }
 
 export interface SessionAttachment {

@@ -28,10 +28,12 @@ export interface SetRow {
   /** A logged set opened for correction, and its values before the edit. */
   editing?: boolean;
   before?: { weight: string; reps: string; rpe: string };
-  /** A logged distance set's stored metres and time, and which record it set (distance or pace). */
+  /** A logged distance set's stored metres and time. */
   distanceM?: number | null;
   durationS?: number | null;
-  prKind?: 'distance' | 'pace' | null;
+  /** The top record a logged set earned, and all of them. */
+  prKind?: string | null;
+  prKinds?: readonly string[];
 }
 
 export interface ExerciseBlock {
@@ -145,6 +147,7 @@ export function loggedBlocks(sets: SessionSet[], display: (kg: number) => number
       distanceM: s.distance_m ?? null,
       durationS: s.duration_s ?? null,
       prKind: s.pr_kind ?? null,
+      prKinds: s.pr_kinds ?? [],
       rpe: s.rpe != null ? String(s.rpe) : '',
       saved: true,
       isPR: s.is_pr,
