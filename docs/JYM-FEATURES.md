@@ -256,17 +256,12 @@ Click a session to see its sets by exercise (with RPE and the exercise note), it
 
 At `/jym/exercises/:id`:
 
-- **Header**: exercise name, muscle group, best weight ever and the best estimated 1RM, from working sets outside deloads.
-- **Records** (weight × reps and bodyweight lifts), from working sets outside deloads, a first workout's included:
-  - the heaviest set (bodyweight: the heaviest added load) and the best estimated 1RM, each with its set and date;
-  - weight × reps: a rep-max table for 1 to 12 reps, each the heaviest set with at least that many reps (its own
-    reps shown when more), "–" until there is one;
-  - bodyweight: the most reps.
+- **Header**: exercise name, muscle group, best weight ever and the best estimated 1RM, from working sets outside deloads. Bodyweight lifts show the most reps, the heaviest added load (once there is one) and the best estimated 1RM.
 - **Charts**: **Est. 1RM** (the best set's, see How Jym counts), **Volume** and **Max weight**, one point per workout from `GET /jym/exercises/:id/stats`. Deloads and workouts with only warm-ups are left out.
   - Points sit at their real dates on a date axis with month ticks, so a break shows as a gap. The axis runs from the first workout shown to today.
   - A chart shows at most your latest 20 workouts in the range (a note under it says so), and the line never swings above or below its points (monotone curves). Reps @ Weight is capped the same way.
   - **3M**, **1Y** and **All** set the range; the page opens on 1Y when the history goes back more than a year, otherwise All. The Est. 1RM tooltip names the set behind each point.
-- **Reps @ Weight**: the reps of each working set at one weight, per workout, outside deloads. Its data is fetched when it's picked (`GET /jym/exercises/:id/reps-at?weight=`).
+- **Reps @ Weight**: the reps of each working set at one weight, per workout, outside deloads, with the most reps ever at that weight and when ("Most at 175 lbs: 6 reps, 8 Oct") above the chart. Its data is fetched when it's picked (`GET /jym/exercises/:id/reps-at?weight=`).
 - **Workouts**: every workout with this exercise, newest first, ten at a time (`GET /jym/exercises/:id/workouts`). Each shows its date, day, type, the exercise note and its sets (warm-ups marked W, RPE, estimated 1RM, PR badges), and links to its summary, or to the player while it's open. **See all workouts with ...** opens them in history.
 - **Form progression** shows the form-check clips; **Notes** lists the exercise notes, one per workout, newest first.
 
