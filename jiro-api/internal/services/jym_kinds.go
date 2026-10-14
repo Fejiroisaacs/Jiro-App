@@ -84,11 +84,28 @@ func checkSetEdit(kind string, v setValues) error {
 // minPaceDistanceM is the shortest distance whose pace can be a record, so a 50 m sprint can't set it.
 const minPaceDistanceM = 400
 
-// Record kinds beyond the plain PR, for distance exercises.
-var (
+// Record kinds (J16), in rank order: a set's badge names the first it earned.
+const (
+	prKindWeight   = "weight"
+	prKindE1RM     = "e1rm"
+	prKindReps     = "reps"
+	prKindHold     = "hold"
 	prKindDistance = "distance"
 	prKindPace     = "pace"
 )
+
+// maxRepPR is the highest rep count with its own rep max.
+const maxRepPR = 12
+
+// prRank orders record kinds for a badge: lower ranks first.
+func prRank(kind string) int {
+	for i, k := range []string{prKindWeight, prKindE1RM, prKindReps, prKindHold, prKindDistance, prKindPace} {
+		if k == kind {
+			return i
+		}
+	}
+	return 99
+}
 
 // prSet is one set in logging order, as records see it. Counts is false for warm-ups and deload sets.
 type prSet struct {
@@ -101,18 +118,35 @@ type prSet struct {
 	counts     bool
 }
 
-// prResult is whether a set is a record, and for distance which one.
+// prResult is whether a set is a record, and which kinds it set, in rank order.
 type prResult struct {
-	pr   bool
-	kind *string
+	pr    bool
+	kinds []string
 }
 
-// ratePRs decides every set's record flag for one exercise of the given kind, in logging order:
-//   - weight × reps: more weight, or the same weight (within prTolerance) for more reps;
-//   - bodyweight: the same on the estimated 1RM of body weight + load (load alone when body weight is unknown,
-//     so unweighted sets compare by reps);
+// top is the record kind a badge names, or nil.
+func (r prResult) top() *string {
+	if len(r.kinds) == 0 {
+		return nil
+	}
+	return &r.kinds[0]
+}
+
+func record(kinds ...string) prResult {
+	if len(kinds) == 0 {
+		return prResult{}
+	}
+	return prResult{pr: true, kinds: kinds}
+}
+
+// ratePRs decides every set's records for one exercise of the given kind, in logging order:
+//   - weight × reps: weight (more weight, or the top weight for more reps), e1RM (a higher estimated 1RM) and reps
+//     (for 1 to maxRepPR reps, more weight than any earlier set with at least as many reps; with no such set, the
+//     first time at a rep count only sets that rep max);
+//   - bodyweight: weight (a heavier added load), e1RM (of body weight + load) and reps (more reps than any earlier
+//     set at the same or more load, which needs one to beat);
 //   - duration: a longer hold than any earlier one at the same or more load;
-//   - distance: a longer distance, or a faster pace over at least minPaceDistanceM.
+//   - distance: a longer distance, and a faster pace over at least minPaceDistanceM.
 //
 // Sets that don't count are never records and don't raise the bar. The first workout with a counting set is the
 // baseline: its sets raise the bar but are never records, since anything beats a best of nothing.
@@ -147,7 +181,9 @@ func ratePRsFromZero(kind string, sets []prSet) []prResult {
 					best = *e.durationS
 				}
 			}
-			out[i].pr = *s.durationS > best
+			if *s.durationS > best {
+				out[i] = record(prKindHold)
+			}
 			earlier = append(earlier, s)
 		}
 	case KindDistance:
@@ -158,40 +194,88 @@ func ratePRsFromZero(kind string, sets []prSet) []prResult {
 			}
 			dist := *s.distanceM
 			pace := float64(*s.durationS) / (dist / 1000)
-			switch {
-			case dist > bestDist+0.05:
-				out[i] = prResult{pr: true, kind: &prKindDistance}
-			case dist >= minPaceDistanceM && pace < bestPace-0.05:
-				out[i] = prResult{pr: true, kind: &prKindPace}
+			var kinds []string
+			if dist > bestDist+0.05 {
+				kinds = append(kinds, prKindDistance)
 			}
+			if dist >= minPaceDistanceM && pace < bestPace-0.05 {
+				kinds = append(kinds, prKindPace)
+			}
+			out[i] = record(kinds...)
 			bestDist = math.Max(bestDist, dist)
 			if dist >= minPaceDistanceM {
 				bestPace = math.Min(bestPace, pace)
 			}
 		}
+	case KindBodyweight:
+		var earlier []prSet
+		var bestLoad, bestE1RM float64
+		for i, s := range sets {
+			if !s.counts || s.reps == nil {
+				continue
+			}
+			reps := *s.reps
+			e1rm := epley1RM(s.weight+defloat(s.bodyWeight), reps)
+			var kinds []string
+			if s.weight > bestLoad+prTolerance {
+				kinds = append(kinds, prKindWeight)
+			}
+			if e1rm > bestE1RM+prTolerance {
+				kinds = append(kinds, prKindE1RM)
+			}
+			// Most reps at this load or more, if an earlier set carried as much.
+			mostReps, beaten := 0, false
+			for _, e := range earlier {
+				if e.weight >= s.weight-prTolerance {
+					mostReps, beaten = max(mostReps, *e.reps), true
+				}
+			}
+			if beaten && reps > mostReps {
+				kinds = append(kinds, prKindReps)
+			}
+			out[i] = record(kinds...)
+			bestLoad, bestE1RM = math.Max(bestLoad, s.weight), math.Max(bestE1RM, e1rm)
+			earlier = append(earlier, s)
+		}
 	default:
-		var bestValue float64
+		var earlier []prSet
+		var bestWeight, bestE1RM float64
 		var bestReps int
 		for i, s := range sets {
 			if !s.counts || s.reps == nil {
 				continue
 			}
-			value := s.weight
-			if kind == KindBodyweight {
-				bw := 0.0
-				if s.bodyWeight != nil {
-					bw = *s.bodyWeight
+			reps := *s.reps
+			e1rm := epley1RM(s.weight, reps)
+			var kinds []string
+			if isNewPR(s.weight, reps, false, bestWeight, bestReps) {
+				kinds = append(kinds, prKindWeight)
+			}
+			if e1rm > bestE1RM+prTolerance {
+				kinds = append(kinds, prKindE1RM)
+			}
+			// The rep max at this many reps: the heaviest earlier set with at least as many.
+			if reps >= 1 && reps <= maxRepPR {
+				repMax, beaten := 0.0, false
+				for _, e := range earlier {
+					if *e.reps >= reps {
+						repMax, beaten = math.Max(repMax, e.weight), true
+					}
 				}
-				value = epley1RM(s.weight+bw, *s.reps)
+				if beaten && s.weight > repMax+prTolerance {
+					kinds = append(kinds, prKindReps)
+				}
 			}
-			out[i].pr = isNewPR(value, *s.reps, false, bestValue, bestReps)
+			out[i] = record(kinds...)
 			switch {
-			case value > bestValue+prTolerance:
-				bestValue, bestReps = value, *s.reps
-			case math.Abs(value-bestValue) <= prTolerance:
-				bestValue = math.Max(bestValue, value)
-				bestReps = max(bestReps, *s.reps)
+			case s.weight > bestWeight+prTolerance:
+				bestWeight, bestReps = s.weight, reps
+			case math.Abs(s.weight-bestWeight) <= prTolerance:
+				bestWeight = math.Max(bestWeight, s.weight)
+				bestReps = max(bestReps, reps)
 			}
+			bestE1RM = math.Max(bestE1RM, e1rm)
+			earlier = append(earlier, s)
 		}
 	}
 	return out

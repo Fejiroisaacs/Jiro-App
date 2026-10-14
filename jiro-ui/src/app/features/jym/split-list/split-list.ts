@@ -244,7 +244,6 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
       padding: 4px 8px;
       border-radius: var(--border-radius-pill);
       border: 1px solid var(--border-color);
-      box-shadow: 1px 1px 0 rgba(var(--shadow-rgb), 0.1);
       white-space: nowrap;
     }
 
@@ -270,9 +269,6 @@ import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/
       color: var(--color-danger);
       border-color: rgba(var(--color-danger-rgb), 0.3);
       background: rgba(var(--color-danger-rgb), 0.04);
-      box-shadow: 1px 1px 0 rgba(var(--color-danger-rgb), 0.3);
-      top: -1px; 
-      left: -1px;
     }
 
 

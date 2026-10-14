@@ -232,7 +232,7 @@ import { HistoryCalendarComponent } from './history-calendar';
 <span class="ds-warmup"><jiro-icon name="fire" [size]="12" />Warm-up</span>
 }
                     @if (set.is_pr) {
-<jym-pr-badge />
+<jym-pr-badge [kind]="set.pr_kind" [kinds]="set.pr_kinds" />
 }
                   </div>
 }

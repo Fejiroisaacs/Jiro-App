@@ -134,6 +134,9 @@ type SectionTab = 'history' | 'form' | 'notes';
 }
             </select>
           </div>
+          @if (weightBest(); as b) {
+            <p class="weight-best">Most at {{ settingsService.toDisplay(selectedWeight()!) | number:'1.0-1' }} {{ settingsService.unitLabel() }}: <strong>{{ b.reps }} reps</strong>, {{ b.date }}</p>
+          }
 }
 
           <!-- Chart wrapper -->
@@ -207,7 +210,7 @@ type SectionTab = 'history' | 'form' | 'notes';
                   <span class="ws-load">{{ setLine(set) }}</span>
                   @if (set.rpe != null) { <span class="ws-rpe">RPE {{ set.rpe }}</span> }
                   @if (!set.is_warmup && set.est_1rm > 0) { <span class="ws-orm">e1RM {{ settingsService.toDisplay(set.est_1rm) | number:'1.0-1' }}</span> }
-                  @if (set.is_pr) { <jym-pr-badge /> }
+                  @if (set.is_pr) { <jym-pr-badge [kind]="set.pr_kind" [kinds]="set.pr_kinds" /> }
                 </li>
 }
               </ul>
@@ -360,7 +363,7 @@ type SectionTab = 'history' | 'form' | 'notes';
 
     .stat { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 
-    .stat-label { font-size: var(--font-size-xs); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-label { font-size: var(--font-size-sm); font-weight: 600; color: var(--text-secondary); }
 
     .stat-value { font-size: var(--font-size-xl); font-weight: 700; color: var(--text-primary); }
 
@@ -423,6 +426,8 @@ type SectionTab = 'history' | 'form' | 'notes';
     }
 
     .ws-label { font-size: var(--font-size-sm); color: var(--text-secondary); font-weight: 500; }
+    .weight-best { margin: 0 0 var(--space-sm); font-size: var(--font-size-sm); color: var(--text-secondary); }
+    .weight-best strong { color: var(--text-primary); font-weight: 600; }
 
     .weight-select {
       min-height: 44px; padding: 6px 10px; border: 1px solid var(--border-color);
@@ -668,6 +673,8 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
   loading = signal(true);
   selectedChart = signal<ChartType>('1rm');
   selectedWeight = signal<number | null>(null);
+  /** The most reps ever at the chosen weight (outside deloads) and the first workout that hit it; null while loading. */
+  weightBest = signal<{ reps: number; date: string } | null>(null);
   chartEmpty = signal(false);
   /** Workouts in the range; past maxPoints the chart shows the latest only. */
   chartTotal = signal(0);
@@ -716,8 +723,14 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
           ...(paces.length ? [{ label: 'Fastest pace', value: paceText(Math.min(...paces), 1000, this.dUnit())! }] : []),
         ];
       }
-      case 'bodyweight':
-        return [{ label: 'Most reps', value: String(Math.max(0, ...ws.map(w => w.max_reps))) }, { label: 'Est. 1RM', value: kg(ex?.est_1rm ?? 0) }];
+      case 'bodyweight': {
+        const load = this.stats()?.records?.weight?.weight ?? 0;
+        return [
+          { label: 'Most reps', value: String(Math.max(0, ...ws.map(w => w.max_reps))) },
+          ...(load > 0 ? [{ label: 'Heaviest added', value: `+${kg(load)}` }] : []),
+          { label: 'Est. 1RM', value: kg(ex?.est_1rm ?? 0) },
+        ];
+      }
       default:
         return [{ label: 'Best weight', value: kg(ex?.best_weight ?? 0) }, { label: 'Est. 1RM', value: kg(ex?.est_1rm ?? 0) }];
     }
@@ -768,6 +781,16 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
   });
 
   sessionNotes = computed(() => notesOf(this.stats()?.workouts ?? []));
+
+  /** The most reps in any one set, and the first workout that did it. */
+  private mostRepsOf(list: RepsAtWeight[]): { reps: number; date: string } | null {
+    let best: { reps: number; date: string } | null = null;
+    for (const w of list) {
+      const reps = Math.max(0, ...w.reps);
+      if (reps > 0 && (!best || reps > best.reps)) best = { reps, date: this.formatDate(w.started_at) };
+    }
+    return best;
+  }
 
   // The plateau rule reads weights; other types have none to judge.
   plateauStatus = computed<PlateauStatus>(() => this.kind() === 'weight_reps' ? detectPlateau(this.stats()?.workouts ?? []) : null);
@@ -975,6 +998,7 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
     const weight = this.selectedWeight();
     if (weight === null) { this.chartEmpty.set(true); return; }
     const cached = this.repsAt.get(weight);
+    this.weightBest.set(cached ? this.mostRepsOf(cached) : null);
     if (!cached) {
       const id = this.currentId;
       this.jymService.getRepsAtWeight(id, weight).subscribe({

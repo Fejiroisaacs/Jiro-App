@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -20,20 +21,26 @@ func apart(sets []prSet) []prSet {
 	return sets
 }
 
-// prFlags is ratePRs as one string: "-" for no record, "P" for a record, "d"/"p" for distance/pace records.
+// prFlags is ratePRs as one string of each set's top record: "-" none, W weight, E e1RM, R reps, H hold,
+// d distance, p pace.
 func prFlags(kind string, sets []prSet) string {
+	letter := map[string]string{prKindWeight: "W", prKindE1RM: "E", prKindReps: "R", prKindHold: "H", prKindDistance: "d", prKindPace: "p"}
 	out := ""
 	for _, r := range ratePRs(kind, sets) {
-		switch {
-		case !r.pr:
+		if !r.pr {
 			out += "-"
-		case r.kind == nil:
-			out += "P"
-		case *r.kind == prKindDistance:
-			out += "d"
-		default:
-			out += "p"
+		} else {
+			out += letter[*r.top()]
 		}
+	}
+	return out
+}
+
+// prKindsOf is every set's kinds, comma-joined, one per set.
+func prKindsOf(kind string, sets []prSet) []string {
+	var out []string
+	for _, r := range ratePRs(kind, sets) {
+		out = append(out, strings.Join(r.kinds, ","))
 	}
 	return out
 }
@@ -48,12 +55,12 @@ func TestRatePRsBodyweight(t *testing.T) {
 		{weight: 20, reps: ip(5), bodyWeight: bw, counts: true},  // 100 x 5 = 116.7: yes
 		{weight: 50, reps: ip(5), bodyWeight: bw, counts: false}, // warm-up: never
 	})
-	if got := prFlags(KindBodyweight, sets); got != "--P-P-" {
+	if got := prFlags(KindBodyweight, sets); got != "--EWW-" {
 		t.Fatalf("with body weight: %s", got)
 	}
 	// No body weight yet: unweighted sets compare by reps.
 	none := apart([]prSet{{reps: ip(8), counts: true}, {reps: ip(8), counts: true}, {reps: ip(9), counts: true}})
-	if got := prFlags(KindBodyweight, none); got != "--P" {
+	if got := prFlags(KindBodyweight, none); got != "--R" {
 		t.Fatalf("without body weight: %s", got)
 	}
 }
@@ -67,7 +74,7 @@ func TestRatePRsDuration(t *testing.T) {
 		{durationS: ip(50), counts: true},             // longest unloaded
 		{weight: 5, durationS: ip(40), counts: true},  // 10 kg held 30, 0 kg held 50 (less load): 40 at 5 kg beats 30
 	})
-	if got := prFlags(KindDuration, sets); got != "--P-PP" {
+	if got := prFlags(KindDuration, sets); got != "--H-HH" {
 		t.Fatalf("duration: %s", got)
 	}
 }
@@ -95,7 +102,7 @@ func TestRatePRsFirstWorkoutIsTheBaseline(t *testing.T) {
 		{session: second, weight: 95, reps: ip(5), counts: true}, // under the baseline's best: no
 		{session: second, weight: 102.5, reps: ip(3), counts: true},
 	}
-	if got := prFlags(KindWeightReps, sets); got != "----P" {
+	if got := prFlags(KindWeightReps, sets); got != "----W" {
 		t.Fatalf("baseline: %s", got)
 	}
 }
@@ -378,5 +385,40 @@ func TestKindsInReportsStatsAndRecords(t *testing.T) {
 				t.Fatalf("plank plan: %+v", it)
 			}
 		}
+	}
+}
+
+func TestRatePRsWeightTypes(t *testing.T) {
+	sets := apart([]prSet{
+		{weight: 100, reps: ip(5), counts: true},  // the baseline
+		{weight: 90, reps: ip(10), counts: true},  // e1RM 120 beats 116.7; the first set of 10 only sets that rep max
+		{weight: 102.5, reps: ip(5), counts: true}, // heavier: weight, e1RM 119.6 doesn't beat 120, 5-rep max 100
+		{weight: 95, reps: ip(8), counts: true},   // e1RM 120.3 beats 120; the 8-rep max is 90 (the 10-rep set)
+		{weight: 95, reps: ip(8), counts: true},   // ties it: nothing
+		{weight: 110, reps: ip(1), counts: true},  // weight, and the 1-rep max (102.5); e1RM 110 doesn't beat 120
+		{weight: 92.5, reps: ip(14), counts: true}, // past 12 reps: no rep max; e1RM capped at 10 reps: 123.3 beats 120
+	})
+	if got := prFlags(KindWeightReps, sets); got != "-EWE-WE" {
+		t.Fatalf("top kinds: %s", got)
+	}
+	got := prKindsOf(KindWeightReps, sets)
+	want := []string{"", "e1rm", "weight,reps", "e1rm,reps", "", "weight,reps", "e1rm"}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("kinds %q, want %q", got, want)
+	}
+}
+
+func TestRatePRsBodyweightTypes(t *testing.T) {
+	bw := fp(80)
+	sets := apart([]prSet{
+		{weight: 0, reps: ip(8), bodyWeight: bw, counts: true},  // the baseline
+		{weight: 10, reps: ip(5), bodyWeight: bw, counts: true}, // heavier load, e1RM 105 beats 101.3; no set at +10 to beat on reps
+		{weight: 10, reps: ip(6), bodyWeight: bw, counts: true}, // most reps at +10, e1RM 108 beats 105
+		{weight: 0, reps: ip(9), bodyWeight: bw, counts: true},  // most reps unweighted (8), e1RM 104 doesn't beat 108
+	})
+	got := prKindsOf(KindBodyweight, sets)
+	want := []string{"", "weight,e1rm", "e1rm,reps", "reps"}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("kinds %q, want %q", got, want)
 	}
 }

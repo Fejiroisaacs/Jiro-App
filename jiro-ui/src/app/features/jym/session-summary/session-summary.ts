@@ -26,6 +26,7 @@ interface LiftHighlight {
   /** In kg, from the API. */
   est1RM: number;
   isPR: boolean;
+  prKind: string | null;
   isFirst: boolean;
   previous?: { weight: number; reps: number; est1RM: number };
   /** The best set and last time's in the lift's own words ("100 × 5", "0:45", "5 km in 26:00"). */
@@ -166,7 +167,7 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
                 <div class="lift-aside">
                   <div class="lift-current">
                     @if (lift.isPR) {
-                      <jym-pr-badge />
+                      <jym-pr-badge [kind]="lift.prKind" />
                     } @else if (lift.isFirst) {
                       <span class="best-tag">First time</span>
                     } @else {
@@ -328,19 +329,22 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
       animation: slideUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
 
-    /* Hero: the theme's sidebar tone into its primary, so every theme gets its own banner. */
+    /* Hero: a quiet card; the theme's primary is its one accent, on the trophy. */
     .hero {
-      margin: 0 calc(-1 * var(--space-md)) var(--space-lg);
-      background: linear-gradient(150deg, var(--bg-sidebar) 0%, var(--color-primary) 100%);
+      margin: var(--space-md) 0 var(--space-lg);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius-lg);
+      box-shadow: var(--shadow-sm);
     }
 
     .hero-content {
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: var(--space-2xl) var(--space-xl) var(--space-xl);
+      padding: var(--space-xl) var(--space-md) var(--space-lg);
       text-align: center;
-      color: var(--text-on-dark);
+      color: var(--text-primary);
     }
 
     .trophy-ring {
@@ -350,7 +354,8 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
       width: 88px;
       height: 88px;
       border-radius: 50%;
-      background: color-mix(in srgb, var(--text-on-dark) 12%, transparent);
+      background: rgba(var(--color-primary-rgb), 0.08);
+      color: var(--color-primary-text);
       margin-bottom: var(--space-md);
     }
 
@@ -358,7 +363,7 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
       font-family: var(--font-family-display);
       font-size: var(--font-size-2xl);
       font-weight: 700;
-      color: var(--text-on-dark);
+      color: var(--text-primary);
       margin: 0 0 var(--space-sm);
       letter-spacing: -0.02em;
       line-height: 1.15;
@@ -368,31 +373,31 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
       margin: 0 0 var(--space-sm);
       font-size: var(--font-size-md);
       font-weight: 600;
-      color: var(--text-on-dark);
+      color: var(--text-primary);
     }
 
-    .hero-when { margin: 0 0 var(--space-sm); font-size: var(--font-size-sm); color: var(--text-on-dark); opacity: 0.9; }
+    .hero-when { margin: 0 0 var(--space-sm); font-size: var(--font-size-sm); color: var(--text-secondary); }
 
-    /* On the banner: takes the banner's text colour, like the workout bar's buttons. */
+    /* Outlined like the secondary button. */
     .hero-edit {
       display: inline-flex; align-items: center; gap: 6px;
       min-height: 44px; padding: 0 var(--space-md); margin-bottom: var(--space-sm);
-      border: 1px solid color-mix(in srgb, var(--text-on-dark) 40%, transparent); border-radius: var(--border-radius-pill);
-      background: none; color: var(--text-on-dark);
+      border: 1px solid color-mix(in srgb, var(--text-primary) 40%, transparent); border-radius: var(--border-radius-pill);
+      background: none; color: var(--text-primary);
       font-family: inherit; font-size: var(--font-size-sm); font-weight: 600; cursor: pointer;
     }
-    .hero-edit:hover { background: color-mix(in srgb, var(--text-on-dark) 12%, transparent); }
+    .hero-edit:hover { background: rgba(var(--color-primary-rgb), 0.06); border-color: var(--text-primary); }
     .hero-edits { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-sm); }
 
     .type-pill {
       display: inline-block;
-      background: color-mix(in srgb, var(--text-on-dark) 12%, transparent);
-      border: 1px solid color-mix(in srgb, var(--text-on-dark) 24%, transparent);
+      background: rgba(var(--color-primary-rgb), 0.08);
+      border: 1px solid rgba(var(--color-primary-rgb), 0.2);
       border-radius: var(--border-radius-pill);
       padding: 3px 12px;
       font-size: var(--font-size-xs);
       font-weight: 600;
-      color: var(--text-on-dark);
+      color: var(--color-primary-text);
       text-transform: uppercase;
       letter-spacing: 0.5px;
     }
@@ -428,6 +433,7 @@ import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-ico
 
     .stat-value {
       font-family: var(--font-family-display);
+      letter-spacing: -0.02em;
       font-size: 1.1rem;
       font-weight: 700;
       color: var(--text-primary);
@@ -1003,6 +1009,7 @@ export class SessionSummaryComponent implements OnInit {
       reps: e.best.reps,
       est1RM: e.best.est_1rm,
       isPR: e.is_pr,
+      prKind: e.pr_kind ?? null,
       isFirst: e.is_first,
       previous: e.previous
         ? { weight: this.settings.toDisplay(e.previous.weight), reps: e.previous.reps, est1RM: e.previous.est_1rm }

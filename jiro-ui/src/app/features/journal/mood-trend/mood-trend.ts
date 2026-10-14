@@ -75,6 +75,7 @@ interface MoodCount {
 
     .moodtrend-title {
       font-family: var(--font-family-display);
+      letter-spacing: -0.02em;
       font-size: var(--font-size-md);
       font-weight: 600;
       color: var(--text-primary);

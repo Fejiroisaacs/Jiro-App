@@ -42,7 +42,7 @@ import { RouterLink } from '@angular/router';
 
     .jiro-card.clickable:hover {
       box-shadow: var(--shadow-md);
-      transform: translate(-2px, -2px);
+      transform: translateY(-1px);
     }
 
     a.jiro-card:focus-visible {

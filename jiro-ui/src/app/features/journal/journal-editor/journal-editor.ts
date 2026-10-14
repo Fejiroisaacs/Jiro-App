@@ -394,6 +394,7 @@ const PROMPT_DISMISSED_KEY = 'jiro_journal_prompt_dismissed';
     }
     .prompt-question {
       font-family: var(--font-family-display);
+      letter-spacing: -0.02em;
       font-size: var(--font-size-md);
       line-height: 1.45;
       color: var(--text-primary);

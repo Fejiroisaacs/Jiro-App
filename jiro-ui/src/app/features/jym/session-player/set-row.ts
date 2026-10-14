@@ -104,7 +104,7 @@ import { PlayerStore } from './player-store';
           <span class="spinner-sm" role="status" aria-label="Saving"></span>
         } @else if (!row.editing) {
           @if (row.isPR) {
-            <jym-pr-badge />
+            <jym-pr-badge [kind]="row.prKind" [kinds]="row.prKinds" />
           } @else {
             <jiro-icon class="logged-mark" name="check" [size]="16" label="Logged" />
           }
@@ -121,7 +121,7 @@ import { PlayerStore } from './player-store';
       </div>
     }
     @if (block.kind === 'distance' && row.saved && !row.editing && pace(row); as p) {
-      <div class="pace-note">{{ p }}{{ row.isPR && row.prKind ? ' · ' + (row.prKind === 'pace' ? 'fastest pace' : 'longest distance') : '' }}</div>
+      <div class="pace-note">{{ p }}</div>
     }
     @if ((!row.saved || row.editing) && store.filled(row.rpe) && store.rpeInvalid(row.rpe)) {
       <div class="rpe-err-msg" role="alert">RPE must be between 1 and 10</div>

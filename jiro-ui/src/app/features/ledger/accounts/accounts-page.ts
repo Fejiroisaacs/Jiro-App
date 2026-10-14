@@ -685,8 +685,7 @@ type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
 
     .form-input:focus {
       border-color: var(--color-primary);
-      box-shadow: 2px 2px 0px var(--color-primary);
-      transform: translate(-1px, -1px);
+      box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.15);
     }
 
     select.form-input { appearance: none; cursor: pointer; }

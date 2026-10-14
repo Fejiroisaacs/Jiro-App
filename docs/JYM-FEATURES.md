@@ -142,7 +142,7 @@ Each exercise block shows a set table with columns: **Set**, **Weight**, **Reps*
 - The fields bring up a number keypad: decimal for weight, whole numbers for reps and RPE. A comma counts as a decimal point ("102,5"), and a typed 0 logs (bodyweight lifts).
 - **RPE** (Rating of Perceived Exertion, 1 to 10) is optional.
 - Ghost values before the first set are today's aim (see below); after it, the last logged working set.
-- A saved set is tinted. A **PR** badge appears if the set is a personal record. An exercise's first workout has none: its line reads *First time. Today sets your baseline.*
+- A saved set is tinted. A record badge names the record the set earned: **Weight PR**, **e1RM PR**, **Rep PR**, **Hold PR**, **Distance PR** or **Pace PR** (see How personal records work). An exercise's first workout has none: its line reads *First time. Today sets your baseline.*
 - Tap a logged value to correct it: the row shows **Cancel** and **Save** under it (Enter on reps or RPE also saves; Escape cancels on desktop).
 - From a day or template, the block shows its plan ("Plan 3 × 8"), and a logged working set below the planned reps is marked.
 
@@ -211,7 +211,7 @@ At `/jym/sessions/:id/summary`, built by the server (`GET /jym/sessions/:id/summ
 - **Save as template** saves its exercises, sets and reps.
 - An open workout's summary says it isn't finished and offers **Resume workout**.
 - **Muscle groups**: each group's share of the working sets, so bodyweight work counts.
-- **Session highlights**: each lift's best set, which is its best record set if it set one, otherwise its highest estimated 1RM (bodyweight lifts: most reps). It is tagged PR, **First time** on the lift's first workout, or Best.
+- **Session highlights**: each lift's best set, which is its best record set if it set one, otherwise its highest estimated 1RM (bodyweight lifts: most reps). It is tagged with its top record (Weight PR, e1RM PR, ...), **First time** on the lift's first workout, or Best.
 - **Last time**: the lift's best set from its latest finished normal workout before this one, with the change in estimated 1RM. A record needs no change shown, and a deload isn't compared.
 - The share card ranks its top lifts by estimated 1RM, bodyweight lifts after them by reps.
 
@@ -256,12 +256,12 @@ Click a session to see its sets by exercise (with RPE and the exercise note), it
 
 At `/jym/exercises/:id`:
 
-- **Header**: exercise name, muscle group, best weight ever and the best estimated 1RM, from working sets outside deloads.
+- **Header**: exercise name, muscle group, best weight ever and the best estimated 1RM, from working sets outside deloads. Bodyweight lifts show the most reps, the heaviest added load (once there is one) and the best estimated 1RM.
 - **Charts**: **Est. 1RM** (the best set's, see How Jym counts), **Volume** and **Max weight**, one point per workout from `GET /jym/exercises/:id/stats`. Deloads and workouts with only warm-ups are left out.
   - Points sit at their real dates on a date axis with month ticks, so a break shows as a gap. The axis runs from the first workout shown to today.
   - A chart shows at most your latest 20 workouts in the range (a note under it says so), and the line never swings above or below its points (monotone curves). Reps @ Weight is capped the same way.
   - **3M**, **1Y** and **All** set the range; the page opens on 1Y when the history goes back more than a year, otherwise All. The Est. 1RM tooltip names the set behind each point.
-- **Reps @ Weight**: the reps of each working set at one weight, per workout, outside deloads. Its data is fetched when it's picked (`GET /jym/exercises/:id/reps-at?weight=`).
+- **Reps @ Weight**: the reps of each working set at one weight, per workout, outside deloads, with the most reps ever at that weight and when ("Most at 175 lbs: 6 reps, 8 Oct") above the chart. Its data is fetched when it's picked (`GET /jym/exercises/:id/reps-at?weight=`).
 - **Workouts**: every workout with this exercise, newest first, ten at a time (`GET /jym/exercises/:id/workouts`). Each shows its date, day, type, the exercise note and its sets (warm-ups marked W, RPE, estimated 1RM, PR badges), and links to its summary, or to the player while it's open. **See all workouts with ...** opens them in history.
 - **Form progression** shows the form-check clips; **Notes** lists the exercise notes, one per workout, newest first.
 
@@ -341,6 +341,15 @@ One set of rules, in `jiro-api/internal/services/jym_metrics.go`, behind every l
 
 ## How Personal Records Work
 
-A working set is a PR when it beats every earlier working set of that exercise: heavier than the best weight, or the same weight with more reps. An exercise's first workout with a working set is its baseline: its sets raise the bar but are never PRs, since anything beats a best of nothing. Deleting that workout makes the next one the baseline. Weights within 0.05 kg count as the same, so switching units never makes a phantom PR. Warm-ups and deload sets are never PRs and never raise the bar.
+A working set can set three kinds of record, and its badge names the first of these it earned:
 
-PR flags are stored on the sets and recomputed for the whole exercise whenever a set is logged, edited, deleted or marked a warm-up, and whenever a session's type changes. `go run ./cmd/rerate-prs` (from `jiro-api/`, with `DATABASE_URL` set) recomputes every flag.
+| Exercise type | Weight PR | e1RM PR | Rep PR |
+|---|---|---|---|
+| Weight × reps | Heavier than ever, or the top weight for more reps | A higher estimated 1RM than any earlier set | For 1 to 12 reps: more weight than any earlier set with at least as many reps |
+| Bodyweight | A heavier added load than ever | A higher estimated 1RM of body weight + load | More reps than any earlier set at the same or more added load |
+
+A Rep PR needs an earlier set to beat: the first set of 8 sets the 8-rep max without a badge. Holds set a Hold PR (the longest hold at the same or more load), and runs a Distance PR and a Pace PR (over 400 m or more). A set's badge lists every record it earned in its tooltip, and the summary and counts still count lifts with any record.
+
+An exercise's first workout with a working set is its baseline: its sets raise the bar but are never PRs, since anything beats a best of nothing. Deleting that workout makes the next one the baseline. Weights within 0.05 kg count as the same, so switching units never makes a phantom PR. Warm-ups and deload sets are never PRs and never raise the bar.
+
+PR flags and their kinds (`pr_kind`, the top one, and `pr_kinds`) are stored on the sets and recomputed for the whole exercise whenever a set is logged, edited, deleted or marked a warm-up, and whenever a session's type changes. `go run ./cmd/rerate-prs` (from `jiro-api/`, with `DATABASE_URL` set) recomputes every flag.

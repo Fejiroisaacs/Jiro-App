@@ -126,6 +126,7 @@ import { GuideSectionComponent } from './guide-section';
       text-underline-offset: 3px;
       text-decoration-thickness: 1px;
     }
+    guide-page .gd-body { line-height: 1.6; }
     guide-page .gd-body strong { font-weight: 600; color: var(--text-primary); }
     guide-page .gd-body kbd {
       display: inline-block;

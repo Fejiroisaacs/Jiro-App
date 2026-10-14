@@ -129,7 +129,7 @@ function combine<A, B, R>(a: WidgetData<A>, b: WidgetData<B>, join: (a: A, b: B)
       text-decoration: none;
       transition: transform 0.15s, box-shadow 0.15s;
     }
-    .sc:hover { text-decoration: none; transform: translate(-1px, -1px); box-shadow: var(--shadow-sm); }
+    .sc:hover { text-decoration: none; transform: translateY(-1px); box-shadow: var(--shadow-md); }
     .sc--disabled { opacity: 0.55; cursor: not-allowed; }
     .sc--disabled:hover { transform: none; box-shadow: none; }
     .sc-soon { font-size: var(--font-size-xs); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }

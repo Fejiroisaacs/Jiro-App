@@ -250,13 +250,9 @@ const ROW_ACTIONS: JiroMenuItem[] = [
       font-size: var(--font-size-sm); font-family: inherit;
       color: var(--text-secondary);
       font-weight: 500;
-      box-shadow: 2px 2px 0 var(--border-color);
       transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
-      position: relative; top: 0; left: 0;
     }
     .mg-chip:hover {
-      top: -1px; left: -1px;
-      box-shadow: 3px 3px 0 var(--color-primary);
       border-color: var(--color-primary);
       color: var(--color-primary);
     }
@@ -264,7 +260,6 @@ const ROW_ACTIONS: JiroMenuItem[] = [
       background: var(--color-primary);
       border: 1px solid var(--color-primary);
       color: var(--text-on-primary);
-      box-shadow: 2px 2px 0 rgba(var(--color-primary-rgb), 0.4);
     }
 
     .ex-loading { display: block; }
@@ -301,6 +296,7 @@ const ROW_ACTIONS: JiroMenuItem[] = [
 
     .ex-name {
       font-family: var(--font-family-display);
+      letter-spacing: -0.02em;
       font-size: var(--font-size-md); font-weight: 600;
       color: var(--text-primary);
     }
@@ -344,7 +340,6 @@ const ROW_ACTIONS: JiroMenuItem[] = [
       padding: 3px 8px;
       border-radius: var(--border-radius-pill);
       border: 1px solid var(--border-color);
-      box-shadow: 1px 1px 0 var(--border-color);
       white-space: nowrap;
     }
 
@@ -376,6 +371,7 @@ const ROW_ACTIONS: JiroMenuItem[] = [
       font-weight: 600;
       color: var(--text-primary);
       font-family: var(--font-family-display);
+      letter-spacing: -0.02em;
     }
 
     .form-input {

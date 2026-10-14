@@ -109,8 +109,8 @@ func TestSessionReportBestSetsTotalsAndMuscles(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("log warm-up: %v", err)
 	}
-	logSet(t, svc, userID, sess, bench, 2, 100, 5) // the record
-	logSet(t, svc, userID, sess, bench, 3, 95, 10) // a higher e1RM, but not a record
+	logSet(t, svc, userID, sess, bench, 2, 100, 5) // a weight record
+	logSet(t, svc, userID, sess, bench, 3, 95, 10) // an e1RM record (126.7), but lighter
 	logSet(t, svc, userID, sess, pullUp, 1, 0, 8)
 	logSet(t, svc, userID, sess, pullUp, 2, 0, 10)
 	logSet(t, svc, userID, sess, curl, 1, 20, 12)
@@ -131,8 +131,10 @@ func TestSessionReportBestSetsTotalsAndMuscles(t *testing.T) {
 		t.Fatalf("%d exercises, want 3", len(report.Exercises))
 	}
 	b, p := report.Exercises[0], report.Exercises[1]
-	if b.ExerciseID != bench || b.Sets != 2 || !b.IsPR || b.IsFirst || b.Best == nil || b.Best.Weight != 100 || b.Best.Reps != 5 {
-		t.Fatalf("bench = %+v, best %+v; want 2 sets, the 100 x 5 record shown", b, b.Best)
+	// The best record set shows; the badge names the top kind among the lift's records.
+	if b.ExerciseID != bench || b.Sets != 2 || !b.IsPR || b.IsFirst || b.Best == nil || b.Best.Weight != 95 || b.Best.Reps != 10 ||
+		b.PRKind == nil || *b.PRKind != prKindWeight {
+		t.Fatalf("bench = %+v, best %+v; want 2 sets, 95 x 10 shown, a weight record", b, b.Best)
 	}
 	if p.Best == nil || p.Best.Reps != 10 {
 		t.Fatalf("pull-up best %+v; want the 10-rep set", p.Best)

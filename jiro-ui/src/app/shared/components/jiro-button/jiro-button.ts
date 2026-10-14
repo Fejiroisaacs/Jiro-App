@@ -55,9 +55,8 @@ import { Component, booleanAttribute, input } from '@angular/core';
       line-height: 1.2;
       cursor: pointer;
       transition: background 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                  box-shadow 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                  transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-      box-shadow: 2px 2px 0px transparent;
+                  border-color 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                  transform 0.1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     }
 
     .jiro-btn--sm {
@@ -74,7 +73,6 @@ import { Component, booleanAttribute, input } from '@angular/core';
       opacity: 0.6;
       cursor: not-allowed;
       transform: none !important;
-      box-shadow: none !important;
     }
 
     /* Opt-in (class="outline-when-disabled" on <jiro-button>): a disabled
@@ -88,8 +86,7 @@ import { Component, booleanAttribute, input } from '@angular/core';
     }
 
     .jiro-btn:active:not(:disabled) {
-      transform: translate(1px, 1px) !important;
-      box-shadow: 0px 0px 0px transparent !important;
+      transform: scale(0.98);
     }
 
     .jiro-btn--primary {
@@ -99,8 +96,6 @@ import { Component, booleanAttribute, input } from '@angular/core';
     }
     .jiro-btn--primary:hover:not(:disabled) {
       background: var(--color-primary-hover);
-      box-shadow: 4px 4px 0px rgba(var(--shadow-rgb), 0.25);
-      transform: translate(-2px, -2px);
     }
 
     /* Outlined, so it never reads as a selected or disabled block beside the primary. */
@@ -112,8 +107,6 @@ import { Component, booleanAttribute, input } from '@angular/core';
     .jiro-btn--secondary:hover:not(:disabled) {
       background: rgba(var(--color-primary-rgb), 0.06);
       border-color: var(--text-primary);
-      box-shadow: 4px 4px 0px rgba(var(--shadow-rgb), 0.15);
-      transform: translate(-2px, -2px);
     }
 
     .jiro-btn--danger {
@@ -123,8 +116,6 @@ import { Component, booleanAttribute, input } from '@angular/core';
     }
     .jiro-btn--danger:hover:not(:disabled) {
       background: var(--color-danger-hover);
-      box-shadow: 4px 4px 0px rgba(var(--color-danger-rgb), 0.25);
-      transform: translate(-2px, -2px);
     }
 
     /* Primary action on a primary-coloured surface */
@@ -134,8 +125,7 @@ import { Component, booleanAttribute, input } from '@angular/core';
       border-color: var(--text-on-primary);
     }
     .jiro-btn--inverse:hover:not(:disabled) {
-      box-shadow: 4px 4px 0px rgba(var(--shadow-rgb), 0.35);
-      transform: translate(-2px, -2px);
+      background: color-mix(in srgb, var(--text-on-primary) 88%, var(--color-primary));
     }
 
     /* Secondary action on any coloured surface: inherits the surface's text colour */
@@ -147,8 +137,6 @@ import { Component, booleanAttribute, input } from '@angular/core';
     .jiro-btn--ghost:hover:not(:disabled) {
       background: color-mix(in srgb, currentColor 12%, transparent);
       border-color: color-mix(in srgb, currentColor 75%, transparent);
-      box-shadow: 4px 4px 0px color-mix(in srgb, currentColor 25%, transparent);
-      transform: translate(-2px, -2px);
     }
 
     .jiro-btn__spinner {

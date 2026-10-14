@@ -70,6 +70,7 @@ import { WIDGET_TEXT_STYLES, WidgetData, WidgetShellComponent, widgetState } fro
     .mo-net {
       display: block;
       font-family: var(--font-family-display);
+      letter-spacing: -0.02em;
       font-size: var(--font-size-3xl);
       font-weight: 600;
       line-height: 1;
