@@ -2,20 +2,24 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/models"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 // GetExerciseStats is an exercise's numbers per workout over all history, oldest first, plus its working weights.
 func (s *JymService) GetExerciseStats(ctx context.Context, userID, exerciseID uuid.UUID) (*models.ExerciseStats, error) {
-	if ok, err := s.ownsExercise(ctx, exerciseID, userID); err != nil {
+	var kind string
+	if err := s.db.QueryRow(ctx, `SELECT kind FROM exercises WHERE id = $1 AND user_id = $2`, exerciseID, userID).Scan(&kind); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrExerciseNotFound
+		}
 		return nil, err
-	} else if !ok {
-		return nil, ErrExerciseNotFound
 	}
 
 	e1rm := e1rmSQL(loadSQL, "ss.reps_performed")
@@ -92,7 +96,12 @@ func (s *JymService) GetExerciseStats(ctx context.Context, userID, exerciseID uu
 		}
 		stats.Weights = append(stats.Weights, w)
 	}
-	return stats, weights.Err()
+	if err := weights.Err(); err != nil {
+		return nil, err
+	}
+	weights.Close()
+	stats.Records, err = s.loadRecords(ctx, userID, exerciseID, kind)
+	return stats, err
 }
 
 // GetRepsAtWeight is each workout's working-set reps at one weight, outside deloads, oldest first.
@@ -151,7 +160,7 @@ func (s *JymService) ListExerciseWorkouts(ctx context.Context, userID, exerciseI
 		 )
 		 SELECT s.id, s.started_at, s.ended_at, s.session_type, r.name,
 		        ss.id, ss.set_number, ss.weight, COALESCE(ss.reps_performed, 0), ss.rpe, ss.is_warmup, ss.is_pr, ss.exercise_note,
-		        ss.duration_s, ss.distance_m, ss.body_weight_kg, ss.pr_kind
+		        ss.duration_s, ss.distance_m, ss.body_weight_kg, ss.pr_kind, ss.pr_kinds
 		 FROM page
 		 JOIN sessions s ON s.id = page.id
 		 LEFT JOIN routines r ON s.routine_id = r.id
@@ -171,7 +180,7 @@ func (s *JymService) ListExerciseWorkouts(ctx context.Context, userID, exerciseI
 		var note *string
 		if err := rows.Scan(&w.SessionID, &w.StartedAt, &w.EndedAt, &w.SessionType, &w.RoutineName,
 			&set.ID, &set.SetNumber, &set.Weight, &set.Reps, &set.RPE, &set.IsWarmup, &set.IsPR, &note,
-			&set.DurationS, &set.DistanceM, &set.BodyWeightKg, &set.PRKind); err != nil {
+			&set.DurationS, &set.DistanceM, &set.BodyWeightKg, &set.PRKind, &set.PRKinds); err != nil {
 			return nil, err
 		}
 		if set.Reps > 0 {

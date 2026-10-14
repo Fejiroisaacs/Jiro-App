@@ -43,7 +43,7 @@ func (s *JymService) GetSessionReport(ctx context.Context, userID, sessionID uui
 
 	setRows, err := s.db.Query(ctx,
 		`SELECT ss.exercise_id, e.name, e.muscle_group, ss.weight, COALESCE(ss.reps_performed, 0), COALESCE(ss.is_pr, false),
-		        e.kind, ss.duration_s, ss.distance_m, ss.body_weight_kg
+		        e.kind, ss.duration_s, ss.distance_m, ss.body_weight_kg, ss.pr_kind
 		 FROM session_sets ss
 		 JOIN exercises e ON e.id = ss.exercise_id
 		 WHERE ss.session_id = $1 AND NOT ss.is_warmup
@@ -64,7 +64,8 @@ func (s *JymService) GetSessionReport(ctx context.Context, userID, sessionID uui
 		var kind string
 		var duration *int
 		var distance, bodyWeight *float64
-		if err := setRows.Scan(&exID, &name, &group, &weight, &reps, &isPR, &kind, &duration, &distance, &bodyWeight); err != nil {
+		var prKind *string
+		if err := setRows.Scan(&exID, &name, &group, &weight, &reps, &isPR, &kind, &duration, &distance, &bodyWeight, &prKind); err != nil {
 			return nil, err
 		}
 		l, ok := lifts[exID]
@@ -77,6 +78,9 @@ func (s *JymService) GetSessionReport(ctx context.Context, userID, sessionID uui
 		l.sets = append(l.sets, set)
 		if isPR {
 			l.prs = append(l.prs, set)
+			if prKind != nil && (l.report.PRKind == nil || prRank(*prKind) < prRank(*l.report.PRKind)) {
+				l.report.PRKind = prKind
+			}
 		}
 		l.report.Sets++
 		l.report.Volume += (weight + defloat(bodyWeight)) * float64(reps)

@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -241,5 +242,63 @@ func TestDeloadOrWarmupsOnlyIsNotTheBaseline(t *testing.T) {
 	}
 	if rep, _ := svc.GetSessionReport(ctx, userID, deload); rep.Exercises[0].IsFirst {
 		t.Fatal("a deload is never the first")
+	}
+}
+
+func TestRecordTypesAreStoredAndReRated(t *testing.T) {
+	svc, userID := testJymDB(t)
+	ctx := context.Background()
+	ex := prTestSetup(t, svc, userID, "Test Types")
+	baselineWorkout(t, svc, userID, models.CreateSetRequest{ExerciseID: ex, Weight: 100, RepsPerformed: ip(5)})
+
+	sess := startSession(t, svc, userID, "")
+	heavy := logSet(t, svc, userID, sess, ex, 1, 105, 5)
+	if heavy.PRKind == nil || *heavy.PRKind != prKindWeight || strings.Join(heavy.PRKinds, ",") != "weight,e1rm,reps" {
+		t.Fatalf("105 x 5 after 100 x 5: %v %v", heavy.PRKind, heavy.PRKinds)
+	}
+	reps := logSet(t, svc, userID, sess, ex, 2, 90, 10)
+	// e1RM 120 is under 105 x 5's 122.5, and a first set of 10 only sets the 10-rep max.
+	if reps.IsPR || len(reps.PRKinds) != 0 {
+		t.Fatalf("90 x 10: %v", reps.PRKinds)
+	}
+
+	// Editing the heavy set down to 95 x 5 leaves no record on it, and 90 x 10's e1RM now beats 100 x 5's 116.7.
+	down := 95.0
+	if _, err := svc.UpdateSet(ctx, userID, heavy.ID, &models.UpdateSetRequest{Weight: &down}); err != nil {
+		t.Fatalf("edit: %v", err)
+	}
+	got := storedSet(t, svc, userID, sess, heavy.ID)
+	if got.IsPR || got.PRKind != nil || len(got.PRKinds) != 0 {
+		t.Fatalf("95 x 5 after the edit: %v %v %v", got.IsPR, got.PRKind, got.PRKinds)
+	}
+	if got := storedSet(t, svc, userID, sess, reps.ID); strings.Join(got.PRKinds, ",") != "e1rm" {
+		t.Fatalf("90 x 10 after the edit: %v", got.PRKinds)
+	}
+}
+
+func TestStatsCarryRecordsFromTheFirstWorkout(t *testing.T) {
+	svc, userID := testJymDB(t)
+	ctx := context.Background()
+	ex := prTestSetup(t, svc, userID, "Test Records")
+	sess := startSession(t, svc, userID, "")
+	logSet(t, svc, userID, sess, ex, 1, 100, 5)
+	logSet(t, svc, userID, sess, ex, 2, 80, 10)
+	finishSession(t, svc, userID, sess)
+
+	stats, err := svc.GetExerciseStats(ctx, userID, ex)
+	if err != nil {
+		t.Fatalf("stats: %v", err)
+	}
+	r := stats.Records
+	if r == nil || r.Weight == nil || r.Weight.Weight != 100 || r.E1RM.Weight != 100 || len(r.RepMaxes) != maxRepPR {
+		t.Fatalf("records %+v", r)
+	}
+	if r.RepMaxes[4].Set.Weight != 100 || r.RepMaxes[9].Set.Weight != 80 || r.RepMaxes[10].Set != nil ||
+		r.RepMaxes[4].Set.SessionID == nil || *r.RepMaxes[4].Set.SessionID != sess {
+		t.Fatalf("rep maxes %+v %+v %+v", r.RepMaxes[4].Set, r.RepMaxes[9].Set, r.RepMaxes[10].Set)
+	}
+	plank := kindExercise(t, svc, userID, "Test Hold", KindDuration)
+	if s, err := svc.GetExerciseStats(ctx, userID, plank); err != nil || s.Records != nil {
+		t.Fatalf("a hold has no records panel: %v %+v", err, s)
 	}
 }

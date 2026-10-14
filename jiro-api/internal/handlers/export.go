@@ -186,6 +186,7 @@ type exportSet struct {
 	DistanceM     *float64  `json:"distance_m"`
 	BodyWeightKg  *float64  `json:"body_weight_kg"`
 	PRKind        *string   `json:"pr_kind"`
+	PRKinds       []string  `json:"pr_kinds"`
 }
 
 type exportSessionAttachment struct {
@@ -619,6 +620,7 @@ func (h *ExportHandler) gatherJym(ctx context.Context, userID uuid.UUID) (export
 				DistanceM:     set.DistanceM,
 				BodyWeightKg:  set.BodyWeightKg,
 				PRKind:        set.PRKind,
+				PRKinds:       set.PRKinds,
 			})
 		}
 		for _, a := range full.Attachments {

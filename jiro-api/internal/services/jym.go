@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -1497,7 +1498,7 @@ func (s *JymService) GetSession(ctx context.Context, userID, sessionID uuid.UUID
 	rows, err := s.db.Query(ctx,
 		`SELECT ss.id, ss.session_id, ss.exercise_id, ss.set_number, ss.weight,
 		        COALESCE(ss.reps_performed, 0), ss.rpe, ss.is_pr, ss.is_warmup, ss.exercise_note, ss.created_at,
-		        ss.duration_s, ss.distance_m, ss.body_weight_kg, ss.pr_kind,
+		        ss.duration_s, ss.distance_m, ss.body_weight_kg, ss.pr_kind, ss.pr_kinds,
 		        e.name, e.muscle_group, e.kind
 		 FROM session_sets ss
 		 JOIN exercises e ON ss.exercise_id = e.id
@@ -1516,7 +1517,7 @@ func (s *JymService) GetSession(ctx context.Context, userID, sessionID uuid.UUID
 		if err := rows.Scan(
 			&set.ID, &set.SessionID, &set.ExerciseID, &set.SetNumber, &set.Weight,
 			&set.RepsPerformed, &set.RPE, &set.IsPR, &set.IsWarmup, &set.ExerciseNote, &set.CreatedAt,
-			&set.DurationS, &set.DistanceM, &set.BodyWeightKg, &set.PRKind,
+			&set.DurationS, &set.DistanceM, &set.BodyWeightKg, &set.PRKind, &set.PRKinds,
 			&set.ExerciseName, &set.MuscleGroup, &set.ExerciseKind,
 		); err != nil {
 			return nil, err
@@ -1892,7 +1893,7 @@ func rerateExercisePRs(ctx context.Context, tx pgx.Tx, userID, exerciseID uuid.U
 
 	rows, err := tx.Query(ctx,
 		`SELECT ss.id, ss.session_id, ss.weight, ss.reps_performed, ss.duration_s, ss.distance_m, ss.body_weight_kg,
-		        NOT ss.is_warmup AND s.session_type <> 'deload', ss.is_pr, ss.pr_kind
+		        NOT ss.is_warmup AND s.session_type <> 'deload', ss.is_pr, ss.pr_kind, ss.pr_kinds
 		 FROM session_sets ss
 		 JOIN sessions s ON s.id = ss.session_id
 		 WHERE ss.exercise_id = $1 AND s.user_id = $2
@@ -1903,16 +1904,17 @@ func rerateExercisePRs(ctx context.Context, tx pgx.Tx, userID, exerciseID uuid.U
 		return 0, err
 	}
 	type current struct {
-		id   uuid.UUID
-		pr   bool
-		kind *string
+		id    uuid.UUID
+		pr    bool
+		kind  *string
+		kinds []string
 	}
 	var sets []prSet
 	var now []current
 	for rows.Next() {
 		var p prSet
 		var c current
-		if err := rows.Scan(&c.id, &p.session, &p.weight, &p.reps, &p.durationS, &p.distanceM, &p.bodyWeight, &p.counts, &c.pr, &c.kind); err != nil {
+		if err := rows.Scan(&c.id, &p.session, &p.weight, &p.reps, &p.durationS, &p.distanceM, &p.bodyWeight, &p.counts, &c.pr, &c.kind, &c.kinds); err != nil {
 			rows.Close()
 			return 0, err
 		}
@@ -1923,24 +1925,26 @@ func rerateExercisePRs(ctx context.Context, tx pgx.Tx, userID, exerciseID uuid.U
 	if err := rows.Err(); err != nil {
 		return 0, err
 	}
-	var ids []string
+	// pgx can't send a ragged text[][], so each set's kinds go comma-joined and are split in SQL.
+	var ids, joined []string
 	var flags []bool
-	var kinds []*string
 	for i, r := range ratePRs(kind, sets) {
-		if r.pr != now[i].pr || deref(r.kind) != deref(now[i].kind) {
+		if r.pr != now[i].pr || deref(r.top()) != deref(now[i].kind) || !slices.Equal(r.kinds, now[i].kinds) {
 			ids = append(ids, now[i].id.String())
 			flags = append(flags, r.pr)
-			kinds = append(kinds, r.kind)
+			joined = append(joined, strings.Join(r.kinds, ","))
 		}
 	}
 	if len(ids) == 0 {
 		return 0, nil
 	}
 	if _, err := tx.Exec(ctx,
-		`UPDATE session_sets SET is_pr = u.pr, pr_kind = u.kind
-		 FROM unnest($1::text[], $2::bool[], $3::text[]) AS u(id, pr, kind)
+		`UPDATE session_sets
+		 SET is_pr = u.pr, pr_kind = NULLIF(split_part(u.kinds, ',', 1), ''),
+		     pr_kinds = COALESCE(string_to_array(NULLIF(u.kinds, ''), ','), '{}')
+		 FROM unnest($1::text[], $2::bool[], $3::text[]) AS u(id, pr, kinds)
 		 WHERE session_sets.id = u.id::uuid`,
-		ids, flags, kinds,
+		ids, flags, joined,
 	); err != nil {
 		return 0, err
 	}
@@ -2172,8 +2176,8 @@ func (s *JymService) UpdateSet(ctx context.Context, userID, setID uuid.UUID, req
 // readSetExtras reads what a write's RETURNING can't know yet: the record flags and body weight after re-rating.
 func readSetExtras(ctx context.Context, tx pgx.Tx, set *models.SessionSet) error {
 	return tx.QueryRow(ctx,
-		`SELECT is_pr, pr_kind, duration_s, distance_m, body_weight_kg FROM session_sets WHERE id = $1`, set.ID,
-	).Scan(&set.IsPR, &set.PRKind, &set.DurationS, &set.DistanceM, &set.BodyWeightKg)
+		`SELECT is_pr, pr_kind, pr_kinds, duration_s, distance_m, body_weight_kg FROM session_sets WHERE id = $1`, set.ID,
+	).Scan(&set.IsPR, &set.PRKind, &set.PRKinds, &set.DurationS, &set.DistanceM, &set.BodyWeightKg)
 }
 
 // DeleteSet removes a set, renumbers the rest of that exercise in the session, and re-rates its PRs.

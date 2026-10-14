@@ -80,6 +80,23 @@ type ExerciseStats struct {
 	Workouts []ExerciseStatsWorkout `json:"workouts"`
 	// Working weights outside deloads, heaviest first.
 	Weights []float64 `json:"weights"`
+	// Records is nil for duration and distance exercises, whose bests are in the workouts.
+	Records *ExerciseRecords `json:"records"`
+}
+
+// ExerciseRecords is a rep exercise's standing records over its working sets outside deloads. Weight is the
+// heaviest set (added load for bodyweight); RepMaxes (weight × reps) or MostReps (bodyweight) complete it.
+type ExerciseRecords struct {
+	Weight   *SetRef  `json:"weight"`
+	E1RM     *SetRef  `json:"e1rm"`
+	MostReps *SetRef  `json:"most_reps,omitempty"`
+	RepMaxes []RepMax `json:"rep_maxes,omitempty"`
+}
+
+// RepMax is the heaviest set of at least Reps reps; Set is nil until there is one.
+type RepMax struct {
+	Reps int     `json:"reps"`
+	Set  *SetRef `json:"set"`
 }
 
 // RepsAtWeight is one workout's working-set reps at a given weight.
@@ -101,9 +118,10 @@ type ExerciseWorkoutSet struct {
 	Est1RM    float64   `json:"est_1rm"`
 	DurationS *int      `json:"duration_s"`
 	DistanceM *float64  `json:"distance_m"`
-	// BodyWeightKg is a bodyweight set's body weight; PRKind names a distance record.
+	// BodyWeightKg is a bodyweight set's body weight. PRKind is the top record the set earned, PRKinds all of them.
 	BodyWeightKg *float64 `json:"body_weight_kg"`
 	PRKind       *string  `json:"pr_kind"`
+	PRKinds      []string `json:"pr_kinds"`
 }
 
 // ExerciseWorkout is a workout that included an exercise, with that exercise's sets.
@@ -582,9 +600,11 @@ type SessionSet struct {
 	// RepsPerformed is 0 for duration and distance sets, which have these instead.
 	DurationS *int     `json:"duration_s"`
 	DistanceM *float64 `json:"distance_m"`
-	// BodyWeightKg is the body weight a bodyweight set counts; PRKind names a distance record (distance, pace).
+	// BodyWeightKg is the body weight a bodyweight set counts. PRKind is the top record the set earned (weight,
+	// e1rm, reps, hold, distance, pace), PRKinds all of them in that order.
 	BodyWeightKg *float64 `json:"body_weight_kg"`
 	PRKind       *string  `json:"pr_kind"`
+	PRKinds      []string `json:"pr_kinds"`
 }
 
 // PreviousBest is the best set for one exercise from the most recent session
@@ -605,6 +625,7 @@ type ExerciseReport struct {
 	Sets        int       `json:"sets"`
 	Volume      float64   `json:"volume"`
 	IsPR        bool      `json:"is_pr"`
+	PRKind      *string   `json:"pr_kind"`  // the top record among the lift's record sets in this workout
 	IsFirst     bool      `json:"is_first"` // this is the lift's first workout, its baseline
 	Best        *SetRef   `json:"best"`
 	Previous    *SetRef   `json:"previous"`
@@ -616,6 +637,8 @@ type SetRef struct {
 	Reps   int        `json:"reps"`
 	Est1RM float64    `json:"est_1rm"`
 	Date   *time.Time `json:"date,omitempty"`
+	// SessionID is the set's workout, given for records.
+	SessionID *uuid.UUID `json:"session_id,omitempty"`
 	// Duration and distance sets have these instead of reps; a bodyweight set its body weight.
 	DurationS    *int     `json:"duration_s,omitempty"`
 	DistanceM    *float64 `json:"distance_m,omitempty"`
