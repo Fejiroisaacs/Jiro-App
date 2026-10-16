@@ -14,6 +14,7 @@ import { JiroPageHeaderComponent } from '../../../shared/components/jiro-page-he
 import { JiroEmptyStateComponent } from '../../../shared/components/jiro-empty-state/jiro-empty-state';
 import { JiroSkeletonComponent } from '../../../shared/components/jiro-skeleton/jiro-skeleton';
 import { JiroMenuComponent, JiroMenuItem } from '../../../shared/components/jiro-menu/jiro-menu';
+import { CataloguePickerComponent } from '../catalogue/catalogue-picker';
 import { formatDay } from '../../../core/utils/format-date';
 import { dayKey, todayKey } from '../../../core/utils/day';
 import { MUSCLE_GROUPS, toggleSecondary, withoutPrimary } from '../shared/muscles';
@@ -35,16 +36,18 @@ const ROW_ACTIONS: JiroMenuItem[] = [
   imports: [
     FormsModule, RouterLink,
     JiroButtonComponent, JiroModalComponent, JiroPageHeaderComponent,
-    JiroEmptyStateComponent, JiroSkeletonComponent, JiroMenuComponent,
+    JiroEmptyStateComponent, JiroSkeletonComponent, JiroMenuComponent, CataloguePickerComponent,
   ],
   template: `
     <div class="exercise-library">
       @if (!embedded()) {
         <jiro-page-header heading="Exercises" subtitle="Your exercise library">
+          <jiro-button actions variant="secondary" type="button" (click)="showCatalogue.set(true)">Add from catalogue</jiro-button>
           <jiro-button actions type="button" (click)="showCreate.set(true)">New exercise</jiro-button>
         </jiro-page-header>
       }
 
+      @if (!inlineCatalogue()) {
       <div class="toolbar">
         <input
           class="search-input"
@@ -58,7 +61,10 @@ const ROW_ACTIONS: JiroMenuItem[] = [
           @for (k of exerciseKinds; track k.value) { <option [value]="k.value">{{ k.label }}</option> }
         </select>
         @if (embedded()) {
-          <jiro-button type="button" (click)="showCreate.set(true)">New exercise</jiro-button>
+          <div class="toolbar-actions">
+            <jiro-button variant="secondary" type="button" (click)="showCatalogue.set(true)">Add from catalogue</jiro-button>
+            <jiro-button type="button" (click)="showCreate.set(true)">New exercise</jiro-button>
+          </div>
         }
       </div>
       <div class="muscle-chips" role="group" aria-label="Filter by muscle group">
@@ -67,6 +73,7 @@ const ROW_ACTIONS: JiroMenuItem[] = [
           <button type="button" class="mg-chip" [class.active]="activeMG() === mg" [attr.aria-pressed]="activeMG() === mg" (click)="setMG(mg)">{{ mg }}</button>
         }
       </div>
+      }
 
       @if (loading()) {
         <div class="ex-loading" aria-busy="true" aria-label="Loading exercises">
@@ -77,8 +84,19 @@ const ROW_ACTIONS: JiroMenuItem[] = [
           <jiro-empty-state icon="magnifying-glass" heading="No exercises match" message="Try another name, or clear the filters.">
             <jiro-button variant="secondary" size="sm" type="button" (click)="clearFilters()">Clear filters</jiro-button>
           </jiro-empty-state>
+        } @else if (inlineCatalogue()) {
+          <!-- An empty library starts from the catalogue; nothing is added unless ticked. -->
+          <section class="first-pick" aria-labelledby="first-pick-title">
+            <div class="first-pick-head">
+              <h2 id="first-pick-title" class="first-pick-title">Pick the exercises you do</h2>
+              <jiro-button variant="secondary" type="button" (click)="showCreate.set(true)">New exercise</jiro-button>
+            </div>
+            <p class="first-pick-sub">Tick the ones you train and add them in one go, or create your own.</p>
+            <jym-catalogue-picker mode="inline" (added)="onCatalogueAdded()" (skip)="catalogueSkipped.set(true)" />
+          </section>
         } @else {
           <jiro-empty-state icon="barbell" heading="No exercises yet" message="Build your library to track performance over time.">
+            <jiro-button variant="secondary" type="button" (click)="showCatalogue.set(true)">Browse the catalogue</jiro-button>
             <jiro-button type="button" (click)="showCreate.set(true)">Add your first exercise</jiro-button>
           </jiro-empty-state>
         }
@@ -114,6 +132,12 @@ const ROW_ACTIONS: JiroMenuItem[] = [
             </li>
           }
         </ul>
+      }
+
+      @if (showCatalogue()) {
+        <jiro-modal sheet title="Add from catalogue" maxWidth="560px" (close)="showCatalogue.set(false)">
+          <jym-catalogue-picker (added)="onCatalogueAdded()" />
+        </jiro-modal>
       }
 
       <!-- Create -->
@@ -229,6 +253,8 @@ const ROW_ACTIONS: JiroMenuItem[] = [
       display: flex; align-items: center; gap: var(--space-sm);
       margin-bottom: var(--space-sm);
     }
+
+    .toolbar-actions { display: flex; gap: var(--space-sm); flex-shrink: 0; }
 
     .search-input {
       flex: 1; max-width: 400px; min-height: 40px; padding: 8px 14px;
@@ -361,6 +387,11 @@ const ROW_ACTIONS: JiroMenuItem[] = [
       .ex-link { grid-template-columns: 1fr; gap: 4px; }
     }
 
+    /* The empty library's catalogue */
+    .first-pick-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); flex-wrap: wrap; margin-top: var(--space-md); }
+    .first-pick-title { font-size: var(--font-size-xl); margin: 0; }
+    .first-pick-sub { color: var(--text-secondary); margin: var(--space-xs) 0 var(--space-md); max-width: 60ch; }
+
     /* Forms */
     .ex-form { display: flex; flex-direction: column; gap: var(--space-md); }
 
@@ -419,6 +450,11 @@ export class ExerciseLibraryComponent implements OnInit {
   searchQuery = '';
 
   showCreate = signal(false);
+  showCatalogue = signal(false);
+  /** Skipped the empty library's catalogue for this visit. */
+  catalogueSkipped = signal(false);
+  /** An empty library, with no search or filter, opens on the catalogue. */
+  readonly inlineCatalogue = computed(() => !this.loading() && !this.catalogueSkipped() && this.exercises().length === 0 && !this.hasFilters());
   saving = signal(false);
   newName = '';
   newMG = '';
@@ -514,6 +550,11 @@ export class ExerciseLibraryComponent implements OnInit {
     if (days < 14) return `${days} days ago`;
     if (days < 56) return `${Math.round(days / 7)} weeks ago`;
     return formatDay(iso);
+  }
+
+  onCatalogueAdded() {
+    this.showCatalogue.set(false);
+    this.load(this.searchQuery.trim() || undefined, this.activeMG() || undefined);
   }
 
   hasFilters(): boolean {
