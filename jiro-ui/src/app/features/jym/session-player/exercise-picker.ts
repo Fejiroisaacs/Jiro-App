@@ -1,6 +1,8 @@
-import { Component, computed, inject, input, output, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { JymService } from '../../../core/services/jym.service';
+import { CatalogueExercise, JymService } from '../../../core/services/jym.service';
+import { ToastService } from '../../../core/services/toast.service';
+import { catalogueMatches } from '../catalogue/catalogue';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
@@ -34,7 +36,17 @@ import { EXERCISE_KINDS, ExerciseKind } from '../exercise-kind';
             </button>
           }
           @if (filtered().length === 0 && search().trim()) {
-            <p class="picker-none">Nothing matches "{{ search().trim() }}".</p>
+            <p class="picker-none">{{ suggestions().length ? 'Not in your library yet.' : 'Nothing matches "' + search().trim() + '".' }}</p>
+          }
+          <!-- Catalogue matches not in the library; choosing one adds just that one. -->
+          @if (suggestions().length) {
+            <p class="picker-group">From the catalogue</p>
+            @for (c of suggestions(); track c.key) {
+              <button type="button" class="picker-item" [disabled]="adding()" (click)="addFromCatalogue(c)">
+                <span class="pi-name">{{ c.name }}</span>
+                <span class="pi-side"><span class="pi-mg">{{ c.muscle_group }}</span><span class="pi-new">New</span></span>
+              </button>
+            }
           }
           <!-- Create shortcut: always at the bottom, name pre-filled from the search -->
           <button type="button" class="picker-create-btn" (click)="startCreate()">
@@ -110,6 +122,12 @@ import { EXERCISE_KINDS, ExerciseKind } from '../exercise-kind';
     .pi-name { font-size: var(--font-size-md); color: var(--text-primary); font-weight: 500; }
     .pi-mg { font-size: var(--font-size-xs); color: var(--text-muted); white-space: nowrap; }
 
+    .picker-group { margin: var(--space-sm) 0 0; padding: 0 var(--space-md); font-size: var(--font-size-sm); font-weight: 600; color: var(--text-secondary); }
+    .pi-side { display: inline-flex; align-items: center; gap: var(--space-sm); }
+    .pi-new {
+      font-size: var(--font-size-xs); font-weight: 600; color: var(--color-primary-text);
+      padding: 2px 8px; border-radius: var(--border-radius-pill); background: rgba(var(--color-primary-rgb), 0.08);
+    }
     .picker-none { padding: var(--space-md); font-size: var(--font-size-sm); color: var(--text-muted); text-align: center; }
 
     .picker-create-btn {
@@ -146,7 +164,7 @@ import { EXERCISE_KINDS, ExerciseKind } from '../exercise-kind';
     .create-error { font-size: var(--font-size-sm); color: var(--color-negative); margin-top: var(--space-xs); }
   `],
 })
-export class ExercisePickerComponent {
+export class ExercisePickerComponent implements OnInit {
   private readonly jym = inject(JymService);
 
   /** The user's library. */
@@ -157,6 +175,41 @@ export class ExercisePickerComponent {
   readonly close = output<void>();
 
   readonly search = signal('');
+  private readonly toast = inject(ToastService);
+  private readonly catalogue = signal<CatalogueExercise[]>([]);
+  readonly adding = signal(false);
+  /** Catalogue matches for the search that the library doesn't have (by name, ignoring case). */
+  readonly suggestions = computed(() => {
+    const have = new Set(this.exercises().map(e => e.name.toLowerCase()));
+    return catalogueMatches(this.catalogue().filter(c => !have.has(c.name.toLowerCase())), this.search());
+  });
+
+  ngOnInit() {
+    this.jym.getCatalogue().subscribe({ next: list => this.catalogue.set(list), error: () => {} });
+  }
+
+  /** Copies one catalogue exercise into the library, then picks it like a created one. */
+  addFromCatalogue(c: CatalogueExercise) {
+    this.adding.set(true);
+    this.jym.addFromCatalogue([c.key]).subscribe({
+      next: res => {
+        this.adding.set(false);
+        const ex = res.added[0];
+        if (ex) {
+          const entry = { id: ex.id, name: ex.name, muscle_group: ex.muscle_group, kind: ex.kind };
+          this.created.emit(entry);
+          this.picked.emit(entry);
+          return;
+        }
+        // Already added elsewhere: pick the library's own.
+        const own = this.exercises().find(e => e.name.toLowerCase() === c.name.toLowerCase());
+        if (own) this.picked.emit(own);
+        else this.toast.error(`${c.name} is already in your library.`);
+      },
+      error: () => { this.adding.set(false); this.toast.error(`Could not add ${c.name}.`); },
+    });
+  }
+
   readonly filtered = computed(() => {
     const q = this.search().toLowerCase();
     return this.exercises().filter(e => e.name.toLowerCase().includes(q) || (e.muscle_group || '').toLowerCase().includes(q));

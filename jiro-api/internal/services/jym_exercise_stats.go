@@ -2,24 +2,20 @@ package services
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/Fejiroisaacs/Jiro-App/jiro-api/internal/models"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 )
 
 // GetExerciseStats is an exercise's numbers per workout over all history, oldest first, plus its working weights.
 func (s *JymService) GetExerciseStats(ctx context.Context, userID, exerciseID uuid.UUID) (*models.ExerciseStats, error) {
-	var kind string
-	if err := s.db.QueryRow(ctx, `SELECT kind FROM exercises WHERE id = $1 AND user_id = $2`, exerciseID, userID).Scan(&kind); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrExerciseNotFound
-		}
+	if ok, err := s.ownsExercise(ctx, exerciseID, userID); err != nil {
 		return nil, err
+	} else if !ok {
+		return nil, ErrExerciseNotFound
 	}
 
 	e1rm := e1rmSQL(loadSQL, "ss.reps_performed")
@@ -96,12 +92,7 @@ func (s *JymService) GetExerciseStats(ctx context.Context, userID, exerciseID uu
 		}
 		stats.Weights = append(stats.Weights, w)
 	}
-	if err := weights.Err(); err != nil {
-		return nil, err
-	}
-	weights.Close()
-	stats.Records, err = s.loadRecords(ctx, userID, exerciseID, kind)
-	return stats, err
+	return stats, weights.Err()
 }
 
 // GetRepsAtWeight is each workout's working-set reps at one weight, outside deloads, oldest first.

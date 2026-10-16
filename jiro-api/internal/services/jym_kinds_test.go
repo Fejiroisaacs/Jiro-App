@@ -390,12 +390,12 @@ func TestKindsInReportsStatsAndRecords(t *testing.T) {
 
 func TestRatePRsWeightTypes(t *testing.T) {
 	sets := apart([]prSet{
-		{weight: 100, reps: ip(5), counts: true},  // the baseline
-		{weight: 90, reps: ip(10), counts: true},  // e1RM 120 beats 116.7; the first set of 10 only sets that rep max
+		{weight: 100, reps: ip(5), counts: true},   // the baseline
+		{weight: 90, reps: ip(10), counts: true},   // e1RM 120 beats 116.7; the first set of 10 only sets that rep max
 		{weight: 102.5, reps: ip(5), counts: true}, // heavier: weight, e1RM 119.6 doesn't beat 120, 5-rep max 100
-		{weight: 95, reps: ip(8), counts: true},   // e1RM 120.3 beats 120; the 8-rep max is 90 (the 10-rep set)
-		{weight: 95, reps: ip(8), counts: true},   // ties it: nothing
-		{weight: 110, reps: ip(1), counts: true},  // weight, and the 1-rep max (102.5); e1RM 110 doesn't beat 120
+		{weight: 95, reps: ip(8), counts: true},    // e1RM 120.3 beats 120; the 8-rep max is 90 (the 10-rep set)
+		{weight: 95, reps: ip(8), counts: true},    // ties it: nothing
+		{weight: 110, reps: ip(1), counts: true},   // weight, and the 1-rep max (102.5); e1RM 110 doesn't beat 120
 		{weight: 92.5, reps: ip(14), counts: true}, // past 12 reps: no rep max; e1RM capped at 10 reps: 123.3 beats 120
 	})
 	if got := prFlags(KindWeightReps, sets); got != "-EWE-WE" {

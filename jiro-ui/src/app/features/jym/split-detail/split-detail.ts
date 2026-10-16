@@ -5,7 +5,8 @@ import { Observable, firstValueFrom, forkJoin } from 'rxjs';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
-import { JymService, Split, SplitWithRoutines, Routine, RoutineItem, Exercise, ReplaceItemEntry } from '../../../core/services/jym.service';
+import { JymService, Split, SplitWithRoutines, Routine, RoutineItem, Exercise, ReplaceItemEntry, CatalogueExercise } from '../../../core/services/jym.service';
+import { catalogueMatches } from '../catalogue/catalogue';
 import { JiroButtonComponent } from '../../../shared/components/jiro-button/jiro-button';
 import { JiroModalComponent } from '../../../shared/components/jiro-modal/jiro-modal';
 import { JiroIconComponent } from '../../../shared/components/jiro-icon/jiro-icon';
@@ -314,9 +315,19 @@ import { MUSCLE_GROUPS } from '../shared/muscles';
 }
           @if (filteredExercises().length === 0) {
 <div class="no-results">
-            <p class="text-secondary">No exercises match "{{ exSearch }}".</p>
+            <p class="text-secondary">{{ catalogueSuggestions().length ? 'Not in your library yet.' : 'No exercises match "' + exSearch + '".' }}</p>
           </div>
 }
+          <!-- Catalogue matches not in the library; choosing one adds just that one. -->
+          @if (catalogueSuggestions().length) {
+            <p class="ex-pick-group">From the catalogue</p>
+            @for (c of catalogueSuggestions(); track c.key) {
+              <button class="ex-pick-btn" [disabled]="catalogueAdding()" (click)="addFromCatalogue(c)">
+                <span class="ex-pick-name">{{ c.name }}</span>
+                <span class="ex-pick-side"><span class="ex-pick-muscle">{{ c.muscle_group }}</span><span class="ex-pick-new">New</span></span>
+              </button>
+            }
+          }
         </div>
 }
 
@@ -807,6 +818,12 @@ import { MUSCLE_GROUPS } from '../shared/muscles';
     .ex-pick-name { font-size: var(--font-size-sm); font-weight: 500; color: var(--text-primary); }
 
     .ex-pick-muscle { font-size: var(--font-size-xs); color: var(--text-muted); }
+    .ex-pick-group { margin: var(--space-sm) 0 0; font-size: var(--font-size-sm); font-weight: 600; color: var(--text-secondary); }
+    .ex-pick-side { display: inline-flex; align-items: center; gap: var(--space-sm); }
+    .ex-pick-new {
+      font-size: var(--font-size-xs); font-weight: 600; color: var(--color-primary-text);
+      padding: 2px 8px; border-radius: var(--border-radius-pill); background: rgba(var(--color-primary-rgb), 0.08);
+    }
 
     .no-results { padding: var(--space-md); text-align: center; }
 
@@ -961,6 +978,10 @@ export class SplitDetailComponent implements OnInit {
   allExercises = signal<Exercise[]>([]);
   filteredExercises = signal<Exercise[]>([]);
   exSearch = '';
+  private catalogue: CatalogueExercise[] = [];
+  /** Catalogue matches for the search that the library doesn't have yet. */
+  catalogueSuggestions = signal<CatalogueExercise[]>([]);
+  catalogueAdding = signal(false);
   pickerSelectedEx = signal<Exercise | null>(null);
   pickerSets = 3;
   pickerReps = 8;
@@ -1414,6 +1435,10 @@ export class SplitDetailComponent implements OnInit {
     this.exSearch = '';
     this.creatingExercise.set(false);
     this.filteredExercises.set(this.allExercises());
+    this.catalogueSuggestions.set([]);
+    if (!this.catalogue.length) {
+      this.jymService.getCatalogue().subscribe({ next: list => { this.catalogue = list; this.filterExercises(); }, error: () => {} });
+    }
     this.showExPicker.set(true);
   }
 
@@ -1422,6 +1447,24 @@ export class SplitDetailComponent implements OnInit {
     this.filteredExercises.set(this.allExercises().filter(e =>
       e.name.toLowerCase().includes(q) || (e.muscle_group || '').toLowerCase().includes(q)
     ));
+    const have = new Set(this.allExercises().map(e => e.name.toLowerCase()));
+    this.catalogueSuggestions.set(catalogueMatches(this.catalogue.filter(c => !have.has(c.name.toLowerCase())), this.exSearch));
+  }
+
+  /** Copies one catalogue exercise into the library, then picks it like a created one. */
+  addFromCatalogue(c: CatalogueExercise) {
+    this.catalogueAdding.set(true);
+    this.jymService.addFromCatalogue([c.key]).subscribe({
+      next: res => {
+        this.catalogueAdding.set(false);
+        const ex = res.added[0] ?? this.allExercises().find(e => e.name.toLowerCase() === c.name.toLowerCase());
+        if (!ex) { this.toast.error(`${c.name} is already in your library.`); return; }
+        if (res.added[0]) this.allExercises.update(list => [...list, ex]);
+        this.filterExercises();
+        this.addExerciseToRoutine(ex);
+      },
+      error: () => { this.catalogueAdding.set(false); this.toast.error(`Could not add ${c.name}.`); },
+    });
   }
 
   addExerciseToRoutine(ex: Exercise) {

@@ -220,6 +220,8 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 				// Exercises
 				jym.POST("/exercises", jymHandler.CreateExercise)
 				jym.GET("/exercises", jymHandler.ListExercises)
+				jym.GET("/catalogue", jymHandler.ListCatalogue)
+				jym.POST("/catalogue/add", jymHandler.AddFromCatalogue)
 				jym.GET("/exercises/:id", jymHandler.GetExercise)
 				jym.PUT("/exercises/:id", jymHandler.UpdateExercise)
 				jym.PUT("/exercises/:id/rest", jymHandler.SetExerciseRest)

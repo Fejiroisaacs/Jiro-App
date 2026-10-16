@@ -31,6 +31,11 @@ A personal exercise dictionary. Each exercise has a **name**, an optional **main
 - Muscles come from one list: Chest, Back, Shoulders, Biceps, Triceps, Legs, Glutes, Core, Cardio and Other. Names stored before the list were mapped onto it ignoring case (quads, hamstrings and calves became Legs, abs became Core, anything else Other).
 - **Also works** (the secondary muscles) organises an exercise: Bench Press is Chest, and also works Shoulders and Triceps. They show as muted tags in the library and on the exercise page, and the library's muscle filter finds them (Triceps lists Bench Press too, with its Triceps tag marked). Everything that counts uses the main muscle only (see How Jym Counts).
 - Create, edit, and delete exercises from the library (`/jym/exercises`), and filter it by muscle group.
+- **The catalogue** (`GET /jym/catalogue`): 115 common exercises, each with its main and other muscles, type and equipment (the list is in `docs/JYM-CATALOGUE.md`). Nothing is added until it's picked:
+  - **Add from catalogue** in the library opens it grouped by main muscle, with search and equipment chips; tick several and add them in one go (`POST /jym/catalogue/add`). An added exercise is a normal copy you can rename or delete.
+  - An empty library opens on it ("Pick the exercises you do", or **Skip for now**).
+  - In the split and workout pickers, a search also lists up to 5 catalogue matches marked **New**; choosing one adds it and picks it.
+  - A catalogue exercise whose name you already have, ignoring case, shows **In your library** and can't be added twice.
 - Each row shows the best set and when the exercise was last trained.
 - Renaming an exercise renames it across all history, since sets reference the exercise by ID.
 - Deleting an exercise removes every set logged with it; the library asks first.

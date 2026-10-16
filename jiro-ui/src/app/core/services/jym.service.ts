@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, shareReplay, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { SettingsService } from './settings.service';
 import type { ExerciseKind } from '../../features/jym/exercise-kind';
@@ -79,18 +79,8 @@ export interface ExerciseStatsWorkout {
 /** An exercise's whole history, one row per workout, oldest first. */
 export interface ExerciseStats {
   workouts: ExerciseStatsWorkout[];
-  /** Working weights outside deloads, heaviest first. */
+  /** Working weights outside deloads, heaviest first (added loads for bodyweight lifts). */
   weights: number[];
-  /** Standing records for weight × reps and bodyweight exercises; null for holds and distances. */
-  records: ExerciseRecords | null;
-}
-
-/** An exercise's standing records: heaviest (added load for bodyweight), best e1RM, and rep maxes or most reps. */
-export interface ExerciseRecords {
-  weight: SetRef | null;
-  e1rm: SetRef | null;
-  most_reps?: SetRef | null;
-  rep_maxes?: { reps: number; set: SetRef | null }[];
 }
 
 export interface RepsAtWeight {
@@ -144,12 +134,23 @@ export interface ExercisePR {
 }
 
 /** One set with its estimated 1RM, in kg; `date` is its workout's start, given for last time. */
+/** A built-in exercise to copy into the library (J20). */
+export interface CatalogueExercise {
+  key: string;
+  name: string;
+  muscle_group: string;
+  secondary_muscles: string[];
+  kind: ExerciseKind;
+  equipment: string;
+  /** The library has an exercise of this name, ignoring case. */
+  in_library: boolean;
+}
+
 export interface SetRef {
   weight: number;
   reps: number;
   est_1rm: number;
   date?: string;
-  session_id?: string;
   duration_s?: number;
   distance_m?: number;
   body_weight_kg?: number;
@@ -524,6 +525,20 @@ export class JymService {
 
   createExercise(req: CreateExerciseRequest): Observable<Exercise> {
     return this.http.post<Exercise>(`${API_URL}/exercises`, req);
+  }
+
+  private catalogue$: Observable<CatalogueExercise[]> | null = null;
+
+  /** The built-in exercise catalogue (J20), each marked in_library; cached until an add. */
+  getCatalogue(): Observable<CatalogueExercise[]> {
+    this.catalogue$ ??= this.http.get<CatalogueExercise[]>(`${API_URL}/catalogue`).pipe(shareReplay(1));
+    return this.catalogue$;
+  }
+
+  /** Copies catalogue exercises into the library; names already there come back as skipped. */
+  addFromCatalogue(keys: string[]): Observable<{ added: Exercise[]; skipped: string[] }> {
+    return this.http.post<{ added: Exercise[]; skipped: string[] }>(`${API_URL}/catalogue/add`, { keys })
+      .pipe(tap(() => { this.catalogue$ = null; }));
   }
 
   updateExercise(id: string, req: UpdateExerciseRequest): Observable<Exercise> {

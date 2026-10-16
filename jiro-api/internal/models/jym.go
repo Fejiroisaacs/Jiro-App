@@ -78,25 +78,8 @@ type ExerciseStatsWorkout struct {
 // ExerciseStats is an exercise's whole history, one row per workout, oldest first.
 type ExerciseStats struct {
 	Workouts []ExerciseStatsWorkout `json:"workouts"`
-	// Working weights outside deloads, heaviest first.
+	// Working weights outside deloads, heaviest first (added loads for bodyweight lifts).
 	Weights []float64 `json:"weights"`
-	// Records is nil for duration and distance exercises, whose bests are in the workouts.
-	Records *ExerciseRecords `json:"records"`
-}
-
-// ExerciseRecords is a rep exercise's standing records over its working sets outside deloads. Weight is the
-// heaviest set (added load for bodyweight); RepMaxes (weight × reps) or MostReps (bodyweight) complete it.
-type ExerciseRecords struct {
-	Weight   *SetRef  `json:"weight"`
-	E1RM     *SetRef  `json:"e1rm"`
-	MostReps *SetRef  `json:"most_reps,omitempty"`
-	RepMaxes []RepMax `json:"rep_maxes,omitempty"`
-}
-
-// RepMax is the heaviest set of at least Reps reps; Set is nil until there is one.
-type RepMax struct {
-	Reps int     `json:"reps"`
-	Set  *SetRef `json:"set"`
 }
 
 // RepsAtWeight is one workout's working-set reps at a given weight.
@@ -160,6 +143,28 @@ type CreateExerciseRequest struct {
 	Notes            *string  `json:"notes"`
 	// Kind defaults to weight_reps.
 	Kind *string `json:"kind" binding:"omitempty,oneof=weight_reps bodyweight duration distance"`
+}
+
+// CatalogueExercise is a built-in exercise (J20); InLibrary when the user has one of that name, ignoring case.
+type CatalogueExercise struct {
+	Key              string   `json:"key"`
+	Name             string   `json:"name"`
+	MuscleGroup      string   `json:"muscle_group"`
+	SecondaryMuscles []string `json:"secondary_muscles"`
+	Kind             string   `json:"kind"`
+	Equipment        string   `json:"equipment"`
+	InLibrary        bool     `json:"in_library"`
+}
+
+// AddFromCatalogueRequest names the catalogue exercises to copy into the library.
+type AddFromCatalogueRequest struct {
+	Keys []string `json:"keys" binding:"required,min=1,max=150"`
+}
+
+// AddFromCatalogueResult is what was added, and the names skipped because the library already had them.
+type AddFromCatalogueResult struct {
+	Added   []Exercise `json:"added"`
+	Skipped []string   `json:"skipped"`
 }
 
 type UpdateExerciseRequest struct {
@@ -637,8 +642,6 @@ type SetRef struct {
 	Reps   int        `json:"reps"`
 	Est1RM float64    `json:"est_1rm"`
 	Date   *time.Time `json:"date,omitempty"`
-	// SessionID is the set's workout, given for records.
-	SessionID *uuid.UUID `json:"session_id,omitempty"`
 	// Duration and distance sets have these instead of reps; a bodyweight set its body weight.
 	DurationS    *int     `json:"duration_s,omitempty"`
 	DistanceM    *float64 `json:"distance_m,omitempty"`
