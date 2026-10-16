@@ -724,7 +724,7 @@ export class ExerciseDetailComponent implements OnInit, AfterViewInit, OnDestroy
         ];
       }
       case 'bodyweight': {
-        const load = this.stats()?.records?.weight?.weight ?? 0;
+        const load = this.stats()?.weights[0] ?? 0;
         return [
           { label: 'Most reps', value: String(Math.max(0, ...ws.map(w => w.max_reps))) },
           ...(load > 0 ? [{ label: 'Heaviest added', value: `+${kg(load)}` }] : []),

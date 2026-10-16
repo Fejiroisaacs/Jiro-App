@@ -276,29 +276,16 @@ func TestRecordTypesAreStoredAndReRated(t *testing.T) {
 	}
 }
 
-func TestStatsCarryRecordsFromTheFirstWorkout(t *testing.T) {
+func TestStatsListAddedLoadsHeaviestFirst(t *testing.T) {
 	svc, userID := testJymDB(t)
 	ctx := context.Background()
-	ex := prTestSetup(t, svc, userID, "Test Records")
+	pull := kindExercise(t, svc, userID, "Test Load", KindBodyweight)
 	sess := startSession(t, svc, userID, "")
-	logSet(t, svc, userID, sess, ex, 1, 100, 5)
-	logSet(t, svc, userID, sess, ex, 2, 80, 10)
+	logSet(t, svc, userID, sess, pull, 1, 0, 8)
+	logSet(t, svc, userID, sess, pull, 2, 10, 5)
 	finishSession(t, svc, userID, sess)
-
-	stats, err := svc.GetExerciseStats(ctx, userID, ex)
-	if err != nil {
-		t.Fatalf("stats: %v", err)
-	}
-	r := stats.Records
-	if r == nil || r.Weight == nil || r.Weight.Weight != 100 || r.E1RM.Weight != 100 || len(r.RepMaxes) != maxRepPR {
-		t.Fatalf("records %+v", r)
-	}
-	if r.RepMaxes[4].Set.Weight != 100 || r.RepMaxes[9].Set.Weight != 80 || r.RepMaxes[10].Set != nil ||
-		r.RepMaxes[4].Set.SessionID == nil || *r.RepMaxes[4].Set.SessionID != sess {
-		t.Fatalf("rep maxes %+v %+v %+v", r.RepMaxes[4].Set, r.RepMaxes[9].Set, r.RepMaxes[10].Set)
-	}
-	plank := kindExercise(t, svc, userID, "Test Hold", KindDuration)
-	if s, err := svc.GetExerciseStats(ctx, userID, plank); err != nil || s.Records != nil {
-		t.Fatalf("a hold has no records panel: %v %+v", err, s)
+	stats, err := svc.GetExerciseStats(ctx, userID, pull)
+	if err != nil || len(stats.Weights) != 2 || stats.Weights[0] != 10 {
+		t.Fatalf("weights: %v %v", err, stats.Weights)
 	}
 }

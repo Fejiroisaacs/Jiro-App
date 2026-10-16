@@ -79,18 +79,8 @@ export interface ExerciseStatsWorkout {
 /** An exercise's whole history, one row per workout, oldest first. */
 export interface ExerciseStats {
   workouts: ExerciseStatsWorkout[];
-  /** Working weights outside deloads, heaviest first. */
+  /** Working weights outside deloads, heaviest first (added loads for bodyweight lifts). */
   weights: number[];
-  /** Standing records for weight × reps and bodyweight exercises; null for holds and distances. */
-  records: ExerciseRecords | null;
-}
-
-/** An exercise's standing records: heaviest (added load for bodyweight), best e1RM, and rep maxes or most reps. */
-export interface ExerciseRecords {
-  weight: SetRef | null;
-  e1rm: SetRef | null;
-  most_reps?: SetRef | null;
-  rep_maxes?: { reps: number; set: SetRef | null }[];
 }
 
 export interface RepsAtWeight {
@@ -149,7 +139,6 @@ export interface SetRef {
   reps: number;
   est_1rm: number;
   date?: string;
-  session_id?: string;
   duration_s?: number;
   distance_m?: number;
   body_weight_kg?: number;
