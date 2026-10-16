@@ -30,13 +30,14 @@ import { GUIDE } from '../shared';
         <guide-steps>
           <li>Open <a routerLink="/jym/exercises">Exercises</a>.</li>
           <li>Type in <strong>Search exercises...</strong>, or select a muscle group such as <strong>Chest</strong> to filter the list.</li>
-          <li>To add one, select <strong>New exercise</strong>, enter a <strong>Name</strong>, choose its <strong>Type</strong> and a <strong>Main muscle group</strong>. Under <strong>Also works</strong>, select any other muscles it trains, such as Triceps for a bench press. Add any <strong>Notes</strong>, then select <strong>Create exercise</strong>.</li>
+          <li>To add common exercises, select <strong>Add from catalogue</strong>. Open a muscle group or search, tick the ones you do, then select <strong>Add</strong>. Only what you tick is added, and ones already in your library are marked. A new account's empty library opens on the catalogue.</li>
+          <li>To add your own, select <strong>New exercise</strong>, enter a <strong>Name</strong>, choose its <strong>Type</strong> and a <strong>Main muscle group</strong>. Under <strong>Also works</strong>, select any other muscles it trains, such as Triceps for a bench press. Add any <strong>Notes</strong>, then select <strong>Create exercise</strong>.</li>
           <li>Filtering by a muscle also lists exercises that work it as an extra muscle. Your stats count each exercise under its main muscle group only.</li>
           <li>The <strong>Type</strong> sets what you log. <strong>Weight × reps</strong> is for most lifts. <strong>Bodyweight</strong> is reps with any weight you add, such as pull-ups with a belt, and counts your body weight. <strong>Duration</strong> is a time held, such as a plank. <strong>Distance + time</strong> is for runs, rows and rides, and shows your pace. Use <strong>All types</strong> to filter the list.</li>
           <li>Once an exercise has logged sets, it can only switch between weight × reps and bodyweight. For another type, make a new exercise.</li>
           <li>To rename or delete an exercise, open the menu at the end of its row and choose <strong>Edit</strong> or <strong>Delete</strong>. A new name shows in your past sessions too.</li>
         </guide-steps>
-        <guide-tip>You can also create an exercise while building a split or during a workout, from the search box in <strong>Add exercise</strong>.</guide-tip>
+        <guide-tip>You can also add an exercise while building a split or during a workout, from the search box in <strong>Add exercise</strong>. Catalogue matches you don't have yet are marked <strong>New</strong>.</guide-tip>
       </guide-section>
 
       <guide-section id="check-an-exercise" title="Check an exercise's progress"
