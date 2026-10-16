@@ -71,6 +71,35 @@ func (h *JymHandler) CreateExercise(c *gin.Context) {
 	c.JSON(http.StatusCreated, ex)
 }
 
+func (h *JymHandler) ListCatalogue(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	list, err := h.jymService.ListCatalogue(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to load the catalogue"}})
+		return
+	}
+	c.JSON(http.StatusOK, list)
+}
+
+func (h *JymHandler) AddFromCatalogue(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+	var req models.AddFromCatalogueRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "VALIDATION_ERROR", Message: err.Error()}})
+		return
+	}
+	res, err := h.jymService.AddFromCatalogue(c.Request.Context(), userID, req.Keys)
+	if err != nil {
+		if errors.Is(err, services.ErrUnknownCatalogueKey) {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse{Error: models.ErrorDetail{Code: "UNKNOWN_EXERCISE", Message: err.Error()}})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: models.ErrorDetail{Code: "INTERNAL_ERROR", Message: "Failed to add exercises"}})
+		return
+	}
+	c.JSON(http.StatusOK, res)
+}
+
 func (h *JymHandler) ListExercises(c *gin.Context) {
 	userID := c.MustGet("user_id").(uuid.UUID)
 	exercises, err := h.jymService.ListExercises(c.Request.Context(), userID, c.Query("q"), c.Query("mg"))

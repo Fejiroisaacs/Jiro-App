@@ -145,6 +145,28 @@ type CreateExerciseRequest struct {
 	Kind *string `json:"kind" binding:"omitempty,oneof=weight_reps bodyweight duration distance"`
 }
 
+// CatalogueExercise is a built-in exercise (J20); InLibrary when the user has one of that name, ignoring case.
+type CatalogueExercise struct {
+	Key              string   `json:"key"`
+	Name             string   `json:"name"`
+	MuscleGroup      string   `json:"muscle_group"`
+	SecondaryMuscles []string `json:"secondary_muscles"`
+	Kind             string   `json:"kind"`
+	Equipment        string   `json:"equipment"`
+	InLibrary        bool     `json:"in_library"`
+}
+
+// AddFromCatalogueRequest names the catalogue exercises to copy into the library.
+type AddFromCatalogueRequest struct {
+	Keys []string `json:"keys" binding:"required,min=1,max=150"`
+}
+
+// AddFromCatalogueResult is what was added, and the names skipped because the library already had them.
+type AddFromCatalogueResult struct {
+	Added   []Exercise `json:"added"`
+	Skipped []string   `json:"skipped"`
+}
+
 type UpdateExerciseRequest struct {
 	Name        *string `json:"name"`
 	MuscleGroup *string `json:"muscle_group"`
